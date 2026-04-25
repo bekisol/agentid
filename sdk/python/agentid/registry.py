@@ -48,12 +48,14 @@ class Registry:
         key_file = self._key_path(did)
         return key_file.read_bytes() if key_file.exists() else None
 
-    def search(self, capability: str = None, owner: str = None) -> list[dict]:
+    def search(self, capability: str = None, owner: str = None, name: str = None) -> list[dict]:
         results = []
         for doc in self._read().values():
             if capability and capability not in doc.get("capabilities", []):
                 continue
             if owner and doc.get("owner") != owner:
+                continue
+            if name and name.lower() not in doc.get("name", "").lower():
                 continue
             results.append(doc)
         return results

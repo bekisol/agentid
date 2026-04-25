@@ -107,11 +107,12 @@ class Agent:
     def find(
         capability: str = None,
         owner: str = None,
+        name: str = None,
         registry_path: str = None,
         registry_url: str = None,
     ) -> list["AgentDocument"]:
         results = _registry(registry_path, registry_url).search(
-            capability=capability, owner=owner
+            capability=capability, owner=owner, name=name
         )
         return [AgentDocument(**d) for d in results]
 

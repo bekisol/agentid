@@ -110,8 +110,9 @@ def resolve_agent(did: str):
 def discover_agents(
     capability: Optional[str] = Query(None),
     owner: Optional[str] = Query(None),
+    name: Optional[str] = Query(None),
 ):
-    results = REGISTRY.search(capability=capability, owner=owner)
+    results = REGISTRY.search(capability=capability, owner=owner, name=name)
     return [AgentResponse(**d) for d in results]
 
 

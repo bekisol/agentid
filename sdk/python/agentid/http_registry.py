@@ -55,12 +55,14 @@ class HTTPRegistry:
         response.raise_for_status()
         return response.json()
 
-    def search(self, capability: str = None, owner: str = None) -> list[dict]:
+    def search(self, capability: str = None, owner: str = None, name: str = None) -> list[dict]:
         params = {}
         if capability:
             params["capability"] = capability
         if owner:
             params["owner"] = owner
+        if name:
+            params["name"] = name
         response = httpx.get(f"{self.base_url}/agents", params=params, timeout=10)
         response.raise_for_status()
         return response.json()
