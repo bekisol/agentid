@@ -40,7 +40,7 @@ class RegisterRequest(BaseModel):
     capabilities: list[str]
     owner: str
     public_key: str
-    created_at: float
+    created_at: str
     metadata: dict = {}
 
 
@@ -55,7 +55,7 @@ class AgentResponse(BaseModel):
     capabilities: list[str]
     owner: str
     public_key: str
-    created_at: float
+    created_at: str
     metadata: dict
 
 

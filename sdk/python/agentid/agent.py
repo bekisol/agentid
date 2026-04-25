@@ -1,5 +1,6 @@
 import time
 import uuid
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 
 from .crypto import sign as crypto_sign, verify as crypto_verify
@@ -18,7 +19,7 @@ class AgentDocument:
     capabilities: list[str]
     owner: str
     public_key: str          # base64-encoded ed25519 public key
-    created_at: float
+    created_at: str
     metadata: dict = field(default_factory=dict)
 
 
@@ -69,7 +70,7 @@ class Agent:
             capabilities=capabilities,
             owner=owner,
             public_key=public_key_to_b64(public_bytes),
-            created_at=time.time(),
+            created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             metadata=metadata or {},
         )
 
