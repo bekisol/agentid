@@ -40,14 +40,28 @@ AgentID fixes all three with a single open protocol.
 
 ## Installation
 
+> **macOS users:** use `pip3` instead of `pip` if `pip` is not found.
+
 ```bash
-pip install agentid-protocol
+pip3 install agentid-protocol
 ```
 
 For the LangChain integration:
 
 ```bash
-pip install agentid-protocol langchain-agentid
+pip3 install agentid-protocol langchain-agentid
+```
+
+For AutoGen:
+
+```bash
+pip3 install agentid-protocol autogen-agentid
+```
+
+For CrewAI:
+
+```bash
+pip3 install agentid-protocol crewai-agentid
 ```
 
 ---
@@ -116,10 +130,10 @@ agent = Agent.create(
     name="my-agent",
     capabilities=["search"],
     owner="you@company.com",
-    registry_url="http://your-registry.com",
+    registry_url="https://your-registry.com",
 )
 
-agents = Agent.find(capability="search", registry_url="http://your-registry.com")
+agents = Agent.find(capability="search", registry_url="https://your-registry.com")
 ```
 
 ### Load an existing agent
@@ -171,12 +185,43 @@ result = executor.invoke({"input": "Research the latest AI papers"})
 verify_langchain_output(result)  # → True
 ```
 
-### What agents can do with AgentID tools
+---
 
+## AutoGen integration
+
+```python
+from autogen_agentid import create_agentid_agent
+
+agent = create_agentid_agent(
+    name="research-bot",
+    capabilities=["research", "summarization"],
+    owner="team@company.com",
+    system_message="You are a research assistant.",
+)
+print(agent.agentid_did)  # did:agentid:...
 ```
-agentid_find("web-search")     → lists all registered agents with web-search capability
-agentid_verify(<signed_msg>)   → verifies a message came from the agent it claims
-agentid_sign(<payload>)        → signs output for downstream verification
+
+Every message sent by this agent is automatically signed. Recipients can verify using the DID.
+
+---
+
+## CrewAI integration
+
+```python
+from crewai_agentid import create_agentid_crew_agent, AgentIDObserver
+
+agent = create_agentid_crew_agent(
+    role="Senior Researcher",
+    goal="Research AI topics",
+    backstory="Expert researcher with 10 years experience",
+    capabilities=["research", "summarization"],
+    owner="team@company.com",
+)
+print(agent.agentid_did)  # did:agentid:...
+
+# Sign task outputs
+observer = AgentIDObserver(signing_agent=agent)
+signed_result = observer.sign_task_result("Summary: AI is advancing rapidly.")
 ```
 
 ---
@@ -187,7 +232,7 @@ Run a shared registry so agents across machines can find each other:
 
 ```bash
 cd registry
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
@@ -228,15 +273,16 @@ sdk/python/agentid/
   integrations/
     langchain.py        LangChain callback handler + tools
 
+integrations/
+  langchain-agentid/    Standalone LangChain package
+  autogen-agentid/      Standalone AutoGen package
+  crewai-agentid/       Standalone CrewAI package
+
 registry/
   server.py             FastAPI registry server
 
 spec/
   protocol.md           Open protocol specification
-
-examples/
-  quickstart.py         Basic usage
-  langchain_example.py  LangChain integration demo
 ```
 
 ---
@@ -246,9 +292,9 @@ examples/
 - [x] Ed25519 identity + DIDs
 - [x] Local and remote registry
 - [x] LangChain integration
+- [x] AutoGen integration
+- [x] CrewAI integration
 - [ ] TypeScript SDK
-- [ ] AutoGen integration
-- [ ] CrewAI integration
 - [ ] Interaction receipts + reputation layer
 - [ ] Hosted public registry
 
@@ -261,9 +307,9 @@ AgentID is an open protocol. The more frameworks adopt it as the default identit
 PRs welcome — especially framework integrations and SDK ports.
 
 ```bash
-git clone https://github.com/agentid/agentid
+git clone https://github.com/bekisol/agentid
 cd agentid/sdk/python
-pip install -e ".[dev]"
+pip3 install -e ".[dev]"
 pytest
 ```
 
