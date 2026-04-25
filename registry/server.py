@@ -5,21 +5,22 @@ A lightweight FastAPI server that acts as a public registry for agent documents.
 Run with: uvicorn server:app --reload
 """
 
+import json
+import os
 import time
 from pathlib import Path
 from typing import Optional
 
+import psycopg2
+import psycopg2.extras
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 import sys
-# Support both local dev (sdk/python) and Railway (agentid-protocol installed)
 _sdk_path = Path(__file__).parent.parent / "sdk" / "python"
 if _sdk_path.exists():
     sys.path.insert(0, str(_sdk_path))
 
-from agentid.agent import AgentDocument
-from agentid.registry import Registry
 from agentid.crypto import verify as crypto_verify
 from agentid.identity import b64_to_public_key_bytes
 
@@ -29,7 +30,35 @@ app = FastAPI(
     version="0.1.0",
 )
 
-REGISTRY = Registry(path=Path(__file__).parent / "data")
+
+# ── database ──────────────────────────────────────────────────────────────────
+
+def get_conn():
+    return psycopg2.connect(os.environ["DATABASE_URL"], sslmode="require")
+
+
+def init_db():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS agents (
+                    did         TEXT PRIMARY KEY,
+                    name        TEXT NOT NULL,
+                    capabilities JSONB NOT NULL,
+                    owner       TEXT NOT NULL,
+                    public_key  TEXT NOT NULL,
+                    created_at  TEXT NOT NULL,
+                    metadata    JSONB NOT NULL DEFAULT '{}'
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_agents_owner ON agents(owner)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_agents_name  ON agents(lower(name))")
+        conn.commit()
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
 
 
 # ── request / response models ─────────────────────────────────────────────────
@@ -59,6 +88,20 @@ class AgentResponse(BaseModel):
     metadata: dict
 
 
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+def row_to_dict(row) -> dict:
+    return {
+        "did":          row[0],
+        "name":         row[1],
+        "capabilities": row[2],
+        "owner":        row[3],
+        "public_key":   row[4],
+        "created_at":   row[5],
+        "metadata":     row[6],
+    }
+
+
 # ── routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -68,42 +111,38 @@ def health():
 
 @app.post("/agents", response_model=AgentResponse, status_code=201)
 def register_agent(req: RegisterRequest):
-    existing = REGISTRY.get(req.did)
-    if existing:
-        raise HTTPException(status_code=409, detail="Agent already registered")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT did FROM agents WHERE did = %s", (req.did,))
+            if cur.fetchone():
+                raise HTTPException(status_code=409, detail="Agent already registered")
 
-    document = AgentDocument(
-        did=req.did,
-        name=req.name,
-        capabilities=req.capabilities,
-        owner=req.owner,
-        public_key=req.public_key,
-        created_at=req.created_at,
-        metadata=req.metadata,
-    )
+            cur.execute("""
+                INSERT INTO agents (did, name, capabilities, owner, public_key, created_at, metadata)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                req.did,
+                req.name,
+                json.dumps(req.capabilities),
+                req.owner,
+                req.public_key,
+                req.created_at,
+                json.dumps(req.metadata),
+            ))
+        conn.commit()
 
-    # Registry server doesn't store private keys — public registry only
-    REGISTRY.db_path.parent.mkdir(parents=True, exist_ok=True)
-    import json
-    from dataclasses import asdict
-    db_path = REGISTRY.db_path
-    db = {}
-    if db_path.exists():
-        with open(db_path) as f:
-            db = json.load(f)
-    db[document.did] = asdict(document)
-    with open(db_path, "w") as f:
-        json.dump(db, f, indent=2)
-
-    return AgentResponse(**asdict(document))
+    return AgentResponse(**req.model_dump())
 
 
 @app.get("/agents/{did}", response_model=AgentResponse)
 def resolve_agent(did: str):
-    data = REGISTRY.get(did)
-    if not data:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT did, name, capabilities, owner, public_key, created_at, metadata FROM agents WHERE did = %s", (did,))
+            row = cur.fetchone()
+    if not row:
         raise HTTPException(status_code=404, detail="Agent not found")
-    return AgentResponse(**data)
+    return AgentResponse(**row_to_dict(row))
 
 
 @app.get("/agents", response_model=list[AgentResponse])
@@ -112,28 +151,50 @@ def discover_agents(
     owner: Optional[str] = Query(None),
     name: Optional[str] = Query(None),
 ):
-    results = REGISTRY.search(capability=capability, owner=owner, name=name)
-    return [AgentResponse(**d) for d in results]
+    query = "SELECT did, name, capabilities, owner, public_key, created_at, metadata FROM agents WHERE 1=1"
+    params = []
+
+    if owner:
+        query += " AND owner = %s"
+        params.append(owner)
+    if name:
+        query += " AND lower(name) LIKE %s"
+        params.append(f"%{name.lower()}%")
+    if capability:
+        query += " AND capabilities @> %s"
+        params.append(json.dumps([capability]))
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+
+    return [AgentResponse(**row_to_dict(r)) for r in rows]
 
 
 @app.post("/agents/{did}/verify")
 def verify_signature(did: str, req: VerifyRequest):
-    data = REGISTRY.get(did)
-    if not data:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT public_key FROM agents WHERE did = %s", (did,))
+            row = cur.fetchone()
+    if not row:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    from agentid.identity import b64_to_public_key_bytes
-    public_key_bytes = b64_to_public_key_bytes(data["public_key"])
+    public_key_bytes = b64_to_public_key_bytes(row[0])
     valid = crypto_verify(public_key_bytes, req.payload, req.signature)
-
     return {"valid": valid, "did": did}
 
 
 @app.delete("/agents/{did}", status_code=204)
 def deregister_agent(did: str, owner: str = Query(...)):
-    data = REGISTRY.get(did)
-    if not data:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    if data.get("owner") != owner:
-        raise HTTPException(status_code=403, detail="Only the owner can deregister")
-    REGISTRY.deregister(did)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT owner FROM agents WHERE did = %s", (did,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Agent not found")
+            if row[0] != owner:
+                raise HTTPException(status_code=403, detail="Only the owner can deregister")
+            cur.execute("DELETE FROM agents WHERE did = %s", (did,))
+        conn.commit()
