@@ -13,7 +13,10 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "sdk" / "python"))
+# Support both local dev (sdk/python) and Railway (agentid-protocol installed)
+_sdk_path = Path(__file__).parent.parent / "sdk" / "python"
+if _sdk_path.exists():
+    sys.path.insert(0, str(_sdk_path))
 
 from agentid.agent import AgentDocument
 from agentid.registry import Registry
