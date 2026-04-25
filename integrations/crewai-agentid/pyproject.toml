@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crewai-agentid"
+version = "0.1.0"
+description = "AgentID integration for CrewAI — identity and trust for crew agents"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["crewai", "agents", "identity", "ai", "multi-agent", "trust"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "agentid-protocol>=0.1.0",
+    "crewai>=0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.urls]
+Homepage = "https://github.com/bekisol/agentid"
+Repository = "https://github.com/bekisol/agentid"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["crewai_agentid*"]
