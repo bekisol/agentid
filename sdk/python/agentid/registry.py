@@ -24,8 +24,14 @@ class Registry:
             return json.load(f)
 
     def _write(self, db: dict):
-        with open(self.db_path, "w") as f:
-            json.dump(db, f, indent=2)
+        # Fix #13 — write atomically with restrictive permissions
+        tmp = self.db_path.parent / f".{self.db_path.name}.tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(fd, json.dumps(db, indent=2).encode())
+        finally:
+            os.close(fd)
+        tmp.replace(self.db_path)
 
     def _key_path(self, did: str) -> Path:
         return self.keys_dir / (did.replace(":", "_") + ".key")
@@ -37,9 +43,13 @@ class Registry:
         db[document.did] = asdict(document)
         self._write(db)
 
+        # Fix #6 — create key file with restrictive permissions atomically
         key_file = self._key_path(document.did)
-        key_file.write_bytes(private_key_bytes)
-        os.chmod(key_file, 0o600)
+        fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(fd, private_key_bytes)
+        finally:
+            os.close(fd)
 
     def get(self, did: str) -> Optional[dict]:
         return self._read().get(did)

@@ -89,6 +89,13 @@ class Agent:
         if data is None:
             raise KeyError(f"Agent not found: {did}")
         document = AgentDocument(**data)
+
+        # Fix #9 — verify DID is cryptographically bound to the stored public key
+        from .identity import b64_to_public_key_bytes, public_key_to_did
+        expected_did = public_key_to_did(b64_to_public_key_bytes(document.public_key))
+        if document.did != expected_did:
+            raise ValueError(f"Registry corruption: DID {did} doesn't match stored public key")
+
         private_key_bytes = reg.load_private_key(did)
         return cls(document, private_key_bytes)
 
@@ -133,7 +140,11 @@ class Agent:
             "signature": crypto_sign(self._private_key, signed_payload),
         }
 
-    def verify_message(self, signed_message: dict) -> bool:
+    def verify_message(self, signed_message: dict, max_age_seconds: int = 300) -> bool:
+        # Fix #8 — reject replayed signatures older than max_age_seconds
+        timestamp = signed_message.get("payload", {}).get("timestamp")
+        if timestamp and (time.time() - float(timestamp)) > max_age_seconds:
+            return False
         public_key_bytes = b64_to_public_key_bytes(self.document.public_key)
         return crypto_verify(
             public_key_bytes,
@@ -146,9 +157,14 @@ class Agent:
         signed_message: dict,
         registry_path: str = None,
         registry_url: str = None,
+        max_age_seconds: int = 300,
     ) -> bool:
         did = signed_message["payload"].get("signer")
         if not did:
+            return False
+        # Fix #8 — reject replayed signatures
+        timestamp = signed_message["payload"].get("timestamp")
+        if timestamp and (time.time() - float(timestamp)) > max_age_seconds:
             return False
         data = _registry(registry_path, registry_url).get(did)
         if not data:
