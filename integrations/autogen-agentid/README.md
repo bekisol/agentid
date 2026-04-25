@@ -125,15 +125,19 @@ Agent.verify_from_did(signed)  # → True
 
 ### Remote registry (production, shared across machines)
 
+Use the hosted public registry or run your own:
+
 ```python
+REGISTRY_URL = "https://agentid-production.up.railway.app"
+
 agent = Agent.create(
     name="my-agent",
     capabilities=["search"],
     owner="you@company.com",
-    registry_url="https://your-registry.com",
+    registry_url=REGISTRY_URL,
 )
 
-agents = Agent.find(capability="search", registry_url="https://your-registry.com")
+agents = Agent.find(capability="search", registry_url=REGISTRY_URL)
 ```
 
 ### Load an existing agent
@@ -228,7 +232,17 @@ signed_result = observer.sign_task_result("Summary: AI is advancing rapidly.")
 
 ## Registry server
 
-Run a shared registry so agents across machines can find each other:
+A public registry is hosted at **`https://agentid-production.up.railway.app`**.
+
+```bash
+# Check it's live
+curl https://agentid-production.up.railway.app/health
+
+# Resolve any DID
+curl https://agentid-production.up.railway.app/agents/<did>
+```
+
+Or run your own:
 
 ```bash
 cd registry
