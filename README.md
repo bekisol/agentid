@@ -12,13 +12,13 @@ agent = Agent.create(
     name="research-agent",
     capabilities=["web-search", "summarization"],
     owner="team@company.com",
-    registry_url="https://agentid-commercial-features-production.up.railway.app",
+    registry_url="https://api.agentid-protocol.com",
 )
 print(agent.did)
 # did:agentid:7sP3V2mNkQxRtYbLcDfHgJwAeUiMoZnXvBqKpTsWyE
 
 # Find agents by what they can do
-results = Agent.find(capability="web-search", registry_url="https://agentid-commercial-features-production.up.railway.app")
+results = Agent.find(capability="web-search", registry_url="https://api.agentid-protocol.com")
 
 # Sign and verify messages between agents
 signed = agent.sign({"task": "summarize this document"})
@@ -129,7 +129,7 @@ Agent.verify_from_did(signed)  # → True
 Use the hosted public registry or run your own:
 
 ```python
-REGISTRY_URL = "https://agentid-commercial-features-production.up.railway.app"
+REGISTRY_URL = "https://api.agentid-protocol.com"
 
 agent = Agent.create(
     name="my-agent",
@@ -233,17 +233,17 @@ signed_result = observer.sign_task_result("Summary: AI is advancing rapidly.")
 
 ## Registry server
 
-The hosted public registry is at **`https://agentid-commercial-features-production.up.railway.app`**.
+The hosted public registry is at **`https://api.agentid-protocol.com`**.
 
 ```bash
 # Check it's live
-curl https://agentid-commercial-features-production.up.railway.app/health
+curl https://api.agentid-protocol.com/health
 
 # Resolve any DID
-curl https://agentid-commercial-features-production.up.railway.app/agents/<did>
+curl https://api.agentid-protocol.com/agents/<did>
 
 # Search by capability (paginated)
-curl "https://agentid-commercial-features-production.up.railway.app/agents?capability=research&limit=50&offset=0"
+curl "https://api.agentid-protocol.com/agents?capability=research&limit=50&offset=0"
 ```
 
 Or run your own:

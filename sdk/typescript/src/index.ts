@@ -10,7 +10,7 @@
  *     name: 'my-agent',
  *     capabilities: ['web-search', 'summarization'],
  *     owner: 'team@company.com',
- *     registryUrl: 'https://agentid-commercial-features-production.up.railway.app',
+ *     registryUrl: 'https://api.agentid-protocol.com',
  *   })
  *
  *   console.log(agent.did)

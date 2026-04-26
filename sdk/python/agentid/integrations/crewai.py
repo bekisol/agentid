@@ -14,8 +14,8 @@ Usage:
 
     # 1. Add discovery tools to your crew
     tools = [
-        AgentIDFindTool(registry_url="https://agentid-commercial-features-production.up.railway.app"),
-        AgentIDVerifyTool(registry_url="https://agentid-commercial-features-production.up.railway.app"),
+        AgentIDFindTool(registry_url="https://api.agentid-protocol.com"),
+        AgentIDVerifyTool(registry_url="https://api.agentid-protocol.com"),
     ]
 
     researcher = Agent(
@@ -29,7 +29,7 @@ Usage:
         name="research-agent",
         capabilities=["web-search", "summarization"],
         owner="team@company.com",
-        registry_url="https://agentid-commercial-features-production.up.railway.app",
+        registry_url="https://api.agentid-protocol.com",
     )
     print(f"Agent DID: {identity.did}")
 

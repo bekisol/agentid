@@ -8,7 +8,7 @@ Works with both AutoGen v0.2.x (pyautogen) and v0.4+ (autogen-agentchat).
     from agentid.integrations.autogen import AgentIDTools
 
     agentid = AgentIDTools(
-        registry_url="https://agentid-commercial-features-production.up.railway.app"
+        registry_url="https://api.agentid-protocol.com"
     )
 
     # Register tools on your agents
@@ -23,7 +23,7 @@ Works with both AutoGen v0.2.x (pyautogen) and v0.4+ (autogen-agentchat).
     from agentid.integrations.autogen import AgentIDTools
 
     agentid = AgentIDTools(
-        registry_url="https://agentid-commercial-features-production.up.railway.app"
+        registry_url="https://api.agentid-protocol.com"
     )
 
     # Get tools as FunctionTool objects
@@ -43,7 +43,7 @@ Works with both AutoGen v0.2.x (pyautogen) and v0.4+ (autogen-agentchat).
         name="my-autogen-agent",
         capabilities=["data-analysis", "code-execution"],
         owner="team@company.com",
-        registry_url="https://agentid-commercial-features-production.up.railway.app",
+        registry_url="https://api.agentid-protocol.com",
     )
     print(f"Agent DID: {identity.did}")
 
@@ -320,7 +320,7 @@ def create_agentid_agent(
             name="data-analyst",
             capabilities=["data-analysis", "code-execution"],
             owner="team@company.com",
-            registry_url="https://agentid-commercial-features-production.up.railway.app",
+            registry_url="https://api.agentid-protocol.com",
         )
         tools = AgentIDTools(registry_url="...", agent=identity)
     """
