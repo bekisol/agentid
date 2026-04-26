@@ -1,0 +1,42 @@
+{
+  "name": "agentid-protocol",
+  "version": "0.1.4",
+  "description": "Identity, discovery, and trust for AI agents — TypeScript SDK",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["agents", "identity", "ai", "did", "trust", "multi-agent", "ed25519"],
+  "author": "Vikhulus",
+  "license": "MIT",
+  "homepage": "https://github.com/bekisol/agentid",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bekisol/agentid.git",
+    "directory": "sdk/typescript"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.4.0",
+    "bs58": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "jest": "^29.0.0",
+    "@jest/globals": "^29.0.0",
+    "ts-jest": "^29.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
