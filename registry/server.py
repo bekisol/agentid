@@ -119,7 +119,7 @@ class RegisterRequest(BaseModel):
     public_key: str
     created_at: str
     metadata: dict = {}
-    proof: Optional[str] = None  # Ed25519 signature of the document — proves key ownership
+    proof: str  # CRIT-4: mandatory — Ed25519 signature proves key ownership
 
     @field_validator("name")
     @classmethod
@@ -199,12 +199,11 @@ def register_agent(req: RegisterRequest, request: Request):
         _audit("register", req.did, ip, "did_mismatch")
         raise HTTPException(status_code=400, detail="DID does not match public key")
 
-    # Fix #2 — verify proof of key possession (signature over the document)
-    if req.proof:
-        payload_to_verify = req.model_dump(exclude={"proof"})
-        if not crypto_verify(pub_key_bytes, payload_to_verify, req.proof):
-            _audit("register", req.did, ip, "invalid_proof")
-            raise HTTPException(status_code=401, detail="Invalid proof of ownership")
+    # CRIT-4: always verify proof — it is mandatory
+    payload_to_verify = req.model_dump(exclude={"proof"})
+    if not crypto_verify(pub_key_bytes, payload_to_verify, req.proof):
+        _audit("register", req.did, ip, "invalid_proof")
+        raise HTTPException(status_code=401, detail="Invalid proof of ownership")
 
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -253,6 +252,8 @@ def discover_agents(
     capability: Optional[str] = Query(None, max_length=128),
     owner: Optional[str] = Query(None, max_length=256),
     name: Optional[str] = Query(None, max_length=256),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ):
     query = "SELECT did, name, capabilities, owner, public_key, created_at, metadata FROM agents WHERE 1=1"
     params = []
@@ -266,6 +267,9 @@ def discover_agents(
     if capability:
         query += " AND capabilities @> %s"
         params.append(json.dumps([capability]))
+
+    query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
+    params.extend([limit, offset])
 
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -285,14 +289,18 @@ def verify_signature(did: str, req: VerifyRequest, request: Request):
     if not row:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    # Fix #8 — reject signatures older than 5 minutes
     timestamp = req.payload.get("timestamp")
-    if timestamp and (time.time() - float(timestamp)) > 300:
-        return {"valid": False, "did": did, "reason": "signature expired"}
+    if timestamp:
+        try:
+            if time.time() - float(timestamp) > 300:
+                return {"valid": False, "did": did, "reason": "signature expired"}
+        except (TypeError, ValueError):
+            return {"valid": False, "did": did, "reason": "invalid timestamp"}
 
     public_key_bytes = b64_to_public_key_bytes(row[0])
     valid = crypto_verify(public_key_bytes, req.payload, req.signature)
-    return {"valid": valid, "did": did}
+    # LOW-5: always include reason field
+    return {"valid": valid, "did": did, "reason": None if valid else "invalid signature"}
 
 
 @app.delete("/agents/{did}", status_code=204)
