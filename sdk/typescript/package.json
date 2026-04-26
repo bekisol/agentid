@@ -17,9 +17,9 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": ["agents", "identity", "ai", "did", "trust", "multi-agent", "ed25519"],
-  "author": "Vikhulus",
+  "author": "Vikhulus <hello@agentid.dev>",
   "license": "MIT",
-  "homepage": "https://github.com/bekisol/agentid",
+  "homepage": "https://agentid.dev",
   "repository": {
     "type": "git",
     "url": "https://github.com/bekisol/agentid.git",

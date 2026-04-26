@@ -280,9 +280,9 @@ The hosted registry includes commercial features for teams:
 | Analytics dashboard | — | ✓ | ✓ |
 | Verified identity badges | — | — | ✓ |
 
-**Dashboard:** [bekisol.github.io/agentid/dashboard.html](https://bekisol.github.io/agentid/dashboard.html)
+**Dashboard:** [agentid.dev/dashboard](https://agentid.dev/dashboard)
 
-Contact [agentid@bekisol.com](mailto:agentid@bekisol.com) for a Pro or Enterprise API key.
+Contact [hello@agentid.dev](mailto:hello@agentid.dev) for a Pro or Enterprise API key.
 
 ---
 

@@ -8,6 +8,7 @@ version = "0.1.4"
 description = "Identity, discovery, and trust for AI agents"
 readme = "README.md"
 license = { text = "MIT" }
+authors = [{ name = "Vikhulus", email = "hello@agentid.dev" }]
 requires-python = ">=3.11"
 keywords = ["agents", "identity", "ai", "multi-agent", "did", "trust"]
 classifiers = [
@@ -33,7 +34,7 @@ autogen = ["autogen-agentchat>=0.4"]
 all = ["langchain-core>=0.2", "crewai>=0.28", "autogen-agentchat>=0.4"]
 
 [project.urls]
-Homepage = "https://github.com/bekisol/agentid"
+Homepage = "https://agentid.dev"
 Repository = "https://github.com/bekisol/agentid"
 
 [tool.setuptools.packages.find]
