@@ -427,7 +427,11 @@
       border-radius: 4px;
       cursor: pointer;
       transition: all 0.1s;
+      background: transparent;
+      border: none;
+      outline: none;
     }
+    .code-tab:hover { color: #A8A29E; }
     .code-tab.active { background: #292524; color: #E7E5E4; }
 
     pre {
@@ -889,10 +893,10 @@ Agent.<span class="fn">verify_from_did</span>(signed)  <span class="cm"># → Tr
             <div class="did-dot red"></div>
             <div class="did-dot yellow"></div>
             <div class="did-dot green"></div>
-            <span class="code-tab active" style="margin-left:0.5rem;">Python</span>
-            <span class="code-tab">TypeScript</span>
+            <button class="code-tab active" id="tab-py" onclick="switchTab('py')" style="margin-left:0.5rem;">Python</button>
+            <button class="code-tab" id="tab-ts" onclick="switchTab('ts')">TypeScript</button>
           </div>
-<pre><span class="kw">from</span> <span class="hl">agentid</span> <span class="kw">import</span> Agent
+<pre id="code-py"><span class="kw">from</span> <span class="hl">agentid</span> <span class="kw">import</span> Agent
 
 <span class="cm"># Create — generates keypair, registers</span>
 agent = Agent.<span class="fn">create</span>(
@@ -917,7 +921,40 @@ valid = <span class="kw">await</span> Agent.<span class="fn">verify_from_did</sp
     registry_url=<span class="st">"https://api.agentid-protocol.com"</span>,
 )
 <span class="fn">print</span>(valid)  <span class="cm"># True</span></pre>
+<pre id="code-ts" style="display:none"><span class="kw">import</span> { <span class="hl">Agent</span> } <span class="kw">from</span> <span class="st">"@vikhulus/agentid-protocol"</span>;
+
+<span class="cm">// Create — generates keypair, registers</span>
+<span class="kw">const</span> agent = <span class="kw">await</span> Agent.<span class="fn">create</span>({
+  name: <span class="st">"analyst-v2"</span>,
+  capabilities: [<span class="st">"analysis"</span>, <span class="st">"reporting"</span>],
+  owner: <span class="st">"team@company.com"</span>,
+  registryUrl: <span class="st">"https://api.agentid-protocol.com"</span>,
+});
+
+<span class="cm">// Discover agents by capability</span>
+<span class="kw">const</span> agents = <span class="kw">await</span> Agent.<span class="fn">find</span>({
+  capability: <span class="st">"analysis"</span>,
+  registryUrl: <span class="st">"https://api.agentid-protocol.com"</span>,
+});
+
+<span class="cm">// Sign a message</span>
+<span class="kw">const</span> signed = agent.<span class="fn">sign</span>({ output: <span class="st">"Q3 revenue up 18%"</span> });
+
+<span class="cm">// Verify from anywhere — no shared secret</span>
+<span class="kw">const</span> valid = <span class="kw">await</span> Agent.<span class="fn">verifyFromDid</span>(
+  signed,
+  <span class="st">"https://api.agentid-protocol.com"</span>,
+);
+console.<span class="fn">log</span>(valid); <span class="cm">// true</span></pre>
         </div>
+        <script>
+          function switchTab(lang) {
+            document.getElementById("code-py").style.display = lang === "py" ? "block" : "none";
+            document.getElementById("code-ts").style.display = lang === "ts" ? "block" : "none";
+            document.getElementById("tab-py").classList.toggle("active", lang === "py");
+            document.getElementById("tab-ts").classList.toggle("active", lang === "ts");
+          }
+        </script>
       </div>
     </div>
   </div>
@@ -936,7 +973,7 @@ valid = <span class="kw">await</span> Agent.<span class="fn">verify_from_did</sp
         <div class="int-body">
           <h3>LangChain</h3>
           <p>Callback handler, identity tools, and automatic signing for LangChain agents and chains.</p>
-          <span class="install-pill">pip install agentid-protocol[langchain]</span>
+          <span class="install-pill">pip install agentid-protocol</span>
         </div>
       </div>
       <div class="integration-card">
@@ -944,7 +981,7 @@ valid = <span class="kw">await</span> Agent.<span class="fn">verify_from_did</sp
         <div class="int-body">
           <h3>AutoGen</h3>
           <p>ConversableAgent mixin with built-in discovery and verification for multi-agent conversations.</p>
-          <span class="install-pill">pip install agentid-protocol[autogen]</span>
+          <span class="install-pill">pip install agentid-protocol</span>
         </div>
       </div>
       <div class="integration-card">
@@ -952,7 +989,7 @@ valid = <span class="kw">await</span> Agent.<span class="fn">verify_from_did</sp
         <div class="int-body">
           <h3>CrewAI</h3>
           <p>Agent wrapper with AgentID tools for crew-to-crew trust and capability-based discovery.</p>
-          <span class="install-pill">pip install agentid-protocol[crewai]</span>
+          <span class="install-pill">pip install agentid-protocol</span>
         </div>
       </div>
       <div class="integration-card">
