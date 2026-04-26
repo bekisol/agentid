@@ -12,12 +12,13 @@ agent = Agent.create(
     name="research-agent",
     capabilities=["web-search", "summarization"],
     owner="team@company.com",
+    registry_url="https://agentid-commercial-features-production.up.railway.app",
 )
 print(agent.did)
 # did:agentid:7sP3V2mNkQxRtYbLcDfHgJwAeUiMoZnXvBqKpTsWyE
 
 # Find agents by what they can do
-results = Agent.find(capability="web-search")
+results = Agent.find(capability="web-search", registry_url="https://agentid-commercial-features-production.up.railway.app")
 
 # Sign and verify messages between agents
 signed = agent.sign({"task": "summarize this document"})
@@ -88,7 +89,7 @@ capabilities=["web-search", "code-review", "translation"]
 
 ### Registry
 
-A registry stores agent documents and makes them discoverable. Run your own or use a shared hosted registry.
+A registry stores agent documents and makes them discoverable. Use the hosted registry or run your own.
 
 ### Signed messages
 
@@ -128,7 +129,7 @@ Agent.verify_from_did(signed)  # → True
 Use the hosted public registry or run your own:
 
 ```python
-REGISTRY_URL = "https://agentid-production.up.railway.app"
+REGISTRY_URL = "https://agentid-commercial-features-production.up.railway.app"
 
 agent = Agent.create(
     name="my-agent",
@@ -232,14 +233,17 @@ signed_result = observer.sign_task_result("Summary: AI is advancing rapidly.")
 
 ## Registry server
 
-A public registry is hosted at **`https://agentid-production.up.railway.app`**.
+The hosted public registry is at **`https://agentid-commercial-features-production.up.railway.app`**.
 
 ```bash
 # Check it's live
-curl https://agentid-production.up.railway.app/health
+curl https://agentid-commercial-features-production.up.railway.app/health
 
 # Resolve any DID
-curl https://agentid-production.up.railway.app/agents/<did>
+curl https://agentid-commercial-features-production.up.railway.app/agents/<did>
+
+# Search by capability (paginated)
+curl "https://agentid-commercial-features-production.up.railway.app/agents?capability=research&limit=50&offset=0"
 ```
 
 Or run your own:
@@ -247,19 +251,38 @@ Or run your own:
 ```bash
 cd registry
 pip3 install -r requirements.txt
-uvicorn server:app --host 0.0.0.0 --port 8000
+DATABASE_URL=postgresql://... uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
 REST API:
 
 ```
-POST   /agents              Register an agent
-GET    /agents/{did}        Resolve a DID
-GET    /agents?capability=  Discover agents by capability
-POST   /agents/{did}/verify Verify a signature
-DELETE /agents/{did}        Deregister
-GET    /health              Health check
+POST   /agents                         Register an agent (proof required)
+GET    /agents/{did}                   Resolve a DID
+GET    /agents?capability=&limit=&offset=  Discover agents (paginated, max 500)
+POST   /agents/{did}/verify            Verify a signature → {valid, did, reason}
+DELETE /agents/{did}                   Deregister (signed proof required)
+GET    /health                         Health check
 ```
+
+> **Note:** Registration requires a cryptographic `proof` field — an Ed25519 signature proving you own the private key for the DID. The SDK handles this automatically.
+
+---
+
+## Pro features
+
+The hosted registry includes commercial features for teams:
+
+| Feature | Free | Pro | Enterprise |
+|---|---|---|---|
+| Agents | 100 | 10,000 | Unlimited |
+| Audit log exports (CSV/JSON) | — | ✓ | ✓ |
+| Analytics dashboard | — | ✓ | ✓ |
+| Verified identity badges | — | — | ✓ |
+
+**Dashboard:** [bekisol.github.io/agentid/dashboard.html](https://bekisol.github.io/agentid/dashboard.html)
+
+Contact [agentid@bekisol.com](mailto:agentid@bekisol.com) for a Pro or Enterprise API key.
 
 ---
 
@@ -270,6 +293,7 @@ AgentID uses:
 - **Ed25519** — fast, small, battle-tested signatures
 - **W3C DID format** — `did:agentid:<base58-public-key>`
 - **JSON canonical form** — deterministic serialization for signing
+- **Mandatory proof-of-ownership** — registration requires signing the document with the private key
 
 [Full protocol spec →](spec/protocol.md)
 
@@ -308,9 +332,13 @@ spec/
 - [x] LangChain integration
 - [x] AutoGen integration
 - [x] CrewAI integration
+- [x] Hosted public registry
+- [x] Pro: audit log exports (CSV/JSON)
+- [x] Pro: analytics dashboard
+- [x] Enterprise: verified identity badges
 - [ ] TypeScript SDK
+- [ ] Stripe self-serve signup
 - [ ] Interaction receipts + reputation layer
-- [ ] Hosted public registry
 
 ---
 
