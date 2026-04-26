@@ -106,13 +106,20 @@ class AgentIDFindTool(_BASE):
     registry_path: Optional[str] = None
 
     def _run(self, capability: str) -> str:
-        agents = Agent.find(
-            capability=capability,
-            registry_url=self.registry_url,
-            registry_path=self.registry_path,
-        )
+        # Sanitise before use — strip control characters that could cause log injection
+        capability = capability.strip()[:128]
+        try:
+            agents = Agent.find(
+                capability=capability,
+                registry_url=self.registry_url,
+                registry_path=self.registry_path,
+            )
+        except Exception as e:
+            logger.error(f"[AgentID] AgentIDFindTool error: {type(e).__name__}")
+            return json.dumps({"error": "Registry lookup failed. The registry may be unavailable."})
+
         if not agents:
-            return f"No agents found with capability '{capability}'."
+            return json.dumps({"found": [], "message": "No agents found with that capability."})
 
         return json.dumps(
             [
@@ -143,20 +150,32 @@ class AgentIDVerifyTool(_BASE):
     registry_path: Optional[str] = None
 
     def _run(self, signed_message: str) -> str:
+        # Bound size before parsing to prevent memory exhaustion
+        if len(signed_message) > 65_536:
+            return json.dumps({"valid": False, "error": "signed_message too large (max 64KB)"})
+
         try:
             msg = json.loads(signed_message)
         except json.JSONDecodeError:
-            return "Invalid input: signed_message must be valid JSON."
+            return json.dumps({"valid": False, "error": "signed_message must be valid JSON"})
 
         if "payload" not in msg or "signature" not in msg:
-            return "Invalid input: message must have 'payload' and 'signature' keys."
+            return json.dumps({"valid": False, "error": "message must have 'payload' and 'signature' keys"})
+
+        # Ensure payload is a dict before calling .get()
+        if not isinstance(msg["payload"], dict):
+            return json.dumps({"valid": False, "error": "payload must be a JSON object"})
 
         signer_did = msg["payload"].get("signer", "unknown")
-        valid = Agent.verify_from_did(
-            msg,
-            registry_url=self.registry_url,
-            registry_path=self.registry_path,
-        )
+        try:
+            valid = Agent.verify_from_did(
+                msg,
+                registry_url=self.registry_url,
+                registry_path=self.registry_path,
+            )
+        except Exception as e:
+            logger.error(f"[AgentID] AgentIDVerifyTool error: {type(e).__name__}")
+            return json.dumps({"valid": False, "error": "Registry lookup failed. The registry may be unavailable."})
 
         return json.dumps({
             "valid": valid,

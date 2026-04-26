@@ -68,13 +68,20 @@ def _make_find_fn(registry_url: Optional[str], registry_path: Optional[str]) -> 
         Find AI agents registered in the AgentID network by capability.
         Returns a JSON list of matching agents with their DIDs and capabilities.
         """
-        agents = Agent.find(
-            capability=capability,
-            registry_url=registry_url,
-            registry_path=registry_path,
-        )
+        # Sanitise before use
+        capability = capability.strip()[:128]
+        try:
+            agents = Agent.find(
+                capability=capability,
+                registry_url=registry_url,
+                registry_path=registry_path,
+            )
+        except Exception as e:
+            logger.error(f"[AgentID] agentid_find error: {type(e).__name__}")
+            return json.dumps({"error": "Registry lookup failed. The registry may be unavailable."})
+
         if not agents:
-            return json.dumps({"found": [], "message": f"No agents found with capability '{capability}'."})
+            return json.dumps({"found": [], "message": "No agents found with that capability."})
 
         return json.dumps(
             {
@@ -107,6 +114,10 @@ def _make_verify_fn(registry_url: Optional[str], registry_path: Optional[str]) -
         Input: JSON string with 'payload' and 'signature' keys.
         Returns: JSON object with 'valid' boolean, 'signer' DID, and a human-readable message.
         """
+        # Bound size before parsing to prevent memory exhaustion
+        if len(signed_message_json) > 65_536:
+            return json.dumps({"valid": False, "error": "signed_message too large (max 64KB)"})
+
         try:
             msg = json.loads(signed_message_json)
         except json.JSONDecodeError:
@@ -115,12 +126,20 @@ def _make_verify_fn(registry_url: Optional[str], registry_path: Optional[str]) -
         if "payload" not in msg or "signature" not in msg:
             return json.dumps({"valid": False, "error": "message must have 'payload' and 'signature' keys"})
 
+        # Ensure payload is a dict before calling .get()
+        if not isinstance(msg["payload"], dict):
+            return json.dumps({"valid": False, "error": "payload must be a JSON object"})
+
         signer_did = msg["payload"].get("signer", "unknown")
-        valid = Agent.verify_from_did(
-            msg,
-            registry_url=registry_url,
-            registry_path=registry_path,
-        )
+        try:
+            valid = Agent.verify_from_did(
+                msg,
+                registry_url=registry_url,
+                registry_path=registry_path,
+            )
+        except Exception as e:
+            logger.error(f"[AgentID] agentid_verify error: {type(e).__name__}")
+            return json.dumps({"valid": False, "error": "Registry lookup failed. The registry may be unavailable."})
 
         return json.dumps({
             "valid": valid,
