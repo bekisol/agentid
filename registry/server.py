@@ -65,6 +65,15 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_agents_owner ON agents(owner)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_agents_name  ON agents(lower(name))")
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS removed_agents (
+                    did        TEXT PRIMARY KEY,
+                    name       TEXT,
+                    owner      TEXT,
+                    removed_at TEXT NOT NULL,
+                    reason     TEXT NOT NULL
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS audit_log (
                     id         SERIAL PRIMARY KEY,
                     ts         TEXT NOT NULL,
@@ -241,6 +250,21 @@ def resolve_agent(did: str, request: Request):
             )
             row = cur.fetchone()
     if not row:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT reason, removed_at FROM removed_agents WHERE did = %s", (did,)
+                )
+                removed = cur.fetchone()
+        if removed:
+            raise HTTPException(
+                status_code=410,
+                detail={
+                    "message": "This agent was removed by the registry admin",
+                    "reason": removed[0],
+                    "removed_at": removed[1],
+                }
+            )
         raise HTTPException(status_code=404, detail="Agent not found")
     return AgentResponse(**row_to_dict(row))
 
