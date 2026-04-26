@@ -4,10 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AgentID — Dashboard</title>
+  <!-- SEC: frame-ancestors prevents clickjacking; connect-src locks fetch targets -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self' https://cdn.jsdelivr.net;
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src https://fonts.gstatic.com;
+             connect-src https://api.agentid-protocol.com;
+             img-src 'self' data:;
+             frame-ancestors 'none';" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- SEC: SRI hash locks Chart.js to exact version — CDN tampering will fail -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"
+          integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g"
+          crossorigin="anonymous"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -488,7 +500,7 @@
   <div class="nav-right">
     <a href="index.html" class="btn btn-ghost">Home</a>
     <a href="https://github.com/bekisol/agentid" target="_blank" class="btn btn-ghost">GitHub</a>
-    <button class="btn btn-outline" id="logout-btn" onclick="logout()" style="display:none;">Sign out</button>
+    <button class="btn btn-outline" id="logout-btn" style="display:none;">Sign out</button>
   </div>
 </nav>
 
@@ -504,8 +516,8 @@
     <div class="login-card">
       <label class="field-label" for="api-key-input">API Key</label>
       <div class="input-row">
-        <input type="password" id="api-key-input" placeholder="agentid_pro_..." onkeydown="if(event.key==='Enter')login()" autocomplete="off" />
-        <button class="btn btn-primary" onclick="login()" style="flex-shrink:0;">Connect</button>
+        <input type="password" id="api-key-input" placeholder="agentid_pro_..." autocomplete="off" spellcheck="false" />
+        <button class="btn btn-primary" id="login-btn" style="flex-shrink:0;">Connect</button>
       </div>
       <div class="error-msg" id="error-msg">Invalid API key — please check and try again.</div>
       <div class="login-footer-note">
@@ -594,8 +606,21 @@
 
 <script>
   const BASE = "https://api.agentid-protocol.com";
-  let apiKey = localStorage.getItem("agentid_key") || "";
+  // SEC: sessionStorage instead of localStorage — cleared when tab closes,
+  // not accessible cross-tab, reduces window for theft vs. persistent storage.
+  let apiKey = sessionStorage.getItem("agentid_key") || "";
   let trendChart, capChart;
+
+  // SEC: HTML escape function — all API-sourced strings pass through this
+  // before being inserted into the DOM via innerHTML.
+  function esc(str) {
+    return String(str ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;");
+  }
 
   const OP_CLASS = {
     register:   "op-register",
@@ -605,15 +630,18 @@
     update:     "op-update",
   };
 
-  function opClass(op) { return OP_CLASS[op] || ""; }
+  // SEC: allowlist — unknown operations get no CSS class, not a user-supplied one
+  function opClass(op) { return OP_CLASS[String(op)] || ""; }
 
   function shortDid(did) {
     if (!did) return "—";
-    return did.length > 26 ? did.slice(0, 14) + "…" + did.slice(-8) : did;
+    const s = String(did);
+    return s.length > 26 ? s.slice(0, 14) + "…" + s.slice(-8) : s;
   }
 
+  // SEC: allowlist tier values — never interpolate raw API tier into class names
   function tierClass(tier) {
-    return { enterprise: "tier-enterprise", pro: "tier-pro", free: "tier-free" }[tier] || "tier-free";
+    return { enterprise: "tier-enterprise", pro: "tier-pro", free: "tier-free" }[String(tier)] || "tier-free";
   }
 
   async function apiFetch(path) {
@@ -629,7 +657,7 @@
     err.style.display = "none";
     try {
       await loadDashboard();
-      localStorage.setItem("agentid_key", apiKey);
+      sessionStorage.setItem("agentid_key", apiKey);
     } catch {
       err.style.display = "block";
       apiKey = "";
@@ -637,7 +665,7 @@
   }
 
   function logout() {
-    localStorage.removeItem("agentid_key");
+    sessionStorage.removeItem("agentid_key");
     apiKey = "";
     document.getElementById("dashboard").style.display = "none";
     document.getElementById("login-screen").style.display = "flex";
@@ -654,10 +682,17 @@
     document.getElementById("dashboard").style.display = "block";
     document.getElementById("logout-btn").style.display = "flex";
 
+    // SEC: textContent for simple strings — no HTML parsing
     document.getElementById("dash-title").textContent = data.owner;
     document.getElementById("dash-sub").textContent = "Pro analytics dashboard";
-    document.getElementById("tier-badge-wrap").innerHTML =
-      `<span class="tier-badge ${tierClass(data.tier)}">${data.tier}</span>`;
+
+    // SEC: tier is allowlisted via tierClass(); esc() guards the display value
+    const tierEl = document.createElement("span");
+    tierEl.className = "tier-badge " + tierClass(data.tier);
+    tierEl.textContent = data.tier;
+    const tierWrap = document.getElementById("tier-badge-wrap");
+    tierWrap.textContent = "";
+    tierWrap.appendChild(tierEl);
 
     const totalActivity = (data.activity_last_7d || []).reduce((s, r) => s + r.count, 0);
     document.getElementById("stat-agents").textContent = data.usage.agents_registered;
@@ -667,12 +702,12 @@
 
     loadBadge(data.owner);
 
-    // Trend chart
+    // Trend chart — labels come from date strings (safe), data are numbers
     const trendLabels = (data.registration_trend_30d || []).map(r => {
       const d = new Date(r.date);
       return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     });
-    const trendData = (data.registration_trend_30d || []).map(r => r.count);
+    const trendData = (data.registration_trend_30d || []).map(r => Number(r.count) || 0);
 
     if (trendChart) trendChart.destroy();
     trendChart = new Chart(document.getElementById("trend-chart"), {
@@ -699,9 +734,9 @@
       }
     });
 
-    // Capabilities chart
-    const capLabels = (data.top_capabilities || []).map(c => c.capability);
-    const capData   = (data.top_capabilities || []).map(c => c.agent_count);
+    // Capabilities chart — labels from API but Chart.js renders as canvas, not HTML
+    const capLabels = (data.top_capabilities || []).map(c => String(c.capability));
+    const capData   = (data.top_capabilities || []).map(c => Number(c.agent_count) || 0);
     const capColors = [
       "rgba(194,65,12,0.7)", "rgba(5,150,105,0.7)", "rgba(37,99,235,0.7)",
       "rgba(217,119,6,0.7)", "rgba(124,58,237,0.7)", "rgba(219,39,119,0.7)",
@@ -731,7 +766,7 @@
       }
     });
 
-    // Activity
+    // Activity — SEC: esc() all API strings; opClass() allowlists CSS class
     const actEl = document.getElementById("activity-list");
     const activity = data.activity_last_7d || [];
     if (!activity.length) {
@@ -739,8 +774,8 @@
     } else {
       actEl.innerHTML = activity.map(r => `
         <div class="activity-row">
-          <span class="op-pill ${opClass(r.operation)}">${r.operation}</span>
-          <span class="activity-count">${r.count.toLocaleString()}</span>
+          <span class="op-pill ${opClass(r.operation)}">${esc(r.operation)}</span>
+          <span class="activity-count">${esc(Number(r.count).toLocaleString())}</span>
         </div>
       `).join("");
     }
@@ -754,12 +789,13 @@
       const section = document.getElementById("badge-section");
       if (res.ok) {
         const b = await res.json();
+        // SEC: esc() all API fields before innerHTML insertion
         section.innerHTML = `
           <div class="verified-banner">
             <div class="verified-icon">✅</div>
             <div class="verified-text">
-              <h3>${b.company_name} <span style="margin-left:0.5rem;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--yellow);background:var(--yellow-bg);border:1px solid #FDE68A;padding:0.15rem 0.5rem;border-radius:999px;">${b.badge_level}</span></h3>
-              <p>Verified owner · since ${b.verified_at.slice(0,10)}</p>
+              <h3>${esc(b.company_name)} <span style="margin-left:0.5rem;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--yellow);background:var(--yellow-bg);border:1px solid #FDE68A;padding:0.15rem 0.5rem;border-radius:999px;">${esc(b.badge_level)}</span></h3>
+              <p>Verified owner · since ${esc(String(b.verified_at).slice(0,10))}</p>
             </div>
           </div>`;
       } else {
@@ -777,22 +813,21 @@
         el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>No audit events yet</p></div>';
         return;
       }
+      // SEC: every cell uses esc(); status class is a ternary, not raw API data;
+      // opClass() allowlists CSS class names
       el.innerHTML = `
         <div style="overflow:auto;">
           <table class="audit-table">
             <thead><tr>
-              <th>Time</th>
-              <th>Operation</th>
-              <th>DID</th>
-              <th>Status</th>
+              <th>Time</th><th>Operation</th><th>DID</th><th>Status</th>
             </tr></thead>
             <tbody>
               ${logs.map(r => `
                 <tr>
-                  <td class="time-cell">${r.timestamp.slice(11,19)}</td>
-                  <td><span class="op-pill ${opClass(r.operation)}">${r.operation}</span></td>
-                  <td class="did-mono">${shortDid(r.did)}</td>
-                  <td class="${r.status === 'ok' ? 'status-ok' : 'status-invalid'}">${r.status}</td>
+                  <td class="time-cell">${esc(String(r.timestamp).slice(11,19))}</td>
+                  <td><span class="op-pill ${opClass(r.operation)}">${esc(r.operation)}</span></td>
+                  <td class="did-mono">${esc(shortDid(r.did))}</td>
+                  <td class="${r.status === "ok" ? "status-ok" : "status-invalid"}">${esc(r.status)}</td>
                 </tr>`).join("")}
             </tbody>
           </table>
@@ -802,13 +837,22 @@
     }
   }
 
-  // Auto-login if key stored
-  if (apiKey) {
-    loadDashboard().catch(() => {
-      localStorage.removeItem("agentid_key");
-      apiKey = "";
+  // SEC: all event listeners attached here — no inline onclick/onkeydown attributes
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("login-btn").addEventListener("click", login);
+    document.getElementById("logout-btn").addEventListener("click", logout);
+    document.getElementById("api-key-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") login();
     });
-  }
+
+    // Auto-login if key stored in sessionStorage
+    if (apiKey) {
+      loadDashboard().catch(() => {
+        sessionStorage.removeItem("agentid_key");
+        apiKey = "";
+      });
+    }
+  });
 </script>
 
 </body>
