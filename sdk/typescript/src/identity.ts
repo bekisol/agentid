@@ -32,9 +32,19 @@ export function publicKeyToDid(publicKeyBytes: Uint8Array): string {
 
 export function didToPublicKeyBytes(did: string): Uint8Array {
   if (!did.startsWith(DID_PREFIX)) {
-    throw new Error(`Invalid DID — must start with '${DID_PREFIX}': ${did}`);
+    throw new Error(`Invalid DID — must start with '${DID_PREFIX}'`);
   }
-  return bs58.decode(did.slice(DID_PREFIX.length));
+  let bytes: Uint8Array;
+  try {
+    bytes = bs58.decode(did.slice(DID_PREFIX.length));
+  } catch {
+    throw new Error("Invalid DID — base58 decoding failed");
+  }
+  // Ed25519 public keys are always exactly 32 bytes
+  if (bytes.length !== 32) {
+    throw new Error(`Invalid DID — expected 32-byte public key, got ${bytes.length}`);
+  }
+  return bytes;
 }
 
 // ── Base64 encoding for public key storage ────────────────────────────────────

@@ -64,6 +64,26 @@ export class Agent {
   static async create(options: CreateAgentOptions): Promise<Agent> {
     const { name, capabilities, owner, metadata = {}, registryUrl } = options;
 
+    // Validate inputs before touching the network — server enforces these too,
+    // but fail fast on the client so error messages are clearer
+    if (!name || name.length > 256) {
+      throw new Error("name must be 1–256 characters");
+    }
+    if (!owner || !owner.trim() || owner.length > 256) {
+      throw new Error("owner must be 1–256 characters");
+    }
+    if (capabilities.length > 100) {
+      throw new Error("too many capabilities (max 100)");
+    }
+    for (const cap of capabilities) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(cap) || cap.length > 128) {
+        throw new Error(`invalid capability: '${cap}' (alphanumeric, dash, underscore, max 128 chars)`);
+      }
+    }
+    if (JSON.stringify(metadata).length > 10_000) {
+      throw new Error("metadata too large (max 10KB)");
+    }
+
     const { privateKey, publicKey } = generateKeypair();
     const did = publicKeyToDid(publicKey);
 
