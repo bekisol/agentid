@@ -164,6 +164,28 @@ class RegisterRequest(BaseModel):
         return v
 
 
+class UpdateRequest(BaseModel):
+    """
+    Signed update request. The payload must contain:
+      - did: the agent's DID
+      - action: "update"
+      - timestamp: unix timestamp (for replay protection)
+    Plus any fields to update: name, owner, capabilities, metadata.
+    DID and public_key cannot be changed.
+    """
+    payload: dict
+    signature: str
+
+    @field_validator("payload")
+    @classmethod
+    def validate_payload(cls, v):
+        if v.get("action") != "update":
+            raise ValueError("payload.action must be 'update'")
+        if "did" not in v:
+            raise ValueError("payload.did is required")
+        return v
+
+
 class VerifyRequest(BaseModel):
     payload: dict
     signature: str
@@ -325,6 +347,83 @@ def verify_signature(did: str, req: VerifyRequest, request: Request):
     valid = crypto_verify(public_key_bytes, req.payload, req.signature)
     # LOW-5: always include reason field
     return {"valid": valid, "did": did, "reason": None if valid else "invalid signature"}
+
+
+@app.patch("/agents/{did}", response_model=AgentResponse)
+@limiter.limit("10/minute")
+def update_agent(did: str, req: UpdateRequest, request: Request):
+    """
+    Update name, owner, capabilities, or metadata.
+    Requires a signed payload proving you own the private key for this DID.
+    DID and public_key cannot be changed.
+    """
+    ip = request.client.host
+
+    if req.payload.get("did") != did:
+        _audit("update", did, ip, "bad_payload")
+        raise HTTPException(status_code=400, detail="payload.did must match the DID in the path")
+
+    # Replay protection — reject requests older than 5 minutes
+    timestamp = req.payload.get("timestamp")
+    if timestamp:
+        try:
+            if time.time() - float(timestamp) > 300:
+                raise HTTPException(status_code=400, detail="Request expired — resend with a fresh timestamp")
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Invalid timestamp")
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT did, name, capabilities, owner, public_key, created_at, metadata FROM agents WHERE did = %s",
+                (did,),
+            )
+            row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Verify Ed25519 signature
+    pub_key_bytes = b64_to_public_key_bytes(row[4])
+    if not crypto_verify(pub_key_bytes, req.payload, req.signature):
+        _audit("update", did, ip, "forbidden")
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    # Apply only the fields present in the payload; keep existing values otherwise
+    current = row_to_dict(row)
+    new_name         = req.payload.get("name", current["name"])
+    new_owner        = req.payload.get("owner", current["owner"])
+    new_capabilities = req.payload.get("capabilities", current["capabilities"])
+    new_metadata     = req.payload.get("metadata", current["metadata"])
+
+    # Validate updated fields (same rules as registration)
+    if not new_name or len(new_name) > 256:
+        raise HTTPException(status_code=400, detail="name must be 1–256 characters")
+    if not new_owner or not new_owner.strip() or len(new_owner) > 256:
+        raise HTTPException(status_code=400, detail="owner must be 1–256 characters")
+    if len(new_capabilities) > 100:
+        raise HTTPException(status_code=400, detail="too many capabilities (max 100)")
+    for cap in new_capabilities:
+        if not isinstance(cap, str) or len(cap) > 128:
+            raise HTTPException(status_code=400, detail=f"capability too long: {cap}")
+        if not re.match(r'^[a-zA-Z0-9_-]+$', cap):
+            raise HTTPException(status_code=400, detail=f"invalid capability format: {cap}")
+    if len(json.dumps(new_metadata)) > 10_000:
+        raise HTTPException(status_code=400, detail="metadata too large (max 10KB)")
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE agents
+                SET name = %s, owner = %s, capabilities = %s, metadata = %s
+                WHERE did = %s
+            """, (new_name, new_owner, json.dumps(new_capabilities), json.dumps(new_metadata), did))
+        conn.commit()
+
+    _audit("update", did, ip)
+    updated = {**current, "name": new_name, "owner": new_owner,
+               "capabilities": new_capabilities, "metadata": new_metadata}
+    return AgentResponse(**updated)
 
 
 @app.delete("/agents/{did}", status_code=204)
