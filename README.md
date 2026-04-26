@@ -282,7 +282,7 @@ The hosted registry includes commercial features for teams:
 
 **Dashboard:** [agentid.dev/dashboard](https://bekisol.github.io/agentid/dashboard.html)
 
-Contact [hello@agentid.dev](mailto:hello@agentid.dev) for a Pro or Enterprise API key.
+Contact [hello@vikhulus.com](mailto:hello@vikhulus.com) for a Pro or Enterprise API key.
 
 ---
 

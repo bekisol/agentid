@@ -1,0 +1,3 @@
+timestamp,operation,did,ip,status
+2026-04-26T12:51:50.921634+00:00,resolve,did:agentid:9jBZLo5RwMEjhiknGehSdB2ADjKJ3pSt6z7eaxzDb8C,100.64.0.8,ok
+2026-04-26T12:36:56.057569+00:00,register,did:agentid:9jBZLo5RwMEjhiknGehSdB2ADjKJ3pSt6z7eaxzDb8C,100.64.0.6,ok

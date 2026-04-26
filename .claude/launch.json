@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Registry Server",
+      "runtimeExecutable": "uvicorn",
+      "runtimeArgs": ["server:app", "--reload", "--port", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "AgentID Pro Server",
+      "runtimeExecutable": "uvicorn",
+      "runtimeArgs": ["server_pro:app", "--reload", "--port", "8001"],
+      "port": 8001
+    },
+    {
+      "name": "Docs Site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "docs"],
+      "port": 8080
+    }
+  ]
+}
