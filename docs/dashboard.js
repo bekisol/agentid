@@ -197,58 +197,6 @@ async function loadDashboard() {
   loadAgentsTable();
   loadDiscoveryStats();
 
-  // ── Export CSV ──────────────────────────────────────────────────────────────
-  const csvBtn = document.getElementById("csv-btn");
-  csvBtn.addEventListener("click", async () => {
-    const original = csvBtn.textContent;
-    csvBtn.textContent = "Exporting…";
-    csvBtn.disabled = true;
-    try {
-      const res = await fetch(`${BASE}/pro/audit-log/csv`, { headers: { "x-api-key": apiKey } });
-      if (!res.ok) throw new Error(res.status);
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href = url; a.download = "audit-log.csv"; a.click();
-      URL.revokeObjectURL(url);
-    } catch { alert("Could not export CSV — please try again."); }
-    finally {
-      csvBtn.textContent = original;
-      csvBtn.disabled = false;
-    }
-  });
-
-  // ── PDF Report ───────────────────────────────────────────────────────────────
-  const pdfBtn = document.getElementById("pdf-btn");
-  pdfBtn.addEventListener("click", async () => {
-    const original = pdfBtn.textContent;
-    pdfBtn.textContent = "Generating…";
-    pdfBtn.disabled = true;
-    try {
-      const res = await fetch(`${BASE}/pro/analytics/report.pdf`, {
-        headers: { "x-api-key": apiKey },
-      });
-      if (!res.ok) throw new Error(res.status);
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      const cd   = res.headers.get("Content-Disposition") || "";
-      const match = cd.match(/filename="([^"]+)"/);
-      a.download = match ? match[1] : "agentid-analytics.pdf";
-      a.href = url;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      if (e.message === "403") {
-        alert("PDF reports require a Pro or Enterprise plan.");
-      } else {
-        alert("Could not generate PDF — please try again.");
-      }
-    } finally {
-      pdfBtn.textContent = original;
-      pdfBtn.disabled = false;
-    }
-  });
 }
 
 // ── CHARTS ────────────────────────────────────────────────────────────────────
@@ -535,6 +483,51 @@ document.addEventListener("DOMContentLoaded", () => {
     if (trendChart) { trendChart.destroy(); trendChart = null; }
     if (capChart)   { capChart.destroy();   capChart = null; }
     loadDashboard();
+  });
+
+  // ── Export CSV ──────────────────────────────────────────────────────────────
+  document.getElementById("csv-btn").addEventListener("click", async function () {
+    if (!apiKey) return;
+    const btn = this;
+    const original = btn.textContent;
+    btn.textContent = "Exporting…";
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/pro/audit-log/csv`, { headers: { "x-api-key": apiKey } });
+      if (!res.ok) throw new Error(res.status);
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = "audit-log.csv"; a.click();
+      URL.revokeObjectURL(url);
+    } catch { alert("Could not export CSV — please try again."); }
+    finally { btn.textContent = original; btn.disabled = false; }
+  });
+
+  // ── PDF Report ───────────────────────────────────────────────────────────────
+  document.getElementById("pdf-btn").addEventListener("click", async function () {
+    if (!apiKey) return;
+    const btn = this;
+    const original = btn.textContent;
+    btn.textContent = "Generating…";
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/pro/analytics/report.pdf`, {
+        headers: { "x-api-key": apiKey },
+      });
+      if (!res.ok) throw new Error(res.status);
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      const cd   = res.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="([^"]+)"/);
+      a.download = match ? match[1] : "agentid-analytics.pdf";
+      a.href = url; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      if (e.message === "403") alert("PDF reports require a Pro or Enterprise plan.");
+      else alert("Could not generate PDF — please try again.");
+    } finally { btn.textContent = original; btn.disabled = false; }
   });
 
   // Auto-login if key in sessionStorage and session not expired
