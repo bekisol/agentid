@@ -444,44 +444,12 @@ async function loadSigningActivity() {
       const statusLbl = isValid ? "✓ valid" : "✗ invalid";
       const timeStr   = e.timestamp ? String(e.timestamp).slice(0, 19).replace("T", " ") : "—";
       const summary   = esc(payloadSummary(e.payload));
+      const payloadJson = e.payload   ? esc(JSON.stringify(e.payload, null, 2)) : "—";
+      const sigFull     = e.signature ? esc(e.signature) : "—";
+      const ipVal       = e.ip        ? esc(e.ip)        : "—";
 
-      // Signature — show first 24 chars in the row, full in expanded detail
-      const sigShort  = e.signature ? esc(e.signature.slice(0, 24)) + "…" : "—";
-
-      // Expanded detail block
-      const payloadJson  = e.payload   ? esc(JSON.stringify(e.payload, null, 2)) : "—";
-      const sigFull      = e.signature ? esc(e.signature) : "—";
-      const ipVal        = e.ip        ? esc(e.ip)        : "—";
-      const sigId        = `sig-${i}`;
-
-      const detailRow = `
-        <tr class="signing-detail-row" id="detail-${i}">
-          <td class="signing-detail-cell" colspan="6">
-            <div class="detail-grid">
-              <div class="detail-block">
-                <div class="detail-label">📍 Origin IP</div>
-                <div class="detail-value prose">${ipVal}</div>
-              </div>
-              <div class="detail-block">
-                <div class="detail-label">💬 Message / Reason</div>
-                <div class="detail-value prose">${esc(payloadSummary(e.payload))}</div>
-              </div>
-              <div class="detail-block" style="grid-column: 1 / -1;">
-                <div class="detail-label">📋 Signed Payload</div>
-                <pre class="detail-value" style="white-space:pre-wrap;font-size:0.73rem;line-height:1.5;">${payloadJson}</pre>
-              </div>
-              <div class="detail-block" style="grid-column: 1 / -1;">
-                <div class="detail-label">🔏 Signature Proof
-                  <button class="sig-copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('${sigId}').textContent)">copy</button>
-                </div>
-                <div class="detail-value" id="${sigId}">${sigFull}</div>
-              </div>
-            </div>
-          </td>
-        </tr>`;
-
-      const mainRow = `
-        <tr class="signing-main-row" style="cursor:pointer;" onclick="toggleSigningDetail(${i})">
+      return `
+        <tr class="signing-main-row" data-idx="${i}" style="cursor:pointer;">
           <td class="time-cell">${esc(timeStr)}</td>
           <td>${signerCell}</td>
           <td style="text-align:center;color:var(--muted);font-size:1rem;">→</td>
@@ -490,40 +458,76 @@ async function loadSigningActivity() {
           <td>
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span class="${statusCls}" style="font-size:0.8rem;">${statusLbl}</span>
-              <button class="expand-btn" id="expand-${i}" title="Show details">▸</button>
+              <span class="expand-btn">▸</span>
             </div>
           </td>
         </tr>
-        ${detailRow}`;
-
-      return mainRow;
+        <tr class="signing-detail-row" data-detail="${i}">
+          <td class="signing-detail-cell" colspan="6">
+            <div class="detail-grid">
+              <div class="detail-block">
+                <div class="detail-label">📍 Origin IP</div>
+                <div class="detail-value prose">${ipVal}</div>
+              </div>
+              <div class="detail-block">
+                <div class="detail-label">💬 Message / Reason</div>
+                <div class="detail-value prose">${summary || "—"}</div>
+              </div>
+              <div class="detail-block" style="grid-column:1/-1;">
+                <div class="detail-label">📋 Signed Payload</div>
+                <pre class="detail-value" style="white-space:pre-wrap;font-size:0.73rem;line-height:1.5;">${payloadJson}</pre>
+              </div>
+              <div class="detail-block" style="grid-column:1/-1;">
+                <div class="detail-label">🔏 Signature Proof <button class="sig-copy-btn">copy</button></div>
+                <div class="detail-value sig-value">${sigFull}</div>
+              </div>
+            </div>
+          </td>
+        </tr>`;
     }).join("");
 
     el.innerHTML = `
       <div style="overflow:auto;">
         <table class="agents-table" style="width:100%;">
           <thead><tr>
-            <th>Time</th>
-            <th>Signer</th>
-            <th style="color:var(--muted);">→</th>
-            <th>Verified By</th>
-            <th>Message</th>
-            <th>Result</th>
+            <th>Time</th><th>Signer</th><th style="color:var(--muted);">→</th>
+            <th>Verified By</th><th>Message</th><th>Result</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
+
+    // ── event delegation — one listener on the container ──────────────────────
+    el.addEventListener("click", function handler(ev) {
+      const mainRow = ev.target.closest(".signing-main-row");
+      if (!mainRow) return;
+
+      // Stop button-click from double-firing on the row click
+      if (ev.target.classList.contains("sig-copy-btn")) return;
+
+      const idx        = mainRow.dataset.idx;
+      const detailRow  = el.querySelector(`[data-detail="${idx}"]`);
+      const expandBtn  = mainRow.querySelector(".expand-btn");
+      if (!detailRow) return;
+
+      const open = detailRow.classList.toggle("open");
+      if (expandBtn) expandBtn.textContent = open ? "▾" : "▸";
+    });
+
+    // ── copy signature button (also via delegation) ───────────────────────────
+    el.addEventListener("click", function (ev) {
+      if (!ev.target.classList.contains("sig-copy-btn")) return;
+      ev.stopPropagation();
+      const cell = ev.target.closest(".signing-detail-cell");
+      const sigEl = cell && cell.querySelector(".sig-value");
+      if (sigEl) navigator.clipboard.writeText(sigEl.textContent);
+      ev.target.textContent = "copied!";
+      setTimeout(() => { ev.target.textContent = "copy"; }, 1500);
+    });
+
   } catch {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load signing activity</p></div>';
   }
-}
-
-function toggleSigningDetail(i) {
-  const detail = document.getElementById(`detail-${i}`);
-  const btn    = document.getElementById(`expand-${i}`);
-  if (!detail) return;
-  const open = detail.classList.toggle("open");
-  if (btn) btn.textContent = open ? "▾" : "▸";
 }
 
 // ── DISCOVERY STATS ───────────────────────────────────────────────────────────
