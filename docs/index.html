@@ -729,6 +729,144 @@
     @media (max-width: 640px) {
       .nav-links .nav-hide { display: none; }
     }
+
+    /* ── LIVE DEMO ── */
+    .demo-section { background: var(--bg); }
+
+    .demo-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 820px) { .demo-steps { grid-template-columns: 1fr; } }
+
+    .demo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      opacity: 0;
+      transform: translateY(16px);
+    }
+
+    .demo-card.visible {
+      animation: demo-fade-in 0.45s ease forwards;
+    }
+
+    .demo-card:nth-child(2).visible { animation-delay: 0.1s; }
+    .demo-card:nth-child(3).visible { animation-delay: 0.2s; }
+
+    @keyframes demo-fade-in {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .demo-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      border-color: var(--border-dark);
+    }
+
+    .demo-step-num {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .demo-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+
+    .demo-card p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.65;
+      margin: 0;
+    }
+
+    .demo-code {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .demo-code-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--code-border);
+      background: #161311;
+    }
+
+    .demo-code pre {
+      padding: 1rem 1.1rem;
+      font-size: 0.75rem;
+      line-height: 1.75;
+      overflow-x: auto;
+    }
+
+    .demo-result {
+      margin-top: 2.5rem;
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(28, 25, 23, 0.12);
+    }
+
+    .demo-result-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid var(--code-border);
+      background: #161311;
+    }
+
+    .demo-result-label {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem;
+      color: #78716C;
+      margin-left: auto;
+    }
+
+    .demo-result pre {
+      padding: 1.25rem 1.5rem;
+      font-size: 0.8rem;
+      line-height: 1.9;
+    }
+
+    .json-brace { color: #A8A29E; }
+    .json-key   { color: #7DD3FC; }
+    .json-str   { color: #86EFAC; }
+    .json-num   { color: #FB923C; }
+
+    .demo-verify-banner {
+      margin-top: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--green-bg);
+      border: 1px solid #6EE7B7;
+      border-radius: 10px;
+      padding: 0.875rem 1.25rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--green);
+    }
   </style>
 </head>
 <body>
@@ -959,6 +1097,120 @@ console.<span class="fn">log</span>(valid); <span class="cm">// true</span></pre
     </div>
   </div>
 </section>
+
+<!-- LIVE DEMO -->
+<section id="live-demo" class="demo-section">
+  <div class="section-inner">
+    <div class="section-eyebrow">Live demo</div>
+    <h2>See it in action</h2>
+    <p class="section-sub">Agent-to-agent authentication in 4 lines</p>
+
+    <div class="demo-steps" id="demo-steps">
+      <!-- Step 01: Register -->
+      <div class="demo-card">
+        <div class="demo-step-num">01</div>
+        <h3>Register</h3>
+        <div class="demo-code">
+          <div class="demo-code-bar">
+            <div class="did-dot red"></div>
+            <div class="did-dot yellow"></div>
+            <div class="did-dot green"></div>
+          </div>
+          <pre><span class="kw">from</span> <span class="hl">agentid</span> <span class="kw">import</span> Agent
+
+agent = Agent.<span class="fn">create</span>(
+  name=<span class="st">"worker-agent"</span>,
+  capabilities=[<span class="st">"analysis"</span>],
+)
+<span class="cm"># → did:agentid:5Ht...</span></pre>
+        </div>
+        <p>Agent generates an Ed25519 keypair locally and publishes a cryptographic DID to the registry. No central authority required.</p>
+      </div>
+
+      <!-- Step 02: Sign -->
+      <div class="demo-card">
+        <div class="demo-step-num">02</div>
+        <h3>Sign</h3>
+        <div class="demo-code">
+          <div class="demo-code-bar">
+            <div class="did-dot red"></div>
+            <div class="did-dot yellow"></div>
+            <div class="did-dot green"></div>
+          </div>
+          <pre>signed = agent.<span class="fn">sign</span>({
+  <span class="st">"task"</span>: <span class="st">"analyze dataset"</span>,
+  <span class="st">"priority"</span>: <span class="st">"high"</span>,
+})
+<span class="cm"># Attaches DID + signature</span></pre>
+        </div>
+        <p>The worker agent signs its message with its private key. The resulting envelope carries the DID, a nonce, and a timestamp alongside the payload.</p>
+      </div>
+
+      <!-- Step 03: Verify -->
+      <div class="demo-card">
+        <div class="demo-step-num">03</div>
+        <h3>Verify</h3>
+        <div class="demo-code">
+          <div class="demo-code-bar">
+            <div class="did-dot red"></div>
+            <div class="did-dot yellow"></div>
+            <div class="did-dot green"></div>
+          </div>
+          <pre>valid = Agent.<span class="fn">verify_from_did</span>(
+  signed,
+)
+<span class="fn">print</span>(valid)  <span class="cm"># True</span></pre>
+        </div>
+        <p>Any peer agent resolves the DID from the registry and checks the signature — no shared secrets, no API keys, no manual config.</p>
+      </div>
+    </div>
+
+    <!-- Result block -->
+    <div class="demo-result">
+      <div class="demo-result-bar">
+        <div class="did-dot red"></div>
+        <div class="did-dot yellow"></div>
+        <div class="did-dot green"></div>
+        <span class="demo-result-label">signed_message.json</span>
+      </div>
+      <pre><span class="json-brace">{</span>
+  <span class="json-key">"payload"</span><span class="json-brace">:</span> <span class="json-brace">{</span>
+    <span class="json-key">"task"</span><span class="json-brace">:</span>     <span class="json-str">"analyze dataset"</span><span class="json-brace">,</span>
+    <span class="json-key">"priority"</span><span class="json-brace">:</span> <span class="json-str">"high"</span>
+  <span class="json-brace">},</span>
+  <span class="json-key">"signature"</span><span class="json-brace">:</span>  <span class="json-str">"MEQCIBx7k2nP...3dQsYaR"</span><span class="json-brace">,</span>
+  <span class="json-key">"signer_did"</span><span class="json-brace">:</span> <span class="json-str">"did:agentid:5HtNkQxRtYbLcDfHgJw"</span><span class="json-brace">,</span>
+  <span class="json-key">"timestamp"</span><span class="json-brace">:</span>  <span class="json-num">1714234567</span><span class="json-brace">,</span>
+  <span class="json-key">"nonce"</span><span class="json-brace">:</span>      <span class="json-str">"a3f9c12e"</span>
+<span class="json-brace">}</span></pre>
+    </div>
+
+    <!-- Verification banner -->
+    <div class="demo-verify-banner">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="10" cy="10" r="9" fill="#059669" fill-opacity="0.15" stroke="#059669" stroke-width="1.5"/>
+        <path d="M6 10.5l2.5 2.5 5-5" stroke="#059669" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Identity verified — worker is who they claim to be
+    </div>
+  </div>
+</section>
+
+<script>
+  (function () {
+    var cards = document.querySelectorAll("#demo-steps .demo-card");
+    if (!cards.length) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    cards.forEach(function (card) { observer.observe(card); });
+  })();
+</script>
 
 <!-- INTEGRATIONS -->
 <section id="integrations">

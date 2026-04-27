@@ -1,38 +1,45 @@
 /**
- * AgentID Protocol — TypeScript SDK
- *
- * Identity, discovery, and trust for AI agents.
+ * @agentid/sdk — Identity, discovery, and trust for AI agents.
  *
  * Quick start:
- *   import { Agent } from 'agentid-protocol'
  *
- *   const agent = await Agent.create({
- *     name: 'my-agent',
- *     capabilities: ['web-search', 'summarization'],
- *     owner: 'team@company.com',
- *     registryUrl: 'https://api.agentid-protocol.com',
- *   })
+ *   import { createAgent } from '@agentid/sdk';
  *
- *   console.log(agent.did)
+ *   const agent = await createAgent({
+ *     name: 'my-bot',
+ *     capabilities: ['summarization', 'web-search'],
+ *     owner: 'team@example.com',
+ *   });
  *
- *   const signed = agent.sign({ result: 'task complete' })
- *   const valid = await Agent.verifyFromDid(signed, registryUrl)
+ *   console.log(agent.did);
+ *   // did:agentid:3mFxR8...
+ *
+ *   const msg = await agent.sign({ task: 'fetch-data', url: 'https://example.com' });
+ *   // msg.signature, msg.signer_did, msg.timestamp, msg.nonce
  */
 
-export { Agent } from "./agent.js";
-export type { CreateAgentOptions, LoadAgentOptions, SignedMessage } from "./agent.js";
+// ── Agent ─────────────────────────────────────────────────────────────────────
+export { Agent, createAgent } from "./agent.js";
+export type { SignedMessage, CreateAgentOptions } from "./agent.js";
 
-export { HTTPRegistry } from "./registry.js";
-export type { AgentDocument, SearchParams } from "./registry.js";
+// ── Registry ──────────────────────────────────────────────────────────────────
+export { RegistryClient } from "./registry.js";
+export type { AgentDocument, FindOptions, VerifyResult } from "./registry.js";
 
+// ── Identity ──────────────────────────────────────────────────────────────────
 export {
   generateKeypair,
   publicKeyToDid,
-  didToPublicKeyBytes,
+  didToPublicKey,
+  publicKeyToBase64,
+  base64ToPublicKey,
+  DID_PREFIX,
+  // Legacy aliases for backward compatibility
   publicKeyToB64,
   b64ToPublicKeyBytes,
-  DID_PREFIX,
+  didToPublicKeyBytes,
 } from "./identity.js";
 export type { Keypair } from "./identity.js";
 
-export { sign, verify, toBase64, fromBase64 } from "./crypto.js";
+// ── Crypto ────────────────────────────────────────────────────────────────────
+export { canonical, sign, verify, toBase64, fromBase64 } from "./crypto.js";
