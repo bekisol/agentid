@@ -149,8 +149,8 @@ def _run_demo(registry_dir: str):
 
     ok(f"DID resolved  → {worker_doc.name}  owner={worker_doc.owner}")
 
-    # Verify the cryptographic signature
-    sig_valid = Agent.verify_from_did(hello_msg, **reg)
+    # Verify the cryptographic signature (pass verifier_did to log the relationship)
+    sig_valid = Agent.verify_from_did(hello_msg, **reg, verifier_did=coordinator.did)
     if not sig_valid:
         fail("Signature verification failed — rejecting handshake")
         return
@@ -196,7 +196,7 @@ def _run_demo(registry_dir: str):
         return
     ok(f"DID resolved  → {coord_doc.name}  owner={coord_doc.owner}")
 
-    coord_sig_valid = Agent.verify_from_did(task_msg, **reg)
+    coord_sig_valid = Agent.verify_from_did(task_msg, **reg, verifier_did=worker.did)
     if not coord_sig_valid:
         fail("Coordinator signature invalid — rejecting task")
         return

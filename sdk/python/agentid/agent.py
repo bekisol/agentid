@@ -158,7 +158,15 @@ class Agent:
         registry_path: str = None,
         registry_url: str = None,
         max_age_seconds: int = 300,
+        verifier_did: str = None,
     ) -> bool:
+        """
+        Verify a signed message by resolving the signer's DID from the registry.
+
+        verifier_did — optionally pass the DID of the agent performing this
+        verification.  When using an HTTP registry this is recorded server-side,
+        making the agent-to-agent trust relationship visible in the dashboard.
+        """
         did = signed_message["payload"].get("signer")
         if not did:
             return False
@@ -166,7 +174,21 @@ class Agent:
         timestamp = signed_message["payload"].get("timestamp")
         if timestamp and (time.time() - float(timestamp)) > max_age_seconds:
             return False
-        data = _registry(registry_path, registry_url).get(did)
+
+        reg = _registry(registry_path, registry_url)
+
+        # When using an HTTP registry, delegate to the server's verify endpoint.
+        # This logs the event (with verifier_did) so it appears in the dashboard.
+        if isinstance(reg, HTTPRegistry):
+            return reg.verify_signature(
+                did,
+                signed_message["payload"],
+                signed_message["signature"],
+                verifier_did=verifier_did,
+            )
+
+        # Local registry — verify cryptographically without a network call.
+        data = reg.get(did)
         if not data:
             return False
         public_key_bytes = b64_to_public_key_bytes(data["public_key"])

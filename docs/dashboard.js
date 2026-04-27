@@ -158,6 +158,7 @@ async function loadDashboard() {
   try { renderCharts(data); } catch (e) { console.warn("Charts:", e); }
   renderActivity(data.activity_last_7d || []);
   loadAuditLog();
+  loadSigningActivity();
   loadAgentsTable();
   loadDiscoveryStats();
 
@@ -365,6 +366,75 @@ async function loadAgentsTable() {
       </div>`;
   } catch {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load agents</p></div>';
+  }
+}
+
+// ── SIGNING ACTIVITY ──────────────────────────────────────────────────────────
+
+async function loadSigningActivity() {
+  const el    = document.getElementById("signing-table");
+  const label = document.getElementById("signing-count-label");
+  try {
+    const data   = await apiFetch("/pro/analytics/signing");
+    const events = data.events || [];
+
+    label.textContent = `${events.length} event${events.length !== 1 ? "s" : ""}`;
+
+    if (!events.length) {
+      el.innerHTML = `<div class="empty">
+        <div class="empty-icon">🤝</div>
+        <p>No signing events yet</p>
+        <p style="font-size:0.78rem;margin-top:0.25rem;">
+          Pass <code style="background:var(--surface2);padding:0.1rem 0.35rem;border-radius:4px;font-size:0.75rem;">verifier_did=agent.did</code>
+          to <code style="background:var(--surface2);padding:0.1rem 0.35rem;border-radius:4px;font-size:0.75rem;">Agent.verify_from_did()</code>
+          to log relationships here.
+        </p>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="overflow:auto;">
+        <table class="agents-table">
+          <thead><tr>
+            <th>Time</th>
+            <th>Signer</th>
+            <th style="padding-left:0.5rem;padding-right:0.5rem;color:var(--muted);">→</th>
+            <th>Verified By</th>
+            <th>Result</th>
+          </tr></thead>
+          <tbody>
+            ${events.map(e => {
+              const signerCell = e.signer_name
+                ? `<span class="agent-name">${esc(e.signer_name)}</span>
+                   <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.signer_did))}</div>`
+                : `<span class="did-mono">${esc(shortDid(e.signer_did))}</span>`;
+
+              const verifierCell = e.verifier_name
+                ? `<span class="agent-name">${esc(e.verifier_name)}</span>
+                   <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.verifier_did))}</div>`
+                : e.verifier_did
+                  ? `<span class="did-mono">${esc(shortDid(e.verifier_did))}</span>`
+                  : `<span style="color:var(--muted);font-size:0.8rem;font-style:italic;">external</span>`;
+
+              const isValid   = e.status === "valid";
+              const statusCls = isValid ? "status-ok" : "status-invalid";
+              const statusLbl = isValid ? "✓ valid" : "✗ invalid";
+              const timeStr   = e.timestamp ? String(e.timestamp).slice(11, 19) : "—";
+
+              return `<tr>
+                <td class="time-cell">${esc(timeStr)}</td>
+                <td>${signerCell}</td>
+                <td style="text-align:center;color:var(--muted);font-size:1rem;">→</td>
+                <td>${verifierCell}</td>
+                <td class="${statusCls}" style="font-size:0.8rem;">${statusLbl}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>`;
+  } catch {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load signing activity</p></div>';
   }
 }
 

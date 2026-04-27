@@ -101,10 +101,14 @@ class HTTPRegistry:
         )
         response.raise_for_status()
 
-    def verify_signature(self, did: str, payload: dict, signature: str) -> bool:
+    def verify_signature(self, did: str, payload: dict, signature: str,
+                         verifier_did: str = None) -> bool:
+        body = {"payload": payload, "signature": signature}
+        if verifier_did:
+            body["verifier_did"] = verifier_did
         response = self._client.post(
             f"{self.base_url}/agents/{did}/verify",
-            json={"payload": payload, "signature": signature},
+            json=body,
         )
         if response.status_code == 404:
             return False
