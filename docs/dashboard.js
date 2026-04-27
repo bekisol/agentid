@@ -1,13 +1,14 @@
 const BASE = "https://api.agentid-protocol.com";
-let apiKey = sessionStorage.getItem("agentid_key") || "";
+let apiKey = localStorage.getItem("agentid_key") || "";
 let trendChart, capChart;
 
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 let sessionTimer = null;
 
 function getSessionAge() {
-  const ts = sessionStorage.getItem("agentid_login_ts");
-  return ts ? Date.now() - Number(ts) : Infinity;
+  const ts = localStorage.getItem("agentid_login_ts");
+  // If no timestamp (e.g. logged in before this feature), treat as fresh
+  return ts ? Date.now() - Number(ts) : 0;
 }
 
 function scheduleSessionExpiry() {
@@ -18,8 +19,8 @@ function scheduleSessionExpiry() {
 }
 
 function expireSession() {
-  sessionStorage.removeItem("agentid_key");
-  sessionStorage.removeItem("agentid_login_ts");
+  localStorage.removeItem("agentid_key");
+  localStorage.removeItem("agentid_login_ts");
   apiKey = "";
   clearTimeout(sessionTimer);
   document.getElementById("dashboard").style.display = "none";
@@ -105,8 +106,8 @@ async function login() {
 
   try {
     await loadDashboard();
-    sessionStorage.setItem("agentid_key", apiKey);
-    sessionStorage.setItem("agentid_login_ts", String(Date.now()));
+    localStorage.setItem("agentid_key", apiKey);
+    localStorage.setItem("agentid_login_ts", String(Date.now()));
     scheduleSessionExpiry();
   } catch (e) {
     const status = e.message;
@@ -126,8 +127,8 @@ async function login() {
 }
 
 function logout() {
-  sessionStorage.removeItem("agentid_key");
-  sessionStorage.removeItem("agentid_login_ts");
+  localStorage.removeItem("agentid_key");
+  localStorage.removeItem("agentid_login_ts");
   apiKey = "";
   clearTimeout(sessionTimer);
   document.getElementById("dashboard").style.display = "none";
@@ -530,7 +531,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } finally { btn.textContent = original; btn.disabled = false; }
   });
 
-  // Auto-login if key in sessionStorage and session not expired
+  // Auto-login if key in localStorage and session not expired
   if (apiKey) {
     if (getSessionAge() >= SESSION_TTL_MS) {
       expireSession();
@@ -538,8 +539,8 @@ document.addEventListener("DOMContentLoaded", () => {
       loadDashboard()
         .then(() => scheduleSessionExpiry())
         .catch(() => {
-          sessionStorage.removeItem("agentid_key");
-          sessionStorage.removeItem("agentid_login_ts");
+          localStorage.removeItem("agentid_key");
+          localStorage.removeItem("agentid_login_ts");
           apiKey = "";
         });
     }
