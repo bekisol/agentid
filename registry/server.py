@@ -16,6 +16,7 @@ from typing import Optional
 import psycopg2
 import psycopg2.extras
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -33,13 +34,31 @@ from agentid.identity import b64_to_public_key_bytes, public_key_to_did
 
 limiter = Limiter(key_func=get_remote_address)
 
+# LOW-6: gate Swagger/ReDoc behind an env var — never expose API docs in production
+_docs_enabled = os.environ.get("ENABLE_DOCS", "").lower() in ("1", "true", "yes")
+
 app = FastAPI(
     title="AgentID Registry",
     description="Public registry for AI agent identity and discovery",
     version="0.1.1",
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# LOW-6: CORS — restrict to allowed origins; default denies all cross-origin access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.environ.get(
+        "CORS_ORIGINS",
+        "",          # empty string = no origins allowed by default
+    ).split(","),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
 
 
 # ── database ──────────────────────────────────────────────────────────────────
@@ -335,17 +354,18 @@ def verify_signature(did: str, req: VerifyRequest, request: Request):
     if not row:
         raise HTTPException(status_code=404, detail="Agent not found")
 
+    # LOW-4: timestamp is mandatory — omitting it would bypass replay protection
     timestamp = req.payload.get("timestamp")
-    if timestamp:
-        try:
-            if time.time() - float(timestamp) > 300:
-                return {"valid": False, "did": did, "reason": "signature expired"}
-        except (TypeError, ValueError):
-            return {"valid": False, "did": did, "reason": "invalid timestamp"}
+    if timestamp is None:
+        return {"valid": False, "did": did, "reason": "missing timestamp"}
+    try:
+        if time.time() - float(timestamp) > 300:
+            return {"valid": False, "did": did, "reason": "signature expired"}
+    except (TypeError, ValueError):
+        return {"valid": False, "did": did, "reason": "invalid timestamp"}
 
     public_key_bytes = b64_to_public_key_bytes(row[0])
     valid = crypto_verify(public_key_bytes, req.payload, req.signature)
-    # LOW-5: always include reason field
     return {"valid": valid, "did": did, "reason": None if valid else "invalid signature"}
 
 
@@ -445,6 +465,16 @@ def deregister_agent(did: str, req: DeregisterRequest, request: Request):
     if req.payload.get("action") != "deregister" or req.payload.get("did") != did:
         _audit("deregister", did, ip, "invalid_payload")
         raise HTTPException(status_code=400, detail="Invalid deregister payload")
+
+    # LOW-6: require timestamp to prevent replay attacks on DELETE
+    timestamp = req.payload.get("timestamp")
+    if not timestamp:
+        raise HTTPException(status_code=400, detail="payload.timestamp is required")
+    try:
+        if time.time() - float(timestamp) > 300:
+            raise HTTPException(status_code=400, detail="Request expired — resend with a fresh timestamp")
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid timestamp")
 
     public_key_bytes = b64_to_public_key_bytes(row[0])
     if not crypto_verify(public_key_bytes, req.payload, req.signature):
