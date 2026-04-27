@@ -2,6 +2,37 @@ const BASE = "https://api.agentid-protocol.com";
 let apiKey = sessionStorage.getItem("agentid_key") || "";
 let trendChart, capChart;
 
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+let sessionTimer = null;
+
+function getSessionAge() {
+  const ts = sessionStorage.getItem("agentid_login_ts");
+  return ts ? Date.now() - Number(ts) : Infinity;
+}
+
+function scheduleSessionExpiry() {
+  clearTimeout(sessionTimer);
+  const remaining = SESSION_TTL_MS - getSessionAge();
+  if (remaining <= 0) { expireSession(); return; }
+  sessionTimer = setTimeout(expireSession, remaining);
+}
+
+function expireSession() {
+  sessionStorage.removeItem("agentid_key");
+  sessionStorage.removeItem("agentid_login_ts");
+  apiKey = "";
+  clearTimeout(sessionTimer);
+  document.getElementById("dashboard").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("logout-btn").style.display = "none";
+  document.getElementById("api-key-input").value = "";
+  if (trendChart) { trendChart.destroy(); trendChart = null; }
+  if (capChart)   { capChart.destroy();   capChart = null; }
+  const err = document.getElementById("error-msg");
+  err.textContent = "Your session expired after 8 hours. Please sign in again.";
+  err.style.display = "block";
+}
+
 // Tier agent limits
 const TIER_LIMITS = { free: 100, pro: 10000, enterprise: Infinity };
 
@@ -75,6 +106,8 @@ async function login() {
   try {
     await loadDashboard();
     sessionStorage.setItem("agentid_key", apiKey);
+    sessionStorage.setItem("agentid_login_ts", String(Date.now()));
+    scheduleSessionExpiry();
   } catch (e) {
     const status = e.message;
     if (status === "401" || status === "403") {
@@ -94,7 +127,9 @@ async function login() {
 
 function logout() {
   sessionStorage.removeItem("agentid_key");
+  sessionStorage.removeItem("agentid_login_ts");
   apiKey = "";
+  clearTimeout(sessionTimer);
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
   document.getElementById("logout-btn").style.display = "none";
@@ -502,11 +537,18 @@ document.addEventListener("DOMContentLoaded", () => {
     loadDashboard();
   });
 
-  // Auto-login if key in sessionStorage
+  // Auto-login if key in sessionStorage and session not expired
   if (apiKey) {
-    loadDashboard().catch(() => {
-      sessionStorage.removeItem("agentid_key");
-      apiKey = "";
-    });
+    if (getSessionAge() >= SESSION_TTL_MS) {
+      expireSession();
+    } else {
+      loadDashboard()
+        .then(() => scheduleSessionExpiry())
+        .catch(() => {
+          sessionStorage.removeItem("agentid_key");
+          sessionStorage.removeItem("agentid_login_ts");
+          apiKey = "";
+        });
+    }
   }
 });
