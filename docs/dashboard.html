@@ -473,20 +473,51 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── FULL AUDIT TABLE CARD ── */
-    .full-card {
-      background: var(--surface);
+    /* ── AGENTS TABLE ── */
+    .agents-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .agents-table th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .agents-table td {
+      padding: 0.65rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-2);
+      vertical-align: middle;
+    }
+    .agents-table tr:last-child td { border-bottom: none; }
+    .agents-table tr:hover td { background: var(--surface2); }
+
+    .cap-pill {
+      display: inline-flex;
+      padding: 0.15rem 0.5rem;
+      border-radius: 5px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: var(--surface2);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 2rem;
+      color: var(--muted);
+      margin: 0.1rem;
     }
 
-    .full-card .card-header {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 0;
+    .agent-name {
+      font-weight: 600;
+      color: var(--text);
     }
+
+    .last-active-fresh { color: var(--green); font-weight: 600; }
+    .last-active-old   { color: var(--muted); }
   </style>
 </head>
 <body>
@@ -536,10 +567,13 @@
       <div class="dash-title" id="dash-title">Dashboard</div>
       <div class="dash-sub" id="dash-sub">Pro analytics</div>
     </div>
-    <div id="tier-badge-wrap"></div>
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <div id="tier-badge-wrap"></div>
+      <button class="btn btn-outline" id="refresh-btn" title="Refresh data">↻ Refresh</button>
+    </div>
   </div>
 
-  <!-- Verified badge (enterprise only) -->
+  <!-- Verified badge -->
   <div id="badge-section"></div>
 
   <!-- Stats -->
@@ -547,7 +581,7 @@
     <div class="stat-card">
       <div class="stat-label">Agents Registered</div>
       <div class="stat-value" id="stat-agents">—</div>
-      <div class="stat-sub">in your registry</div>
+      <div class="stat-sub" id="stat-agents-sub">in your registry</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Audit Events</div>
@@ -560,9 +594,26 @@
       <div class="stat-sub">operations last 7 days</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Capabilities</div>
-      <div class="stat-value" id="stat-caps">—</div>
-      <div class="stat-sub">unique types</div>
+      <div class="stat-label">Discovery Rate</div>
+      <div class="stat-value" id="stat-discovery">—</div>
+      <div class="stat-sub">resolves + verifies (7d)</div>
+    </div>
+  </div>
+
+  <!-- Usage meter -->
+  <div class="card" style="margin-bottom:1.25rem;" id="usage-card">
+    <div class="card-header">
+      <div class="card-title">Plan Usage</div>
+      <span id="usage-tier-label" class="tier-badge tier-free" style="font-size:0.7rem;">—</span>
+    </div>
+    <div id="usage-bar-wrap">
+      <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem;">
+        <span id="usage-label">— / — agents</span>
+        <span id="usage-pct">—%</span>
+      </div>
+      <div style="height:8px;background:var(--surface2);border-radius:999px;overflow:hidden;border:1px solid var(--border);">
+        <div id="usage-fill" style="height:100%;width:0%;background:var(--accent);border-radius:999px;transition:width 0.6s ease;"></div>
+      </div>
     </div>
   </div>
 
@@ -597,9 +648,19 @@
     <div class="card">
       <div class="card-header">
         <div class="card-title">Recent Audit Log</div>
+        <a id="export-csv-btn" href="#" class="btn btn-outline" style="font-size:0.78rem;padding:0.3rem 0.75rem;">↓ Export CSV</a>
       </div>
       <div id="audit-list"><div class="loading"><div class="spinner"></div> Loading…</div></div>
     </div>
+  </div>
+
+  <!-- My Agents table -->
+  <div class="card" style="margin-bottom:2rem;">
+    <div class="card-header">
+      <div class="card-title">My Agents</div>
+      <span id="agents-count-label" style="font-size:0.8rem;color:var(--muted);"></span>
+    </div>
+    <div id="agents-table"><div class="loading"><div class="spinner"></div> Loading…</div></div>
   </div>
 
 </div><!-- /dashboard -->

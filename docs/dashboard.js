@@ -1,9 +1,11 @@
 const BASE = "https://api.agentid-protocol.com";
-// SEC: sessionStorage — cleared when tab closes, not accessible cross-tab
 let apiKey = sessionStorage.getItem("agentid_key") || "";
 let trendChart, capChart;
 
-// SEC: HTML escape — all API-sourced strings pass through before innerHTML
+// Tier agent limits
+const TIER_LIMITS = { free: 100, pro: 10000, enterprise: Infinity };
+
+// SEC: HTML escape — all API strings pass through before innerHTML
 function esc(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
@@ -21,7 +23,6 @@ const OP_CLASS = {
   update:     "op-update",
 };
 
-// SEC: allowlist — unknown operations get no CSS class
 function opClass(op) { return OP_CLASS[String(op)] || ""; }
 
 function shortDid(did) {
@@ -30,9 +31,20 @@ function shortDid(did) {
   return s.length > 26 ? s.slice(0, 14) + "…" + s.slice(-8) : s;
 }
 
-// SEC: allowlist tier values — never interpolate raw API tier into class names
 function tierClass(tier) {
   return { enterprise: "tier-enterprise", pro: "tier-pro", free: "tier-free" }[String(tier)] || "tier-free";
+}
+
+function timeAgo(isoStr) {
+  if (!isoStr) return "—";
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins < 2)   return "just now";
+  if (mins < 60)  return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
 }
 
 async function apiFetch(path) {
@@ -40,6 +52,8 @@ async function apiFetch(path) {
   if (!res.ok) throw new Error(res.status);
   return res.json();
 }
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
 
 async function login() {
   const input = document.getElementById("api-key-input");
@@ -55,7 +69,6 @@ async function login() {
     return;
   }
 
-  // Show loading state on button
   btn.textContent = "Connecting…";
   btn.disabled = true;
 
@@ -90,6 +103,8 @@ function logout() {
   if (capChart)   { capChart.destroy();   capChart = null; }
 }
 
+// ── MAIN DASHBOARD LOAD ───────────────────────────────────────────────────────
+
 async function loadDashboard() {
   const data = await apiFetch("/pro/analytics/overview");
 
@@ -97,27 +112,63 @@ async function loadDashboard() {
   document.getElementById("dashboard").style.display = "block";
   document.getElementById("logout-btn").style.display = "flex";
 
-  // SEC: textContent for simple strings — no HTML parsing
+  const tier = String(data.tier);
+
+  // Header
   document.getElementById("dash-title").textContent = data.owner;
   document.getElementById("dash-sub").textContent = "Pro analytics dashboard";
 
-  // SEC: tier is allowlisted via tierClass(); textContent guards the value
   const tierEl = document.createElement("span");
-  tierEl.className = "tier-badge " + tierClass(data.tier);
-  tierEl.textContent = data.tier;
+  tierEl.className = "tier-badge " + tierClass(tier);
+  tierEl.textContent = tier;
   const tierWrap = document.getElementById("tier-badge-wrap");
   tierWrap.textContent = "";
   tierWrap.appendChild(tierEl);
 
+  // Stats
+  const agentsReg   = Number(data.usage.agents_registered) || 0;
+  const auditEvents = Number(data.usage.audit_events) || 0;
   const totalActivity = (data.activity_last_7d || []).reduce((s, r) => s + r.count, 0);
-  document.getElementById("stat-agents").textContent = data.usage.agents_registered;
-  document.getElementById("stat-events").textContent = data.usage.audit_events;
-  document.getElementById("stat-active").textContent = totalActivity;
-  document.getElementById("stat-caps").textContent = (data.top_capabilities || []).length;
 
+  // Discovery = resolves + verifies from searches endpoint (load async)
+  document.getElementById("stat-agents").textContent = agentsReg;
+  document.getElementById("stat-events").textContent = auditEvents.toLocaleString();
+  document.getElementById("stat-active").textContent = totalActivity.toLocaleString();
+  document.getElementById("stat-discovery").textContent = "…";
+
+  // Usage meter
+  const limit = TIER_LIMITS[tier] ?? 100;
+  const pct   = limit === Infinity ? 0 : Math.min(100, Math.round((agentsReg / limit) * 100));
+
+  document.getElementById("usage-tier-label").className = "tier-badge " + tierClass(tier);
+  document.getElementById("usage-tier-label").textContent = tier;
+  document.getElementById("usage-label").textContent =
+    limit === Infinity
+      ? `${agentsReg.toLocaleString()} agents (unlimited)`
+      : `${agentsReg.toLocaleString()} / ${limit.toLocaleString()} agents`;
+  document.getElementById("usage-pct").textContent = limit === Infinity ? "∞" : `${pct}%`;
+
+  const fill = document.getElementById("usage-fill");
+  fill.style.width = (limit === Infinity ? 2 : pct) + "%";
+  fill.style.background = pct > 90 ? "var(--red)" : pct > 70 ? "var(--yellow)" : "var(--accent)";
+
+  // Badge, charts, audit, agents — load in parallel
   loadBadge(data.owner);
+  renderCharts(data);
+  renderActivity(data.activity_last_7d || []);
+  loadAuditLog();
+  loadAgentsTable();
+  loadDiscoveryStats();
 
-  // Trend chart
+  // Export CSV link
+  const exportBtn = document.getElementById("export-csv-btn");
+  exportBtn.href = `${BASE}/pro/audit-log/csv?api_key=${encodeURIComponent(apiKey)}`;
+  exportBtn.download = "audit-log.csv";
+}
+
+// ── CHARTS ────────────────────────────────────────────────────────────────────
+
+function renderCharts(data) {
   const trendLabels = (data.registration_trend_30d || []).map(r => {
     const d = new Date(r.date);
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -133,14 +184,11 @@ async function loadDashboard() {
         data: trendData.length ? trendData : [0],
         backgroundColor: "rgba(194, 65, 12, 0.15)",
         borderColor: "rgba(194, 65, 12, 0.8)",
-        borderWidth: 1.5,
-        borderRadius: 5,
-        borderSkipped: false,
+        borderWidth: 1.5, borderRadius: 5, borderSkipped: false,
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: "#78716C", font: { size: 10, family: "Inter" }, maxRotation: 0, maxTicksLimit: 8 }, grid: { color: "#F2F0EC" }, border: { color: "#E5E2DB" } },
@@ -149,7 +197,6 @@ async function loadDashboard() {
     }
   });
 
-  // Capabilities chart
   const capLabels = (data.top_capabilities || []).map(c => String(c.capability));
   const capData   = (data.top_capabilities || []).map(c => Number(c.agent_count) || 0);
   const capColors = [
@@ -162,17 +209,10 @@ async function loadDashboard() {
     type: "bar",
     data: {
       labels: capLabels.length ? capLabels : ["No data"],
-      datasets: [{
-        data: capData.length ? capData : [0],
-        backgroundColor: capColors,
-        borderRadius: 5,
-        borderSkipped: false,
-      }]
+      datasets: [{ data: capData.length ? capData : [0], backgroundColor: capColors, borderRadius: 5, borderSkipped: false }]
     },
     options: {
-      indexAxis: "y",
-      responsive: true,
-      maintainAspectRatio: false,
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: "#78716C", font: { size: 10, family: "Inter" }, stepSize: 1 }, grid: { color: "#F2F0EC" }, border: { color: "#E5E2DB" }, beginAtZero: true },
@@ -180,23 +220,25 @@ async function loadDashboard() {
       }
     }
   });
+}
 
-  // Activity
+// ── ACTIVITY ──────────────────────────────────────────────────────────────────
+
+function renderActivity(activity) {
   const actEl = document.getElementById("activity-list");
-  const activity = data.activity_last_7d || [];
   if (!activity.length) {
     actEl.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>No activity in the last 7 days</p></div>';
-  } else {
-    actEl.innerHTML = activity.map(r => `
-      <div class="activity-row">
-        <span class="op-pill ${opClass(r.operation)}">${esc(r.operation)}</span>
-        <span class="activity-count">${esc(Number(r.count).toLocaleString())}</span>
-      </div>
-    `).join("");
+    return;
   }
-
-  loadAuditLog();
+  actEl.innerHTML = activity.map(r => `
+    <div class="activity-row">
+      <span class="op-pill ${opClass(r.operation)}">${esc(r.operation)}</span>
+      <span class="activity-count">${esc(Number(r.count).toLocaleString())}</span>
+    </div>
+  `).join("");
 }
+
+// ── BADGE ─────────────────────────────────────────────────────────────────────
 
 async function loadBadge(owner) {
   try {
@@ -218,6 +260,8 @@ async function loadBadge(owner) {
   } catch { document.getElementById("badge-section").innerHTML = ""; }
 }
 
+// ── AUDIT LOG ─────────────────────────────────────────────────────────────────
+
 async function loadAuditLog() {
   const el = document.getElementById("audit-list");
   try {
@@ -230,9 +274,7 @@ async function loadAuditLog() {
     el.innerHTML = `
       <div style="overflow:auto;">
         <table class="audit-table">
-          <thead><tr>
-            <th>Time</th><th>Operation</th><th>DID</th><th>Status</th>
-          </tr></thead>
+          <thead><tr><th>Time</th><th>Operation</th><th>DID</th><th>Status</th></tr></thead>
           <tbody>
             ${logs.map(r => `
               <tr>
@@ -249,15 +291,95 @@ async function loadAuditLog() {
   }
 }
 
-// Attach all event listeners — no inline handlers in HTML
+// ── AGENTS TABLE ──────────────────────────────────────────────────────────────
+
+async function loadAgentsTable() {
+  const el = document.getElementById("agents-table");
+  const label = document.getElementById("agents-count-label");
+  try {
+    const data = await apiFetch("/pro/analytics/agents");
+    const agents = data.agents || [];
+
+    label.textContent = `${agents.length} agent${agents.length !== 1 ? "s" : ""}`;
+
+    if (!agents.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">🤖</div><p>No agents registered yet</p></div>';
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="overflow:auto;">
+        <table class="agents-table">
+          <thead><tr>
+            <th>Name</th>
+            <th>DID</th>
+            <th>Capabilities</th>
+            <th>Audit Events</th>
+            <th>Last Active</th>
+            <th>Registered</th>
+          </tr></thead>
+          <tbody>
+            ${agents.map(a => {
+              const caps = (Array.isArray(a.capabilities) ? a.capabilities : [])
+                .slice(0, 4)
+                .map(c => `<span class="cap-pill">${esc(String(c))}</span>`)
+                .join("") + (a.capabilities && a.capabilities.length > 4
+                  ? `<span class="cap-pill">+${a.capabilities.length - 4}</span>` : "");
+
+              const lastActiveStr = a.last_activity ? timeAgo(a.last_activity) : "—";
+              const lastActiveClass = a.last_activity &&
+                (Date.now() - new Date(a.last_activity).getTime()) < 86400000 * 7
+                ? "last-active-fresh" : "last-active-old";
+
+              const createdStr = a.created_at ? new Date(a.created_at).toLocaleDateString("en-US", {
+                month: "short", day: "numeric", year: "numeric"
+              }) : "—";
+
+              return `<tr>
+                <td class="agent-name">${esc(a.name)}</td>
+                <td class="did-mono">${esc(shortDid(a.did))}</td>
+                <td>${caps || '<span style="color:var(--muted);font-size:0.8rem;">none</span>'}</td>
+                <td style="text-align:center;font-weight:600;">${esc(String(a.audit_events ?? 0))}</td>
+                <td class="${lastActiveClass}">${esc(lastActiveStr)}</td>
+                <td style="color:var(--muted);font-size:0.78rem;">${esc(createdStr)}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>`;
+  } catch {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load agents</p></div>';
+  }
+}
+
+// ── DISCOVERY STATS ───────────────────────────────────────────────────────────
+
+async function loadDiscoveryStats() {
+  try {
+    const data = await apiFetch("/pro/analytics/searches");
+    const stats = data.discovery_stats || [];
+    const total = stats.reduce((s, r) => s + r.count, 0);
+    document.getElementById("stat-discovery").textContent = total.toLocaleString();
+  } catch {
+    document.getElementById("stat-discovery").textContent = "—";
+  }
+}
+
+// ── EVENT LISTENERS ───────────────────────────────────────────────────────────
+
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("login-btn").addEventListener("click", login);
   document.getElementById("logout-btn").addEventListener("click", logout);
   document.getElementById("api-key-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") login();
   });
+  document.getElementById("refresh-btn").addEventListener("click", () => {
+    if (trendChart) { trendChart.destroy(); trendChart = null; }
+    if (capChart)   { capChart.destroy();   capChart = null; }
+    loadDashboard();
+  });
 
-  // Auto-login if key already in sessionStorage
+  // Auto-login if key in sessionStorage
   if (apiKey) {
     loadDashboard().catch(() => {
       sessionStorage.removeItem("agentid_key");
