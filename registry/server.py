@@ -9,6 +9,7 @@ import json
 import os
 import re
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -102,6 +103,13 @@ def init_db():
                     status     TEXT
                 )
             """)
+            # MED-2: nonce deduplication — prevents replay within the 300s window
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS used_nonces (
+                    nonce      TEXT PRIMARY KEY,
+                    expires_at TIMESTAMPTZ NOT NULL
+                )
+            """)
         conn.commit()
 
 
@@ -123,6 +131,24 @@ def _audit(operation: str, did: str = None, ip: str = None, status: str = "ok"):
             conn.commit()
     except Exception:
         pass  # never let audit failure break a request
+
+
+def _check_nonce(cur, nonce) -> bool:
+    """
+    MED-2: Atomically record a nonce and return True if it is fresh.
+    Returns False if the nonce is missing, malformed, or has already been seen.
+    Expired nonces are cleaned up inline on every call.
+    """
+    if not nonce or not isinstance(nonce, str) or len(nonce) > 64:
+        return False
+    cur.execute("DELETE FROM used_nonces WHERE expires_at < NOW()")
+    cur.execute("""
+        INSERT INTO used_nonces (nonce, expires_at)
+        VALUES (%s, NOW() + INTERVAL '300 seconds')
+        ON CONFLICT (nonce) DO NOTHING
+        RETURNING nonce
+    """, (nonce,))
+    return cur.fetchone() is not None
 
 
 def row_to_dict(row) -> dict:
@@ -225,6 +251,16 @@ class AgentResponse(BaseModel):
     metadata: dict
 
 
+class AgentPublicResponse(BaseModel):
+    """MED-3: Owner field omitted — prevents bulk PII harvesting via unauthenticated listing."""
+    did: str
+    name: str
+    capabilities: list[str]
+    public_key: str
+    created_at: str
+    metadata: dict
+
+
 # ── routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -255,16 +291,14 @@ def register_agent(req: RegisterRequest, request: Request):
         _audit("register", req.did, ip, "invalid_proof")
         raise HTTPException(status_code=401, detail="Invalid proof of ownership")
 
+    # HIGH-2: atomic INSERT ON CONFLICT — eliminates SELECT+INSERT race condition
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT did FROM agents WHERE did = %s", (req.did,))
-            if cur.fetchone():
-                _audit("register", req.did, ip, "conflict")
-                raise HTTPException(status_code=409, detail="Agent already registered")
-
             cur.execute("""
                 INSERT INTO agents (did, name, capabilities, owner, public_key, created_at, metadata)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (did) DO NOTHING
+                RETURNING did
             """, (
                 req.did,
                 req.name,
@@ -274,6 +308,9 @@ def register_agent(req: RegisterRequest, request: Request):
                 req.created_at,
                 json.dumps(req.metadata),
             ))
+            if not cur.fetchone():
+                _audit("register", req.did, ip, "conflict")
+                raise HTTPException(status_code=409, detail="Agent already registered")
         conn.commit()
 
     _audit("register", req.did, ip)
@@ -310,7 +347,7 @@ def resolve_agent(did: str, request: Request):
     return AgentResponse(**row_to_dict(row))
 
 
-@app.get("/agents", response_model=list[AgentResponse])
+@app.get("/agents", response_model=list[AgentPublicResponse])
 @limiter.limit("60/minute")
 def discover_agents(
     request: Request,
@@ -341,7 +378,7 @@ def discover_agents(
             cur.execute(query, params)
             rows = cur.fetchall()
 
-    return [AgentResponse(**row_to_dict(r)) for r in rows]
+    return [AgentPublicResponse(**row_to_dict(r)) for r in rows]
 
 
 @app.post("/agents/{did}/verify")
@@ -351,18 +388,26 @@ def verify_signature(did: str, req: VerifyRequest, request: Request):
         with conn.cursor() as cur:
             cur.execute("SELECT public_key FROM agents WHERE did = %s", (did,))
             row = cur.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Agent not found")
 
-    # LOW-4: timestamp is mandatory — omitting it would bypass replay protection
-    timestamp = req.payload.get("timestamp")
-    if timestamp is None:
-        return {"valid": False, "did": did, "reason": "missing timestamp"}
-    try:
-        if time.time() - float(timestamp) > 300:
-            return {"valid": False, "did": did, "reason": "signature expired"}
-    except (TypeError, ValueError):
-        return {"valid": False, "did": did, "reason": "invalid timestamp"}
+            # MED-1: 403 not 404 — prevents probing which DIDs exist
+            if not row:
+                raise HTTPException(status_code=403, detail="Forbidden")
+
+            # LOW-4: timestamp mandatory
+            timestamp = req.payload.get("timestamp")
+            if timestamp is None:
+                return {"valid": False, "did": did, "reason": "missing timestamp"}
+            try:
+                if time.time() - float(timestamp) > 300:
+                    return {"valid": False, "did": did, "reason": "signature expired"}
+            except (TypeError, ValueError):
+                return {"valid": False, "did": did, "reason": "invalid timestamp"}
+
+            # MED-2: nonce mandatory — prevents replaying within the 300s window
+            if not _check_nonce(cur, req.payload.get("nonce")):
+                return {"valid": False, "did": did, "reason": "missing or replayed nonce"}
+
+            conn.commit()
 
     public_key_bytes = b64_to_public_key_bytes(row[0])
     valid = crypto_verify(public_key_bytes, req.payload, req.signature)
@@ -383,14 +428,15 @@ def update_agent(did: str, req: UpdateRequest, request: Request):
         _audit("update", did, ip, "bad_payload")
         raise HTTPException(status_code=400, detail="payload.did must match the DID in the path")
 
-    # Replay protection — reject requests older than 5 minutes
+    # HIGH-1: timestamp mandatory on update — omitting it allowed permanent replay
     timestamp = req.payload.get("timestamp")
-    if timestamp:
-        try:
-            if time.time() - float(timestamp) > 300:
-                raise HTTPException(status_code=400, detail="Request expired — resend with a fresh timestamp")
-        except (TypeError, ValueError):
-            raise HTTPException(status_code=400, detail="Invalid timestamp")
+    if not timestamp:
+        raise HTTPException(status_code=400, detail="payload.timestamp is required")
+    try:
+        if time.time() - float(timestamp) > 300:
+            raise HTTPException(status_code=400, detail="Request expired — resend with a fresh timestamp")
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid timestamp")
 
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -400,8 +446,15 @@ def update_agent(did: str, req: UpdateRequest, request: Request):
             )
             row = cur.fetchone()
 
-    if not row:
-        raise HTTPException(status_code=404, detail="Agent not found")
+            if not row:
+                raise HTTPException(status_code=404, detail="Agent not found")
+
+            # MED-2: nonce mandatory
+            if not _check_nonce(cur, req.payload.get("nonce")):
+                _audit("update", did, ip, "replayed_nonce")
+                raise HTTPException(status_code=400, detail="Missing or replayed nonce")
+
+            conn.commit()
 
     # Verify Ed25519 signature
     pub_key_bytes = b64_to_public_key_bytes(row[4])
@@ -412,9 +465,13 @@ def update_agent(did: str, req: UpdateRequest, request: Request):
     # Apply only the fields present in the payload; keep existing values otherwise
     current = row_to_dict(row)
     new_name         = req.payload.get("name", current["name"])
-    new_owner        = req.payload.get("owner", current["owner"])
     new_capabilities = req.payload.get("capabilities", current["capabilities"])
     new_metadata     = req.payload.get("metadata", current["metadata"])
+
+    # LOW-3: owner changes not supported without API key auth — prevents hijack via stolen key
+    if "owner" in req.payload and req.payload["owner"] != current["owner"]:
+        raise HTTPException(status_code=403, detail="Owner transfer not supported on this endpoint")
+    new_owner = current["owner"]
 
     # Validate updated fields (same rules as registration)
     if not new_name or len(new_name) > 256:
@@ -475,6 +532,14 @@ def deregister_agent(did: str, req: DeregisterRequest, request: Request):
             raise HTTPException(status_code=400, detail="Request expired — resend with a fresh timestamp")
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="Invalid timestamp")
+
+    # MED-2: nonce mandatory on deregister
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            if not _check_nonce(cur, req.payload.get("nonce")):
+                _audit("deregister", did, ip, "replayed_nonce")
+                raise HTTPException(status_code=400, detail="Missing or replayed nonce")
+            conn.commit()
 
     public_key_bytes = b64_to_public_key_bytes(row[0])
     if not crypto_verify(public_key_bytes, req.payload, req.signature):

@@ -7,6 +7,7 @@ the public agent document.
 
 import os
 import time
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -88,10 +89,12 @@ class HTTPRegistry:
         from agentid.crypto import sign as crypto_sign
 
         # Fix #1 — prove ownership with a signature instead of plain owner string
+        # MED-2: include nonce so server can reject replays within the 300s window
         payload = {
             "action": "deregister",
             "did": did,
             "timestamp": time.time(),
+            "nonce": str(uuid.uuid4()),
         }
         signature = crypto_sign(private_key_bytes, payload)
         response = self._client.request(
