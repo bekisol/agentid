@@ -585,6 +585,43 @@
     .last-active-fresh { color: var(--green); font-weight: 600; }
     .last-active-old   { color: var(--muted); }
 
+    /* ── SIGNING PAGINATION ── */
+    .signing-pager {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 0.85rem 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .pager-btn {
+      width: 2rem; height: 2rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.12s;
+    }
+    .pager-btn:hover:not([disabled]) {
+      border-color: var(--green);
+      color: var(--green);
+    }
+    .pager-btn[disabled] { opacity: 0.35; cursor: default; }
+    .pager-label {
+      font-size: 0.82rem;
+      color: var(--text);
+      min-width: 9rem;
+      text-align: center;
+    }
+    .pager-range {
+      color: var(--muted);
+      font-size: 0.75rem;
+      margin-left: 0.35rem;
+    }
+
     /* ── SIGNING DETAIL ROWS ── */
     .signing-detail-row { display: none; background: var(--surface2); }
     .signing-detail-row.open { display: table-row; }

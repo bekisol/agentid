@@ -467,11 +467,12 @@ async function loadAgentsTable() {
 
 // ── SIGNING ACTIVITY ──────────────────────────────────────────────────────────
 
+const _signing = { page: 1, pages: 1, total: 0, perPage: 50 };
+
 function payloadSummary(payload) {
   if (!payload) return "—";
-  const msg = payload.message || payload.action || payload.reason || null;
+  const msg = payload.reason || payload.message || payload.action || null;
   if (msg) return String(msg).slice(0, 80) + (String(msg).length > 80 ? "…" : "");
-  // Fall back to first non-meta key
   const skip = new Set(["timestamp","nonce","action","did"]);
   for (const [k, v] of Object.entries(payload)) {
     if (!skip.has(k)) return `${k}: ${String(v).slice(0, 60)}`;
@@ -479,16 +480,135 @@ function payloadSummary(payload) {
   return "signed payload";
 }
 
+function _signingRows(events) {
+  return events.map((e, i) => {
+    const signerCell = e.signer_name
+      ? `<span class="agent-name">${esc(e.signer_name)}</span>
+         <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.signer_did))}</div>`
+      : `<span class="did-mono">${esc(shortDid(e.signer_did))}</span>`;
+
+    const verifierCell = e.verifier_name
+      ? `<span class="agent-name">${esc(e.verifier_name)}</span>
+         <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.verifier_did))}</div>`
+      : e.verifier_did
+        ? `<span class="did-mono">${esc(shortDid(e.verifier_did))}</span>`
+        : `<span style="color:var(--muted);font-size:0.8rem;font-style:italic;">external</span>`;
+
+    const isValid     = e.status === "valid";
+    const statusCls   = isValid ? "status-ok" : "status-invalid";
+    const statusLbl   = isValid ? "✓ valid" : "✗ invalid";
+    const timeStr     = e.timestamp ? String(e.timestamp).slice(0, 19).replace("T"," ") : "—";
+    const summary     = esc(payloadSummary(e.payload));
+    const payloadJson = e.payload   ? esc(JSON.stringify(e.payload, null, 2)) : "—";
+    const sigFull     = e.signature ? esc(e.signature) : "—";
+
+    return `
+      <tr data-idx="${i}" style="cursor:pointer;user-select:none;">
+        <td class="time-cell">${esc(timeStr)}</td>
+        <td>${signerCell}</td>
+        <td style="text-align:center;color:var(--muted);font-size:1rem;">→</td>
+        <td>${verifierCell}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.8rem;color:var(--muted);">${summary}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span class="${statusCls}" style="font-size:0.8rem;">${statusLbl}</span>
+            <span class="expand-btn" style="font-size:0.85rem;color:var(--muted);padding:0.1rem 0.3rem;">▸</span>
+          </div>
+        </td>
+      </tr>
+      <tr data-detail="${i}" style="display:none;background:var(--surface2);">
+        <td colspan="6" style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;">
+            <div>
+              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">💬 Message</div>
+              <div style="font-size:0.8rem;color:var(--text-2);">${summary || "—"}</div>
+            </div>
+            <div>
+              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">📋 Signed Payload</div>
+              <pre style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);white-space:pre-wrap;line-height:1.5;margin:0;">${payloadJson}</pre>
+            </div>
+            <div style="grid-column:1/-1;">
+              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">
+                🔏 Signature
+                <button data-copy="${i}" style="background:none;border:1px solid var(--border-dark);border-radius:5px;padding:0.1rem 0.45rem;font-size:0.7rem;cursor:pointer;color:var(--muted);margin-left:0.4rem;">copy</button>
+              </div>
+              <div data-sig="${i}" style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);word-break:break-all;">${sigFull}</div>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+  }).join("");
+}
+
+function _signingPager() {
+  const { page, pages, total, perPage } = _signing;
+  const start = (page - 1) * perPage + 1;
+  const end   = Math.min(page * perPage, total);
+  const prevDis = page <= 1     ? "disabled" : "";
+  const nextDis = page >= pages ? "disabled" : "";
+
+  return `
+    <div class="signing-pager" id="signing-pager">
+      <button class="pager-btn" id="sign-prev" ${prevDis}>&#8592;</button>
+      <span class="pager-label">
+        <strong>${page}</strong> of <strong>${pages}</strong>
+        <span class="pager-range">(${start}–${end} of ${total})</span>
+      </span>
+      <button class="pager-btn" id="sign-next" ${nextDis}>&#8594;</button>
+    </div>`;
+}
+
+function _attachSigningListeners() {
+  // Expand/copy rows
+  const tbody = document.getElementById("signing-tbody");
+  if (!tbody) return;
+
+  tbody.addEventListener("click", function (ev) {
+    const copyBtn = ev.target.closest("[data-copy]");
+    if (copyBtn) {
+      const sigEl = this.querySelector(`[data-sig="${copyBtn.dataset.copy}"]`);
+      if (sigEl) navigator.clipboard.writeText(sigEl.textContent).catch(() => {});
+      copyBtn.textContent = "copied!";
+      setTimeout(() => { copyBtn.textContent = "copy"; }, 1500);
+      return;
+    }
+    const mainRow = ev.target.closest("tr[data-idx]");
+    if (!mainRow) return;
+    const idx       = mainRow.dataset.idx;
+    const detailRow = this.querySelector(`tr[data-detail="${idx}"]`);
+    const btn       = mainRow.querySelector(".expand-btn");
+    if (!detailRow) return;
+    const nowOpen = detailRow.style.display === "none" || detailRow.style.display === "";
+    detailRow.style.display = nowOpen ? "table-row" : "none";
+    if (btn) btn.textContent = nowOpen ? "▾" : "▸";
+  });
+
+  // Pagination buttons
+  document.getElementById("sign-prev")?.addEventListener("click", () => {
+    if (_signing.page > 1) { _signing.page--; loadSigningActivity(); }
+  });
+  document.getElementById("sign-next")?.addEventListener("click", () => {
+    if (_signing.page < _signing.pages) { _signing.page++; loadSigningActivity(); }
+  });
+}
+
 async function loadSigningActivity() {
   const el    = document.getElementById("signing-table");
   const label = document.getElementById("signing-count-label");
   try {
-    const data   = await apiFetch("/pro/analytics/signing");
+    const data = await apiFetch(
+      `/pro/analytics/signing?page=${_signing.page}&per_page=${_signing.perPage}`
+    );
     const events = data.events || [];
 
-    label.textContent = `${events.length} event${events.length !== 1 ? "s" : ""}`;
+    // Sync pagination state from server response
+    _signing.total  = data.total  ?? events.length;
+    _signing.pages  = data.pages  ?? 1;
+    _signing.page   = data.page   ?? _signing.page;
 
-    if (!events.length) {
+    label.textContent = `${_signing.total} event${_signing.total !== 1 ? "s" : ""}`;
+
+    if (!events.length && _signing.page === 1) {
       el.innerHTML = `<div class="empty">
         <div class="empty-icon">🤝</div>
         <p>No signing events yet</p>
@@ -501,100 +621,20 @@ async function loadSigningActivity() {
       return;
     }
 
-    const rows = events.map((e, i) => {
-      const signerCell = e.signer_name
-        ? `<span class="agent-name">${esc(e.signer_name)}</span>
-           <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.signer_did))}</div>`
-        : `<span class="did-mono">${esc(shortDid(e.signer_did))}</span>`;
-
-      const verifierCell = e.verifier_name
-        ? `<span class="agent-name">${esc(e.verifier_name)}</span>
-           <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.verifier_did))}</div>`
-        : e.verifier_did
-          ? `<span class="did-mono">${esc(shortDid(e.verifier_did))}</span>`
-          : `<span style="color:var(--muted);font-size:0.8rem;font-style:italic;">external</span>`;
-
-      const isValid   = e.status === "valid";
-      const statusCls = isValid ? "status-ok" : "status-invalid";
-      const statusLbl = isValid ? "✓ valid" : "✗ invalid";
-      const timeStr   = e.timestamp ? String(e.timestamp).slice(0, 19).replace("T", " ") : "—";
-      const summary   = esc(payloadSummary(e.payload));
-      const payloadJson = e.payload   ? esc(JSON.stringify(e.payload, null, 2)) : "—";
-      const sigFull     = e.signature ? esc(e.signature) : "—";
-      const ipVal       = e.ip        ? esc(e.ip)        : "—";
-
-      return `
-        <tr data-idx="${i}" style="cursor:pointer;user-select:none;">
-          <td class="time-cell">${esc(timeStr)}</td>
-          <td>${signerCell}</td>
-          <td style="text-align:center;color:var(--muted);font-size:1rem;">→</td>
-          <td>${verifierCell}</td>
-          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.8rem;color:var(--muted);">${summary}</td>
-          <td>
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-              <span class="${statusCls}" style="font-size:0.8rem;">${statusLbl}</span>
-              <span style="font-size:0.85rem;color:var(--muted);padding:0.1rem 0.3rem;" class="expand-btn">▸</span>
-            </div>
-          </td>
-        </tr>
-        <tr data-detail="${i}" style="display:none;background:var(--surface2);">
-          <td colspan="6" style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);">
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;">
-              <div>
-                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">💬 Message</div>
-                <div style="font-size:0.8rem;color:var(--text-2);">${summary || "—"}</div>
-              </div>
-              <div>
-                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">📋 Signed Payload</div>
-                <pre style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);white-space:pre-wrap;line-height:1.5;margin:0;">${payloadJson}</pre>
-              </div>
-              <div style="grid-column:1/-1;">
-                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">
-                  🔏 Signature
-                  <button data-copy="${i}" style="background:none;border:1px solid var(--border-dark);border-radius:5px;padding:0.1rem 0.45rem;font-size:0.7rem;cursor:pointer;color:var(--muted);margin-left:0.4rem;">copy</button>
-                </div>
-                <div data-sig="${i}" style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);word-break:break-all;">${sigFull}</div>
-              </div>
-            </div>
-          </td>
-        </tr>`;
-    }).join("");
-
     el.innerHTML = `
       <div style="overflow:auto;">
         <table class="agents-table" style="width:100%;">
           <thead><tr>
-            <th>Time</th><th>Signer</th><th style="color:var(--muted);">→</th>
+            <th>Time</th><th>Signer</th>
+            <th style="color:var(--muted);">→</th>
             <th>Verified By</th><th>Message</th><th>Result</th>
           </tr></thead>
-          <tbody id="signing-tbody">${rows}</tbody>
+          <tbody id="signing-tbody">${_signingRows(events)}</tbody>
         </table>
-      </div>`;
+      </div>
+      ${_signing.pages > 1 ? _signingPager() : ""}`;
 
-    // Single delegated listener on the tbody
-    document.getElementById("signing-tbody").addEventListener("click", function (ev) {
-      // Copy button
-      const copyBtn = ev.target.closest("[data-copy]");
-      if (copyBtn) {
-        const sigEl = this.querySelector(`[data-sig="${copyBtn.dataset.copy}"]`);
-        if (sigEl) navigator.clipboard.writeText(sigEl.textContent);
-        copyBtn.textContent = "copied!";
-        setTimeout(() => { copyBtn.textContent = "copy"; }, 1500);
-        return;
-      }
-
-      // Row click — find the nearest <tr> with data-idx
-      const mainRow = ev.target.closest("tr[data-idx]");
-      if (!mainRow) return;
-      const idx       = mainRow.dataset.idx;
-      const detailRow = this.querySelector(`tr[data-detail="${idx}"]`);
-      const btn       = mainRow.querySelector(".expand-btn");
-      if (!detailRow) return;
-
-      const nowOpen = detailRow.style.display === "none" || detailRow.style.display === "";
-      detailRow.style.display = nowOpen ? "table-row" : "none";
-      if (btn) btn.textContent = nowOpen ? "▾" : "▸";
-    });
+    _attachSigningListeners();
 
   } catch {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load signing activity</p></div>';
