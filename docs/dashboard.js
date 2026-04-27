@@ -135,6 +135,7 @@ async function loadDashboard() {
   document.getElementById("stat-events").textContent = auditEvents.toLocaleString();
   document.getElementById("stat-active").textContent = totalActivity.toLocaleString();
   document.getElementById("stat-discovery").textContent = "…";
+  // Note: stat-caps was replaced by stat-discovery in the HTML
 
   // Usage meter
   const limit = TIER_LIMITS[tier] ?? 100;
@@ -154,21 +155,36 @@ async function loadDashboard() {
 
   // Badge, charts, audit, agents — load in parallel
   loadBadge(data.owner);
-  renderCharts(data);
+  try { renderCharts(data); } catch (e) { console.warn("Charts:", e); }
   renderActivity(data.activity_last_7d || []);
   loadAuditLog();
   loadAgentsTable();
   loadDiscoveryStats();
 
-  // Export CSV link
+  // Export CSV — fetch with header (server only accepts x-api-key, not query param)
   const exportBtn = document.getElementById("export-csv-btn");
-  exportBtn.href = `${BASE}/pro/audit-log/csv?api_key=${encodeURIComponent(apiKey)}`;
-  exportBtn.download = "audit-log.csv";
+  exportBtn.removeAttribute("href");
+  exportBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${BASE}/pro/audit-log/csv`, { headers: { "x-api-key": apiKey } });
+      if (!res.ok) throw new Error(res.status);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "audit-log.csv"; a.click();
+      URL.revokeObjectURL(url);
+    } catch { alert("Could not export CSV — please try again."); }
+  });
 }
 
 // ── CHARTS ────────────────────────────────────────────────────────────────────
 
 function renderCharts(data) {
+  if (typeof Chart === "undefined") {
+    console.warn("Chart.js not loaded — charts skipped");
+    return;
+  }
   const trendLabels = (data.registration_trend_30d || []).map(r => {
     const d = new Date(r.date);
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
