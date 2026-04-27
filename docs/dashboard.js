@@ -392,6 +392,18 @@ async function loadAgentsTable() {
 
 // ── SIGNING ACTIVITY ──────────────────────────────────────────────────────────
 
+function payloadSummary(payload) {
+  if (!payload) return "—";
+  const msg = payload.message || payload.action || payload.reason || null;
+  if (msg) return String(msg).slice(0, 80) + (String(msg).length > 80 ? "…" : "");
+  // Fall back to first non-meta key
+  const skip = new Set(["timestamp","nonce","action","did"]);
+  for (const [k, v] of Object.entries(payload)) {
+    if (!skip.has(k)) return `${k}: ${String(v).slice(0, 60)}`;
+  }
+  return "signed payload";
+}
+
 async function loadSigningActivity() {
   const el    = document.getElementById("signing-table");
   const label = document.getElementById("signing-count-label");
@@ -414,49 +426,104 @@ async function loadSigningActivity() {
       return;
     }
 
+    const rows = events.map((e, i) => {
+      const signerCell = e.signer_name
+        ? `<span class="agent-name">${esc(e.signer_name)}</span>
+           <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.signer_did))}</div>`
+        : `<span class="did-mono">${esc(shortDid(e.signer_did))}</span>`;
+
+      const verifierCell = e.verifier_name
+        ? `<span class="agent-name">${esc(e.verifier_name)}</span>
+           <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.verifier_did))}</div>`
+        : e.verifier_did
+          ? `<span class="did-mono">${esc(shortDid(e.verifier_did))}</span>`
+          : `<span style="color:var(--muted);font-size:0.8rem;font-style:italic;">external</span>`;
+
+      const isValid   = e.status === "valid";
+      const statusCls = isValid ? "status-ok" : "status-invalid";
+      const statusLbl = isValid ? "✓ valid" : "✗ invalid";
+      const timeStr   = e.timestamp ? String(e.timestamp).slice(0, 19).replace("T", " ") : "—";
+      const summary   = esc(payloadSummary(e.payload));
+
+      // Signature — show first 24 chars in the row, full in expanded detail
+      const sigShort  = e.signature ? esc(e.signature.slice(0, 24)) + "…" : "—";
+
+      // Expanded detail block
+      const payloadJson  = e.payload   ? esc(JSON.stringify(e.payload, null, 2)) : "—";
+      const sigFull      = e.signature ? esc(e.signature) : "—";
+      const ipVal        = e.ip        ? esc(e.ip)        : "—";
+      const sigId        = `sig-${i}`;
+
+      const detailRow = `
+        <tr class="signing-detail-row" id="detail-${i}">
+          <td class="signing-detail-cell" colspan="6">
+            <div class="detail-grid">
+              <div class="detail-block">
+                <div class="detail-label">📍 Origin IP</div>
+                <div class="detail-value prose">${ipVal}</div>
+              </div>
+              <div class="detail-block">
+                <div class="detail-label">💬 Message / Reason</div>
+                <div class="detail-value prose">${esc(payloadSummary(e.payload))}</div>
+              </div>
+              <div class="detail-block" style="grid-column: 1 / -1;">
+                <div class="detail-label">📋 Signed Payload</div>
+                <pre class="detail-value" style="white-space:pre-wrap;font-size:0.73rem;line-height:1.5;">${payloadJson}</pre>
+              </div>
+              <div class="detail-block" style="grid-column: 1 / -1;">
+                <div class="detail-label">🔏 Signature Proof
+                  <button class="sig-copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('${sigId}').textContent)">copy</button>
+                </div>
+                <div class="detail-value" id="${sigId}">${sigFull}</div>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+
+      const mainRow = `
+        <tr class="signing-main-row" style="cursor:pointer;" onclick="toggleSigningDetail(${i})">
+          <td class="time-cell">${esc(timeStr)}</td>
+          <td>${signerCell}</td>
+          <td style="text-align:center;color:var(--muted);font-size:1rem;">→</td>
+          <td>${verifierCell}</td>
+          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.8rem;color:var(--muted);">${summary}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span class="${statusCls}" style="font-size:0.8rem;">${statusLbl}</span>
+              <button class="expand-btn" id="expand-${i}" title="Show details">▸</button>
+            </div>
+          </td>
+        </tr>
+        ${detailRow}`;
+
+      return mainRow;
+    }).join("");
+
     el.innerHTML = `
       <div style="overflow:auto;">
-        <table class="agents-table">
+        <table class="agents-table" style="width:100%;">
           <thead><tr>
             <th>Time</th>
             <th>Signer</th>
-            <th style="padding-left:0.5rem;padding-right:0.5rem;color:var(--muted);">→</th>
+            <th style="color:var(--muted);">→</th>
             <th>Verified By</th>
+            <th>Message</th>
             <th>Result</th>
           </tr></thead>
-          <tbody>
-            ${events.map(e => {
-              const signerCell = e.signer_name
-                ? `<span class="agent-name">${esc(e.signer_name)}</span>
-                   <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.signer_did))}</div>`
-                : `<span class="did-mono">${esc(shortDid(e.signer_did))}</span>`;
-
-              const verifierCell = e.verifier_name
-                ? `<span class="agent-name">${esc(e.verifier_name)}</span>
-                   <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(e.verifier_did))}</div>`
-                : e.verifier_did
-                  ? `<span class="did-mono">${esc(shortDid(e.verifier_did))}</span>`
-                  : `<span style="color:var(--muted);font-size:0.8rem;font-style:italic;">external</span>`;
-
-              const isValid   = e.status === "valid";
-              const statusCls = isValid ? "status-ok" : "status-invalid";
-              const statusLbl = isValid ? "✓ valid" : "✗ invalid";
-              const timeStr   = e.timestamp ? String(e.timestamp).slice(11, 19) : "—";
-
-              return `<tr>
-                <td class="time-cell">${esc(timeStr)}</td>
-                <td>${signerCell}</td>
-                <td style="text-align:center;color:var(--muted);font-size:1rem;">→</td>
-                <td>${verifierCell}</td>
-                <td class="${statusCls}" style="font-size:0.8rem;">${statusLbl}</td>
-              </tr>`;
-            }).join("")}
-          </tbody>
+          <tbody>${rows}</tbody>
         </table>
       </div>`;
   } catch {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load signing activity</p></div>';
   }
+}
+
+function toggleSigningDetail(i) {
+  const detail = document.getElementById(`detail-${i}`);
+  const btn    = document.getElementById(`expand-${i}`);
+  if (!detail) return;
+  const open = detail.classList.toggle("open");
+  if (btn) btn.textContent = open ? "▾" : "▸";
 }
 
 // ── DISCOVERY STATS ───────────────────────────────────────────────────────────

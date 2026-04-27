@@ -518,6 +518,60 @@
 
     .last-active-fresh { color: var(--green); font-weight: 600; }
     .last-active-old   { color: var(--muted); }
+
+    /* ── SIGNING DETAIL ROWS ── */
+    .signing-detail-row { display: none; background: var(--surface2); }
+    .signing-detail-row.open { display: table-row; }
+    .signing-detail-cell {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+    .detail-block { display: flex; flex-direction: column; gap: 0.2rem; }
+    .detail-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+    }
+    .detail-value {
+      font-size: 0.8rem;
+      color: var(--text-2);
+      word-break: break-all;
+      font-family: "JetBrains Mono", monospace;
+    }
+    .detail-value.prose {
+      font-family: "Inter", sans-serif;
+      word-break: normal;
+    }
+    .sig-copy-btn {
+      background: none;
+      border: 1px solid var(--border-dark);
+      border-radius: 5px;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+      color: var(--muted);
+      margin-left: 0.4rem;
+      vertical-align: middle;
+    }
+    .sig-copy-btn:hover { background: var(--surface2); color: var(--text); }
+    .expand-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .expand-btn:hover { color: var(--text); }
   </style>
 </head>
 <body>
