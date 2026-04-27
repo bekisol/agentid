@@ -177,6 +177,40 @@ async function loadDashboard() {
       URL.revokeObjectURL(url);
     } catch { alert("Could not export CSV — please try again."); }
   });
+
+  // PDF report — streams the full analytics report as a PDF download
+  const pdfBtn = document.getElementById("pdf-btn");
+  pdfBtn.addEventListener("click", async () => {
+    const original = pdfBtn.textContent;
+    pdfBtn.textContent = "Generating…";
+    pdfBtn.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/pro/analytics/report.pdf`, {
+        headers: { "x-api-key": apiKey },
+      });
+      if (!res.ok) throw new Error(res.status);
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      // Use filename from Content-Disposition if present, otherwise fall back
+      const cd   = res.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="([^"]+)"/);
+      a.download = match ? match[1] : "agentid-analytics.pdf";
+      a.href = url;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      const status = e.message;
+      if (status === "403") {
+        alert("PDF reports require a Pro or Enterprise plan.");
+      } else {
+        alert("Could not generate PDF — please try again.");
+      }
+    } finally {
+      pdfBtn.textContent = original;
+      pdfBtn.disabled = false;
+    }
+  });
 }
 
 // ── CHARTS ────────────────────────────────────────────────────────────────────
