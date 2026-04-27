@@ -331,16 +331,110 @@ async function loadAuditLog() {
 
 // ── AGENTS TABLE ──────────────────────────────────────────────────────────────
 
+let _allAgents = [];   // cached for client-side search
+
+function _renderAgentRow(a) {
+  const capsArr = Array.isArray(a.capabilities) ? a.capabilities : [];
+  const caps = capsArr.length
+    ? `<div class="caps-scroll">${capsArr.map(c => `<span class="cap-pill">${esc(String(c))}</span>`).join("")}</div>`
+    : "";
+  const lastActiveStr   = a.last_activity ? timeAgo(a.last_activity) : "—";
+  const lastActiveClass = a.last_activity &&
+    (Date.now() - new Date(a.last_activity).getTime()) < 86400000 * 7
+    ? "last-active-fresh" : "last-active-old";
+  const createdStr = a.created_at
+    ? new Date(a.created_at).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" })
+    : "—";
+  return `<tr
+    data-name="${esc(a.name.toLowerCase())}"
+    data-did="${esc((a.did || "").toLowerCase())}"
+    data-caps="${esc(capsArr.join(" ").toLowerCase())}">
+    <td class="agent-name">${esc(a.name)}</td>
+    <td class="did-mono" title="${esc(a.did || "")}">${esc(shortDid(a.did))}</td>
+    <td>${caps || '<span style="color:var(--muted);font-size:0.8rem;">none</span>'}</td>
+    <td style="text-align:center;font-weight:600;">${esc(String(a.audit_events ?? 0))}</td>
+    <td class="${lastActiveClass}">${esc(lastActiveStr)}</td>
+    <td style="color:var(--muted);font-size:0.78rem;">${esc(createdStr)}</td>
+  </tr>`;
+}
+
+function _applyAgentSearch() {
+  const q      = (document.getElementById("agent-search")?.value || "").trim().toLowerCase();
+  const mode   = document.querySelector(".search-tag-active")?.dataset.mode || "all";
+  const status = document.getElementById("agent-search-status");
+  const tbody  = document.querySelector("#agents-table tbody");
+  const label  = document.getElementById("agents-count-label");
+  if (!tbody) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  let visible = 0;
+
+  rows.forEach(row => {
+    if (!q) {
+      row.classList.remove("agent-row-hidden", "agent-row-highlight");
+      visible++;
+      return;
+    }
+    const name = row.dataset.name || "";
+    const did  = row.dataset.did  || "";
+    const caps = row.dataset.caps || "";
+
+    let match = false;
+    if (mode === "all")  match = name.includes(q) || did.includes(q) || caps.includes(q);
+    if (mode === "name") match = name.includes(q);
+    if (mode === "did")  match = did.includes(q);
+    if (mode === "cap")  match = caps.split(" ").some(c => c.includes(q));
+
+    row.classList.toggle("agent-row-hidden",    !match);
+    row.classList.toggle("agent-row-highlight",  match && q.length > 0);
+    if (match) visible++;
+  });
+
+  const total = _allAgents.length;
+  if (q) {
+    label.textContent = `${visible} of ${total} agent${total !== 1 ? "s" : ""}`;
+    status.textContent = visible === 0
+      ? `No agents match "${q}" — try a different term or switch filter`
+      : `${visible} result${visible !== 1 ? "s" : ""} for "${q}"`;
+  } else {
+    label.textContent = `${total} agent${total !== 1 ? "s" : ""}`;
+    status.textContent = "";
+  }
+}
+
+function _initAgentSearch() {
+  const input = document.getElementById("agent-search");
+  const tags  = document.querySelectorAll(".search-tag");
+  if (!input) return;
+
+  input.addEventListener("input", _applyAgentSearch);
+
+  // Clear on Escape
+  input.addEventListener("keydown", e => {
+    if (e.key === "Escape") { input.value = ""; _applyAgentSearch(); input.blur(); }
+  });
+
+  // Mode pills
+  tags.forEach(tag => {
+    tag.addEventListener("click", () => {
+      tags.forEach(t => t.classList.remove("search-tag-active"));
+      tag.classList.add("search-tag-active");
+      _applyAgentSearch();
+      input.focus();
+    });
+  });
+}
+
 async function loadAgentsTable() {
-  const el = document.getElementById("agents-table");
+  const el    = document.getElementById("agents-table");
   const label = document.getElementById("agents-count-label");
   try {
     const data = await apiFetch("/pro/analytics/agents");
-    const agents = data.agents || [];
+    _allAgents = data.agents || [];
 
-    label.textContent = `${agents.length} agent${agents.length !== 1 ? "s" : ""}`;
+    label.textContent = `${_allAgents.length} agent${_allAgents.length !== 1 ? "s" : ""}`;
 
-    if (!agents.length) {
+    if (!_allAgents.length) {
       el.innerHTML = '<div class="empty"><div class="empty-icon">🤖</div><p>No agents registered yet</p></div>';
       return;
     }
@@ -356,34 +450,16 @@ async function loadAgentsTable() {
             <th>Last Active</th>
             <th>Registered</th>
           </tr></thead>
-          <tbody>
-            ${agents.map(a => {
-              const capsArr = Array.isArray(a.capabilities) ? a.capabilities : [];
-              const caps = capsArr.length
-                ? `<div class="caps-scroll">${capsArr.map(c => `<span class="cap-pill">${esc(String(c))}</span>`).join("")}</div>`
-                : "";
-
-              const lastActiveStr = a.last_activity ? timeAgo(a.last_activity) : "—";
-              const lastActiveClass = a.last_activity &&
-                (Date.now() - new Date(a.last_activity).getTime()) < 86400000 * 7
-                ? "last-active-fresh" : "last-active-old";
-
-              const createdStr = a.created_at ? new Date(a.created_at).toLocaleDateString("en-US", {
-                month: "short", day: "numeric", year: "numeric"
-              }) : "—";
-
-              return `<tr>
-                <td class="agent-name">${esc(a.name)}</td>
-                <td class="did-mono">${esc(shortDid(a.did))}</td>
-                <td>${caps || '<span style="color:var(--muted);font-size:0.8rem;">none</span>'}</td>
-                <td style="text-align:center;font-weight:600;">${esc(String(a.audit_events ?? 0))}</td>
-                <td class="${lastActiveClass}">${esc(lastActiveStr)}</td>
-                <td style="color:var(--muted);font-size:0.78rem;">${esc(createdStr)}</td>
-              </tr>`;
-            }).join("")}
-          </tbody>
+          <tbody>${_allAgents.map(_renderAgentRow).join("")}</tbody>
         </table>
       </div>`;
+
+    // Re-apply any pending search query (e.g. user typed before data loaded)
+    _applyAgentSearch();
+
+    // Initialise search controls once per load
+    _initAgentSearch();
+
   } catch {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load agents</p></div>';
   }

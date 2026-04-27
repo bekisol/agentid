@@ -499,6 +499,59 @@
     .agents-table tr:last-child td { border-bottom: none; }
     .agents-table tr:hover td { background: var(--surface2); }
 
+    /* ── AGENT SEARCH ── */
+    .agent-search-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.4rem 0.75rem;
+      transition: border-color 0.15s;
+    }
+    .agent-search-wrap:focus-within {
+      border-color: var(--green);
+      box-shadow: 0 0 0 2px rgba(5,150,105,0.1);
+    }
+    .agent-search-icon { color: var(--muted); flex-shrink: 0; }
+    .agent-search-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 0.85rem;
+      color: var(--text);
+      outline: none;
+      min-width: 0;
+    }
+    .agent-search-input::placeholder { color: var(--muted); }
+    .agent-search-tags {
+      display: flex;
+      gap: 0.3rem;
+      flex-shrink: 0;
+    }
+    .search-tag {
+      padding: 0.15rem 0.55rem;
+      border-radius: 20px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: var(--surface);
+      transition: all 0.12s;
+      user-select: none;
+    }
+    .search-tag:hover { border-color: var(--green); color: var(--green); }
+    .search-tag-active {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
+    }
+
+    .agent-row-hidden { display: none !important; }
+    .agent-row-highlight td { background: rgba(5,150,105,0.04); }
+
     .caps-scroll {
       display: flex;
       flex-wrap: wrap;
@@ -739,6 +792,30 @@
       <div class="card-title">My Agents</div>
       <span id="agents-count-label" style="font-size:0.8rem;color:var(--muted);"></span>
     </div>
+
+    <!-- Search bar -->
+    <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);">
+      <div class="agent-search-wrap">
+        <svg class="agent-search-icon" width="15" height="15" viewBox="0 0 20 20" fill="none">
+          <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M13 13l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <input id="agent-search"
+               class="agent-search-input"
+               type="text"
+               placeholder="Search by name, DID, or capability…"
+               autocomplete="off"
+               spellcheck="false"/>
+        <div class="agent-search-tags" id="agent-search-tags">
+          <span class="search-tag search-tag-active" data-mode="all">All</span>
+          <span class="search-tag" data-mode="name">Name</span>
+          <span class="search-tag" data-mode="did">DID</span>
+          <span class="search-tag" data-mode="cap">Capability</span>
+        </div>
+      </div>
+      <div id="agent-search-status" style="font-size:0.75rem;color:var(--muted);margin-top:0.4rem;min-height:1rem;"></div>
+    </div>
+
     <div id="agents-table"><div class="loading"><div class="spinner"></div> Loading…</div></div>
   </div>
 
