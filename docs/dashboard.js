@@ -162,23 +162,28 @@ async function loadDashboard() {
   loadAgentsTable();
   loadDiscoveryStats();
 
-  // Export CSV — fetch with header (server only accepts x-api-key, not query param)
-  const exportBtn = document.getElementById("export-csv-btn");
-  exportBtn.removeAttribute("href");
-  exportBtn.addEventListener("click", async (e) => {
-    e.preventDefault();
+  // ── Export CSV ──────────────────────────────────────────────────────────────
+  const csvBtn = document.getElementById("csv-btn");
+  csvBtn.addEventListener("click", async () => {
+    const original = csvBtn.textContent;
+    csvBtn.textContent = "Exporting…";
+    csvBtn.disabled = true;
     try {
       const res = await fetch(`${BASE}/pro/audit-log/csv`, { headers: { "x-api-key": apiKey } });
       if (!res.ok) throw new Error(res.status);
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
       a.href = url; a.download = "audit-log.csv"; a.click();
       URL.revokeObjectURL(url);
     } catch { alert("Could not export CSV — please try again."); }
+    finally {
+      csvBtn.textContent = original;
+      csvBtn.disabled = false;
+    }
   });
 
-  // PDF report — streams the full analytics report as a PDF download
+  // ── PDF Report ───────────────────────────────────────────────────────────────
   const pdfBtn = document.getElementById("pdf-btn");
   pdfBtn.addEventListener("click", async () => {
     const original = pdfBtn.textContent;
@@ -192,7 +197,6 @@ async function loadDashboard() {
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
-      // Use filename from Content-Disposition if present, otherwise fall back
       const cd   = res.headers.get("Content-Disposition") || "";
       const match = cd.match(/filename="([^"]+)"/);
       a.download = match ? match[1] : "agentid-analytics.pdf";
@@ -200,8 +204,7 @@ async function loadDashboard() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      const status = e.message;
-      if (status === "403") {
+      if (e.message === "403") {
         alert("PDF reports require a Pro or Enterprise plan.");
       } else {
         alert("Could not generate PDF — please try again.");
