@@ -358,11 +358,10 @@ async function loadAgentsTable() {
           </tr></thead>
           <tbody>
             ${agents.map(a => {
-              const caps = (Array.isArray(a.capabilities) ? a.capabilities : [])
-                .slice(0, 4)
-                .map(c => `<span class="cap-pill">${esc(String(c))}</span>`)
-                .join("") + (a.capabilities && a.capabilities.length > 4
-                  ? `<span class="cap-pill">+${a.capabilities.length - 4}</span>` : "");
+              const capsArr = Array.isArray(a.capabilities) ? a.capabilities : [];
+              const caps = capsArr.length
+                ? `<div class="caps-scroll">${capsArr.map(c => `<span class="cap-pill">${esc(String(c))}</span>`).join("")}</div>`
+                : "";
 
               const lastActiveStr = a.last_activity ? timeAgo(a.last_activity) : "—";
               const lastActiveClass = a.last_activity &&

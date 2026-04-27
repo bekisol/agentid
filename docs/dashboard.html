@@ -499,6 +499,19 @@
     .agents-table tr:last-child td { border-bottom: none; }
     .agents-table tr:hover td { background: var(--surface2); }
 
+    .caps-scroll {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.15rem;
+      max-height: 5.2rem;       /* ~3 rows of pills */
+      overflow-y: auto;
+      padding-right: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .caps-scroll::-webkit-scrollbar { width: 4px; }
+    .caps-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
     .cap-pill {
       display: inline-flex;
       padding: 0.15rem 0.5rem;
@@ -508,7 +521,7 @@
       background: var(--surface2);
       border: 1px solid var(--border);
       color: var(--muted);
-      margin: 0.1rem;
+      white-space: nowrap;
     }
 
     .agent-name {
