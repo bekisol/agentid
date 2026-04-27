@@ -449,7 +449,7 @@ async function loadSigningActivity() {
       const ipVal       = e.ip        ? esc(e.ip)        : "—";
 
       return `
-        <tr class="signing-main-row" data-idx="${i}" style="cursor:pointer;">
+        <tr data-idx="${i}" style="cursor:pointer;user-select:none;">
           <td class="time-cell">${esc(timeStr)}</td>
           <td>${signerCell}</td>
           <td style="text-align:center;color:var(--muted);font-size:1rem;">→</td>
@@ -458,28 +458,27 @@ async function loadSigningActivity() {
           <td>
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span class="${statusCls}" style="font-size:0.8rem;">${statusLbl}</span>
-              <span class="expand-btn">▸</span>
+              <span style="font-size:0.85rem;color:var(--muted);padding:0.1rem 0.3rem;" class="expand-btn">▸</span>
             </div>
           </td>
         </tr>
-        <tr class="signing-detail-row" data-detail="${i}">
-          <td class="signing-detail-cell" colspan="6">
-            <div class="detail-grid">
-              <div class="detail-block">
-                <div class="detail-label">📍 Origin IP</div>
-                <div class="detail-value prose">${ipVal}</div>
+        <tr data-detail="${i}" style="display:none;background:var(--surface2);">
+          <td colspan="6" style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;">
+              <div>
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">💬 Message</div>
+                <div style="font-size:0.8rem;color:var(--text-2);">${summary || "—"}</div>
               </div>
-              <div class="detail-block">
-                <div class="detail-label">💬 Message / Reason</div>
-                <div class="detail-value prose">${summary || "—"}</div>
+              <div>
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">📋 Signed Payload</div>
+                <pre style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);white-space:pre-wrap;line-height:1.5;margin:0;">${payloadJson}</pre>
               </div>
-              <div class="detail-block" style="grid-column:1/-1;">
-                <div class="detail-label">📋 Signed Payload</div>
-                <pre class="detail-value" style="white-space:pre-wrap;font-size:0.73rem;line-height:1.5;">${payloadJson}</pre>
-              </div>
-              <div class="detail-block" style="grid-column:1/-1;">
-                <div class="detail-label">🔏 Signature Proof <button class="sig-copy-btn">copy</button></div>
-                <div class="detail-value sig-value">${sigFull}</div>
+              <div style="grid-column:1/-1;">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">
+                  🔏 Signature
+                  <button data-copy="${i}" style="background:none;border:1px solid var(--border-dark);border-radius:5px;padding:0.1rem 0.45rem;font-size:0.7rem;cursor:pointer;color:var(--muted);margin-left:0.4rem;">copy</button>
+                </div>
+                <div data-sig="${i}" style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);word-break:break-all;">${sigFull}</div>
               </div>
             </div>
           </td>
@@ -493,36 +492,33 @@ async function loadSigningActivity() {
             <th>Time</th><th>Signer</th><th style="color:var(--muted);">→</th>
             <th>Verified By</th><th>Message</th><th>Result</th>
           </tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody id="signing-tbody">${rows}</tbody>
         </table>
       </div>`;
 
-    // ── event delegation — one listener on the container ──────────────────────
-    el.addEventListener("click", function handler(ev) {
-      const mainRow = ev.target.closest(".signing-main-row");
+    // Single delegated listener on the tbody
+    document.getElementById("signing-tbody").addEventListener("click", function (ev) {
+      // Copy button
+      const copyBtn = ev.target.closest("[data-copy]");
+      if (copyBtn) {
+        const sigEl = this.querySelector(`[data-sig="${copyBtn.dataset.copy}"]`);
+        if (sigEl) navigator.clipboard.writeText(sigEl.textContent);
+        copyBtn.textContent = "copied!";
+        setTimeout(() => { copyBtn.textContent = "copy"; }, 1500);
+        return;
+      }
+
+      // Row click — find the nearest <tr> with data-idx
+      const mainRow = ev.target.closest("tr[data-idx]");
       if (!mainRow) return;
-
-      // Stop button-click from double-firing on the row click
-      if (ev.target.classList.contains("sig-copy-btn")) return;
-
-      const idx        = mainRow.dataset.idx;
-      const detailRow  = el.querySelector(`[data-detail="${idx}"]`);
-      const expandBtn  = mainRow.querySelector(".expand-btn");
+      const idx       = mainRow.dataset.idx;
+      const detailRow = this.querySelector(`tr[data-detail="${idx}"]`);
+      const btn       = mainRow.querySelector(".expand-btn");
       if (!detailRow) return;
 
-      const open = detailRow.classList.toggle("open");
-      if (expandBtn) expandBtn.textContent = open ? "▾" : "▸";
-    });
-
-    // ── copy signature button (also via delegation) ───────────────────────────
-    el.addEventListener("click", function (ev) {
-      if (!ev.target.classList.contains("sig-copy-btn")) return;
-      ev.stopPropagation();
-      const cell = ev.target.closest(".signing-detail-cell");
-      const sigEl = cell && cell.querySelector(".sig-value");
-      if (sigEl) navigator.clipboard.writeText(sigEl.textContent);
-      ev.target.textContent = "copied!";
-      setTimeout(() => { ev.target.textContent = "copy"; }, 1500);
+      const nowOpen = detailRow.style.display === "none" || detailRow.style.display === "";
+      detailRow.style.display = nowOpen ? "table-row" : "none";
+      if (btn) btn.textContent = nowOpen ? "▾" : "▸";
     });
 
   } catch {
