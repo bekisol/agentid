@@ -12,8 +12,8 @@ class Registry:
         base = Path(path) if path else DEFAULT_DIR
         self.db_path = base / "registry.json"
         self.keys_dir = base / "keys"
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.keys_dir.mkdir(parents=True, exist_ok=True)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.keys_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     # ── persistence ──────────────────────────────────────────────────────────
 
@@ -32,6 +32,7 @@ class Registry:
         finally:
             os.close(fd)
         tmp.replace(self.db_path)
+        os.chmod(self.db_path, 0o600)
 
     def _key_path(self, did: str) -> Path:
         return self.keys_dir / (did.replace(":", "_") + ".key")

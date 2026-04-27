@@ -31,4 +31,10 @@ def public_key_to_b64(public_bytes: bytes) -> str:
 
 
 def b64_to_public_key_bytes(b64: str) -> bytes:
-    return base64.b64decode(b64)
+    try:
+        raw = base64.b64decode(b64, validate=True)
+    except Exception:
+        raise ValueError("Invalid base64 encoding for public key")
+    if len(raw) != 32:
+        raise ValueError(f"Ed25519 public key must be 32 bytes, got {len(raw)}")
+    return raw

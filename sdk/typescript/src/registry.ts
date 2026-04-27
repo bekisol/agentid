@@ -99,7 +99,7 @@ export class RegistryClient {
 
   private get headers(): Record<string, string> {
     const h: Record<string, string> = { "Content-Type": "application/json" };
-    if (this.apiKey) h["Authorization"] = `Bearer ${this.apiKey}`;
+    if (this.apiKey) h["x-api-key"] = this.apiKey;
     return h;
   }
 

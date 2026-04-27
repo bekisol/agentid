@@ -1,7 +1,10 @@
+import re
 import time
 import uuid
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
+
+_DID_RE = re.compile(r'^did:agentid:[1-9A-HJ-NP-Za-km-z]{32,64}$')
 
 from .crypto import sign as crypto_sign, verify as crypto_verify
 from .identity import (
@@ -143,7 +146,12 @@ class Agent:
     def verify_message(self, signed_message: dict, max_age_seconds: int = 300) -> bool:
         # Fix #8 — reject replayed signatures older than max_age_seconds
         timestamp = signed_message.get("payload", {}).get("timestamp")
-        if timestamp and (time.time() - float(timestamp)) > max_age_seconds:
+        if timestamp is None:
+            return False  # require timestamp — unsigned messages are not replayed
+        try:
+            if (time.time() - float(timestamp)) > max_age_seconds:
+                return False
+        except (TypeError, ValueError):
             return False
         public_key_bytes = b64_to_public_key_bytes(self.document.public_key)
         return crypto_verify(
@@ -170,9 +178,16 @@ class Agent:
         did = signed_message["payload"].get("signer")
         if not did:
             return False
+        if not _DID_RE.match(did):
+            return False
         # Fix #8 — reject replayed signatures
         timestamp = signed_message["payload"].get("timestamp")
-        if timestamp and (time.time() - float(timestamp)) > max_age_seconds:
+        if timestamp is None:
+            return False
+        try:
+            if (time.time() - float(timestamp)) > max_age_seconds:
+                return False
+        except (TypeError, ValueError):
             return False
 
         reg = _registry(registry_path, registry_url)
