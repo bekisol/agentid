@@ -4,31 +4,49 @@ AgentID × LangChain integration.
 Gives every LangChain agent a verifiable identity and makes
 agent discovery a first-class tool.
 
-Usage:
+Usage
+-----
+**First run** — create a new identity and persist the DID somewhere (env var,
+config file, secrets manager):
+
+    from agentid import Agent
     from agentid.integrations.langchain import (
+        load_or_create,
         AgentIDCallbackHandler,
         AgentIDFindTool,
         AgentIDVerifyTool,
     )
 
-    # 1. Give your agent an identity
-    identity = AgentIDCallbackHandler(
+    # Create once, store the DID
+    my_agent = load_or_create(
         name="research-agent",
         capabilities=["web-search", "summarization"],
         owner="team@company.com",
-        registry_url="http://localhost:8000",   # optional, local registry if omitted
+        registry_url="https://api.agentid-protocol.com",
     )
-    print(f"Agent DID: {identity.did}")
+    print(f"DID (store this): {my_agent.did}")
+
+**Subsequent runs** — reload the existing identity:
+
+    my_agent = load_or_create(
+        did=os.environ["MY_AGENT_DID"],       # pass the stored DID
+        name="research-agent",                 # ignored when did is given
+        capabilities=["web-search"],           # ignored when did is given
+        owner="team@company.com",
+        registry_url="https://api.agentid-protocol.com",
+    )
+
+    # 1. Attach identity to the LangChain executor
+    handler = AgentIDCallbackHandler(my_agent)
 
     # 2. Add discovery tools
     tools = [
-        AgentIDFindTool(registry_url="http://localhost:8000"),
-        AgentIDVerifyTool(registry_url="http://localhost:8000"),
-        ...your other tools...
+        AgentIDFindTool(registry_url="https://api.agentid-protocol.com"),
+        AgentIDVerifyTool(registry_url="https://api.agentid-protocol.com"),
     ]
 
     # 3. Wire up
-    executor = AgentExecutor(agent=agent, tools=tools, callbacks=[identity])
+    executor = AgentExecutor(agent=agent, tools=tools, callbacks=[handler])
 """
 
 import json
@@ -44,38 +62,67 @@ from ..agent import Agent, AgentDocument
 logger = logging.getLogger(__name__)
 
 
+# ── Helper: load-or-create ────────────────────────────────────────────────────
+
+def load_or_create(
+    *,
+    name: str,
+    capabilities: list[str],
+    owner: str,
+    did: str = None,
+    metadata: dict = None,
+    registry_url: str = None,
+    registry_path: str = None,
+) -> Agent:
+    """
+    Load an existing agent by DID, or register a brand-new one on first run.
+
+    Call this **once at application start** and pass the returned Agent into
+    AgentIDCallbackHandler.  Store the agent's DID (agent.did) in an env var
+    or secrets manager so you can reload the same identity across restarts
+    instead of creating a new one every time.
+
+    Args:
+        did:          Previously stored DID.  When supplied the agent is loaded
+                      from the registry (name/capabilities/metadata are ignored).
+        name:         Human-readable name — used only when creating a new agent.
+        capabilities: Capability list  — used only when creating a new agent.
+        owner:        Owner e-mail/identifier — used only when creating a new agent.
+        metadata:     Extra metadata dict — used only when creating a new agent.
+        registry_url: URL of the HTTP registry (mutually exclusive with registry_path).
+        registry_path: Path to a local file registry.
+    """
+    if did:
+        return Agent.load(did, registry_url=registry_url, registry_path=registry_path)
+    return Agent.create(
+        name=name,
+        capabilities=capabilities,
+        owner=owner,
+        metadata=metadata or {},
+        registry_url=registry_url,
+        registry_path=registry_path,
+    )
+
+
 # ── Callback Handler ──────────────────────────────────────────────────────────
 
 class AgentIDCallbackHandler(BaseCallbackHandler):
     """
     Attaches a verifiable AgentID identity to any LangChain agent.
 
-    - Registers the agent in the registry on init
+    Accepts a pre-created Agent instance so the same cryptographic identity
+    is reused across process restarts — no new key-pair is generated on every
+    init.  Use ``load_or_create()`` to obtain the Agent before constructing
+    this handler.
+
     - Signs every final output with the agent's private key
-    - Logs identity info at agent start
+    - Logs identity info at agent start/action
     """
 
-    def __init__(
-        self,
-        name: str,
-        capabilities: list[str],
-        owner: str,
-        metadata: dict = None,
-        registry_url: str = None,
-        registry_path: str = None,
-    ):
+    def __init__(self, agent: Agent):
         super().__init__()
-        self._agent = Agent.create(
-            name=name,
-            capabilities=capabilities,
-            owner=owner,
-            metadata=metadata or {},
-            registry_url=registry_url,
-            registry_path=registry_path,
-        )
-        self._registry_url = registry_url
-        self._registry_path = registry_path
-        logger.info(f"[AgentID] Registered agent: {self._agent.did}")
+        self._agent = agent
+        logger.info(f"[AgentID] Handler attached to agent: {self._agent.did}")
 
     @property
     def did(self) -> str:

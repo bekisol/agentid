@@ -4,39 +4,45 @@ AgentID × CrewAI integration.
 Gives every CrewAI agent a verifiable identity and makes
 agent discovery and verification first-class tools.
 
-Usage:
+Usage
+-----
+**First run** — create a new identity, store the DID:
+
     from agentid.integrations.crewai import (
+        load_or_create,
         AgentIDFindTool,
         AgentIDVerifyTool,
         AgentIDSignTool,
-        create_agentid_agent,
     )
 
-    # 1. Add discovery tools to your crew
+    identity, sign_tool = load_or_create(
+        name="research-agent",
+        capabilities=["web-search", "summarization"],
+        owner="team@company.com",
+        registry_url="https://api.agentid-protocol.com",
+    )
+    print(f"DID (store this): {identity.did}")
+
+**Subsequent runs** — reload the same identity:
+
+    identity, sign_tool = load_or_create(
+        did=os.environ["MY_AGENT_DID"],
+        name="research-agent",             # ignored when did is given
+        capabilities=["web-search"],       # ignored when did is given
+        owner="team@company.com",
+        registry_url="https://api.agentid-protocol.com",
+    )
+
     tools = [
         AgentIDFindTool(registry_url="https://api.agentid-protocol.com"),
         AgentIDVerifyTool(registry_url="https://api.agentid-protocol.com"),
+        sign_tool,
     ]
 
     researcher = Agent(
         role="Researcher",
         goal="Find and verify trusted AI agents",
         tools=tools,
-    )
-
-    # 2. Give a CrewAI agent its own verifiable identity
-    identity, sign_tool = create_agentid_agent(
-        name="research-agent",
-        capabilities=["web-search", "summarization"],
-        owner="team@company.com",
-        registry_url="https://api.agentid-protocol.com",
-    )
-    print(f"Agent DID: {identity.did}")
-
-    researcher = Agent(
-        role="Researcher",
-        goal="Find and verify trusted AI agents",
-        tools=[*tools, sign_tool],
     )
 """
 
@@ -49,6 +55,54 @@ from pydantic import BaseModel, Field
 from ..agent import Agent
 
 logger = logging.getLogger(__name__)
+
+
+# ── Helper: load-or-create ────────────────────────────────────────────────────
+
+def load_or_create(
+    *,
+    name: str,
+    capabilities: list[str],
+    owner: str,
+    did: str = None,
+    metadata: dict = None,
+    registry_url: str = None,
+    registry_path: str = None,
+) -> tuple["Agent", "AgentIDSignTool"]:
+    """
+    Load an existing agent by DID (or register a new one on first run) and
+    return ``(agent, sign_tool)`` ready to attach to a CrewAI agent.
+
+    Call this **once at application start** and pass the returned Agent into
+    AgentIDSignTool.  Store the agent's DID (agent.did) in an env var or
+    secrets manager so you reload the same identity across restarts instead
+    of creating a new one every time.
+
+    Args:
+        did:          Previously stored DID.  When supplied, the agent is loaded
+                      from the registry (name/capabilities/metadata are ignored).
+        name:         Human-readable name — used only when creating a new agent.
+        capabilities: Capability list  — used only when creating a new agent.
+        owner:        Owner e-mail/identifier — used only when creating a new agent.
+        metadata:     Extra metadata dict — used only when creating a new agent.
+        registry_url: URL of the HTTP registry (mutually exclusive with registry_path).
+        registry_path: Path to a local file registry.
+    """
+    if did:
+        agent = Agent.load(did, registry_url=registry_url, registry_path=registry_path)
+        logger.info(f"[AgentID] Loaded CrewAI agent: {agent.did}")
+    else:
+        agent = Agent.create(
+            name=name,
+            capabilities=capabilities,
+            owner=owner,
+            metadata=metadata or {},
+            registry_url=registry_url,
+            registry_path=registry_path,
+        )
+        logger.info(f"[AgentID] Registered CrewAI agent: {agent.did}")
+    return agent, AgentIDSignTool(agent=agent)
+
 
 # ── Try to import CrewAI's BaseTool; fall back to LangChain (CrewAI accepts both) ──
 
@@ -223,12 +277,24 @@ def create_agentid_agent(
     registry_path: str = None,
 ) -> tuple[Agent, AgentIDSignTool]:
     """
-    Register a new agent in the AgentID network and return:
-    - the Agent object (with .did, .sign(), etc.)
-    - a ready-to-use AgentIDSignTool pre-loaded with its private key
+    **First-time setup only** — register a brand-new agent and return
+    ``(agent, sign_tool)``.
 
-    Add the sign tool to your CrewAI agent's tools list so it can
-    sign its outputs for other agents to verify.
+    This creates a fresh Ed25519 key-pair and registers it in the AgentID
+    network every time it is called.  For recurring runs, use
+    ``load_or_create(did=stored_did, ...)`` instead so the same cryptographic
+    identity is reused rather than a new one being minted on every restart.
+
+    Args:
+        name:         Human-readable agent name.
+        capabilities: List of capability strings.
+        owner:        Owner e-mail or identifier.
+        metadata:     Optional extra metadata dict.
+        registry_url: URL of the HTTP registry.
+        registry_path: Path to a local file registry.
+
+    Returns:
+        (Agent, AgentIDSignTool) — store agent.did for future ``load_or_create`` calls.
     """
     agent = Agent.create(
         name=name,

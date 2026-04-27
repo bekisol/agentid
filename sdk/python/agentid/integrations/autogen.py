@@ -7,11 +7,7 @@ Works with both AutoGen v0.2.x (pyautogen) and v0.4+ (autogen-agentchat).
 
     from agentid.integrations.autogen import AgentIDTools
 
-    agentid = AgentIDTools(
-        registry_url="https://api.agentid-protocol.com"
-    )
-
-    # Register tools on your agents
+    agentid = AgentIDTools(registry_url="https://api.agentid-protocol.com")
     agentid.register_v2(assistant, user_proxy)
 
     # Now the assistant can call agentid_find and agentid_verify
@@ -22,30 +18,39 @@ Works with both AutoGen v0.2.x (pyautogen) and v0.4+ (autogen-agentchat).
 
     from agentid.integrations.autogen import AgentIDTools
 
-    agentid = AgentIDTools(
-        registry_url="https://api.agentid-protocol.com"
-    )
-
-    # Get tools as FunctionTool objects
+    agentid = AgentIDTools(registry_url="https://api.agentid-protocol.com")
     tools = agentid.as_tools()   # list of autogen.tools.FunctionTool
 
-    agent = AssistantAgent(
-        name="assistant",
-        tools=tools,
-    )
+    agent = AssistantAgent(name="assistant", tools=tools)
 
 
 ── Giving an AutoGen agent its own identity ──────────────────────────────────
 
-    from agentid.integrations.autogen import AgentIDTools, create_agentid_agent
+    from agentid.integrations.autogen import AgentIDTools, load_or_create
 
-    identity = create_agentid_agent(
+    # First run — create a new identity and store the DID
+    identity = load_or_create(
         name="my-autogen-agent",
         capabilities=["data-analysis", "code-execution"],
         owner="team@company.com",
         registry_url="https://api.agentid-protocol.com",
     )
-    print(f"Agent DID: {identity.did}")
+    print(f"DID (store this): {identity.did}")
+
+    # Subsequent runs — reload the same identity
+    identity = load_or_create(
+        did=os.environ["MY_AGENT_DID"],
+        name="my-autogen-agent",          # ignored when did is given
+        capabilities=["data-analysis"],   # ignored when did is given
+        owner="team@company.com",
+        registry_url="https://api.agentid-protocol.com",
+    )
+
+    agentid = AgentIDTools(
+        registry_url="https://api.agentid-protocol.com",
+        agent=identity,   # enables the sign tool
+    )
+    tools = agentid.as_tools()
 
     # Sign outputs before sending to other agents
     signed = identity.sign({"result": "analysis complete", "data": [...]})
@@ -58,6 +63,52 @@ from typing import Callable, Optional
 from ..agent import Agent
 
 logger = logging.getLogger(__name__)
+
+
+# ── Helper: load-or-create ────────────────────────────────────────────────────
+
+def load_or_create(
+    *,
+    name: str,
+    capabilities: list[str],
+    owner: str,
+    did: str = None,
+    metadata: dict = None,
+    registry_url: str = None,
+    registry_path: str = None,
+) -> Agent:
+    """
+    Load an existing agent by DID, or register a brand-new one on first run.
+
+    Call this **once at application start** and pass the returned Agent into
+    ``AgentIDTools(agent=identity)``.  Store the agent's DID (agent.did) in an
+    env var or secrets manager so you reload the same identity across restarts
+    instead of creating a new one every time.
+
+    Args:
+        did:          Previously stored DID.  When supplied, the agent is loaded
+                      from the registry (name/capabilities/metadata are ignored).
+        name:         Human-readable name — used only when creating a new agent.
+        capabilities: Capability list  — used only when creating a new agent.
+        owner:        Owner e-mail/identifier — used only when creating a new agent.
+        metadata:     Extra metadata dict — used only when creating a new agent.
+        registry_url: URL of the HTTP registry (mutually exclusive with registry_path).
+        registry_path: Path to a local file registry.
+    """
+    if did:
+        agent = Agent.load(did, registry_url=registry_url, registry_path=registry_path)
+        logger.info(f"[AgentID] Loaded AutoGen agent: {agent.did}")
+    else:
+        agent = Agent.create(
+            name=name,
+            capabilities=capabilities,
+            owner=owner,
+            metadata=metadata or {},
+            registry_url=registry_url,
+            registry_path=registry_path,
+        )
+        logger.info(f"[AgentID] Registered AutoGen agent: {agent.did}")
+    return agent
 
 
 # ── Core tool functions (plain Python — framework-agnostic) ───────────────────
@@ -309,11 +360,23 @@ def create_agentid_agent(
     registry_path: str = None,
 ) -> Agent:
     """
-    Register a new agent in the AgentID network and return the Agent object.
+    **First-time setup only** — register a brand-new agent and return it.
 
-    The returned agent can:
-    - Sign outputs:  signed = agent.sign({"result": "..."})
-    - Be resolved:   Agent.resolve(agent.did, registry_url="...")
+    This creates a fresh Ed25519 key-pair and registers it in the AgentID
+    network every time it is called.  For recurring runs, use
+    ``load_or_create(did=stored_did, ...)`` instead so the same cryptographic
+    identity is reused rather than a new one being minted on every restart.
+
+    Args:
+        name:         Human-readable agent name.
+        capabilities: List of capability strings.
+        owner:        Owner e-mail or identifier.
+        metadata:     Optional extra metadata dict.
+        registry_url: URL of the HTTP registry.
+        registry_path: Path to a local file registry.
+
+    Returns:
+        Agent — store agent.did for future ``load_or_create`` calls.
 
     Example:
         identity = create_agentid_agent(
@@ -322,6 +385,7 @@ def create_agentid_agent(
             owner="team@company.com",
             registry_url="https://api.agentid-protocol.com",
         )
+        print(f"Store this DID: {identity.did}")
         tools = AgentIDTools(registry_url="...", agent=identity)
     """
     agent = Agent.create(
