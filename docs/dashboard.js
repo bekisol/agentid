@@ -546,13 +546,25 @@ function _signingRows(events) {
     const statusCls   = isValid ? "status-ok" : "status-invalid";
     const statusLbl   = isValid ? "✓ valid" : "✗ invalid";
     const timeStr     = e.timestamp ? String(e.timestamp).slice(0, 19).replace("T"," ") : "—";
-    const summary     = esc(payloadSummary(e.payload));
-    const payloadJson = e.payload   ? esc(JSON.stringify(e.payload, null, 2)) : "—";
-    const sigFull     = e.signature ? esc(e.signature) : "—";
+
+    // Payload may arrive as a dict (psycopg2 auto-deserialised JSONB) or as a
+    // raw JSON string (older psycopg2 without JSONB casting) — normalise to object.
+    let payloadObj = e.payload;
+    if (typeof payloadObj === "string") {
+      try { payloadObj = JSON.parse(payloadObj); } catch { payloadObj = null; }
+    }
+
+    const summary     = esc(payloadSummary(payloadObj));
+    const payloadJson = payloadObj
+      ? esc(JSON.stringify(payloadObj, null, 2))
+      : '<span style="color:var(--muted);font-style:italic;">Not recorded — this event pre-dates payload logging</span>';
+    const sigFull     = e.signature
+      ? esc(e.signature)
+      : '<span style="color:var(--muted);font-style:italic;">Not recorded — this event pre-dates signature logging</span>';
 
     const signerToken   = `${(e.signer_name||"").toLowerCase()} ${(e.signer_did||"").toLowerCase()}`;
     const verifierToken = `${(e.verifier_name||"").toLowerCase()} ${(e.verifier_did||"").toLowerCase()}`;
-    const msgToken      = payloadSummary(e.payload).toLowerCase();
+    const msgToken      = payloadSummary(payloadObj).toLowerCase();
     const statusToken   = (e.status || "").toLowerCase();
 
     return `
@@ -587,7 +599,7 @@ function _signingRows(events) {
             <div style="grid-column:1/-1;">
               <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">
                 🔏 Signature
-                <button data-copy="${i}" style="background:none;border:1px solid var(--border-dark);border-radius:5px;padding:0.1rem 0.45rem;font-size:0.7rem;cursor:pointer;color:var(--muted);margin-left:0.4rem;">copy</button>
+                ${e.signature ? `<button data-copy="${i}" style="background:none;border:1px solid var(--border-dark);border-radius:5px;padding:0.1rem 0.45rem;font-size:0.7rem;cursor:pointer;color:var(--muted);margin-left:0.4rem;">copy</button>` : ""}
               </div>
               <div data-sig="${i}" style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);word-break:break-all;">${sigFull}</div>
             </div>
