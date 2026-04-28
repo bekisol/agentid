@@ -515,7 +515,7 @@ async function loadAgentsTable() {
 
 // ── SIGNING ACTIVITY ──────────────────────────────────────────────────────────
 
-const _signing = { page: 1, pages: 1, total: 0, perPage: 50 };
+const _signing = { page: 1, pages: 1, total: 0, perPage: 50, didQuery: "" };
 
 function payloadSummary(payload) {
   if (!payload) return "—";
@@ -653,13 +653,37 @@ function _attachRowListeners() {
   });
 }
 
+let _didSearchTimer = null;
+
 function _applySigningSearch() {
-  const q      = (document.getElementById("signing-search")?.value || "").trim().toLowerCase();
+  const rawQ   = (document.getElementById("signing-search")?.value || "").trim();
+  const q      = rawQ.toLowerCase();
   const mode   = document.querySelector(".search-tag-active[data-smode]")?.dataset.smode || "all";
   const status = document.getElementById("signing-search-status");
   const tbody  = document.getElementById("signing-tbody");
-  if (!tbody) return;
 
+  // DID mode: server-side search across all pages — debounced re-fetch
+  if (mode === "did") {
+    clearTimeout(_didSearchTimer);
+    _didSearchTimer = setTimeout(() => {
+      if (rawQ === _signing.didQuery) return; // no change
+      _signing.didQuery = rawQ;
+      _signing.page = 1;           // reset to page 1 for new search
+      loadSigningActivity();
+    }, 350); // 350ms debounce
+    if (status) status.textContent = rawQ ? "Searching across all pages…" : "";
+    return;
+  }
+
+  // For non-DID modes: if a server-side DID search was active, clear it first
+  if (_signing.didQuery) {
+    _signing.didQuery = "";
+    _signing.page = 1;
+    loadSigningActivity();
+    return;
+  }
+
+  if (!tbody) return;
   const rows = Array.from(tbody.querySelectorAll("tr[data-idx]"));
   let visible = 0;
 
@@ -676,11 +700,14 @@ function _applySigningSearch() {
       );
     } else if (!q) {
       match = true;
-    } else {
-      if (mode === "all")      match = row.dataset.signer.includes(q) || row.dataset.verifier.includes(q) || row.dataset.msg.includes(q);
-      if (mode === "signer")   match = row.dataset.signer.includes(q);
-      if (mode === "verifier") match = row.dataset.verifier.includes(q);
-      if (mode === "msg")      match = row.dataset.msg.includes(q);
+    } else if (mode === "all") {
+      match = row.dataset.signer.includes(q) || row.dataset.verifier.includes(q) || row.dataset.msg.includes(q);
+    } else if (mode === "signer") {
+      match = row.dataset.signer.includes(q);
+    } else if (mode === "verifier") {
+      match = row.dataset.verifier.includes(q);
+    } else if (mode === "msg") {
+      match = row.dataset.msg.includes(q);
     }
 
     row.classList.toggle("agent-row-hidden", !match);
@@ -691,11 +718,11 @@ function _applySigningSearch() {
 
   const total = rows.length;
   if (q || mode === "invalid") {
-    status.textContent = visible === 0
+    if (status) status.textContent = visible === 0
       ? `No events match — try a different term or filter`
       : `${visible} of ${total} events on this page`;
   } else {
-    status.textContent = "";
+    if (status) status.textContent = "";
   }
 }
 
@@ -706,7 +733,18 @@ function _initSigningSearch() {
 
   input.addEventListener("input", _applySigningSearch);
   input.addEventListener("keydown", e => {
-    if (e.key === "Escape") { input.value = ""; _applySigningSearch(); input.blur(); }
+    if (e.key === "Escape") {
+      input.value = "";
+      // Also clear any active server-side DID search
+      if (_signing.didQuery) {
+        _signing.didQuery = "";
+        _signing.page = 1;
+        loadSigningActivity();
+      } else {
+        _applySigningSearch();
+      }
+      input.blur();
+    }
   });
 
   tags.forEach(tag => {
@@ -714,7 +752,8 @@ function _initSigningSearch() {
       tags.forEach(t => t.classList.remove("search-tag-active"));
       tag.classList.add("search-tag-active");
       _applySigningSearch();
-      if (tag.dataset.smode !== "invalid") input.focus();
+      if (tag.dataset.smode !== "invalid" && tag.dataset.smode !== "did") input.focus();
+      if (tag.dataset.smode === "did") input.focus();
     });
   });
 }
@@ -723,8 +762,11 @@ async function loadSigningActivity() {
   const el    = document.getElementById("signing-table");
   const label = document.getElementById("signing-count-label");
   try {
+    const qParam = _signing.didQuery
+      ? `&q=${encodeURIComponent(_signing.didQuery)}`
+      : "";
     const data = await apiFetch(
-      `/pro/analytics/signing?page=${_signing.page}&per_page=${_signing.perPage}`
+      `/pro/analytics/signing?page=${_signing.page}&per_page=${_signing.perPage}${qParam}`
     );
     const events = data.events || [];
 
@@ -734,6 +776,16 @@ async function loadSigningActivity() {
     _signing.page   = data.page   ?? _signing.page;
 
     label.textContent = `${_signing.total} event${_signing.total !== 1 ? "s" : ""}`;
+
+    // Update search status after DID search resolves
+    const statusEl = document.getElementById("signing-search-status");
+    if (statusEl && _signing.didQuery) {
+      statusEl.textContent = _signing.total === 0
+        ? `No events found for DID "${_signing.didQuery}"`
+        : `${_signing.total} event${_signing.total !== 1 ? "s" : ""} matching DID "${_signing.didQuery}" (all pages)`;
+    } else if (statusEl) {
+      statusEl.textContent = "";
+    }
 
     if (!events.length && _signing.page === 1) {
       el.innerHTML = `<div class="empty">
