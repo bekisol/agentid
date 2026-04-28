@@ -540,29 +540,41 @@ function _signingRows(events) {
   }).join("");
 }
 
-function _signingPager() {
+function _updatePager() {
+  const wrap = document.getElementById("signing-pager-wrap");
+  if (!wrap) return;
   const { page, pages, total, perPage } = _signing;
+  if (pages <= 1) { wrap.innerHTML = ""; return; }
   const start = (page - 1) * perPage + 1;
   const end   = Math.min(page * perPage, total);
-  const prevDis = page <= 1     ? "disabled" : "";
-  const nextDis = page >= pages ? "disabled" : "";
-
-  return `
-    <div class="signing-pager" id="signing-pager">
-      <button class="pager-btn" id="sign-prev" ${prevDis}>&#8592;</button>
+  wrap.innerHTML = `
+    <div class="signing-pager">
+      <button class="pager-btn" data-sign-nav="prev" ${page <= 1 ? "disabled" : ""}>&#8592;</button>
       <span class="pager-label">
         <strong>${page}</strong> of <strong>${pages}</strong>
         <span class="pager-range">(${start}–${end} of ${total})</span>
       </span>
-      <button class="pager-btn" id="sign-next" ${nextDis}>&#8594;</button>
+      <button class="pager-btn" data-sign-nav="next" ${page >= pages ? "disabled" : ""}>&#8594;</button>
     </div>`;
 }
 
-function _attachSigningListeners() {
-  // Expand/copy rows
+function _initSigningPager() {
+  // One permanent delegated listener on the static wrapper — survives table redraws
+  const wrap = document.getElementById("signing-pager-wrap");
+  if (!wrap) return;
+  wrap.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-sign-nav]");
+    if (!btn || btn.disabled || btn.hasAttribute("disabled")) return;
+    const dir = btn.dataset.signNav;
+    if (dir === "prev" && _signing.page > 1)            { _signing.page--; loadSigningActivity(); }
+    if (dir === "next" && _signing.page < _signing.pages){ _signing.page++; loadSigningActivity(); }
+  });
+}
+
+function _attachRowListeners() {
+  // Expand/copy — re-attached each page load since tbody is rebuilt
   const tbody = document.getElementById("signing-tbody");
   if (!tbody) return;
-
   tbody.addEventListener("click", function (ev) {
     const copyBtn = ev.target.closest("[data-copy]");
     if (copyBtn) {
@@ -581,14 +593,6 @@ function _attachSigningListeners() {
     const nowOpen = detailRow.style.display === "none" || detailRow.style.display === "";
     detailRow.style.display = nowOpen ? "table-row" : "none";
     if (btn) btn.textContent = nowOpen ? "▾" : "▸";
-  });
-
-  // Pagination buttons
-  document.getElementById("sign-prev")?.addEventListener("click", () => {
-    if (_signing.page > 1) { _signing.page--; loadSigningActivity(); }
-  });
-  document.getElementById("sign-next")?.addEventListener("click", () => {
-    if (_signing.page < _signing.pages) { _signing.page++; loadSigningActivity(); }
   });
 }
 
@@ -631,10 +635,10 @@ async function loadSigningActivity() {
           </tr></thead>
           <tbody id="signing-tbody">${_signingRows(events)}</tbody>
         </table>
-      </div>
-      ${_signing.pages > 1 ? _signingPager() : ""}`;
+      </div>`;
 
-    _attachSigningListeners();
+    _updatePager();
+    _attachRowListeners();
 
   } catch {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load signing activity</p></div>';
@@ -657,6 +661,8 @@ async function loadDiscoveryStats() {
 // ── EVENT LISTENERS ───────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", () => {
+  _initSigningPager();   // one-time — survives every table redraw
+
   document.getElementById("login-btn").addEventListener("click", login);
   document.getElementById("logout-btn").addEventListener("click", logout);
   document.getElementById("api-key-input").addEventListener("keydown", (e) => {
