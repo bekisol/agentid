@@ -1,12 +1,49 @@
 const BASE = "https://api.agentid-protocol.com";
-let apiKey = localStorage.getItem("agentid_key") || "";
+
+// ── SECURE KEY STORAGE ────────────────────────────────────────────────────────
+// Key lives in sessionStorage (tab-scoped, cleared on browser close, not
+// readable across origins). A short-lived localStorage pulse lets new tabs
+// inherit an active session without permanently storing the raw key.
+let apiKey = sessionStorage.getItem("agentid_key") || "";
+
+// If this tab has no key yet, request one from a sibling tab.
+if (!apiKey) {
+  localStorage.setItem("agentid_tab_ping", String(Date.now()));
+  localStorage.removeItem("agentid_tab_ping");
+}
+
+// Listen for sibling tabs broadcasting a key in response to a ping,
+// or sharing a fresh login.
+window.addEventListener("storage", (ev) => {
+  if (ev.key === "agentid_tab_sync" && ev.newValue) {
+    try {
+      const { key, ts } = JSON.parse(ev.newValue);
+      // Only accept a sync that arrived within the last 2 seconds
+      if (key && Date.now() - ts < 2000 && !apiKey) {
+        apiKey = key;
+        sessionStorage.setItem("agentid_key", key);
+        sessionStorage.setItem("agentid_login_ts",
+          sessionStorage.getItem("agentid_login_ts") || String(ts));
+        loadDashboard().then(() => scheduleSessionExpiry());
+      }
+    } catch { /* ignore malformed events */ }
+  }
+  if (ev.key === "agentid_tab_ping" && apiKey) {
+    // A new tab is asking for the key — respond once
+    const payload = JSON.stringify({ key: apiKey, ts: Date.now() });
+    localStorage.setItem("agentid_tab_sync", payload);
+    // Remove after a tick so the event fires in the new tab
+    setTimeout(() => localStorage.removeItem("agentid_tab_sync"), 200);
+  }
+});
+
 let trendChart, capChart;
 
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 let sessionTimer = null;
 
 function getSessionAge() {
-  const ts = localStorage.getItem("agentid_login_ts");
+  const ts = sessionStorage.getItem("agentid_login_ts");
   // If no timestamp (e.g. logged in before this feature), treat as fresh
   return ts ? Date.now() - Number(ts) : 0;
 }
@@ -19,8 +56,8 @@ function scheduleSessionExpiry() {
 }
 
 function expireSession() {
-  localStorage.removeItem("agentid_key");
-  localStorage.removeItem("agentid_login_ts");
+  sessionStorage.removeItem("agentid_key");
+  sessionStorage.removeItem("agentid_login_ts");
   apiKey = "";
   clearTimeout(sessionTimer);
   document.getElementById("dashboard").style.display = "none";
@@ -106,8 +143,12 @@ async function login() {
 
   try {
     await loadDashboard();
-    localStorage.setItem("agentid_key", apiKey);
-    localStorage.setItem("agentid_login_ts", String(Date.now()));
+    sessionStorage.setItem("agentid_key", apiKey);
+    sessionStorage.setItem("agentid_login_ts", String(Date.now()));
+    // Broadcast to any new tabs that open while this session is active
+    const sync = JSON.stringify({ key: apiKey, ts: Date.now() });
+    localStorage.setItem("agentid_tab_sync", sync);
+    setTimeout(() => localStorage.removeItem("agentid_tab_sync"), 200);
     scheduleSessionExpiry();
   } catch (e) {
     const status = e.message;
@@ -127,8 +168,8 @@ async function login() {
 }
 
 function logout() {
-  localStorage.removeItem("agentid_key");
-  localStorage.removeItem("agentid_login_ts");
+  sessionStorage.removeItem("agentid_key");
+  sessionStorage.removeItem("agentid_login_ts");
   apiKey = "";
   clearTimeout(sessionTimer);
   document.getElementById("dashboard").style.display = "none";
@@ -796,7 +837,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } finally { btn.textContent = original; btn.disabled = false; }
   });
 
-  // Auto-login if key in localStorage and session not expired
+  // Auto-login if key in sessionStorage and session not expired
   if (apiKey) {
     if (getSessionAge() >= SESSION_TTL_MS) {
       expireSession();
@@ -804,8 +845,8 @@ document.addEventListener("DOMContentLoaded", () => {
       loadDashboard()
         .then(() => scheduleSessionExpiry())
         .catch(() => {
-          localStorage.removeItem("agentid_key");
-          localStorage.removeItem("agentid_login_ts");
+          sessionStorage.removeItem("agentid_key");
+          sessionStorage.removeItem("agentid_login_ts");
           apiKey = "";
         });
     }
