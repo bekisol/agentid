@@ -676,6 +676,166 @@
     }
     .expand-btn:hover { color: var(--text); }
 
+    /* ── SETTINGS MODAL ── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+      animation: fade-in 0.18s ease;
+    }
+    @keyframes fade-in { from { opacity:0; } to { opacity:1; } }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+      width: 100%; max-width: 560px;
+      max-height: 90vh;
+      display: flex; flex-direction: column;
+      animation: modal-in 0.2s ease;
+      overflow: hidden;
+    }
+    @keyframes modal-in {
+      from { opacity:0; transform: translateY(12px) scale(0.98); }
+      to   { opacity:1; transform: none; }
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.1rem 1.4rem 0;
+    }
+    .modal-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .modal-close {
+      background: none; border: none; cursor: pointer;
+      font-size: 1.3rem; color: var(--muted); line-height: 1;
+      padding: 0.2rem 0.4rem; border-radius: 6px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .modal-close:hover { background: var(--surface2); color: var(--text); }
+
+    /* tabs */
+    .modal-tabs {
+      display: flex; gap: 0; padding: 0.9rem 1.4rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-tab {
+      font-size: 0.82rem; font-weight: 600; color: var(--muted);
+      padding: 0.5rem 0.9rem; cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color 0.12s, border-color 0.12s;
+      user-select: none;
+    }
+    .modal-tab:hover { color: var(--text); }
+    .modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* body */
+    .modal-body { padding: 1.25rem 1.4rem; overflow-y: auto; flex: 1; }
+    .modal-panel { display: none; }
+    .modal-panel.active { display: block; }
+
+    /* form elements inside modal */
+    .settings-field { margin-bottom: 1rem; }
+    .settings-label {
+      display: block; font-size: 0.75rem; font-weight: 600;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 0.35rem;
+    }
+    .settings-value {
+      font-size: 0.88rem; color: var(--text); font-weight: 500;
+    }
+    .settings-input {
+      width: 100%; padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border-dark); border-radius: 7px;
+      background: var(--surface); color: var(--text);
+      font-size: 0.88rem; font-family: inherit;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+    .settings-input:focus { border-color: var(--accent); }
+    .settings-hint {
+      font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; line-height: 1.4;
+    }
+    .settings-divider {
+      border: none; border-top: 1px solid var(--border);
+      margin: 1.1rem 0;
+    }
+    .settings-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .scope-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.5rem; margin-top: 0.4rem;
+    }
+    .scope-option {
+      display: flex; align-items: flex-start; gap: 0.5rem;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border); border-radius: 7px;
+      cursor: pointer; transition: border-color 0.12s, background 0.12s;
+    }
+    .scope-option:hover { border-color: var(--border-dark); background: var(--surface2); }
+    .scope-option input[type="checkbox"] { margin-top: 0.1rem; accent-color: var(--accent); }
+    .scope-option-label { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+    .scope-option-desc  { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+
+    /* key reveal box */
+    .key-reveal {
+      background: var(--surface2); border: 1px solid var(--border-dark);
+      border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.75rem;
+    }
+    .key-reveal-label {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--green); margin-bottom: 0.4rem;
+    }
+    .key-reveal-value {
+      font-family: "JetBrains Mono", monospace; font-size: 0.78rem;
+      color: var(--text); word-break: break-all; line-height: 1.5;
+    }
+    .key-reveal-warning {
+      font-size: 0.72rem; color: var(--yellow); margin-top: 0.45rem;
+    }
+
+    /* rotation agent list */
+    .rotation-agent-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border);
+      gap: 0.5rem;
+    }
+    .rotation-agent-row:last-child { border-bottom: none; }
+    .rotation-badge {
+      font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.5rem;
+      border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .rotation-badge.pending  { background: var(--yellow-bg); color: var(--yellow); border: 1px solid #FDE68A; }
+    .rotation-badge.none     { background: var(--surface2);  color: var(--muted);  border: 1px solid var(--border); }
+
+    /* modal footer */
+    .modal-footer {
+      padding: 0.9rem 1.4rem;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: 0.5rem;
+    }
+
+    /* info row in account tab */
+    .info-row {
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding: 0.55rem 0; border-bottom: 1px solid var(--border);
+      gap: 0.5rem;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-key   { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+    .info-val   { font-size: 0.82rem; color: var(--text);  font-weight: 600; text-align: right; }
+    .info-val.mono { font-family: "JetBrains Mono", monospace; font-size: 0.74rem; word-break: break-all; }
+
+    /* feedback states inside modal */
+    .modal-msg {
+      font-size: 0.8rem; padding: 0.55rem 0.75rem; border-radius: 7px;
+      margin-top: 0.75rem; display: none;
+    }
+    .modal-msg.ok    { background: var(--green-bg); color: var(--green); border: 1px solid #6EE7B7; }
+    .modal-msg.error { background: var(--red-bg);   color: var(--red);   border: 1px solid #FCA5A5; }
+
     /* ── SSE TOASTS ── */
     .sse-toast {
       display: flex;
@@ -762,6 +922,7 @@
         <button class="btn btn-outline" id="pdf-btn" title="Download PDF analytics report">↓ PDF Report</button>
       </div>
       <button class="btn btn-outline" id="refresh-btn" title="Refresh data">↻ Refresh</button>
+      <button class="btn btn-outline" id="settings-btn" title="Account settings">⚙ Settings</button>
       <!-- SSE live indicator -->
       <div style="display:flex;align-items:center;gap:0.35rem;font-size:0.72rem;color:var(--muted);">
         <span id="sse-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background 0.4s;" title="Offline"></span>
@@ -769,6 +930,152 @@
       </div>
     </div>
   </div>
+
+  <!-- ── SETTINGS MODAL ── -->
+  <div id="settings-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">⚙ Settings</span>
+        <button class="modal-close" id="settings-close" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="account">Account</div>
+        <div class="modal-tab" data-tab="team-keys">Team Keys</div>
+        <div class="modal-tab" data-tab="key-rotation">Key Rotation</div>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- ── ACCOUNT TAB ── -->
+        <div class="modal-panel active" id="tab-account">
+          <div id="account-info-rows">
+            <div class="info-row"><span class="info-key">Loading…</span></div>
+          </div>
+
+          <hr class="settings-divider">
+
+          <div class="settings-field">
+            <label class="settings-label" for="allowlist-input">IP Allowlist</label>
+            <textarea id="allowlist-input" class="settings-input"
+              rows="2" placeholder="e.g. 203.0.113.0/24, 192.168.1.10  (leave blank = unrestricted)"
+              spellcheck="false"></textarea>
+            <p class="settings-hint">Comma-separated IPs or CIDR ranges. Requests from other IPs will be rejected. Leave blank to remove all restrictions.</p>
+            <div id="allowlist-msg" class="modal-msg"></div>
+          </div>
+          <button class="btn btn-primary" id="allowlist-save-btn" style="margin-top:0.25rem;">Save Allowlist</button>
+        </div>
+
+        <!-- ── TEAM KEYS TAB ── -->
+        <div class="modal-panel" id="tab-team-keys">
+          <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
+            Create a restricted API key that can be shared with team members or CI systems.
+            It inherits your owner and tier but is limited to the scopes you choose.
+          </p>
+
+          <div class="settings-field">
+            <label class="settings-label" for="team-key-label">Label</label>
+            <input id="team-key-label" class="settings-input" type="text"
+              placeholder="e.g. ci-pipeline, read-only-monitor" maxlength="128" />
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label">Scopes</label>
+            <div class="scope-grid">
+              <label class="scope-option">
+                <input type="checkbox" value="read" checked />
+                <div>
+                  <div class="scope-option-label">read</div>
+                  <div class="scope-option-desc">Resolve &amp; list agents, check badges</div>
+                </div>
+              </label>
+              <label class="scope-option">
+                <input type="checkbox" value="write" />
+                <div>
+                  <div class="scope-option-label">write</div>
+                  <div class="scope-option-desc">Register, update, deregister agents</div>
+                </div>
+              </label>
+              <label class="scope-option">
+                <input type="checkbox" value="verify" />
+                <div>
+                  <div class="scope-option-label">verify</div>
+                  <div class="scope-option-desc">Verify &amp; batch-verify signatures</div>
+                </div>
+              </label>
+              <label class="scope-option">
+                <input type="checkbox" value="admin" />
+                <div>
+                  <div class="scope-option-label">admin</div>
+                  <div class="scope-option-desc">Admin operations on your account</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="team-key-create-btn">Create Team Key</button>
+          <div id="team-key-msg" class="modal-msg"></div>
+
+          <!-- Key reveal — shown once after creation -->
+          <div id="team-key-reveal" style="display:none;">
+            <div class="key-reveal">
+              <div class="key-reveal-label">✓ Key created — copy it now</div>
+              <div class="key-reveal-value" id="team-key-value"></div>
+              <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;align-items:center;">
+                <button class="btn btn-outline" id="team-key-copy-btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">Copy key</button>
+                <span id="team-key-scopes-display" style="font-size:0.75rem;color:var(--muted);"></span>
+              </div>
+              <div class="key-reveal-warning">⚠ This key will not be shown again. Store it securely.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── KEY ROTATION TAB ── -->
+        <div class="modal-panel" id="tab-key-rotation">
+          <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
+            Rotate an agent's signing key without losing its DID or history.
+            Both keys are accepted during the grace period so in-flight
+            interactions are not disrupted.
+          </p>
+
+          <div class="settings-field">
+            <label class="settings-label">Your Agents — Rotation Status</label>
+            <div id="rotation-agent-list">
+              <div class="loading" style="padding:0.75rem 0;"><div class="spinner"></div> Loading agents…</div>
+            </div>
+          </div>
+
+          <hr class="settings-divider">
+
+          <div class="settings-field">
+            <label class="settings-label" for="rotation-did-input">Agent DID to rotate</label>
+            <input id="rotation-did-input" class="settings-input" type="text"
+              placeholder="did:key:z6Mk…" spellcheck="false" />
+          </div>
+          <div class="settings-field">
+            <label class="settings-label" for="rotation-newkey-input">New Public Key (Base64)</label>
+            <input id="rotation-newkey-input" class="settings-input" type="text"
+              placeholder="Base64-encoded Ed25519 public key" spellcheck="false" />
+            <p class="settings-hint">Generate a new key pair and paste the public key here. The signed payload and signature must be created by your SDK.</p>
+          </div>
+          <div class="settings-field">
+            <label class="settings-label" for="rotation-grace-input">Grace Period (hours)</label>
+            <input id="rotation-grace-input" class="settings-input" type="number"
+              value="48" min="1" max="168" style="max-width:120px;" />
+            <p class="settings-hint">Both keys are accepted for this many hours after initiating rotation. Default 48 h, max 168 h (7 days).</p>
+          </div>
+
+          <div id="rotation-msg" class="modal-msg"></div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.25rem;">
+            <button class="btn btn-outline" id="rotation-status-btn">Check Status</button>
+          </div>
+
+          <div id="rotation-status-box" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.82rem;color:var(--text-2);"></div>
+        </div>
+
+      </div><!-- /modal-body -->
+    </div>
+  </div><!-- /settings-modal -->
 
   <!-- SSE toast container (bottom-right) -->
   <div id="sse-toasts" style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:999;display:flex;flex-direction:column;gap:0.4rem;pointer-events:none;"></div>

@@ -1014,6 +1014,251 @@ function stopSse() {
   _setSseDot(false);
 }
 
+// ── SETTINGS MODAL ───────────────────────────────────────────────────────────
+
+function _modalMsg(id, text, type /* "ok" | "error" */) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = `modal-msg ${type}`;
+  el.style.display = "block";
+}
+function _modalMsgClear(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = "none";
+  el.textContent = "";
+}
+
+// ── Account tab ───────────────────────────────────────────────────────────────
+
+async function _loadAccountInfo() {
+  const wrap = document.getElementById("account-info-rows");
+  if (!wrap) return;
+  try {
+    const data = await apiFetch("/pro/keys/me");
+    const rows = [
+      ["Owner",       esc(data.owner),      false],
+      ["Tier",        esc(data.tier),        false],
+      ["Label",       esc(data.label || "—"), false],
+      ["Created",     esc(String(data.created_at || "—").slice(0, 10)), false],
+      ["Scopes",      data.scopes ? esc(data.scopes) : "full access", false],
+      ["IP Allowlist",data.allowed_ips ? esc(data.allowed_ips) : "unrestricted", true],
+    ];
+    wrap.innerHTML = rows.map(([k, v, mono]) =>
+      `<div class="info-row">
+        <span class="info-key">${k}</span>
+        <span class="info-val${mono ? " mono" : ""}">${v}</span>
+       </div>`
+    ).join("");
+
+    // Pre-fill allowlist textarea
+    const ta = document.getElementById("allowlist-input");
+    if (ta) ta.value = data.allowed_ips || "";
+  } catch {
+    wrap.innerHTML = `<div class="info-row"><span class="info-key" style="color:var(--red);">Could not load key info</span></div>`;
+  }
+}
+
+async function _saveAllowlist() {
+  const btn = document.getElementById("allowlist-save-btn");
+  const val = (document.getElementById("allowlist-input")?.value || "").trim();
+  _modalMsgClear("allowlist-msg");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  try {
+    const res = await fetch(`${BASE}/pro/keys/allowlist`, {
+      method:  "PATCH",
+      headers: { "x-api-key": apiKey, "content-type": "application/json" },
+      body:    JSON.stringify({ allowed_ips: val || null }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.status);
+    _modalMsg("allowlist-msg", data.message || "Allowlist updated.", "ok");
+    // Refresh the info rows
+    _loadAccountInfo();
+  } catch (e) {
+    _modalMsg("allowlist-msg", `Error: ${e.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save Allowlist";
+  }
+}
+
+// ── Team Keys tab ─────────────────────────────────────────────────────────────
+
+async function _createTeamKey() {
+  const btn    = document.getElementById("team-key-create-btn");
+  const label  = (document.getElementById("team-key-label")?.value || "").trim();
+  const boxes  = document.querySelectorAll("#tab-team-keys .scope-option input[type='checkbox']");
+  const scopes = Array.from(boxes).filter(b => b.checked).map(b => b.value);
+
+  _modalMsgClear("team-key-msg");
+  document.getElementById("team-key-reveal").style.display = "none";
+
+  if (!label) {
+    _modalMsg("team-key-msg", "Please enter a label for the team key.", "error");
+    return;
+  }
+  if (!scopes.length) {
+    _modalMsg("team-key-msg", "Select at least one scope.", "error");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Creating…";
+
+  try {
+    const params = new URLSearchParams({ label, scopes: scopes.join(",") });
+    const res = await fetch(`${BASE}/pro/keys/team?${params}`, {
+      method:  "POST",
+      headers: { "x-api-key": apiKey },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.status);
+
+    // Show key once
+    document.getElementById("team-key-value").textContent = data.key;
+    document.getElementById("team-key-scopes-display").textContent =
+      `Scopes: ${data.scopes}`;
+    document.getElementById("team-key-reveal").style.display = "block";
+    document.getElementById("team-key-label").value = "";
+    boxes.forEach(b => { b.checked = b.value === "read"; }); // reset to default
+
+  } catch (e) {
+    _modalMsg("team-key-msg", `Error: ${e.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Create Team Key";
+  }
+}
+
+// ── Key Rotation tab ──────────────────────────────────────────────────────────
+
+async function _loadRotationAgentList() {
+  const wrap = document.getElementById("rotation-agent-list");
+  if (!wrap) return;
+  try {
+    const data = await apiFetch("/pro/analytics/agents");
+    const agents = (data.agents || []).slice(0, 20); // cap at 20 for UI
+    if (!agents.length) {
+      wrap.innerHTML = `<p style="font-size:0.82rem;color:var(--muted);">No agents registered yet.</p>`;
+      return;
+    }
+    // Fetch rotation status for each in parallel (best-effort)
+    const statuses = await Promise.allSettled(
+      agents.map(a =>
+        fetch(`${BASE}/agents/${encodeURIComponent(a.did)}/rotation`)
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      )
+    );
+
+    wrap.innerHTML = agents.map((a, i) => {
+      const st = statuses[i].status === "fulfilled" ? statuses[i].value : null;
+      const pending = st && st.rotation_pending;
+      const badgeCls = pending ? "pending" : "none";
+      const badgeTxt = pending ? "rotation pending" : "no rotation";
+      const expiry   = pending && st.rotation_expires_at
+        ? `expires ${String(st.rotation_expires_at).slice(0, 10)}`
+        : "";
+      return `<div class="rotation-agent-row">
+        <div>
+          <div style="font-size:0.82rem;font-weight:600;">${esc(a.name)}</div>
+          <div class="did-mono" style="font-size:0.7rem;">${esc(shortDid(a.did))}</div>
+        </div>
+        <div style="text-align:right;">
+          <span class="rotation-badge ${badgeCls}">${badgeTxt}</span>
+          ${expiry ? `<div style="font-size:0.68rem;color:var(--muted);margin-top:0.2rem;">${esc(expiry)}</div>` : ""}
+          ${pending
+            ? `<button class="btn btn-outline" data-cancel-did="${esc(a.did)}"
+                style="font-size:0.7rem;padding:0.2rem 0.5rem;margin-top:0.3rem;color:var(--red);border-color:var(--red);">
+                Cancel</button>`
+            : `<button class="btn btn-outline" data-prefill-did="${esc(a.did)}"
+                style="font-size:0.7rem;padding:0.2rem 0.5rem;margin-top:0.3rem;">
+                Rotate</button>`}
+        </div>
+      </div>`;
+    }).join("");
+
+    // Wire up quick-fill buttons
+    wrap.querySelectorAll("[data-prefill-did]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const input = document.getElementById("rotation-did-input");
+        if (input) { input.value = btn.dataset.prefillDid; input.focus(); }
+      });
+    });
+
+    // Wire up cancel buttons (informational only — full cancel requires signed payload via SDK)
+    wrap.querySelectorAll("[data-cancel-did]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        _modalMsg("rotation-msg",
+          "Cancelling a rotation requires a signed payload from your SDK. "
+          + `Use: agent.cancel_rotation('${btn.dataset.cancelDid}')`,
+          "error");
+      });
+    });
+
+  } catch {
+    wrap.innerHTML = `<p style="font-size:0.82rem;color:var(--muted);">Could not load agents.</p>`;
+  }
+}
+
+async function _checkRotationStatus() {
+  const did = (document.getElementById("rotation-did-input")?.value || "").trim();
+  const box = document.getElementById("rotation-status-box");
+  _modalMsgClear("rotation-msg");
+  if (!did) {
+    _modalMsg("rotation-msg", "Enter an agent DID to check.", "error");
+    return;
+  }
+  try {
+    const res = await fetch(`${BASE}/agents/${encodeURIComponent(did)}/rotation`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.status);
+    box.style.display = "block";
+    if (data.rotation_pending) {
+      box.innerHTML = `
+        <span style="color:var(--yellow);font-weight:600;">⏳ Rotation pending</span><br>
+        Grace period expires: <strong>${esc(String(data.rotation_expires_at).slice(0, 19).replace("T"," "))}</strong><br>
+        <span style="color:var(--muted);font-size:0.75rem;margin-top:0.35rem;display:block;">
+          Call <code style="background:var(--surface);padding:0.1rem 0.3rem;border-radius:4px;">agent.confirm_rotation(did)</code> signed with the new key to complete.
+        </span>`;
+    } else {
+      box.innerHTML = `<span style="color:var(--green);font-weight:600;">✓ No pending rotation</span>
+        ${data.note ? `<span style="color:var(--muted);font-size:0.75rem;margin-left:0.5rem;">(${esc(data.note)})</span>` : ""}`;
+    }
+  } catch (e) {
+    _modalMsg("rotation-msg", `Error: ${e.message}`, "error");
+    box.style.display = "none";
+  }
+}
+
+// ── Modal open / close / tab switching ───────────────────────────────────────
+
+function openSettings() {
+  document.getElementById("settings-modal").style.display = "flex";
+  document.body.style.overflow = "hidden";
+  // Always reload account info when modal opens
+  _loadAccountInfo();
+}
+
+function closeSettings() {
+  document.getElementById("settings-modal").style.display = "none";
+  document.body.style.overflow = "";
+}
+
+function _switchSettingsTab(tab) {
+  document.querySelectorAll(".modal-tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.tab === tab)
+  );
+  document.querySelectorAll(".modal-panel").forEach(p =>
+    p.classList.toggle("active", p.id === `tab-${tab}`)
+  );
+  // Lazy-load rotation list only when that tab is opened
+  if (tab === "key-rotation") _loadRotationAgentList();
+}
+
 // ── EVENT LISTENERS ───────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1030,6 +1275,42 @@ document.addEventListener("DOMContentLoaded", () => {
     if (capChart)   { capChart.destroy();   capChart = null; }
     loadDashboard();
   });
+
+  // ── Settings modal ──────────────────────────────────────────────────────────
+  document.getElementById("settings-btn").addEventListener("click", openSettings);
+  document.getElementById("settings-close").addEventListener("click", closeSettings);
+
+  // Close on backdrop click
+  document.getElementById("settings-modal").addEventListener("click", (e) => {
+    if (e.target === document.getElementById("settings-modal")) closeSettings();
+  });
+
+  // Close on Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.getElementById("settings-modal").style.display !== "none") {
+      closeSettings();
+    }
+  });
+
+  // Tab switching
+  document.querySelectorAll(".modal-tab").forEach(tab => {
+    tab.addEventListener("click", () => _switchSettingsTab(tab.dataset.tab));
+  });
+
+  // Account tab actions
+  document.getElementById("allowlist-save-btn").addEventListener("click", _saveAllowlist);
+
+  // Team Keys tab
+  document.getElementById("team-key-create-btn").addEventListener("click", _createTeamKey);
+  document.getElementById("team-key-copy-btn").addEventListener("click", function () {
+    const val = document.getElementById("team-key-value")?.textContent || "";
+    navigator.clipboard.writeText(val).catch(() => {});
+    this.textContent = "Copied!";
+    setTimeout(() => { this.textContent = "Copy key"; }, 1800);
+  });
+
+  // Key Rotation tab
+  document.getElementById("rotation-status-btn").addEventListener("click", _checkRotationStatus);
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
   document.getElementById("csv-btn").addEventListener("click", async function () {
