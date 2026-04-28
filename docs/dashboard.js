@@ -458,11 +458,14 @@ function _renderAgentRow(a) {
     style="font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:5px;cursor:pointer;border:1px solid ${isPrivate ? "var(--yellow)" : "var(--border-dark)"};background:${isPrivate ? "var(--yellow-bg)" : "var(--surface2)"};color:${isPrivate ? "var(--yellow)" : "var(--muted)"};">
     ${isPrivate ? "🔒 private" : "🌐 public"}
   </button>`;
+  const rotBadge = a.rotation_pending
+    ? `<span title="Key rotation in progress" style="margin-left:0.35rem;font-size:0.68rem;padding:0.1rem 0.4rem;border-radius:4px;background:var(--yellow-bg,#fff8e1);color:var(--yellow,#b45309);border:1px solid var(--yellow,#b45309);vertical-align:middle;">⟳ rotation</span>`
+    : "";
   return `<tr
     data-name="${esc(a.name.toLowerCase())}"
     data-did="${esc((a.did || "").toLowerCase())}"
     data-caps="${esc(capsArr.join(" ").toLowerCase())}">
-    <td class="agent-name">${esc(a.name)}</td>
+    <td class="agent-name">${esc(a.name)}${rotBadge}</td>
     <td class="did-mono" title="${esc(a.did || "")}">${esc(shortDid(a.did))}</td>
     <td>${caps || '<span style="color:var(--muted);font-size:0.8rem;">none</span>'}</td>
     <td style="text-align:center;font-weight:600;">${esc(String(a.audit_events ?? 0))}</td>
@@ -619,7 +622,7 @@ async function loadAgentsTable() {
 
 // ── SIGNING ACTIVITY ──────────────────────────────────────────────────────────
 
-const _signing = { page: 1, pages: 1, total: 0, perPage: 50, didQuery: "" };
+const _signing = { page: 1, pages: 1, total: 0, perPage: 20, didQuery: "" };
 
 function payloadSummary(payload) {
   if (!payload) return "—";
@@ -1533,6 +1536,25 @@ document.addEventListener("DOMContentLoaded", () => {
       a.href = url; a.download = "audit-log.csv"; a.click();
       URL.revokeObjectURL(url);
     } catch { alert("Could not export CSV — please try again."); }
+    finally { btn.textContent = original; btn.disabled = false; }
+  });
+
+  // ── Export JSON ──────────────────────────────────────────────────────────────
+  document.getElementById("json-btn").addEventListener("click", async function () {
+    if (!apiKey) return;
+    const btn = this;
+    const original = btn.textContent;
+    btn.textContent = "Exporting…";
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/pro/audit-log/json`, { headers: { "x-api-key": apiKey } });
+      if (!res.ok) throw new Error(res.status);
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = "audit-log.json"; a.click();
+      URL.revokeObjectURL(url);
+    } catch { alert("Could not export JSON — please try again."); }
     finally { btn.textContent = original; btn.disabled = false; }
   });
 

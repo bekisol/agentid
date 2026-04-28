@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentID — Agent Profile</title>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src https://fonts.gstatic.com;
+             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
+             img-src 'self' data:;
+             frame-ancestors 'none';" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:           #F9F7F4;
+      --surface:      #FFFFFF;
+      --surface2:     #F2F0EC;
+      --border:       #E5E2DB;
+      --border-dark:  #C9C5BC;
+      --text:         #1C1917;
+      --text-2:       #44403C;
+      --muted:        #78716C;
+      --accent:       #C2410C;
+      --accent-light: #FFF7ED;
+      --green:        #059669;
+      --green-bg:     #ECFDF5;
+      --red:          #DC2626;
+      --red-bg:       #FEF2F2;
+      --yellow:       #D97706;
+      --yellow-bg:    #FFFBEB;
+      --blue:         #2563EB;
+      --blue-bg:      #EFF6FF;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Inter", -apple-system, sans-serif;
+      line-height: 1.6;
+      font-size: 15px;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .topbar-brand {
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .topbar-brand span { color: var(--accent); }
+
+    .container {
+      max-width: 780px;
+      margin: 2.5rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .agent-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.25rem;
+    }
+    .agent-avatar {
+      width: 60px;
+      height: 60px;
+      border-radius: 14px;
+      background: var(--accent-light);
+      border: 1px solid var(--accent-border, #FDBA74);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      flex-shrink: 0;
+    }
+    .agent-name-row {
+      flex: 1;
+      min-width: 0;
+    }
+    .agent-name {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 0.3rem;
+    }
+    .badge-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 5px;
+      letter-spacing: 0.02em;
+    }
+    .badge-verified  { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green); }
+    .badge-private   { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow); }
+    .badge-public    { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue); }
+
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.65rem;
+    }
+    .did-block {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78rem;
+      color: var(--text-2);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0.65rem 0.85rem;
+      word-break: break-all;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .did-text { flex: 1; }
+    .copy-btn {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid var(--border-dark);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .copy-btn:hover { background: var(--surface2); }
+
+    .caps-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .cap-pill {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      background: var(--accent-light);
+      color: var(--accent);
+      border: 1px solid var(--accent-border, #FDBA74);
+      font-weight: 500;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .meta-item label {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+    .meta-item .meta-val {
+      font-size: 0.88rem;
+      color: var(--text-2);
+    }
+
+    .verify-box {
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 1rem 1.25rem;
+      background: var(--surface2);
+    }
+    .verify-box .url-line {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78rem;
+      color: var(--text-2);
+      word-break: break-all;
+    }
+    .verify-box .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    .pubkey-block {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--text-2);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0.65rem 0.85rem;
+      word-break: break-all;
+      max-height: 80px;
+      overflow: hidden;
+      position: relative;
+    }
+    .pubkey-expand {
+      position: absolute;
+      bottom: 0; right: 0;
+      background: linear-gradient(to right, transparent, var(--surface2) 40%);
+      padding: 0.2rem 0.6rem;
+      font-size: 0.72rem;
+      color: var(--accent);
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+    }
+
+    .error-state, .loading-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+    }
+    .error-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .error-title { font-size: 1.15rem; font-weight: 700; color: var(--text); margin-bottom: 0.4rem; }
+
+    .footer-note {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2rem;
+      padding-bottom: 2rem;
+    }
+
+    @media (max-width: 600px) {
+      .topbar { padding: 0 1rem; }
+      .container { padding: 0 1rem; margin: 1.5rem auto; }
+      .agent-header { flex-direction: column; }
+      .card { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">Agent<span>ID</span></div>
+  <a href="dashboard.html" style="font-size:0.85rem;color:var(--muted);">← Dashboard</a>
+</div>
+
+<div class="container" id="main">
+  <div class="loading-state">
+    <div class="error-icon">⏳</div>
+    <div>Loading agent…</div>
+  </div>
+</div>
+
+<div class="footer-note">
+  Powered by <a href="https://agentid-protocol.com">AgentID Protocol</a>
+</div>
+
+<script>
+const BASE = "https://api.agentid-protocol.com";
+
+function esc(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function timeAgo(iso) {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 2)  return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
+}
+
+function getDIDFromURL() {
+  const params = new URLSearchParams(location.search);
+  const did = params.get("did");
+  if (did) return did;
+  // Also support /agent/{did} path style (hash-based)
+  const hash = location.hash.replace(/^#\/?/, "");
+  if (hash.startsWith("did:")) return hash;
+  return null;
+}
+
+async function checkVerifiedBadge(did) {
+  try {
+    const res = await fetch(`${BASE}/pro/badges/${encodeURIComponent(did)}`);
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!data.verified;
+  } catch { return false; }
+}
+
+function renderAgent(agent, verified) {
+  const main = document.getElementById("main");
+
+  const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
+  const meta = (typeof agent.metadata === "object" && agent.metadata) ? agent.metadata : {};
+
+  const badgesHtml = [
+    verified ? `<span class="badge badge-verified">✓ Verified</span>` : "",
+    `<span class="badge ${agent.private ? "badge-private" : "badge-public"}">${agent.private ? "🔒 Private" : "🌐 Public"}</span>`,
+  ].filter(Boolean).join("");
+
+  const capsHtml = caps.length
+    ? `<div class="caps-grid">${caps.map(c => `<span class="cap-pill">${esc(c)}</span>`).join("")}</div>`
+    : `<span style="color:var(--muted);font-size:0.85rem;">No capabilities listed</span>`;
+
+  const metaEntries = Object.entries(meta).filter(([k]) => !["did","name","capabilities","public_key","owner"].includes(k));
+  const metaHtml = metaEntries.length
+    ? `<div class="meta-grid">${metaEntries.map(([k,v]) => `
+        <div class="meta-item">
+          <label>${esc(k)}</label>
+          <div class="meta-val">${esc(typeof v === "object" ? JSON.stringify(v) : String(v))}</div>
+        </div>`).join("")}</div>`
+    : `<span style="color:var(--muted);font-size:0.85rem;">No additional metadata</span>`;
+
+  const registeredStr = agent.created_at
+    ? new Date(agent.created_at).toLocaleDateString("en-US", { month:"long", day:"numeric", year:"numeric" })
+    : "—";
+
+  const verifyEndpoint = `${BASE}/agents/${encodeURIComponent(agent.did)}/verify`;
+
+  main.innerHTML = `
+    <div class="card">
+      <div class="agent-header">
+        <div class="agent-avatar">🤖</div>
+        <div class="agent-name-row">
+          <div class="agent-name">${esc(agent.name)}</div>
+          <div class="badge-row">${badgesHtml}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Decentralized Identifier (DID)</div>
+      <div class="did-block">
+        <span class="did-text" id="did-text">${esc(agent.did)}</span>
+        <button class="copy-btn" id="copy-did-btn">Copy</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Capabilities</div>
+      ${capsHtml}
+    </div>
+
+    <div class="card">
+      <div class="section-title">Details</div>
+      <div class="meta-grid" style="margin-bottom:${metaEntries.length ? "1rem" : "0"};">
+        <div class="meta-item">
+          <label>Registered</label>
+          <div class="meta-val">${esc(registeredStr)}</div>
+        </div>
+        <div class="meta-item">
+          <label>Capabilities</label>
+          <div class="meta-val">${caps.length} listed</div>
+        </div>
+        <div class="meta-item">
+          <label>Registry</label>
+          <div class="meta-val">AgentID Protocol</div>
+        </div>
+      </div>
+      ${metaEntries.length ? `<div class="section-title" style="margin-top:1rem;">Metadata</div>${metaHtml}` : ""}
+    </div>
+
+    <div class="card">
+      <div class="section-title">Verification Endpoint</div>
+      <div class="verify-box">
+        <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.4rem;">POST</div>
+        <div class="url-line">${esc(verifyEndpoint)}</div>
+        <div class="hint">Send a signed payload to verify this agent's identity. Requires an AgentID API key.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Public Key</div>
+      <div style="position:relative;">
+        <div class="pubkey-block" id="pubkey-block">${esc(agent.public_key)}</div>
+        <button class="pubkey-expand" id="pubkey-expand-btn">show full ▾</button>
+      </div>
+    </div>
+  `;
+
+  // Copy DID
+  document.getElementById("copy-did-btn").addEventListener("click", function () {
+    navigator.clipboard.writeText(agent.did).catch(() => {});
+    this.textContent = "Copied!";
+    setTimeout(() => { this.textContent = "Copy"; }, 1800);
+  });
+
+  // Expand public key
+  const pkBlock = document.getElementById("pubkey-block");
+  document.getElementById("pubkey-expand-btn").addEventListener("click", function () {
+    if (pkBlock.style.maxHeight === "none") {
+      pkBlock.style.maxHeight = "80px";
+      this.textContent = "show full ▾";
+    } else {
+      pkBlock.style.maxHeight = "none";
+      this.textContent = "collapse ▴";
+    }
+  });
+
+  document.title = `AgentID — ${agent.name}`;
+}
+
+function renderError(status, detail) {
+  const main = document.getElementById("main");
+  if (status === 410) {
+    main.innerHTML = `
+      <div class="card error-state">
+        <div class="error-icon">🗑️</div>
+        <div class="error-title">Agent Removed</div>
+        <p>This agent was removed from the registry.</p>
+        ${detail?.reason ? `<p style="margin-top:0.5rem;font-size:0.85rem;color:var(--muted);">Reason: ${esc(detail.reason)}</p>` : ""}
+      </div>`;
+  } else if (status === 403 || status === 404) {
+    main.innerHTML = `
+      <div class="card error-state">
+        <div class="error-icon">🔒</div>
+        <div class="error-title">Agent Not Found</div>
+        <p>This agent does not exist or is private.</p>
+      </div>`;
+  } else {
+    main.innerHTML = `
+      <div class="card error-state">
+        <div class="error-icon">⚠️</div>
+        <div class="error-title">Could Not Load Agent</div>
+        <p>An error occurred. Please try again later.</p>
+      </div>`;
+  }
+}
+
+async function init() {
+  const did = getDIDFromURL();
+  if (!did) {
+    document.getElementById("main").innerHTML = `
+      <div class="card error-state">
+        <div class="error-icon">🤖</div>
+        <div class="error-title">No Agent Specified</div>
+        <p>Add <code style="background:var(--surface2);padding:0.1rem 0.4rem;border-radius:4px;">?did=did:key:...</code> to the URL to view an agent profile.</p>
+      </div>`;
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BASE}/agents/${encodeURIComponent(did)}`);
+    if (!res.ok) {
+      let detail = null;
+      try { detail = (await res.json()).detail; } catch {}
+      renderError(res.status, detail);
+      return;
+    }
+    const agent = await res.json();
+    const verified = await checkVerifiedBadge(did);
+    renderAgent(agent, verified);
+  } catch {
+    renderError(0, null);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
