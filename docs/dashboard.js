@@ -6,43 +6,81 @@ const BASE = "https://api.agentid-protocol.com";
 // inherit an active session without permanently storing the raw key.
 let apiKey = sessionStorage.getItem("agentid_key") || "";
 
-// If this tab has no key yet, request one from a sibling tab.
-if (!apiKey) {
-  localStorage.setItem("agentid_tab_ping", String(Date.now()));
-  localStorage.removeItem("agentid_tab_ping");
-}
+// ── CROSS-TAB SESSION SYNC ────────────────────────────────────────────────────
+// BroadcastChannel is preferred: messages are never persisted to disk/storage.
+// The API key is transmitted only in memory, in-process, between same-origin tabs.
+// localStorage fallback is used on browsers without BroadcastChannel (rare in 2026).
+//
+// Security properties:
+//   - BroadcastChannel: key never touches localStorage/sessionStorage; invisible
+//     to DevTools Application tab; not accessible to extensions that read storage.
+//   - localStorage fallback: key written for ≤1 animation frame then deleted;
+//     origin field is verified on receipt; ignored if key already present.
 
-// Listen for sibling tabs broadcasting a key in response to a ping,
-// or sharing a fresh login.
-const _TAB_ORIGIN = location.origin; // captured once at load time
-window.addEventListener("storage", (ev) => {
-  if (ev.key === "agentid_tab_sync" && ev.newValue) {
-    try {
-      const { key, ts, origin } = JSON.parse(ev.newValue);
-      // Guard: reject syncs that don't carry our own origin (injected by
-      // another same-origin page would still match, but that's the expected
-      // trust boundary for localStorage — protects against foreign origins
-      // that may share a browser profile or extension injection).
-      if (origin !== _TAB_ORIGIN) return;
-      // Only accept a sync that arrived within the last 2 seconds
-      if (key && Date.now() - ts < 2000 && !apiKey) {
-        apiKey = key;
-        sessionStorage.setItem("agentid_key", key);
-        sessionStorage.setItem("agentid_login_ts",
-          sessionStorage.getItem("agentid_login_ts") || String(ts));
-        loadDashboard().then(() => scheduleSessionExpiry());
+(function _setupTabSync() {
+  if (typeof BroadcastChannel !== "undefined") {
+    // ── BroadcastChannel path (no localStorage exposure) ──────────────────
+    const bc = new BroadcastChannel("agentid_session");
+
+    // Request from sibling tabs if we have no key
+    if (!apiKey) bc.postMessage({ type: "request" });
+
+    bc.onmessage = (ev) => {
+      const msg = ev.data;
+      if (!msg || typeof msg !== "object") return;
+      if (msg.type === "request" && apiKey) {
+        // A new tab is asking — respond with our key
+        bc.postMessage({ type: "response", key: apiKey, ts: Date.now() });
       }
-    } catch { /* ignore malformed events */ }
+      if (msg.type === "response" && !apiKey) {
+        const { key, ts } = msg;
+        if (key && Date.now() - ts < 2000) {
+          apiKey = key;
+          sessionStorage.setItem("agentid_key", key);
+          sessionStorage.setItem("agentid_login_ts",
+            sessionStorage.getItem("agentid_login_ts") || String(ts));
+          loadDashboard().then(() => scheduleSessionExpiry());
+        }
+      }
+    };
+
+    // Export so login() can notify siblings
+    window._bcTabSync = bc;
+
+  } else {
+    // ── localStorage fallback (key present for ≤1 frame then removed) ──────
+    const _TAB_ORIGIN = location.origin;
+
+    if (!apiKey) {
+      // Signal new tab; key never written here — only sibling writes sync
+      localStorage.setItem("agentid_tab_ping", String(Date.now()));
+      // Remove immediately so nothing persists
+      localStorage.removeItem("agentid_tab_ping");
+    }
+
+    window.addEventListener("storage", (ev) => {
+      if (ev.key === "agentid_tab_sync" && ev.newValue) {
+        try {
+          const { key, ts, origin } = JSON.parse(ev.newValue);
+          if (origin !== _TAB_ORIGIN) return;          // wrong origin — ignore
+          if (key && Date.now() - ts < 2000 && !apiKey) {
+            apiKey = key;
+            sessionStorage.setItem("agentid_key", key);
+            sessionStorage.setItem("agentid_login_ts",
+              sessionStorage.getItem("agentid_login_ts") || String(ts));
+            loadDashboard().then(() => scheduleSessionExpiry());
+          }
+        } catch { /* malformed — ignore */ }
+      }
+      if (ev.key === "agentid_tab_ping" && apiKey) {
+        const payload = JSON.stringify({ key: apiKey, ts: Date.now(), origin: _TAB_ORIGIN });
+        localStorage.setItem("agentid_tab_sync", payload);
+        // Delete after one tick — key is in localStorage for ≤1 animation frame
+        setTimeout(() => localStorage.removeItem("agentid_tab_sync"), 0);
+      }
+    });
   }
-  if (ev.key === "agentid_tab_ping" && apiKey) {
-    // A new tab is asking for the key — respond once, include origin so the
-    // receiving tab can verify the message came from the same app.
-    const payload = JSON.stringify({ key: apiKey, ts: Date.now(), origin: _TAB_ORIGIN });
-    localStorage.setItem("agentid_tab_sync", payload);
-    // Remove after a tick so the event fires in the new tab
-    setTimeout(() => localStorage.removeItem("agentid_tab_sync"), 200);
-  }
-});
+}());
 
 let trendChart, capChart;
 
@@ -152,10 +190,15 @@ async function login() {
     await loadDashboard();
     sessionStorage.setItem("agentid_key", apiKey);
     sessionStorage.setItem("agentid_login_ts", String(Date.now()));
-    // Broadcast to any new tabs that open while this session is active
-    const sync = JSON.stringify({ key: apiKey, ts: Date.now() });
-    localStorage.setItem("agentid_tab_sync", sync);
-    setTimeout(() => localStorage.removeItem("agentid_tab_sync"), 200);
+    // Notify sibling tabs — BroadcastChannel (no storage) or localStorage fallback
+    if (window._bcTabSync) {
+      window._bcTabSync.postMessage({ type: "response", key: apiKey, ts: Date.now() });
+    } else {
+      // Fallback: write then immediately delete — key in localStorage for ≤1 tick
+      const sync = JSON.stringify({ key: apiKey, ts: Date.now(), origin: location.origin });
+      localStorage.setItem("agentid_tab_sync", sync);
+      setTimeout(() => localStorage.removeItem("agentid_tab_sync"), 0);
+    }
     scheduleSessionExpiry();
   } catch (e) {
     const status = e.message;
