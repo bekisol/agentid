@@ -83,6 +83,7 @@ let apiKey = sessionStorage.getItem("agentid_key") || "";
 }());
 
 let trendChart, capChart;
+let _anomalyTimer = null;
 
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 let sessionTimer = null;
@@ -105,6 +106,7 @@ function expireSession() {
   sessionStorage.removeItem("agentid_login_ts");
   apiKey = "";
   clearTimeout(sessionTimer);
+  clearInterval(_anomalyTimer);
   stopSse();
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
@@ -223,6 +225,7 @@ function logout() {
   sessionStorage.removeItem("agentid_login_ts");
   apiKey = "";
   clearTimeout(sessionTimer);
+  clearInterval(_anomalyTimer);
   stopSse();
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
@@ -294,6 +297,10 @@ async function loadDashboard() {
 
   // Start real-time SSE feed (or restart if already running)
   startSse();
+
+  // Anomaly auto-refresh every 60 s
+  clearInterval(_anomalyTimer);
+  _anomalyTimer = setInterval(loadAnomalies, 60000);
 
 }
 
@@ -442,6 +449,15 @@ function _renderAgentRow(a) {
   const createdStr = a.created_at
     ? new Date(a.created_at).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" })
     : "—";
+  const isPrivate = !!a.private;
+  const privacyBtn = `<button
+    class="privacy-toggle"
+    data-did="${esc(a.did || "")}"
+    data-private="${isPrivate}"
+    title="${isPrivate ? "Private — click to make public" : "Public — click to make private"}"
+    style="font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:5px;cursor:pointer;border:1px solid ${isPrivate ? "var(--yellow)" : "var(--border-dark)"};background:${isPrivate ? "var(--yellow-bg)" : "var(--surface2)"};color:${isPrivate ? "var(--yellow)" : "var(--muted)"};">
+    ${isPrivate ? "🔒 private" : "🌐 public"}
+  </button>`;
   return `<tr
     data-name="${esc(a.name.toLowerCase())}"
     data-did="${esc((a.did || "").toLowerCase())}"
@@ -452,6 +468,7 @@ function _renderAgentRow(a) {
     <td style="text-align:center;font-weight:600;">${esc(String(a.audit_events ?? 0))}</td>
     <td class="${lastActiveClass}">${esc(lastActiveStr)}</td>
     <td style="color:var(--muted);font-size:0.78rem;">${esc(createdStr)}</td>
+    <td>${privacyBtn}</td>
   </tr>`;
 }
 
@@ -522,6 +539,42 @@ function _initAgentSearch() {
   });
 }
 
+function _initPrivacyToggles() {
+  const el = document.getElementById("agents-table");
+  if (!el) return;
+  el.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest(".privacy-toggle");
+    if (!btn) return;
+    const did        = btn.dataset.did;
+    const isPrivate  = btn.dataset.private === "true";
+    const newPrivate = !isPrivate;
+    btn.disabled = true;
+    btn.textContent = "…";
+    try {
+      const res = await fetch(
+        `${BASE}/agents/${encodeURIComponent(did)}/visibility?private=${newPrivate}`,
+        { method: "PATCH", headers: { "x-api-key": apiKey } }
+      );
+      if (!res.ok) throw new Error((await res.json()).detail || res.status);
+      // Update button in place without full reload
+      btn.dataset.private = String(newPrivate);
+      btn.title     = newPrivate ? "Private — click to make public" : "Public — click to make private";
+      btn.style.border     = `1px solid ${newPrivate ? "var(--yellow)" : "var(--border-dark)"}`;
+      btn.style.background = newPrivate ? "var(--yellow-bg)" : "var(--surface2)";
+      btn.style.color      = newPrivate ? "var(--yellow)" : "var(--muted)";
+      btn.textContent      = newPrivate ? "🔒 private" : "🌐 public";
+    } catch (e) {
+      btn.textContent = "error";
+      setTimeout(() => {
+        btn.textContent = isPrivate ? "🔒 private" : "🌐 public";
+        btn.disabled = false;
+      }, 1500);
+      return;
+    }
+    btn.disabled = false;
+  });
+}
+
 async function loadAgentsTable() {
   const el    = document.getElementById("agents-table");
   const label = document.getElementById("agents-count-label");
@@ -546,6 +599,7 @@ async function loadAgentsTable() {
             <th>Audit Events</th>
             <th>Last Active</th>
             <th>Registered</th>
+            <th>Visibility</th>
           </tr></thead>
           <tbody>${_allAgents.map(_renderAgentRow).join("")}</tbody>
         </table>
@@ -554,8 +608,9 @@ async function loadAgentsTable() {
     // Re-apply any pending search query (e.g. user typed before data loaded)
     _applyAgentSearch();
 
-    // Initialise search controls once per load
+    // Initialise search + privacy controls once per load
     _initAgentSearch();
+    _initPrivacyToggles();
 
   } catch {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load agents</p></div>';
@@ -1234,6 +1289,145 @@ async function _checkRotationStatus() {
   }
 }
 
+// ── Webhooks tab ─────────────────────────────────────────────────────────────
+
+const WH_EVENTS = [
+  "agent.registered", "agent.deregistered", "agent.updated",
+  "verification.succeeded", "verification.failed",
+  "key.created", "key.revoked",
+];
+
+function _initWebhookEventGrid() {
+  const grid = document.getElementById("wh-events-grid");
+  if (!grid || grid.children.length) return; // already populated
+  grid.innerHTML = WH_EVENTS.map(ev => `
+    <label class="scope-option" style="font-size:0.78rem;">
+      <input type="checkbox" value="${esc(ev)}" />
+      <span style="font-size:0.76rem;color:var(--text);">${esc(ev)}</span>
+    </label>`).join("");
+}
+
+async function _loadWebhooks() {
+  const el = document.getElementById("webhooks-list");
+  if (!el) return;
+  try {
+    const data = await apiFetch("/pro/webhooks");
+    if (!data.length) {
+      el.innerHTML = `<p style="font-size:0.82rem;color:var(--muted);">No webhooks yet — add one below.</p>`;
+      return;
+    }
+    el.innerHTML = data.map(wh => {
+      const evList = (wh.events || []).map(e => `<span style="font-size:0.68rem;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:0.1rem 0.35rem;">${esc(e)}</span>`).join(" ");
+      const lastFired = wh.last_fired_at ? timeAgo(wh.last_fired_at) : "never";
+      const statusColor = wh.active ? "var(--green)" : "var(--red)";
+      const statusTxt   = wh.active ? "active" : "disabled";
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:0.7rem 0.9rem;margin-bottom:0.5rem;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(wh.url)}">${esc(wh.url)}</div>
+            <div style="margin-top:0.3rem;display:flex;flex-wrap:wrap;gap:0.25rem;">${evList}</div>
+            <div style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem;">Last fired: ${esc(lastFired)} · Failures: ${esc(String(wh.failure_count))}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.3rem;align-items:flex-end;">
+            <span style="font-size:0.7rem;font-weight:700;color:${statusColor};border:1px solid ${statusColor};border-radius:999px;padding:0.1rem 0.45rem;">${statusTxt}</span>
+            <div style="display:flex;gap:0.3rem;">
+              <button class="btn btn-outline" data-wh-test="${wh.id}" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Test</button>
+              <button class="btn btn-outline" data-wh-toggle="${wh.id}" style="font-size:0.7rem;padding:0.2rem 0.5rem;">${wh.active ? "Disable" : "Enable"}</button>
+              <button class="btn btn-outline" data-wh-delete="${wh.id}" style="font-size:0.7rem;padding:0.2rem 0.5rem;color:var(--red);border-color:var(--red);">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+
+    // Wire up action buttons
+    el.querySelectorAll("[data-wh-test]").forEach(btn => {
+      btn.addEventListener("click", () => _webhookAction("test", Number(btn.dataset.whTest), btn));
+    });
+    el.querySelectorAll("[data-wh-toggle]").forEach(btn => {
+      btn.addEventListener("click", () => _webhookAction("toggle", Number(btn.dataset.whToggle), btn));
+    });
+    el.querySelectorAll("[data-wh-delete]").forEach(btn => {
+      btn.addEventListener("click", () => _webhookAction("delete", Number(btn.dataset.whDelete), btn));
+    });
+  } catch {
+    el.innerHTML = `<p style="font-size:0.82rem;color:var(--red);">Could not load webhooks.</p>`;
+  }
+}
+
+async function _webhookAction(action, id, btn) {
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "…";
+  try {
+    let res;
+    if (action === "test") {
+      res = await fetch(`${BASE}/pro/webhooks/${id}/test`, { method: "POST", headers: { "x-api-key": apiKey } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || res.status);
+      btn.textContent = data.delivered ? "✓ sent" : "✗ failed";
+    } else if (action === "toggle") {
+      res = await fetch(`${BASE}/pro/webhooks/${id}/toggle`, { method: "PATCH", headers: { "x-api-key": apiKey } });
+      if (!res.ok) throw new Error((await res.json()).detail || res.status);
+      await _loadWebhooks();
+      return;
+    } else if (action === "delete") {
+      if (!confirm("Delete this webhook? This cannot be undone.")) { btn.disabled = false; btn.textContent = orig; return; }
+      res = await fetch(`${BASE}/pro/webhooks/${id}`, { method: "DELETE", headers: { "x-api-key": apiKey } });
+      if (!res.ok) throw new Error(res.status);
+      await _loadWebhooks();
+      return;
+    }
+  } catch (e) {
+    btn.textContent = "error";
+  }
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+}
+
+async function _createWebhook() {
+  const btn    = document.getElementById("wh-create-btn");
+  const url    = (document.getElementById("wh-url-input")?.value || "").trim();
+  const secret = (document.getElementById("wh-secret-input")?.value || "").trim() || null;
+  const events = Array.from(
+    document.querySelectorAll("#wh-events-grid input[type='checkbox']:checked")
+  ).map(cb => cb.value);
+
+  _modalMsgClear("wh-create-msg");
+  document.getElementById("wh-secret-reveal").style.display = "none";
+
+  if (!url) { _modalMsg("wh-create-msg", "Enter a webhook URL.", "error"); return; }
+  if (!events.length) { _modalMsg("wh-create-msg", "Select at least one event type.", "error"); return; }
+
+  btn.disabled = true;
+  btn.textContent = "Adding…";
+  try {
+    const res = await fetch(`${BASE}/pro/webhooks`, {
+      method:  "POST",
+      headers: { "x-api-key": apiKey, "content-type": "application/json" },
+      body:    JSON.stringify({ url, secret, events }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.status);
+
+    // Show secret once
+    document.getElementById("wh-secret-value").textContent = data.secret;
+    document.getElementById("wh-secret-reveal").style.display = "block";
+
+    // Reset form
+    document.getElementById("wh-url-input").value = "";
+    document.getElementById("wh-secret-input").value = "";
+    document.querySelectorAll("#wh-events-grid input").forEach(cb => { cb.checked = false; });
+
+    // Reload list
+    await _loadWebhooks();
+  } catch (e) {
+    _modalMsg("wh-create-msg", `Error: ${e.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Add Webhook";
+  }
+}
+
 // ── Modal open / close / tab switching ───────────────────────────────────────
 
 function openSettings() {
@@ -1255,8 +1449,9 @@ function _switchSettingsTab(tab) {
   document.querySelectorAll(".modal-panel").forEach(p =>
     p.classList.toggle("active", p.id === `tab-${tab}`)
   );
-  // Lazy-load rotation list only when that tab is opened
+  // Lazy-load heavy tabs only when opened
   if (tab === "key-rotation") _loadRotationAgentList();
+  if (tab === "webhooks") { _initWebhookEventGrid(); _loadWebhooks(); }
 }
 
 // ── EVENT LISTENERS ───────────────────────────────────────────────────────────
@@ -1311,6 +1506,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Key Rotation tab
   document.getElementById("rotation-status-btn").addEventListener("click", _checkRotationStatus);
+
+  // Webhooks tab
+  document.getElementById("wh-create-btn").addEventListener("click", _createWebhook);
+  document.getElementById("webhooks-refresh-btn").addEventListener("click", _loadWebhooks);
+  document.getElementById("wh-secret-copy-btn").addEventListener("click", function () {
+    const val = document.getElementById("wh-secret-value")?.textContent || "";
+    navigator.clipboard.writeText(val).catch(() => {});
+    this.textContent = "Copied!";
+    setTimeout(() => { this.textContent = "Copy secret"; }, 1800);
+  });
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
   document.getElementById("csv-btn").addEventListener("click", async function () {

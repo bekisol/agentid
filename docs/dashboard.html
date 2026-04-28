@@ -943,6 +943,7 @@
         <div class="modal-tab active" data-tab="account">Account</div>
         <div class="modal-tab" data-tab="team-keys">Team Keys</div>
         <div class="modal-tab" data-tab="key-rotation">Key Rotation</div>
+        <div class="modal-tab" data-tab="webhooks">Webhooks</div>
       </div>
 
       <div class="modal-body">
@@ -1071,6 +1072,65 @@
           </div>
 
           <div id="rotation-status-box" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.82rem;color:var(--text-2);"></div>
+        </div>
+
+        <!-- ── WEBHOOKS TAB ── -->
+        <div class="modal-panel" id="tab-webhooks">
+          <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
+            Receive HTTP callbacks when events happen on your account.
+            All deliveries are signed with HMAC-SHA256 via the <code style="background:var(--surface2);padding:0.1rem 0.3rem;border-radius:4px;font-size:0.75rem;">X-AgentID-Signature</code> header.
+          </p>
+
+          <!-- Existing webhooks list -->
+          <div class="settings-field">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+              <label class="settings-label" style="margin:0;">Your Webhooks</label>
+              <button class="btn btn-outline" id="webhooks-refresh-btn" style="font-size:0.72rem;padding:0.2rem 0.6rem;">↻ Refresh</button>
+            </div>
+            <div id="webhooks-list">
+              <div class="loading" style="padding:0.5rem 0;"><div class="spinner"></div> Loading…</div>
+            </div>
+          </div>
+
+          <hr class="settings-divider">
+
+          <!-- Create webhook form -->
+          <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:0.75rem;">Add New Webhook</div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="wh-url-input">HTTPS URL</label>
+            <input id="wh-url-input" class="settings-input" type="url"
+              placeholder="https://your-server.com/hooks/agentid" spellcheck="false" />
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label" for="wh-secret-input">Secret (optional)</label>
+            <input id="wh-secret-input" class="settings-input" type="text"
+              placeholder="Leave blank to auto-generate" spellcheck="false" maxlength="128" />
+            <p class="settings-hint">Used to verify HMAC-SHA256 signatures. Auto-generated if left blank — shown once on creation.</p>
+          </div>
+
+          <div class="settings-field">
+            <label class="settings-label">Events</label>
+            <div id="wh-events-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem;margin-top:0.35rem;">
+              <!-- Populated by JS from VALID_EVENTS -->
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="wh-create-btn">Add Webhook</button>
+          <div id="wh-create-msg" class="modal-msg"></div>
+
+          <!-- Secret reveal -->
+          <div id="wh-secret-reveal" style="display:none;">
+            <div class="key-reveal" style="margin-top:0.75rem;">
+              <div class="key-reveal-label">✓ Webhook created — copy your secret</div>
+              <div class="key-reveal-value" id="wh-secret-value"></div>
+              <div style="margin-top:0.6rem;">
+                <button class="btn btn-outline" id="wh-secret-copy-btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">Copy secret</button>
+              </div>
+              <div class="key-reveal-warning">⚠ The secret will not be shown again. Store it to verify incoming signatures.</div>
+            </div>
+          </div>
         </div>
 
       </div><!-- /modal-body -->
