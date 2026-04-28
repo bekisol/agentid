@@ -14,10 +14,16 @@ if (!apiKey) {
 
 // Listen for sibling tabs broadcasting a key in response to a ping,
 // or sharing a fresh login.
+const _TAB_ORIGIN = location.origin; // captured once at load time
 window.addEventListener("storage", (ev) => {
   if (ev.key === "agentid_tab_sync" && ev.newValue) {
     try {
-      const { key, ts } = JSON.parse(ev.newValue);
+      const { key, ts, origin } = JSON.parse(ev.newValue);
+      // Guard: reject syncs that don't carry our own origin (injected by
+      // another same-origin page would still match, but that's the expected
+      // trust boundary for localStorage — protects against foreign origins
+      // that may share a browser profile or extension injection).
+      if (origin !== _TAB_ORIGIN) return;
       // Only accept a sync that arrived within the last 2 seconds
       if (key && Date.now() - ts < 2000 && !apiKey) {
         apiKey = key;
@@ -29,8 +35,9 @@ window.addEventListener("storage", (ev) => {
     } catch { /* ignore malformed events */ }
   }
   if (ev.key === "agentid_tab_ping" && apiKey) {
-    // A new tab is asking for the key — respond once
-    const payload = JSON.stringify({ key: apiKey, ts: Date.now() });
+    // A new tab is asking for the key — respond once, include origin so the
+    // receiving tab can verify the message came from the same app.
+    const payload = JSON.stringify({ key: apiKey, ts: Date.now(), origin: _TAB_ORIGIN });
     localStorage.setItem("agentid_tab_sync", payload);
     // Remove after a tick so the event fires in the new tab
     setTimeout(() => localStorage.removeItem("agentid_tab_sync"), 200);
