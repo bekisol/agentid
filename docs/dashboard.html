@@ -820,6 +820,31 @@
       <div class="card-title">Signing Activity</div>
       <span id="signing-count-label" style="font-size:0.8rem;color:var(--muted);"></span>
     </div>
+
+    <!-- Search bar -->
+    <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);">
+      <div class="agent-search-wrap">
+        <svg class="agent-search-icon" width="15" height="15" viewBox="0 0 20 20" fill="none">
+          <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M13 13l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <input id="signing-search"
+               class="agent-search-input"
+               type="text"
+               placeholder="Search by agent name, DID, or message…"
+               autocomplete="off"
+               spellcheck="false"/>
+        <div class="agent-search-tags" id="signing-search-tags">
+          <span class="search-tag search-tag-active" data-smode="all">All</span>
+          <span class="search-tag" data-smode="signer">Signer</span>
+          <span class="search-tag" data-smode="verifier">Verifier</span>
+          <span class="search-tag" data-smode="msg">Message</span>
+          <span class="search-tag" data-smode="invalid">Invalid only</span>
+        </div>
+      </div>
+      <div id="signing-search-status" style="font-size:0.75rem;color:var(--muted);margin-top:0.4rem;min-height:1rem;"></div>
+    </div>
+
     <div id="signing-table"><div class="loading"><div class="spinner"></div> Loading…</div></div>
     <div id="signing-pager-wrap"></div>
   </div>

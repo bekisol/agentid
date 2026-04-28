@@ -502,8 +502,17 @@ function _signingRows(events) {
     const payloadJson = e.payload   ? esc(JSON.stringify(e.payload, null, 2)) : "—";
     const sigFull     = e.signature ? esc(e.signature) : "—";
 
+    const signerToken   = `${(e.signer_name||"").toLowerCase()} ${(e.signer_did||"").toLowerCase()}`;
+    const verifierToken = `${(e.verifier_name||"").toLowerCase()} ${(e.verifier_did||"").toLowerCase()}`;
+    const msgToken      = payloadSummary(e.payload).toLowerCase();
+    const statusToken   = (e.status || "").toLowerCase();
+
     return `
-      <tr data-idx="${i}" style="cursor:pointer;user-select:none;">
+      <tr data-idx="${i}" style="cursor:pointer;user-select:none;"
+          data-signer="${esc(signerToken)}"
+          data-verifier="${esc(verifierToken)}"
+          data-msg="${esc(msgToken)}"
+          data-status="${esc(statusToken)}">
         <td class="time-cell">${esc(timeStr)}</td>
         <td>${signerCell}</td>
         <td style="text-align:center;color:var(--muted);font-size:1rem;">→</td>
@@ -596,6 +605,72 @@ function _attachRowListeners() {
   });
 }
 
+function _applySigningSearch() {
+  const q      = (document.getElementById("signing-search")?.value || "").trim().toLowerCase();
+  const mode   = document.querySelector(".search-tag-active[data-smode]")?.dataset.smode || "all";
+  const status = document.getElementById("signing-search-status");
+  const tbody  = document.getElementById("signing-tbody");
+  if (!tbody) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr[data-idx]"));
+  let visible = 0;
+
+  rows.forEach(row => {
+    const detail = tbody.querySelector(`tr[data-detail="${row.dataset.idx}"]`);
+    let match = false;
+
+    if (mode === "invalid") {
+      match = row.dataset.status === "invalid";
+      if (q) match = match && (
+        row.dataset.signer.includes(q) ||
+        row.dataset.verifier.includes(q) ||
+        row.dataset.msg.includes(q)
+      );
+    } else if (!q) {
+      match = true;
+    } else {
+      if (mode === "all")      match = row.dataset.signer.includes(q) || row.dataset.verifier.includes(q) || row.dataset.msg.includes(q);
+      if (mode === "signer")   match = row.dataset.signer.includes(q);
+      if (mode === "verifier") match = row.dataset.verifier.includes(q);
+      if (mode === "msg")      match = row.dataset.msg.includes(q);
+    }
+
+    row.classList.toggle("agent-row-hidden", !match);
+    row.classList.toggle("agent-row-highlight", match && (q.length > 0 || mode === "invalid"));
+    if (detail) detail.classList.toggle("agent-row-hidden", !match);
+    if (match) visible++;
+  });
+
+  const total = rows.length;
+  if (q || mode === "invalid") {
+    status.textContent = visible === 0
+      ? `No events match — try a different term or filter`
+      : `${visible} of ${total} events on this page`;
+  } else {
+    status.textContent = "";
+  }
+}
+
+function _initSigningSearch() {
+  const input = document.getElementById("signing-search");
+  const tags  = document.querySelectorAll(".search-tag[data-smode]");
+  if (!input) return;
+
+  input.addEventListener("input", _applySigningSearch);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Escape") { input.value = ""; _applySigningSearch(); input.blur(); }
+  });
+
+  tags.forEach(tag => {
+    tag.addEventListener("click", () => {
+      tags.forEach(t => t.classList.remove("search-tag-active"));
+      tag.classList.add("search-tag-active");
+      _applySigningSearch();
+      if (tag.dataset.smode !== "invalid") input.focus();
+    });
+  });
+}
+
 async function loadSigningActivity() {
   const el    = document.getElementById("signing-table");
   const label = document.getElementById("signing-count-label");
@@ -639,6 +714,7 @@ async function loadSigningActivity() {
 
     _updatePager();
     _attachRowListeners();
+    _applySigningSearch();   // re-apply active filter on new page
 
   } catch {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load signing activity</p></div>';
@@ -662,6 +738,7 @@ async function loadDiscoveryStats() {
 
 document.addEventListener("DOMContentLoaded", () => {
   _initSigningPager();   // one-time — survives every table redraw
+  _initSigningSearch();  // one-time — survives every table redraw
 
   document.getElementById("login-btn").addEventListener("click", login);
   document.getElementById("logout-btn").addEventListener("click", logout);
