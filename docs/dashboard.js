@@ -662,8 +662,10 @@ function _applySigningSearch() {
   const status = document.getElementById("signing-search-status");
   const tbody  = document.getElementById("signing-tbody");
 
-  // DID mode: server-side search across all pages — debounced re-fetch
-  if (mode === "did") {
+  // DID mode OR query that looks like a DID (starts with "did:") → server-side search
+  // across all pages so the user doesn't have to know to click the DID pill first.
+  const looksLikeDid = rawQ.toLowerCase().startsWith("did:");
+  if (mode === "did" || looksLikeDid) {
     clearTimeout(_didSearchTimer);
     _didSearchTimer = setTimeout(() => {
       if (rawQ === _signing.didQuery) return; // no change
