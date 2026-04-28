@@ -105,6 +105,7 @@ function expireSession() {
   sessionStorage.removeItem("agentid_login_ts");
   apiKey = "";
   clearTimeout(sessionTimer);
+  stopSse();
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
   document.getElementById("logout-btn").style.display = "none";
@@ -222,6 +223,7 @@ function logout() {
   sessionStorage.removeItem("agentid_login_ts");
   apiKey = "";
   clearTimeout(sessionTimer);
+  stopSse();
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
   document.getElementById("logout-btn").style.display = "none";
@@ -288,6 +290,10 @@ async function loadDashboard() {
   loadSigningActivity();
   loadAgentsTable();
   loadDiscoveryStats();
+  loadAnomalies();
+
+  // Start real-time SSE feed (or restart if already running)
+  startSse();
 
 }
 
@@ -889,6 +895,123 @@ async function loadDiscoveryStats() {
   } catch {
     document.getElementById("stat-discovery").textContent = "—";
   }
+}
+
+// ── ANOMALY DETECTION ─────────────────────────────────────────────────────────
+
+async function loadAnomalies() {
+  const el = document.getElementById("anomaly-list");
+  if (!el) return;
+  try {
+    const data = await apiFetch("/pro/anomalies");
+    const anomalies = data.anomalies || [];
+    if (!anomalies.length) {
+      el.innerHTML = `<div class="anomaly-clear">
+        <span style="font-size:1.2rem;">✅</span>
+        <span>No anomalies detected</span>
+      </div>`;
+      return;
+    }
+    el.innerHTML = anomalies.map(a => {
+      const sev = a.severity || "low";
+      const sevColor = sev === "high" ? "var(--red)" : sev === "medium" ? "var(--yellow)" : "var(--blue)";
+      const sevBg    = sev === "high" ? "var(--red-bg)" : sev === "medium" ? "var(--yellow-bg)" : "var(--blue-bg)";
+      return `<div class="anomaly-card" style="border-left:3px solid ${sevColor};background:${sevBg};border-radius:6px;padding:0.6rem 0.9rem;margin-bottom:0.5rem;">
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">
+          <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:${sevColor};border:1px solid ${sevColor};border-radius:999px;padding:0.1rem 0.45rem;">${esc(sev)}</span>
+          <span style="font-weight:600;font-size:0.88rem;">${esc(a.title)}</span>
+        </div>
+        <p style="font-size:0.8rem;color:var(--text-2);margin:0;">${esc(a.description)}</p>
+      </div>`;
+    }).join("");
+  } catch {
+    if (el) el.innerHTML = `<div class="anomaly-clear" style="color:var(--muted);font-size:0.8rem;">Could not load anomaly data</div>`;
+  }
+}
+
+// ── REAL-TIME SSE ─────────────────────────────────────────────────────────────
+
+let _sseSource = null;
+let _sseReconnectTimer = null;
+const SSE_TOAST_MAX = 5;   // max toasts shown at once
+
+function _showSseToast(ev) {
+  const container = document.getElementById("sse-toasts");
+  if (!container) return;
+
+  // Limit visible toasts
+  while (container.children.length >= SSE_TOAST_MAX) {
+    container.removeChild(container.firstChild);
+  }
+
+  const opCls = opClass(ev.operation || "");
+  const toast = document.createElement("div");
+  toast.className = "sse-toast";
+  toast.innerHTML = `
+    <span class="op-pill ${opCls}" style="font-size:0.7rem;">${esc(ev.operation || "event")}</span>
+    <span style="font-size:0.78rem;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortDid(ev.did))}</span>
+    <span class="${ev.status === "valid" || ev.status === "ok" ? "status-ok" : ev.status === "invalid" ? "status-invalid" : ""}" style="font-size:0.75rem;">${esc(ev.status || "")}</span>
+  `;
+  container.appendChild(toast);
+
+  // Fade out and remove after 6 s
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transition = "opacity 0.4s";
+    setTimeout(() => toast.remove(), 400);
+  }, 6000);
+}
+
+function _setSseDot(connected) {
+  const dot = document.getElementById("sse-dot");
+  if (!dot) return;
+  dot.title = connected ? "Live — real-time events connected" : "Offline — reconnecting…";
+  dot.style.background = connected ? "var(--green)" : "var(--muted)";
+}
+
+function startSse() {
+  if (!apiKey) return;
+  stopSse();
+
+  const url = `${BASE}/pro/stream?api_key=${encodeURIComponent(apiKey)}`;
+  _sseSource = new EventSource(url);
+
+  _sseSource.addEventListener("connected", () => {
+    _setSseDot(true);
+  });
+
+  _sseSource.addEventListener("audit", (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      _showSseToast(data);
+      // Refresh audit log silently in the background
+      loadAuditLog();
+      if (data.operation === "verify") loadSigningActivity();
+    } catch { /* ignore parse errors */ }
+  });
+
+  _sseSource.addEventListener("timeout", () => {
+    // Server closed the connection intentionally — reconnect in 2 s
+    _setSseDot(false);
+    stopSse();
+    _sseReconnectTimer = setTimeout(startSse, 2000);
+  });
+
+  _sseSource.onerror = () => {
+    _setSseDot(false);
+    stopSse();
+    // Exponential back-off: try again in 10 s
+    _sseReconnectTimer = setTimeout(startSse, 10000);
+  };
+}
+
+function stopSse() {
+  clearTimeout(_sseReconnectTimer);
+  if (_sseSource) {
+    _sseSource.close();
+    _sseSource = null;
+  }
+  _setSseDot(false);
 }
 
 // ── EVENT LISTENERS ───────────────────────────────────────────────────────────

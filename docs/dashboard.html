@@ -675,6 +675,37 @@
       transition: color 0.15s;
     }
     .expand-btn:hover { color: var(--text); }
+
+    /* ── SSE TOASTS ── */
+    .sse-toast {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      padding: 0.4rem 0.75rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      min-width: 220px;
+      max-width: 320px;
+      pointer-events: auto;
+      font-size: 0.78rem;
+      animation: toast-in 0.25s ease;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ── ANOMALY ── */
+    .anomaly-clear {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--green);
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -731,8 +762,16 @@
         <button class="btn btn-outline" id="pdf-btn" title="Download PDF analytics report">↓ PDF Report</button>
       </div>
       <button class="btn btn-outline" id="refresh-btn" title="Refresh data">↻ Refresh</button>
+      <!-- SSE live indicator -->
+      <div style="display:flex;align-items:center;gap:0.35rem;font-size:0.72rem;color:var(--muted);">
+        <span id="sse-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background 0.4s;" title="Offline"></span>
+        <span>Live</span>
+      </div>
     </div>
   </div>
+
+  <!-- SSE toast container (bottom-right) -->
+  <div id="sse-toasts" style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:999;display:flex;flex-direction:column;gap:0.4rem;pointer-events:none;"></div>
 
   <!-- Verified badge -->
   <div id="badge-section"></div>
@@ -795,6 +834,17 @@
       <div class="chart-wrap">
         <canvas id="cap-chart"></canvas>
       </div>
+    </div>
+  </div>
+
+  <!-- Anomaly Detection -->
+  <div class="card" style="margin-bottom:1.25rem;" id="anomaly-card">
+    <div class="card-header">
+      <div class="card-title">⚠️ Anomaly Detection</div>
+      <span style="font-size:0.72rem;color:var(--muted);">Updated every 60 s</span>
+    </div>
+    <div id="anomaly-list" style="padding:0.75rem 1.25rem;">
+      <div class="loading"><div class="spinner"></div> Checking…</div>
     </div>
   </div>
 
