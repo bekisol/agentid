@@ -313,10 +313,114 @@ async function loadDashboard() {
   // Start real-time SSE feed (or restart if already running)
   startSse();
 
+  // Onboarding checklist — shown until all steps done or dismissed
+  _renderOnboarding(data);
+
   // Anomaly auto-refresh every 60 s
   clearInterval(_anomalyTimer);
   _anomalyTimer = setInterval(loadAnomalies, 60000);
 
+}
+
+// ── ONBOARDING CHECKLIST ──────────────────────────────────────────────────────
+
+const _ONBOARDING_KEY = "agentid_onboarding_dismissed";
+
+function _renderOnboarding(data) {
+  const card = document.getElementById("onboarding-card");
+  if (!card) return;
+  if (localStorage.getItem(_ONBOARDING_KEY) === "1") return;
+
+  const agentCount   = Number(data.usage?.agents_registered) || 0;
+  const hasWebhooks  = false; // will be refreshed async below
+  const tier         = String(data.tier || "free");
+
+  const steps = [
+    {
+      id: "register-agent",
+      done: agentCount > 0,
+      icon: "🤖",
+      label: "Register your first agent",
+      action: () => document.getElementById("register-agent-btn")?.click(),
+      actionLabel: "Register now",
+    },
+    {
+      id: "set-webhook",
+      done: false,  // async check
+      icon: "🔔",
+      label: "Set up a webhook to receive real-time events",
+      action: () => {
+        document.getElementById("settings-btn")?.click();
+        setTimeout(() => document.querySelector(".modal-tab[data-tab='webhooks']")?.click(), 200);
+      },
+      actionLabel: "Add webhook",
+    },
+    {
+      id: "invite-team",
+      done: false,  // no easy check without extra API call
+      icon: "👥",
+      label: "Invite a team member with a scoped API key",
+      action: () => {
+        document.getElementById("settings-btn")?.click();
+        setTimeout(() => document.querySelector(".modal-tab[data-tab='team-keys']")?.click(), 200);
+      },
+      actionLabel: "Invite teammate",
+    },
+    {
+      id: "download-export",
+      done: false,
+      icon: "📥",
+      label: "Download your audit log (CSV or JSON)",
+      action: () => document.getElementById("csv-btn")?.click(),
+      actionLabel: "Download CSV",
+    },
+  ];
+
+  // Async: check if any webhooks exist
+  apiFetch("/pro/webhooks").then(whs => {
+    if (whs && whs.length > 0) {
+      const whStep = steps.find(s => s.id === "set-webhook");
+      if (whStep) whStep.done = true;
+      _reRenderSteps(card, steps);
+    }
+  }).catch(() => {});
+
+  _reRenderSteps(card, steps);
+  card.style.display = "";
+
+  document.getElementById("onboarding-dismiss")?.addEventListener("click", () => {
+    localStorage.setItem(_ONBOARDING_KEY, "1");
+    card.style.display = "none";
+  });
+}
+
+function _reRenderSteps(card, steps) {
+  const stepsEl = document.getElementById("onboarding-steps");
+  const progEl  = document.getElementById("onboarding-progress");
+  if (!stepsEl) return;
+
+  const done = steps.filter(s => s.done).length;
+  stepsEl.innerHTML = steps.map(s => `
+    <div style="display:flex;align-items:center;gap:0.6rem;font-size:0.84rem;${s.done ? "opacity:0.5;" : ""}">
+      <span style="font-size:1rem;flex-shrink:0;">${s.done ? "✅" : s.icon}</span>
+      <span style="flex:1;${s.done ? "text-decoration:line-through;color:var(--muted);" : ""}">${s.label}</span>
+      ${!s.done ? `<button class="agent-action-btn onboarding-action" data-step="${s.id}" style="white-space:nowrap;">${s.actionLabel}</button>` : ""}
+    </div>`).join("");
+
+  if (progEl) progEl.textContent = `${done} of ${steps.length} completed`;
+
+  stepsEl.querySelectorAll(".onboarding-action").forEach(btn => {
+    const step = steps.find(s => s.id === btn.dataset.step);
+    if (step?.action) btn.addEventListener("click", step.action);
+  });
+
+  // Auto-hide once all done
+  if (done === steps.length) {
+    setTimeout(() => {
+      localStorage.setItem(_ONBOARDING_KEY, "1");
+      card.style.display = "none";
+    }, 2000);
+  }
 }
 
 // ── CHARTS ────────────────────────────────────────────────────────────────────
@@ -511,6 +615,85 @@ let _allAgents  = [];   // full list from API
 let _agFiltered = [];   // after search filter
 let _agPage     = 1;
 const _AG_PER_PAGE = 20;
+let _agSelection = {};  // did → agent object for checked rows
+
+function _updateBulkBar() {
+  const selected = Object.values(_agSelection).filter(Boolean);
+  const bar   = document.getElementById("agents-bulk-bar");
+  const label = document.getElementById("bulk-bar-label");
+  if (!bar) return;
+  if (selected.length === 0) {
+    bar.classList.remove("active");
+  } else {
+    bar.classList.add("active");
+    label.textContent = `${selected.length} agent${selected.length !== 1 ? "s" : ""} selected`;
+  }
+}
+
+function _initBulkActions() {
+  document.getElementById("bulk-clear-sel")?.addEventListener("click", () => {
+    _agSelection = {};
+    document.querySelectorAll(".agent-row-check").forEach(cb => cb.checked = false);
+    const all = document.getElementById("ag-select-all");
+    if (all) all.checked = false;
+    _updateBulkBar();
+  });
+
+  document.getElementById("bulk-make-private")?.addEventListener("click", async () => {
+    await _bulkVisibility(true);
+  });
+  document.getElementById("bulk-make-public")?.addEventListener("click", async () => {
+    await _bulkVisibility(false);
+  });
+  document.getElementById("bulk-export-json")?.addEventListener("click", () => {
+    const agents = Object.values(_agSelection).filter(Boolean);
+    const blob = new Blob([JSON.stringify(agents, null, 2)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `agents-export-${Date.now()}.json`; a.click(); URL.revokeObjectURL(a.href);
+  });
+  document.getElementById("bulk-deregister")?.addEventListener("click", async () => {
+    const agents = Object.values(_agSelection).filter(Boolean);
+    if (!agents.length) return;
+    if (!confirm(`Deregister ${agents.length} agent${agents.length !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+    const btn = document.getElementById("bulk-deregister");
+    btn.disabled = true; btn.textContent = "Deregistering…";
+    try {
+      const res = await apiFetch("/pro/agents/bulk", {
+        method: "DELETE",
+        body: JSON.stringify({ dids: agents.map(a => a.did) }),
+      });
+      _agSelection = {};
+      _updateBulkBar();
+      await loadAgentsTable();
+      _showToast(`Deregistered ${res.count} agent${res.count !== 1 ? "s" : ""}.`);
+    } catch(e) {
+      alert("Bulk deregister failed: " + e.message);
+    } finally { btn.disabled = false; btn.textContent = "Deregister selected"; }
+  });
+}
+
+async function _bulkVisibility(makePrivate) {
+  const agents = Object.values(_agSelection).filter(Boolean);
+  if (!agents.length) return;
+  const btn = makePrivate
+    ? document.getElementById("bulk-make-private")
+    : document.getElementById("bulk-make-public");
+  if (btn) { btn.disabled = true; btn.textContent = "Updating…"; }
+  try {
+    const res = await apiFetch("/pro/agents/bulk-visibility", {
+      method: "PATCH",
+      body: JSON.stringify({ dids: agents.map(a => a.did), private: makePrivate }),
+    });
+    _agSelection = {};
+    _updateBulkBar();
+    await loadAgentsTable();
+    _showToast(`Updated visibility for ${res.updated} agent${res.updated !== 1 ? "s" : ""}.`);
+  } catch(e) {
+    alert("Bulk visibility update failed: " + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = makePrivate ? "🔒 Make private" : "🌐 Make public"; }
+  }
+}
 
 function _renderAgentRow(a) {
   const capsArr = Array.isArray(a.capabilities) ? a.capabilities : [];
@@ -551,7 +734,9 @@ function _renderAgentRow(a) {
   return `<tr
     data-name="${esc(a.name.toLowerCase())}"
     data-did="${esc((a.did || "").toLowerCase())}"
-    data-caps="${esc(capsArr.join(" ").toLowerCase())}">
+    data-caps="${esc(capsArr.join(" ").toLowerCase())}"
+    data-raw-did="${esc(a.did || "")}">
+    <td style="width:2rem;text-align:center;"><input type="checkbox" class="agent-row-check" data-did="${esc(a.did||"")}" style="cursor:pointer;" /></td>
     <td class="agent-name" style="display:flex;align-items:center;gap:0;">${healthDot}${esc(a.name)}${rotBadge}</td>
     <td class="did-mono" title="${esc(a.did || "")}">${esc(shortDid(a.did))}</td>
     <td>${caps || '<span style="color:var(--muted);font-size:0.8rem;">none</span>'}</td>
@@ -603,6 +788,7 @@ function _renderAgPage() {
     <div style="overflow:auto;">
       <table class="agents-table">
         <thead><tr>
+          <th style="width:2rem;text-align:center;"><input type="checkbox" id="ag-select-all" title="Select all on this page" style="cursor:pointer;" /></th>
           <th>Name</th><th>DID</th><th>Capabilities</th>
           <th>Audit Events</th><th>Last Active</th><th>Registered</th>
           <th>Visibility</th><th></th>
@@ -610,6 +796,24 @@ function _renderAgPage() {
         <tbody>${slice.map(_renderAgentRow).join("")}</tbody>
       </table>
     </div>`;
+
+  // Select-all for current page
+  document.getElementById("ag-select-all")?.addEventListener("change", function() {
+    el.querySelectorAll(".agent-row-check").forEach(cb => {
+      cb.checked = this.checked;
+      _agSelection[cb.dataset.did] = this.checked ? _allAgents.find(a => a.did === cb.dataset.did) : undefined;
+      if (!this.checked) delete _agSelection[cb.dataset.did];
+    });
+    _updateBulkBar();
+  });
+  el.querySelectorAll(".agent-row-check").forEach(cb => {
+    cb.checked = !!_agSelection[cb.dataset.did];
+    cb.addEventListener("change", function() {
+      if (this.checked) _agSelection[this.dataset.did] = _allAgents.find(a => a.did === this.dataset.did);
+      else delete _agSelection[this.dataset.did];
+      _updateBulkBar();
+    });
+  });
 
   // Pager
   const pagerEl = document.getElementById("agents-pager-wrap");
@@ -767,9 +971,10 @@ async function loadAgentsTable() {
     _buildAgFiltered();
     _renderAgPage();
 
-    // Init search and privacy controls once per full load
+    // Init search, privacy controls, and bulk actions once per full load
     _initAgentSearch();
     _initPrivacyToggles();
+    _initBulkActions();
 
   } catch {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load agents</p></div>';
@@ -1492,17 +1697,22 @@ async function _loadWebhooks() {
           </div>
           <div style="display:flex;flex-direction:column;gap:0.3rem;align-items:flex-end;">
             <span style="font-size:0.7rem;font-weight:700;color:${statusColor};border:1px solid ${statusColor};border-radius:999px;padding:0.1rem 0.45rem;">${statusTxt}</span>
-            <div style="display:flex;gap:0.3rem;">
+            <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+              <button class="btn btn-outline" data-wh-logs="${wh.id}" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Logs</button>
               <button class="btn btn-outline" data-wh-test="${wh.id}" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Test</button>
               <button class="btn btn-outline" data-wh-toggle="${wh.id}" style="font-size:0.7rem;padding:0.2rem 0.5rem;">${wh.active ? "Disable" : "Enable"}</button>
               <button class="btn btn-outline" data-wh-delete="${wh.id}" style="font-size:0.7rem;padding:0.2rem 0.5rem;color:var(--red);border-color:var(--red);">Delete</button>
             </div>
           </div>
         </div>
+        <div id="wh-logs-${wh.id}" style="display:none;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.65rem;"></div>
       </div>`;
     }).join("");
 
     // Wire up action buttons
+    el.querySelectorAll("[data-wh-logs]").forEach(btn => {
+      btn.addEventListener("click", () => _toggleDeliveryLog(Number(btn.dataset.whLogs), btn));
+    });
     el.querySelectorAll("[data-wh-test]").forEach(btn => {
       btn.addEventListener("click", () => _webhookAction("test", Number(btn.dataset.whTest), btn));
     });
@@ -1515,6 +1725,61 @@ async function _loadWebhooks() {
   } catch {
     el.innerHTML = `<p style="font-size:0.82rem;color:var(--red);">Could not load webhooks.</p>`;
   }
+}
+
+async function _toggleDeliveryLog(id, btn) {
+  const panel = document.getElementById(`wh-logs-${id}`);
+  if (!panel) return;
+  const isOpen = panel.style.display !== "none";
+  if (isOpen) {
+    panel.style.display = "none";
+    btn.textContent = "Logs";
+    return;
+  }
+  btn.textContent = "Loading…"; btn.disabled = true;
+  panel.style.display = "";
+  panel.innerHTML = `<div style="font-size:0.75rem;color:var(--muted);">Loading delivery log…</div>`;
+  try {
+    const data = await apiFetch(`/pro/webhooks/${id}/deliveries?limit=50`);
+    const rows = data.deliveries || [];
+    if (!rows.length) {
+      panel.innerHTML = `<p style="font-size:0.78rem;color:var(--muted);">No deliveries recorded yet.</p>`;
+    } else {
+      panel.innerHTML = `
+        <div style="font-size:0.72rem;font-weight:600;color:var(--muted);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.04em;">Last ${rows.length} deliveries</div>
+        <div style="overflow:auto;max-height:260px;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+            <thead>
+              <tr style="background:var(--surface2);">
+                <th style="padding:0.3rem 0.5rem;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Time</th>
+                <th style="padding:0.3rem 0.5rem;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Event</th>
+                <th style="padding:0.3rem 0.5rem;text-align:center;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Status</th>
+                <th style="padding:0.3rem 0.5rem;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => {
+                const ok = r.success;
+                const ts = r.attempted_at ? new Date(r.attempted_at).toLocaleString() : "—";
+                const statusHtml = ok
+                  ? `<span style="color:var(--green);font-weight:700;">✓ ${r.status_code ?? "2xx"}</span>`
+                  : `<span style="color:var(--red);font-weight:700;">✗ ${r.status_code ?? "err"}</span>`;
+                const detail = r.error ? esc(r.error) : (ok ? "—" : "no response");
+                return `<tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:0.3rem 0.5rem;color:var(--muted);white-space:nowrap;">${esc(ts)}</td>
+                  <td style="padding:0.3rem 0.5rem;font-family:'JetBrains Mono',monospace;">${esc(r.event_type || "—")}</td>
+                  <td style="padding:0.3rem 0.5rem;text-align:center;">${statusHtml}</td>
+                  <td style="padding:0.3rem 0.5rem;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.error||"")}">${detail}</td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>`;
+    }
+  } catch(e) {
+    panel.innerHTML = `<p style="font-size:0.78rem;color:var(--red);">Could not load logs: ${esc(e.message)}</p>`;
+  }
+  btn.textContent = "Hide logs"; btn.disabled = false;
 }
 
 async function _webhookAction(action, id, btn) {
@@ -2141,6 +2406,71 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
     if (action === "verify")   _openTestVerify(did, name);
     if (action === "snippets") _openSnippets(did, name);
   });
+
+  // ── API Playground ───────────────────────────────────────────────────────────
+  (function _initPlayground() {
+    const methodSel = document.getElementById("pg-method");
+    const pathInput = document.getElementById("pg-path");
+    const bodyWrap  = document.getElementById("pg-body-wrap");
+    const runBtn    = document.getElementById("pg-run-btn");
+    const respEl    = document.getElementById("pg-response");
+    const statusEl  = document.getElementById("pg-status-line");
+    const bodyEl    = document.getElementById("pg-response-body");
+    const copyBtn   = document.getElementById("pg-copy-btn");
+    if (!runBtn) return;
+
+    function toggleBody() {
+      const m = methodSel?.value;
+      if (bodyWrap) bodyWrap.style.display = (m === "POST" || m === "PATCH") ? "" : "none";
+    }
+    methodSel?.addEventListener("change", toggleBody);
+    toggleBody();
+
+    document.querySelectorAll(".pg-preset").forEach(btn => {
+      btn.addEventListener("click", () => {
+        methodSel.value = btn.dataset.method;
+        pathInput.value = btn.dataset.path;
+        toggleBody();
+        pathInput.focus();
+      });
+    });
+
+    runBtn.addEventListener("click", async function() {
+      const method = methodSel.value;
+      const path   = (pathInput.value || "").trim();
+      if (!path) return;
+      this.disabled = true; this.textContent = "Running…";
+      respEl.style.display = "";
+      statusEl.textContent = "…";
+      bodyEl.textContent   = "";
+      const t0 = Date.now();
+      try {
+        const opts = { method, headers: { "x-api-key": apiKey } };
+        const rawBody = document.getElementById("pg-body")?.value?.trim();
+        if ((method === "POST" || method === "PATCH") && rawBody) {
+          opts.headers["Content-Type"] = "application/json";
+          opts.body = rawBody;
+        }
+        const res = await fetch(BASE + path, opts);
+        const ms  = Date.now() - t0;
+        const text = await res.text();
+        let pretty = text;
+        try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch {}
+        const color = res.ok ? "var(--green)" : "var(--red)";
+        statusEl.innerHTML = `<span style="color:${color};font-weight:700;">HTTP ${res.status}</span> · ${ms}ms · ${text.length} bytes`;
+        bodyEl.textContent = pretty;
+      } catch(e) {
+        statusEl.innerHTML = `<span style="color:var(--red);">Network error</span>`;
+        bodyEl.textContent = e.message;
+      }
+      this.disabled = false; this.textContent = "▶ Run";
+    });
+
+    copyBtn?.addEventListener("click", function() {
+      navigator.clipboard.writeText(bodyEl.textContent).catch(() => {});
+      this.textContent = "copied!"; setTimeout(() => { this.textContent = "copy"; }, 1800);
+    });
+  })();
 
   // ── Admin re-auth gate ────────────────────────────────────────────────────────
   document.querySelector('#tab-team-keys input[value="admin"]')?.addEventListener("change", function () {
