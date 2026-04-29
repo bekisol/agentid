@@ -164,9 +164,18 @@ function timeAgo(isoStr) {
   return `${days}d ago`;
 }
 
-async function apiFetch(path) {
-  const res = await fetch(BASE + path, { headers: { "x-api-key": apiKey } });
-  if (!res.ok) throw new Error(res.status);
+async function apiFetch(path, options = {}) {
+  const headers = { "x-api-key": apiKey, ...options.headers };
+  if (options.body && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  const res = await fetch(BASE + path, { ...options, headers });
+  if (!res.ok) {
+    let msg = res.status;
+    try { const j = await res.json(); msg = j.detail || j.message || msg; } catch (_) {}
+    throw new Error(msg);
+  }
+  if (res.status === 204) return null;
   return res.json();
 }
 
