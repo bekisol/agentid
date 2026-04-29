@@ -383,13 +383,14 @@ function renderCharts(data) {
     }
   });
 
-  // PNG export
-  document.getElementById("export-trend-png")?.addEventListener("click", () => {
+  // PNG export — use onclick to avoid stacking listeners on re-render
+  const exportTrendBtn = document.getElementById("export-trend-png");
+  if (exportTrendBtn) exportTrendBtn.onclick = () => {
     const a = document.createElement("a");
     a.download = "registrations.png";
     a.href = trendChart.toBase64Image("image/png", 1);
     a.click();
-  });
+  };
 
   const capLabels = (data.top_capabilities || []).map(c => String(c.capability));
   const capData   = (data.top_capabilities || []).map(c => Number(c.agent_count) || 0);
@@ -426,12 +427,13 @@ function renderCharts(data) {
     }
   });
 
-  document.getElementById("export-cap-png")?.addEventListener("click", () => {
+  const exportCapBtn = document.getElementById("export-cap-png");
+  if (exportCapBtn) exportCapBtn.onclick = () => {
     const a = document.createElement("a");
     a.download = "capabilities.png";
     a.href = capChart.toBase64Image("image/png", 1);
     a.click();
-  });
+  };
 }
 
 // ── ACTIVITY ──────────────────────────────────────────────────────────────────

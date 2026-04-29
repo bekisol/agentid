@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentID — My Agents</title>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self' 'unsafe-inline';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src https://fonts.gstatic.com;
+             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
+             img-src 'self' data:;
+             frame-ancestors 'none';" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #F9F7F4; --surface: #FFFFFF; --surface2: #F2F0EC;
+      --border: #E5E2DB; --border-dark: #C9C5BC;
+      --text: #1C1917; --text-2: #44403C; --muted: #78716C;
+      --accent: #C2410C; --accent-light: #FFF7ED; --accent-border: #FDBA74;
+      --green: #059669; --green-bg: #ECFDF5;
+      --red: #DC2626; --red-bg: #FEF2F2;
+      --yellow: #D97706; --yellow-bg: #FFFBEB;
+    }
+    body { background:var(--bg); color:var(--text); font-family:"Inter",-apple-system,sans-serif; line-height:1.6; font-size:15px; -webkit-font-smoothing:antialiased; }
+    a { color:var(--accent); text-decoration:none; }
+
+    /* Topbar */
+    .topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 2rem; height:56px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+    .topbar-brand { font-weight:800; font-size:1.1rem; letter-spacing:-0.02em; }
+    .topbar-brand span { color:var(--accent); }
+    .topbar-nav { display:flex; align-items:center; gap:1.25rem; font-size:0.85rem; }
+    .topbar-nav a { color:var(--muted); font-weight:500; }
+    .topbar-nav a:hover { color:var(--text); }
+    .topbar-user { font-size:0.82rem; color:var(--muted); }
+
+    /* Layout */
+    .page-wrap { max-width:1200px; margin:0 auto; padding:2rem 2rem 4rem; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.75rem; }
+    .page-title { font-size:1.4rem; font-weight:800; letter-spacing:-0.02em; }
+    .page-subtitle { font-size:0.85rem; color:var(--muted); margin-top:0.15rem; }
+
+    /* Auth wall */
+    #auth-wall { display:flex; align-items:center; justify-content:center; min-height:60vh; }
+    .auth-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:2.5rem 2rem; max-width:400px; width:100%; text-align:center; }
+    .auth-card h2 { font-size:1.2rem; font-weight:700; margin-bottom:0.4rem; }
+    .auth-card p { font-size:0.85rem; color:var(--muted); margin-bottom:1.25rem; }
+    .auth-input { width:100%; padding:0.6rem 0.85rem; border:1px solid var(--border-dark); border-radius:8px; font-size:0.875rem; font-family:inherit; outline:none; margin-bottom:0.75rem; }
+    .auth-input:focus { border-color:var(--accent); }
+
+    /* Cards */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; margin-bottom:1.25rem; overflow:hidden; }
+    .card-header { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:0.5rem; }
+    .card-title { font-size:1rem; font-weight:700; }
+
+    /* Stats row */
+    .stats-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:1rem; margin-bottom:1.25rem; }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1rem 1.25rem; }
+    .stat-label { font-size:0.75rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.2rem; }
+    .stat-value { font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; color:var(--text); }
+    .stat-sub { font-size:0.75rem; color:var(--muted); margin-top:0.15rem; }
+
+    /* Cap bar */
+    .cap-bar-wrap { padding:0.85rem 1.25rem; border-bottom:1px solid var(--border); }
+    .cap-bar-label { display:flex; justify-content:space-between; font-size:0.78rem; color:var(--muted); margin-bottom:0.4rem; }
+    .cap-bar-track { height:7px; background:var(--surface2); border-radius:999px; overflow:hidden; border:1px solid var(--border); }
+    .cap-bar-fill { height:100%; background:var(--accent); border-radius:999px; transition:width 0.6s ease; }
+    .upgrade-prompt { margin:0.75rem 1.25rem; padding:0.75rem 1rem; background:var(--accent-light); border:1px solid var(--accent-border); border-radius:8px; display:none; }
+    .upgrade-prompt-title { font-size:0.82rem; font-weight:600; color:var(--accent); margin-bottom:0.15rem; }
+    .upgrade-prompt-body { font-size:0.78rem; color:var(--text-2); }
+
+    /* Search */
+    .search-wrap { padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); }
+    .search-inner { display:flex; align-items:center; gap:0.5rem; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:0 0.75rem; transition:border-color 0.15s; }
+    .search-inner:focus-within { border-color:var(--accent); }
+    .search-icon { color:var(--muted); flex-shrink:0; }
+    .search-input { flex:1; border:none; background:transparent; padding:0.5rem 0; font-size:0.875rem; font-family:inherit; color:var(--text); outline:none; }
+    .search-input::placeholder { color:var(--muted); }
+    .search-tags { display:flex; gap:0.3rem; margin-top:0.5rem; flex-wrap:wrap; }
+    .search-tag { font-size:0.72rem; font-weight:600; padding:0.18rem 0.55rem; border-radius:999px; border:1px solid var(--border-dark); color:var(--muted); cursor:pointer; background:var(--surface); user-select:none; }
+    .search-tag:hover { border-color:var(--accent); color:var(--accent); }
+    .search-tag-active { background:var(--accent-light); border-color:var(--accent-border); color:var(--accent); }
+    .search-status { font-size:0.75rem; color:var(--muted); margin-top:0.4rem; min-height:1rem; }
+
+    /* Table */
+    .table-wrap { overflow:auto; }
+    table.agents-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+    table.agents-table th { padding:0.55rem 0.9rem; background:var(--surface2); font-weight:600; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); white-space:nowrap; border-bottom:1px solid var(--border); text-align:left; }
+    table.agents-table td { padding:0.65rem 0.9rem; border-bottom:1px solid var(--border); vertical-align:middle; }
+    table.agents-table tbody tr:last-child td { border-bottom:none; }
+    table.agents-table tbody tr:hover td { background:var(--surface2); }
+    .agent-name { font-weight:600; display:flex; align-items:center; gap:0.3rem; }
+    .did-mono { font-family:"JetBrains Mono",monospace; font-size:0.72rem; color:var(--muted); }
+    .caps-scroll { display:flex; flex-wrap:wrap; gap:0.25rem; max-width:240px; }
+    .cap-pill { display:inline-block; font-size:0.68rem; font-weight:600; padding:0.12rem 0.4rem; border-radius:4px; background:var(--accent-light); color:var(--accent); border:1px solid var(--accent-border); white-space:nowrap; }
+    .cap-pill-removable { display:inline-flex; align-items:center; gap:0.25rem; font-size:0.68rem; font-weight:600; padding:0.12rem 0.4rem; border-radius:4px; background:var(--accent-light); color:var(--accent); border:1px solid var(--accent-border); }
+    .cap-pill-removable button { border:none; background:none; color:var(--accent); font-size:0.8rem; cursor:pointer; line-height:1; padding:0; }
+    .last-active-fresh { color:var(--green); font-size:0.78rem; font-weight:500; }
+    .last-active-old { color:var(--muted); font-size:0.78rem; }
+    .privacy-toggle { font-size:0.72rem; padding:0.15rem 0.5rem; border-radius:5px; cursor:pointer; }
+    .agent-action-btn { font-size:0.72rem; padding:0.15rem 0.5rem; border-radius:5px; border:1px solid var(--border-dark); background:var(--surface2); color:var(--muted); cursor:pointer; font-family:inherit; }
+    .agent-action-btn:hover { background:var(--accent-light); border-color:var(--accent-border); color:var(--accent); }
+    .health-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:0.4rem; flex-shrink:0; }
+    .health-dot-green  { background:var(--green); box-shadow:0 0 0 2px var(--green-bg); }
+    .health-dot-yellow { background:var(--yellow); box-shadow:0 0 0 2px var(--yellow-bg); }
+    .health-dot-grey   { background:var(--border-dark); }
+    .row-hidden { display:none; }
+    .row-highlight td { background:var(--accent-light) !important; }
+
+    /* Empty / loading */
+    .empty { text-align:center; padding:3rem 1.5rem; color:var(--muted); }
+    .empty-icon { font-size:2.5rem; margin-bottom:0.5rem; }
+    .empty-title { font-size:1rem; font-weight:700; color:var(--text); margin-bottom:0.3rem; }
+    .spinner { width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 0.5rem; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* Buttons */
+    .btn { padding:0.5rem 1.1rem; border-radius:8px; font-size:0.875rem; font-weight:600; cursor:pointer; border:none; font-family:inherit; }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { background:#a83509; }
+    .btn-primary:disabled { opacity:0.5; cursor:default; }
+    .btn-outline { background:var(--surface); color:var(--text-2); border:1px solid var(--border-dark); }
+    .btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* Modals */
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:9000; padding:1rem; }
+    .modal { background:var(--surface); border-radius:16px; border:1px solid var(--border); max-width:520px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.18); }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid var(--border); }
+    .modal-title { font-weight:700; font-size:0.95rem; }
+    .modal-close { background:none; border:none; font-size:1.1rem; cursor:pointer; color:var(--muted); padding:0.2rem 0.4rem; border-radius:4px; }
+    .modal-close:hover { background:var(--surface2); color:var(--text); }
+    .modal-body { padding:1.25rem; }
+    .field { margin-bottom:1rem; }
+    .field label { display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.3rem; color:var(--text-2); }
+    .field input, .field textarea, .field select { width:100%; padding:0.5rem 0.75rem; border:1px solid var(--border-dark); border-radius:8px; font-size:0.875rem; font-family:inherit; color:var(--text); outline:none; background:var(--surface); }
+    .field input:focus, .field textarea:focus { border-color:var(--accent); }
+    .field textarea { resize:vertical; }
+    .field-row { display:flex; gap:0.5rem; }
+    .field-row input { flex:1; }
+
+    /* Snippet modal */
+    .snippet-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); }
+    .snippet-tab { padding:0.6rem 1rem; font-size:0.8rem; font-weight:600; cursor:pointer; border:none; background:none; font-family:inherit; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px; }
+    .snippet-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .snippet-body { background:#1C1917; border-radius:0 0 8px 8px; padding:1rem; overflow:auto; max-height:320px; }
+    .snippet-body pre { font-family:"JetBrains Mono",monospace; font-size:0.75rem; color:#D6D3D1; white-space:pre; margin:0; }
+
+    /* Register step display */
+    .step-label { font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:0.75rem; }
+    .did-box { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-family:"JetBrains Mono",monospace; font-size:0.72rem; word-break:break-all; color:var(--text-2); margin-bottom:0.75rem; }
+
+    @media(max-width:600px) {
+      .topbar { padding:0 1rem; }
+      .page-wrap { padding:1.25rem 1rem 4rem; }
+      .stats-row { grid-template-columns:1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">Agent<span>ID</span></div>
+  <div class="topbar-nav">
+    <a href="dashboard.html">← Dashboard</a>
+    <a href="agents.html" target="_blank">Public Registry</a>
+  </div>
+  <div class="topbar-user" id="topbar-user"></div>
+</div>
+
+<!-- Auth wall -->
+<div id="auth-wall" style="display:none;">
+  <div class="auth-card">
+    <div style="font-size:2rem;margin-bottom:0.5rem;">🔑</div>
+    <h2>Sign in to AgentID</h2>
+    <p>Enter your API key to manage your agents.</p>
+    <input id="auth-key-input" class="auth-input" type="password" placeholder="agentid_…" autocomplete="off" spellcheck="false" />
+    <button class="btn btn-primary" id="auth-sign-in-btn" style="width:100%;">Sign In</button>
+    <p id="auth-error" style="color:var(--red);font-size:0.8rem;margin-top:0.6rem;"></p>
+  </div>
+</div>
+
+<!-- Main content -->
+<div id="main-content" style="display:none;">
+  <div class="page-wrap">
+
+    <div class="page-header">
+      <div>
+        <div class="page-title">My Agents</div>
+        <div class="page-subtitle" id="page-subtitle">Loading…</div>
+      </div>
+      <div style="display:flex;gap:0.6rem;">
+        <button class="btn btn-outline" id="refresh-btn" title="Refresh">↺ Refresh</button>
+        <button class="btn btn-primary" id="register-agent-btn">+ Register Agent</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Agents</div>
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-sub" id="stat-cap-sub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active (7 days)</div>
+        <div class="stat-value" id="stat-active">—</div>
+        <div class="stat-sub">with recent activity</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Private</div>
+        <div class="stat-value" id="stat-private">—</div>
+        <div class="stat-sub">not in public registry</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Plan</div>
+        <div class="stat-value" id="stat-tier" style="font-size:1.1rem;margin-top:0.2rem;">—</div>
+        <div class="stat-sub" id="stat-tier-sub"></div>
+      </div>
+    </div>
+
+    <!-- Agents card -->
+    <div class="card">
+      <!-- Cap bar -->
+      <div class="cap-bar-wrap">
+        <div class="cap-bar-label">
+          <span>Agent capacity</span>
+          <span id="cap-label"></span>
+        </div>
+        <div class="cap-bar-track">
+          <div class="cap-bar-fill" id="cap-bar-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="upgrade-prompt" id="upgrade-prompt">
+        <div class="upgrade-prompt-title">You're approaching your agent limit</div>
+        <div class="upgrade-prompt-body">Upgrade to Pro for 10,000 agents, analytics, webhooks, and more. <a href="index.html#pricing" style="font-weight:600;">View Pro plans →</a></div>
+      </div>
+
+      <!-- Search -->
+      <div class="search-wrap">
+        <div class="search-inner">
+          <svg class="search-icon" width="15" height="15" viewBox="0 0 20 20" fill="none">
+            <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M13 13l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <input id="agent-search" class="search-input" type="text" placeholder="Search by name, DID, or capability…" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="search-tags" id="search-tags">
+          <span class="search-tag search-tag-active" data-mode="all">All</span>
+          <span class="search-tag" data-mode="name">Name</span>
+          <span class="search-tag" data-mode="did">DID</span>
+          <span class="search-tag" data-mode="cap">Capability</span>
+        </div>
+        <div class="search-status" id="search-status"></div>
+      </div>
+
+      <!-- Card header with count -->
+      <div class="card-header" style="border-top:1px solid var(--border);">
+        <span id="agents-count-label" style="font-size:0.82rem;color:var(--muted);"></span>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <label style="font-size:0.78rem;color:var(--muted);display:flex;align-items:center;gap:0.3rem;">
+            <input type="checkbox" id="filter-active-only" style="width:auto;" />
+            Active only
+          </label>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div id="agents-container">
+        <div class="empty"><div class="spinner"></div><div>Loading agents…</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── REGISTER AGENT MODAL ── -->
+<div id="register-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <span class="modal-title">+ Register Agent</span>
+      <button class="modal-close" id="register-modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="reg-step-1">
+        <div class="step-label">Step 1 of 2 — Configure</div>
+        <div class="field">
+          <label>Agent name <span style="color:var(--red)">*</span></label>
+          <input id="reg-name" type="text" placeholder="e.g. Billing Agent" maxlength="128" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Capabilities</label>
+          <div class="field-row">
+            <input id="reg-caps-input" type="text" placeholder="e.g. invoice-approval" autocomplete="off" spellcheck="false" />
+            <button class="btn btn-outline" id="reg-caps-add-btn" style="white-space:nowrap;padding:0.5rem 0.75rem;">+ Add</button>
+          </div>
+          <div id="reg-caps-pills" style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-top:0.4rem;"></div>
+        </div>
+        <div class="field" style="display:flex;align-items:center;gap:0.5rem;">
+          <input id="reg-private" type="checkbox" style="width:auto;" />
+          <label for="reg-private" style="margin-bottom:0;font-weight:500;font-size:0.85rem;">Private agent (hidden from public registry)</label>
+        </div>
+        <p id="reg-step1-msg" style="font-size:0.8rem;min-height:1.2em;margin-bottom:0.75rem;"></p>
+        <button class="btn btn-primary" id="reg-generate-btn" style="width:100%;">Generate Keys & Preview</button>
+      </div>
+
+      <div id="reg-step-2" style="display:none;">
+        <div class="step-label">Step 2 of 2 — Save & Register</div>
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem;">Your Ed25519 key pair has been generated in-browser. Download the key file before registering.</p>
+        <div class="field">
+          <label>DID (Decentralised Identifier)</label>
+          <div class="did-box" id="reg-did-display"></div>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.85rem;flex-wrap:wrap;">
+          <button class="btn btn-outline" id="reg-back-btn">← Back</button>
+          <button class="btn btn-outline" id="reg-download-key-btn" style="flex:1;">⬇ Download Key File</button>
+        </div>
+        <div id="reg-download-warning" style="display:none;font-size:0.78rem;color:var(--red);margin-bottom:0.6rem;">⚠ Download your key file first — you won't be able to retrieve it later.</div>
+        <p id="reg-step2-msg" style="font-size:0.8rem;min-height:1.2em;margin-bottom:0.75rem;color:var(--red);"></p>
+        <button class="btn btn-primary" id="reg-register-btn" style="width:100%;">Register Agent</button>
+        <div id="reg-success" style="display:none;margin-top:1rem;padding:1rem;background:var(--green-bg);border:1px solid var(--green);border-radius:8px;">
+          <div style="font-weight:700;color:var(--green);margin-bottom:0.3rem;">✓ Agent Registered</div>
+          <div class="did-mono" id="reg-success-did" style="margin-bottom:0.75rem;word-break:break-all;"></div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline" id="reg-view-btn" style="font-size:0.8rem;">View Profile</button>
+            <button class="btn btn-outline" id="reg-another-btn" style="font-size:0.8rem;">+ Register Another</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TEST VERIFY MODAL ── -->
+<div id="verify-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title">🔍 Test Verify — <span id="verify-modal-name"></span></span>
+      <button class="modal-close" id="verify-modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;">Paste a signed payload and its signature to test verification against this agent's public key.</p>
+      <div class="field">
+        <label>Payload (JSON)</label>
+        <textarea id="verify-payload-input" rows="5" spellcheck="false" placeholder='{"action":"approve","timestamp":"2026-01-01T00:00:00Z"}'></textarea>
+      </div>
+      <div class="field">
+        <label>Signature (base64)</label>
+        <input id="verify-sig-input" type="text" spellcheck="false" placeholder="base64-encoded Ed25519 signature" autocomplete="off" />
+      </div>
+      <div id="verify-result" style="display:none;margin-bottom:1rem;padding:0.85rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:600;"></div>
+      <button class="btn btn-primary" id="verify-run-btn" style="width:100%;">Run Verification</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CODE SNIPPETS MODAL ── -->
+<div id="snippets-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <span class="modal-title">&lt;/&gt; Code Snippets — <span id="snippets-modal-name"></span></span>
+      <button class="modal-close" id="snippets-modal-close">✕</button>
+    </div>
+    <div id="snippets-tabs" class="snippet-tabs">
+      <button class="snippet-tab active" data-stab="python">Python</button>
+      <button class="snippet-tab" data-stab="js">JavaScript</button>
+      <button class="snippet-tab" data-stab="curl">curl</button>
+    </div>
+    <div class="snippet-body">
+      <pre id="snippets-code"></pre>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:0.75rem 1.25rem;border-top:1px solid var(--border);">
+      <button class="btn btn-outline" id="snippets-copy-btn" style="font-size:0.8rem;padding:0.35rem 0.9rem;">copy</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = "https://api.agentid-protocol.com";
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+let apiKey = sessionStorage.getItem("agentid_key") || "";
+
+// Inherit key from sibling tabs (BroadcastChannel)
+(function () {
+  if (!apiKey && typeof BroadcastChannel !== "undefined") {
+    const bc = new BroadcastChannel("agentid_session");
+    bc.postMessage({ type: "request" });
+    bc.onmessage = (ev) => {
+      const msg = ev.data;
+      if (msg?.type === "response" && msg.key && !apiKey) {
+        apiKey = msg.key;
+        sessionStorage.setItem("agentid_key", apiKey);
+        bc.close();
+        boot();
+      }
+    };
+    // Give sibling tabs 200ms to respond, else show auth wall
+    setTimeout(() => {
+      if (!apiKey) { bc.close(); showAuthWall(); }
+    }, 200);
+  } else if (apiKey) {
+    boot();
+  } else {
+    showAuthWall();
+  }
+})();
+
+function showAuthWall() {
+  document.getElementById("auth-wall").style.display = "flex";
+  document.getElementById("main-content").style.display = "none";
+}
+
+async function signIn() {
+  const key = (document.getElementById("auth-key-input").value || "").trim();
+  const errEl = document.getElementById("auth-error");
+  errEl.textContent = "";
+  if (!key) { errEl.textContent = "Enter your API key."; return; }
+  const btn = document.getElementById("auth-sign-in-btn");
+  btn.disabled = true; btn.textContent = "Signing in…";
+  try {
+    const res = await fetch(`${BASE}/pro/dashboard`, { headers: { "x-api-key": key } });
+    if (!res.ok) throw new Error("Invalid API key");
+    apiKey = key;
+    sessionStorage.setItem("agentid_key", key);
+    document.getElementById("auth-wall").style.display = "none";
+    boot();
+  } catch(e) {
+    errEl.textContent = e.message || "Could not sign in";
+    btn.disabled = false; btn.textContent = "Sign In";
+  }
+}
+
+document.getElementById("auth-sign-in-btn").addEventListener("click", signIn);
+document.getElementById("auth-key-input").addEventListener("keydown", e => { if (e.key === "Enter") signIn(); });
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function shortDid(did) {
+  if (!did) return "—";
+  if (did.length <= 20) return did;
+  return did.slice(0, 14) + "…" + did.slice(-6);
+}
+function timeAgo(iso) {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 60000) return "just now";
+  if (ms < 3600000) return `${Math.floor(ms/60000)}m ago`;
+  if (ms < 86400000) return `${Math.floor(ms/3600000)}h ago`;
+  if (ms < 86400000 * 30) return `${Math.floor(ms/86400000)}d ago`;
+  return new Date(iso).toLocaleDateString("en-US", { month:"short", day:"numeric" });
+}
+
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(BASE + path, {
+    ...opts,
+    headers: { "x-api-key": apiKey, "Content-Type": "application/json", ...(opts.headers || {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+  return data;
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let _allAgents = [];
+let _searchMode = "all";
+
+// ── RENDER AGENT ROW ──────────────────────────────────────────────────────────
+function renderAgentRow(a) {
+  const capsArr = Array.isArray(a.capabilities) ? a.capabilities : [];
+  const caps = capsArr.length
+    ? `<div class="caps-scroll">${capsArr.map(c => `<span class="cap-pill">${esc(String(c))}</span>`).join("")}</div>`
+    : '<span style="color:var(--muted);font-size:0.8rem;">none</span>';
+  const created = a.created_at
+    ? new Date(a.created_at).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" })
+    : "—";
+  const ageMs = a.last_activity ? Date.now() - new Date(a.last_activity).getTime() : Infinity;
+  const activeClass = ageMs < 86400000 * 7 ? "last-active-fresh" : "last-active-old";
+
+  let dotCls = "health-dot-grey";
+  if (a.last_activity) {
+    dotCls = ageMs < 86400000 ? "health-dot-green" : ageMs < 86400000 * 7 ? "health-dot-yellow" : "health-dot-grey";
+  }
+  const healthDot = `<span class="health-dot ${dotCls}" title="Last active ${timeAgo(a.last_activity)}"></span>`;
+  const rotBadge = a.rotation_pending
+    ? `<span title="Key rotation in progress" style="font-size:0.68rem;padding:0.1rem 0.4rem;border-radius:4px;background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow);margin-left:0.3rem;">⟳ rotation</span>`
+    : "";
+
+  const isPrivate = !!a.private;
+  const privBtn = `<button class="privacy-toggle" data-did="${esc(a.did||"")}" data-private="${isPrivate}"
+    style="font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:5px;cursor:pointer;border:1px solid ${isPrivate?"var(--yellow)":"var(--border-dark)"};background:${isPrivate?"var(--yellow-bg)":"var(--surface2)"};color:${isPrivate?"var(--yellow)":"var(--muted)"};">
+    ${isPrivate ? "🔒 private" : "🌐 public"}
+  </button>`;
+
+  const dataActive = ageMs < 86400000 * 7 ? "1" : "0";
+
+  return `<tr
+    data-name="${esc((a.name||"").toLowerCase())}"
+    data-did="${esc((a.did||"").toLowerCase())}"
+    data-caps="${esc(capsArr.join(" ").toLowerCase())}"
+    data-active="${dataActive}">
+    <td><div class="agent-name">${healthDot}${esc(a.name)}${rotBadge}</div></td>
+    <td class="did-mono" title="${esc(a.did||"")}">${esc(shortDid(a.did))}</td>
+    <td>${caps}</td>
+    <td style="text-align:center;font-weight:600;">${esc(String(a.audit_events ?? 0))}</td>
+    <td class="${activeClass}">${esc(timeAgo(a.last_activity))}</td>
+    <td style="color:var(--muted);font-size:0.78rem;">${esc(created)}</td>
+    <td>${privBtn}</td>
+    <td>
+      <a href="agent.html?did=${encodeURIComponent(a.did||"")}" target="_blank" class="agent-action-btn" style="text-decoration:none;margin-right:0.25rem;">Profile</a>
+      <button class="agent-action-btn" data-action="verify" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}">Test</button>
+      <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">&lt;/&gt;</button>
+    </td>
+  </tr>`;
+}
+
+// ── APPLY SEARCH/FILTER ───────────────────────────────────────────────────────
+function applyFilter() {
+  const q       = (document.getElementById("agent-search")?.value || "").trim().toLowerCase();
+  const activeOnly = document.getElementById("filter-active-only")?.checked;
+  const tbody   = document.querySelector("#agents-container tbody");
+  const label   = document.getElementById("agents-count-label");
+  const status  = document.getElementById("search-status");
+  if (!tbody) return;
+  let visible = 0;
+  Array.from(tbody.querySelectorAll("tr")).forEach(row => {
+    let show = true;
+    if (activeOnly && row.dataset.active !== "1") show = false;
+    if (show && q) {
+      const name = row.dataset.name || "";
+      const did  = row.dataset.did  || "";
+      const caps = row.dataset.caps || "";
+      const match = _searchMode === "name" ? name.includes(q)
+                  : _searchMode === "did"  ? did.includes(q)
+                  : _searchMode === "cap"  ? caps.split(" ").some(c => c.includes(q))
+                  : name.includes(q) || did.includes(q) || caps.includes(q);
+      show = match;
+    }
+    row.classList.toggle("row-hidden", !show);
+    row.classList.toggle("row-highlight", show && q.length > 0);
+    if (show) visible++;
+  });
+  const total = _allAgents.length;
+  label.textContent = q || activeOnly ? `${visible} of ${total} agent${total !== 1 ? "s" : ""}` : `${total} agent${total !== 1 ? "s" : ""}`;
+  status.textContent = visible === 0 && (q || activeOnly) ? "No agents match the current filter." : "";
+}
+
+// ── PRIVACY TOGGLE ────────────────────────────────────────────────────────────
+function initPrivacyToggles() {
+  document.getElementById("agents-container")?.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest(".privacy-toggle");
+    if (!btn) return;
+    const did = btn.dataset.did;
+    const isPrivate = btn.dataset.private === "true";
+    btn.disabled = true; btn.textContent = "…";
+    try {
+      await apiFetch(`/agents/${encodeURIComponent(did)}/visibility?private=${!isPrivate}`, { method: "PATCH" });
+      btn.dataset.private = String(!isPrivate);
+      btn.title = !isPrivate ? "Private — click to make public" : "Public — click to make private";
+      btn.style.border = `1px solid ${!isPrivate ? "var(--yellow)" : "var(--border-dark)"}`;
+      btn.style.background = !isPrivate ? "var(--yellow-bg)" : "var(--surface2)";
+      btn.style.color = !isPrivate ? "var(--yellow)" : "var(--muted)";
+      btn.textContent = !isPrivate ? "🔒 private" : "🌐 public";
+      btn.disabled = false;
+    } catch(e) {
+      btn.textContent = "error"; setTimeout(() => { btn.disabled = false; btn.textContent = isPrivate ? "🔒 private" : "🌐 public"; }, 1500);
+    }
+  });
+}
+
+// ── LOAD AGENTS ───────────────────────────────────────────────────────────────
+async function loadAgents() {
+  const container = document.getElementById("agents-container");
+  container.innerHTML = '<div class="empty"><div class="spinner"></div><div>Loading agents…</div></div>';
+  try {
+    const [agData, dashData] = await Promise.all([
+      apiFetch("/pro/analytics/agents"),
+      apiFetch("/pro/dashboard").catch(() => null),
+    ]);
+    _allAgents = agData.agents || [];
+
+    // Stats
+    const activeCount  = _allAgents.filter(a => a.last_activity && Date.now() - new Date(a.last_activity).getTime() < 86400000 * 7).length;
+    const privateCount = _allAgents.filter(a => a.private).length;
+    document.getElementById("stat-total").textContent   = _allAgents.length;
+    document.getElementById("stat-active").textContent  = activeCount;
+    document.getElementById("stat-private").textContent = privateCount;
+
+    if (dashData) {
+      const tier = dashData.tier || "free";
+      const maxAgents = dashData.max_agents ?? 100;
+      const pct = maxAgents > 0 ? Math.min(100, (_allAgents.length / maxAgents) * 100) : 0;
+      document.getElementById("stat-tier").textContent = tier.charAt(0).toUpperCase() + tier.slice(1);
+      document.getElementById("stat-tier-sub").textContent = maxAgents > 0 ? `${maxAgents.toLocaleString()} agent cap` : "unlimited agents";
+      document.getElementById("cap-label").textContent = maxAgents > 0 ? `${_allAgents.length} / ${maxAgents}` : `${_allAgents.length} / ∞`;
+      document.getElementById("cap-bar-fill").style.width = pct + "%";
+      document.getElementById("cap-bar-fill").style.background = pct >= 90 ? "var(--red)" : pct >= 70 ? "var(--yellow)" : "var(--accent)";
+      document.getElementById("stat-cap-sub").textContent = maxAgents > 0 ? `of ${maxAgents.toLocaleString()} max` : "unlimited";
+      document.getElementById("upgrade-prompt").style.display = (tier === "free" && pct >= 70) ? "" : "none";
+      document.getElementById("page-subtitle").textContent = `${dashData.owner || ""} · ${tier} plan`;
+      document.getElementById("topbar-user").textContent = dashData.owner || "";
+    }
+
+    if (!_allAgents.length) {
+      container.innerHTML = `<div class="empty">
+        <div class="empty-icon">🤖</div>
+        <div class="empty-title">No agents yet</div>
+        <p style="margin-bottom:1rem;">Register your first agent to get started.</p>
+        <button class="btn btn-primary" onclick="document.getElementById('register-modal').style.display='flex'">+ Register Agent</button>
+      </div>`;
+      document.getElementById("agents-count-label").textContent = "0 agents";
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-wrap">
+        <table class="agents-table">
+          <thead><tr>
+            <th>Name</th><th>DID</th><th>Capabilities</th>
+            <th>Audit Events</th><th>Last Active</th><th>Registered</th>
+            <th>Visibility</th><th></th>
+          </tr></thead>
+          <tbody>${_allAgents.map(renderAgentRow).join("")}</tbody>
+        </table>
+      </div>`;
+    document.getElementById("agents-count-label").textContent = `${_allAgents.length} agent${_allAgents.length !== 1 ? "s" : ""}`;
+    applyFilter();
+  } catch(e) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load agents: ${esc(e.message)}</p></div>`;
+  }
+}
+
+// ── SEARCH & FILTER INIT ──────────────────────────────────────────────────────
+function initSearch() {
+  document.getElementById("agent-search")?.addEventListener("input", applyFilter);
+  document.getElementById("agent-search")?.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.target.value = ""; applyFilter(); }
+  });
+  document.getElementById("filter-active-only")?.addEventListener("change", applyFilter);
+  document.querySelectorAll("#search-tags .search-tag").forEach(tag => {
+    tag.addEventListener("click", () => {
+      document.querySelectorAll("#search-tags .search-tag").forEach(t => t.classList.remove("search-tag-active"));
+      tag.classList.add("search-tag-active");
+      _searchMode = tag.dataset.mode || "all";
+      applyFilter();
+    });
+  });
+}
+
+// ── REGISTER AGENT MODAL ──────────────────────────────────────────────────────
+const _reg = { kp: null, did: null, pubB64: null, seedB64: null, capsArr: [], downloaded: false };
+
+function base58Encode(bytes) {
+  const ALPHA = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let n = BigInt("0x" + [...bytes].map(b => b.toString(16).padStart(2, "0")).join(""));
+  let out = "";
+  while (n > 0n) { out = ALPHA[Number(n % 58n)] + out; n /= 58n; }
+  for (const b of bytes) { if (b !== 0) break; out = ALPHA[0] + out; }
+  return out;
+}
+function canonicalJSON(obj) {
+  if (typeof obj !== "object" || obj === null) return JSON.stringify(obj);
+  if (Array.isArray(obj)) return "[" + obj.map(canonicalJSON).join(",") + "]";
+  return "{" + Object.keys(obj).sort().map(k => JSON.stringify(k) + ":" + canonicalJSON(obj[k])).join(",") + "}";
+}
+async function generateKeyPair() {
+  const kp = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+  const pubRaw = await crypto.subtle.exportKey("raw", kp.publicKey);
+  const pubBytes = new Uint8Array(pubRaw);
+  const privJwk = await crypto.subtle.exportKey("jwk", kp.privateKey);
+  const seedB64url = privJwk.d;
+  const seedB64 = seedB64url.replace(/-/g,"+").replace(/_/g,"/").padEnd(seedB64url.length + (4 - seedB64url.length % 4) % 4, "=");
+  return { kp, did: "did:agentid:" + base58Encode(pubBytes), pubB64: btoa(String.fromCharCode(...pubBytes)), seedB64 };
+}
+async function signPayload(kp, payload) {
+  const msg = new TextEncoder().encode(canonicalJSON(payload));
+  const sig = await crypto.subtle.sign("Ed25519", kp.privateKey, msg);
+  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+}
+
+function renderCapPills() {
+  const wrap = document.getElementById("reg-caps-pills");
+  if (!wrap) return;
+  wrap.innerHTML = _reg.capsArr.map((c, i) => `
+    <span class="cap-pill-removable">${esc(c)}<button data-idx="${i}" title="Remove">×</button></span>`).join("");
+  wrap.querySelectorAll("button[data-idx]").forEach(btn => {
+    btn.addEventListener("click", () => { _reg.capsArr.splice(Number(btn.dataset.idx), 1); renderCapPills(); });
+  });
+}
+function addCap() {
+  const inp = document.getElementById("reg-caps-input");
+  const val = (inp?.value || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  if (!val || _reg.capsArr.includes(val)) { if (inp) inp.value = ""; return; }
+  _reg.capsArr.push(val); if (inp) inp.value = ""; renderCapPills();
+}
+function regReset() {
+  Object.assign(_reg, { kp:null, did:null, pubB64:null, seedB64:null, capsArr:[], downloaded:false });
+  document.getElementById("reg-step-1").style.display = "";
+  document.getElementById("reg-step-2").style.display = "none";
+  document.getElementById("reg-name").value = "";
+  document.getElementById("reg-caps-input").value = "";
+  document.getElementById("reg-private").checked = false;
+  document.getElementById("reg-caps-pills").innerHTML = "";
+  document.getElementById("reg-step1-msg").textContent = "";
+  document.getElementById("reg-step2-msg").textContent = "";
+  document.getElementById("reg-success").style.display = "none";
+  document.getElementById("reg-download-warning").style.display = "none";
+  document.getElementById("reg-register-btn").style.display = "";
+}
+
+document.getElementById("register-agent-btn").addEventListener("click", () => { regReset(); document.getElementById("register-modal").style.display = "flex"; });
+document.getElementById("register-modal-close").addEventListener("click", () => { document.getElementById("register-modal").style.display = "none"; });
+document.getElementById("register-modal").addEventListener("click", function(e) { if (e.target===this) this.style.display="none"; });
+document.getElementById("reg-caps-add-btn").addEventListener("click", addCap);
+document.getElementById("reg-caps-input").addEventListener("keydown", e => { if (e.key==="Enter") { e.preventDefault(); addCap(); } });
+document.getElementById("reg-back-btn").addEventListener("click", () => {
+  document.getElementById("reg-step-1").style.display = "";
+  document.getElementById("reg-step-2").style.display = "none";
+});
+document.getElementById("reg-generate-btn").addEventListener("click", async function() {
+  const name = (document.getElementById("reg-name").value || "").trim();
+  const msgEl = document.getElementById("reg-step1-msg");
+  msgEl.style.color = "var(--red)"; msgEl.textContent = "";
+  if (!name) { msgEl.textContent = "Agent name is required."; return; }
+  this.textContent = "Generating…"; this.disabled = true;
+  try {
+    const kp = await generateKeyPair();
+    Object.assign(_reg, kp);
+    document.getElementById("reg-did-display").textContent = kp.did;
+    document.getElementById("reg-step-1").style.display = "none";
+    document.getElementById("reg-step-2").style.display = "";
+    document.getElementById("reg-success").style.display = "none";
+    document.getElementById("reg-register-btn").style.display = "";
+  } catch(e) {
+    msgEl.textContent = "Key generation failed — try Chrome 113+ or Firefox 130+.";
+  } finally { this.textContent = "Generate Keys & Preview"; this.disabled = false; }
+});
+document.getElementById("reg-download-key-btn").addEventListener("click", function() {
+  if (!_reg.did) return;
+  const name = (document.getElementById("reg-name").value || "").trim();
+  const payload = JSON.stringify({ did:_reg.did, name, public_key_b64:_reg.pubB64, private_key_b64:_reg.seedB64, created_at:new Date().toISOString(), warning:"Keep this file secret." }, null, 2);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([payload], { type:"application/json" }));
+  a.download = "agentid-key-" + _reg.did.slice(-12) + ".json";
+  a.click(); URL.revokeObjectURL(a.href);
+  _reg.downloaded = true;
+  document.getElementById("reg-download-warning").style.display = "none";
+  this.textContent = "⬇ Downloaded ✓"; this.style.borderColor = "var(--green)"; this.style.color = "var(--green)";
+});
+document.getElementById("reg-register-btn").addEventListener("click", async function() {
+  if (!_reg.did) return;
+  if (!_reg.downloaded) { document.getElementById("reg-download-warning").style.display = ""; return; }
+  const name = (document.getElementById("reg-name").value || "").trim();
+  const isPrivate = document.getElementById("reg-private").checked;
+  const msgEl = document.getElementById("reg-step2-msg");
+  msgEl.textContent = ""; this.textContent = "Registering…"; this.disabled = true;
+  try {
+    const createdAt = new Date().toISOString();
+    const payload = { did:_reg.did, name, capabilities:[..._reg.capsArr], public_key:_reg.pubB64, created_at:createdAt, metadata:{}, private:isPrivate };
+    const proof = await signPayload(_reg.kp, payload);
+    const res = await fetch(`${BASE}/agents`, {
+      method:"POST", headers:{"Content-Type":"application/json","x-api-key":apiKey},
+      body: JSON.stringify({ ...payload, proof }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.status);
+    document.getElementById("reg-register-btn").style.display = "none";
+    document.getElementById("reg-success").style.display = "";
+    document.getElementById("reg-success-did").textContent = _reg.did;
+    document.getElementById("reg-view-btn").onclick = () => window.open(`agent.html?did=${encodeURIComponent(_reg.did)}`, "_blank");
+    document.getElementById("reg-another-btn").onclick = regReset;
+    loadAgents();
+  } catch(e) {
+    msgEl.style.color = "var(--red)"; msgEl.textContent = "Registration failed: " + e.message;
+  } finally { this.textContent = "Register Agent"; this.disabled = false; }
+});
+
+// ── TEST VERIFY MODAL ─────────────────────────────────────────────────────────
+let _verifyDid = "";
+document.getElementById("verify-modal-close").addEventListener("click", () => { document.getElementById("verify-modal").style.display = "none"; });
+document.getElementById("verify-modal").addEventListener("click", function(e) { if (e.target===this) this.style.display="none"; });
+function openTestVerify(did, name) {
+  _verifyDid = did;
+  document.getElementById("verify-modal-name").textContent = name;
+  document.getElementById("verify-payload-input").value = JSON.stringify({ action:"approve", timestamp:new Date().toISOString() }, null, 2);
+  document.getElementById("verify-sig-input").value = "";
+  document.getElementById("verify-result").style.display = "none";
+  document.getElementById("verify-run-btn").textContent = "Run Verification";
+  document.getElementById("verify-modal").style.display = "flex";
+}
+document.getElementById("verify-run-btn").addEventListener("click", async function() {
+  const rawPayload = document.getElementById("verify-payload-input").value.trim();
+  const sig = document.getElementById("verify-sig-input").value.trim();
+  const resultEl = document.getElementById("verify-result");
+  resultEl.style.display = "none";
+  const errStyle = "display:block;padding:0.85rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:600;background:var(--red-bg);border:1px solid var(--red);color:var(--red);margin-bottom:1rem;";
+  if (!rawPayload || !sig) { resultEl.style.cssText = errStyle; resultEl.textContent = "Both payload and signature are required."; return; }
+  let payload; try { payload = JSON.parse(rawPayload); } catch { resultEl.style.cssText = errStyle; resultEl.textContent = "Payload is not valid JSON."; return; }
+  this.textContent = "Verifying…"; this.disabled = true;
+  try {
+    const res = await fetch(`${BASE}/agents/${encodeURIComponent(_verifyDid)}/verify`, {
+      method:"POST", headers:{"Content-Type":"application/json","x-api-key":apiKey},
+      body: JSON.stringify({ payload, signature:sig }),
+    });
+    const data = await res.json();
+    const valid = data.status === "valid";
+    resultEl.style.cssText = `display:block;padding:0.85rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:600;background:${valid?"var(--green-bg)":"var(--red-bg)"};border:1px solid ${valid?"var(--green)":"var(--red)"};color:${valid?"var(--green)":"var(--red)"};margin-bottom:1rem;`;
+    resultEl.textContent = valid ? "✓ Valid — signature verified successfully." : "✗ Invalid — signature does not match this agent's public key.";
+  } catch(e) { resultEl.style.cssText = errStyle; resultEl.textContent = "Error: " + e.message; }
+  finally { this.textContent = "Run Verification"; this.disabled = false; }
+});
+
+// ── CODE SNIPPETS MODAL ───────────────────────────────────────────────────────
+const SNIPPETS = {
+  python: (did) =>
+`from agentid import Agent
+
+agent = Agent.from_file("agentid-key.json")
+
+payload = {"action": "approve", "timestamp": "2026-01-01T00:00:00Z"}
+signature = agent.sign(payload)
+
+result = Agent.verify_from_did(
+    did="${did}",
+    payload=payload,
+    signature=signature,
+)
+print(result.status)   # "valid" or "invalid"`,
+
+  js: (did) =>
+`const BASE = "https://api.agentid-protocol.com";
+
+const res = await fetch(\`\${BASE}/agents/${did}/verify\`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": "YOUR_API_KEY",
+  },
+  body: JSON.stringify({
+    payload:   { action: "approve", timestamp: new Date().toISOString() },
+    signature: "BASE64_SIGNATURE_HERE",
+  }),
+});
+const { status } = await res.json();
+console.log(status);  // "valid" or "invalid"`,
+
+  curl: (did) =>
+`# Resolve agent profile
+curl https://api.agentid-protocol.com/agents/${did}
+
+# Verify a signed payload
+curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{
+    "payload":   {"action":"approve","timestamp":"2026-01-01T00:00:00Z"},
+    "signature": "BASE64_SIGNATURE_HERE"
+  }'`,
+};
+
+let _snippetTab = "python";
+let _snippetDid = "";
+
+document.getElementById("snippets-modal-close").addEventListener("click", () => { document.getElementById("snippets-modal").style.display = "none"; });
+document.getElementById("snippets-modal").addEventListener("click", function(e) { if (e.target===this) this.style.display="none"; });
+document.getElementById("snippets-tabs").addEventListener("click", e => {
+  const tab = e.target.closest("[data-stab]");
+  if (!tab) return;
+  _snippetTab = tab.dataset.stab;
+  document.querySelectorAll("[data-stab]").forEach(t => t.classList.toggle("active", t===tab));
+  document.getElementById("snippets-code").textContent = SNIPPETS[_snippetTab]?.(_snippetDid) || "";
+});
+document.getElementById("snippets-copy-btn").addEventListener("click", function() {
+  navigator.clipboard.writeText(document.getElementById("snippets-code").textContent).catch(() => {});
+  this.textContent = "copied!"; setTimeout(() => { this.textContent = "copy"; }, 1800);
+});
+function openSnippets(did, name) {
+  _snippetDid = did; _snippetTab = "python";
+  document.getElementById("snippets-modal-name").textContent = name;
+  document.querySelectorAll("[data-stab]").forEach(t => t.classList.toggle("active", t.dataset.stab === "python"));
+  document.getElementById("snippets-code").textContent = SNIPPETS.python(did);
+  document.getElementById("snippets-modal").style.display = "flex";
+}
+
+// ── AGENT ROW ACTION DELEGATION ───────────────────────────────────────────────
+document.getElementById("agents-container").addEventListener("click", e => {
+  const btn = e.target.closest(".agent-action-btn[data-action]");
+  if (!btn) return;
+  const { action, did, name } = btn.dataset;
+  if (action === "verify")   openTestVerify(did, name);
+  if (action === "snippets") openSnippets(did, name);
+});
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+function boot() {
+  document.getElementById("auth-wall").style.display = "none";
+  document.getElementById("main-content").style.display = "";
+  loadAgents();
+  initSearch();
+  initPrivacyToggles();
+  document.getElementById("refresh-btn").addEventListener("click", loadAgents);
+}
+</script>
+</body>
+</html>
