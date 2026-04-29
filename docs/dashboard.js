@@ -686,15 +686,26 @@ function _initPrivacyToggles() {
   const el = document.getElementById("agents-table");
   if (!el) return;
   el.addEventListener("click", (ev) => {
-    // Confirm step: clicking "Make public?" confirm button
+    // Confirm step: clicking "Confirm" after key entry
     const confirmBtn = ev.target.closest(".privacy-confirm-yes");
     if (confirmBtn) {
+      const wrapper  = confirmBtn.closest(".privacy-confirm-wrap");
+      const keyInput = wrapper?.querySelector(".privacy-key-input");
+      const errEl    = wrapper?.querySelector(".privacy-key-error");
+      const entered  = (keyInput?.value || "").trim();
+      if (!entered) {
+        if (errEl) { errEl.textContent = "Enter your API key."; errEl.style.display = ""; }
+        keyInput?.focus();
+        return;
+      }
+      if (entered !== apiKey) {
+        if (errEl) { errEl.textContent = "Incorrect API key."; errEl.style.display = ""; }
+        keyInput?.select();
+        return;
+      }
       const did = confirmBtn.dataset.did;
-      const cell = confirmBtn.closest("td");
-      // Find or reconstruct the original button to reuse styling logic
-      const wrapper = confirmBtn.closest(".privacy-confirm-wrap");
       const btn = wrapper?._origBtn;
-      if (btn) { cell.replaceChild(btn, wrapper); _doPrivacyChange(btn, did, false); }
+      if (btn) { confirmBtn.closest("td").replaceChild(btn, wrapper); _doPrivacyChange(btn, did, false); }
       return;
     }
 
@@ -718,7 +729,19 @@ function _initPrivacyToggles() {
       const wrapper = document.createElement("span");
       wrapper.className = "privacy-confirm-wrap";
       wrapper._origBtn  = btn;
-      wrapper.innerHTML = `<span style="font-size:0.72rem;color:var(--text-2);font-weight:500;margin-right:0.25rem;">Make public?</span><button class="privacy-confirm-yes" data-did="${esc(did)}" style="font-size:0.72rem;padding:0.1rem 0.45rem;border-radius:4px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);cursor:pointer;margin-right:0.2rem;font-family:inherit;">Yes</button><button class="privacy-confirm-no" style="font-size:0.72rem;padding:0.1rem 0.45rem;border-radius:4px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;">Cancel</button>`;
+      wrapper.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:0.3rem;min-width:200px;">
+          <span style="font-size:0.72rem;color:var(--text-2);font-weight:600;">Make public? Enter API key to confirm:</span>
+          <div style="display:flex;gap:0.3rem;align-items:center;">
+            <input class="privacy-key-input" type="password" placeholder="agentid_…" autocomplete="off" spellcheck="false"
+              style="font-size:0.72rem;padding:0.2rem 0.45rem;border-radius:4px;border:1px solid var(--border-dark);font-family:inherit;flex:1;outline:none;min-width:0;" />
+            <button class="privacy-confirm-yes" data-did="${esc(did)}"
+              style="font-size:0.72rem;padding:0.2rem 0.5rem;border-radius:4px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);cursor:pointer;font-family:inherit;white-space:nowrap;">Confirm</button>
+            <button class="privacy-confirm-no"
+              style="font-size:0.72rem;padding:0.2rem 0.45rem;border-radius:4px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;">✕</button>
+          </div>
+          <span class="privacy-key-error" style="font-size:0.7rem;color:var(--red);display:none;"></span>
+        </div>`;
       btn.parentNode.replaceChild(wrapper, btn);
     } else {
       // public → private: no confirmation needed
