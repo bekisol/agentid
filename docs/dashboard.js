@@ -309,6 +309,7 @@ async function loadDashboard() {
   loadAgentsTable();
   loadDiscoveryStats();
   loadAnomalies();
+  _loadGroups();
 
   // Start real-time SSE feed (or restart if already running)
   startSse();
@@ -2493,6 +2494,196 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
       }
     }
   }, true);   // capture phase so it fires before the existing handler
+
+  // ── Agent Groups ─────────────────────────────────────────────────────────────
+
+  let _editingGroupId = null;
+
+  async function _loadGroups() {
+    const container = document.getElementById("groups-list");
+    const empty     = document.getElementById("groups-empty");
+    if (!container) return;
+    try {
+      const data = await apiFetch("/pro/groups");
+      const groups = data.groups || [];
+      container.innerHTML = "";
+      if (!groups.length) {
+        empty && (empty.style.display = "block");
+        return;
+      }
+      empty && (empty.style.display = "none");
+      const tbl = document.createElement("table");
+      tbl.style.cssText = "width:100%;border-collapse:collapse;font-size:0.85rem;";
+      tbl.innerHTML = `
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:0.5rem 0.75rem;font-weight:600;color:var(--muted);font-size:0.75rem;">NAME</th>
+            <th style="text-align:left;padding:0.5rem 0.75rem;font-weight:600;color:var(--muted);font-size:0.75rem;">DESCRIPTION</th>
+            <th style="text-align:center;padding:0.5rem 0.75rem;font-weight:600;color:var(--muted);font-size:0.75rem;">AGENTS</th>
+            <th style="padding:0.5rem 0.75rem;"></th>
+          </tr>
+        </thead>`;
+      const tbody = document.createElement("tbody");
+      groups.forEach(g => {
+        const tr = document.createElement("tr");
+        tr.style.borderBottom = "1px solid var(--border)";
+        tr.innerHTML = `
+          <td style="padding:0.6rem 0.75rem;font-weight:600;">${_esc(g.name)}</td>
+          <td style="padding:0.6rem 0.75rem;color:var(--muted);font-size:0.82rem;">${_esc(g.description || "—")}</td>
+          <td style="padding:0.6rem 0.75rem;text-align:center;">
+            <span style="background:var(--accent-bg);color:var(--accent);border-radius:12px;padding:0.15rem 0.6rem;font-size:0.75rem;font-weight:600;">${g.member_count}</span>
+          </td>
+          <td style="padding:0.6rem 0.75rem;text-align:right;white-space:nowrap;">
+            <button class="agent-action-btn grp-members-btn" data-id="${g.id}" data-name="${_esc(g.name)}">Members</button>
+            <button class="agent-action-btn grp-edit-btn" data-id="${g.id}" data-name="${_esc(g.name)}" data-desc="${_esc(g.description || "")}">Edit</button>
+            <button class="agent-action-btn danger grp-delete-btn" data-id="${g.id}" style="color:var(--red);">Delete</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);
+      container.appendChild(tbl);
+
+      container.querySelectorAll(".grp-members-btn").forEach(btn =>
+        btn.addEventListener("click", () => _openGroupMembers(+btn.dataset.id, btn.dataset.name))
+      );
+      container.querySelectorAll(".grp-edit-btn").forEach(btn =>
+        btn.addEventListener("click", () => _openGroupEdit(+btn.dataset.id, btn.dataset.name, btn.dataset.desc))
+      );
+      container.querySelectorAll(".grp-delete-btn").forEach(btn =>
+        btn.addEventListener("click", () => _deleteGroup(+btn.dataset.id, btn.dataset.name))
+      );
+    } catch(e) {
+      container.innerHTML = `<p style="font-size:0.83rem;color:var(--red);padding:0.5rem 0;">Could not load groups: ${e.message}</p>`;
+    }
+  }
+
+  function _openGroupModal(title, name = "", desc = "", id = null) {
+    _editingGroupId = id;
+    document.getElementById("group-modal-title").textContent = title;
+    document.getElementById("group-name-input").value = name;
+    document.getElementById("group-desc-input").value = desc;
+    document.getElementById("group-modal-error").style.display = "none";
+    document.getElementById("group-modal-save").textContent = id ? "Save changes" : "Create group";
+    document.getElementById("group-modal").style.display = "flex";
+    document.getElementById("group-name-input").focus();
+  }
+
+  function _openGroupEdit(id, name, desc) {
+    _openGroupModal("Edit Group", name, desc, id);
+  }
+
+  document.getElementById("create-group-btn")?.addEventListener("click", () =>
+    _openGroupModal("Create Group")
+  );
+  document.getElementById("group-modal-close")?.addEventListener("click", () => {
+    document.getElementById("group-modal").style.display = "none";
+  });
+
+  document.getElementById("group-modal-save")?.addEventListener("click", async () => {
+    const name = (document.getElementById("group-name-input").value || "").trim();
+    const desc = (document.getElementById("group-desc-input").value || "").trim();
+    const errEl = document.getElementById("group-modal-error");
+    if (!name) { errEl.textContent = "Group name is required."; errEl.style.display = "block"; return; }
+    errEl.style.display = "none";
+    try {
+      if (_editingGroupId) {
+        await apiFetch(`/pro/groups/${_editingGroupId}`, { method: "PATCH", body: JSON.stringify({ name, description: desc }) });
+        _showToast("Group updated.");
+      } else {
+        await apiFetch("/pro/groups", { method: "POST", body: JSON.stringify({ name, description: desc }) });
+        _showToast("Group created.");
+      }
+      document.getElementById("group-modal").style.display = "none";
+      _loadGroups();
+    } catch(e) {
+      errEl.textContent = e.message || "Failed to save group.";
+      errEl.style.display = "block";
+    }
+  });
+
+  async function _deleteGroup(id, name) {
+    if (!confirm(`Delete group "${name}"? Agents will not be removed.`)) return;
+    try {
+      await apiFetch(`/pro/groups/${id}`, { method: "DELETE" });
+      _showToast(`Group "${name}" deleted.`);
+      _loadGroups();
+    } catch(e) {
+      _showToast(`Error: ${e.message}`, true);
+    }
+  }
+
+  // ── Group Members modal ───────────────────────────────────────────────────────
+
+  let _currentGroupId = null;
+
+  async function _openGroupMembers(id, name) {
+    _currentGroupId = id;
+    document.getElementById("gmm-title").textContent = `Members — ${name}`;
+    document.getElementById("group-members-modal").style.display = "flex";
+    await _loadGroupMembers(id);
+
+    // Populate agent select from _allAgents
+    const sel = document.getElementById("gmm-agent-select");
+    sel.innerHTML = '<option value="">— pick an agent —</option>';
+    (_allAgents || []).forEach(a => {
+      const opt = document.createElement("option");
+      opt.value = a.did;
+      opt.textContent = `${a.name} (${a.did.slice(0, 24)}…)`;
+      sel.appendChild(opt);
+    });
+  }
+
+  async function _loadGroupMembers(id) {
+    const el = document.getElementById("gmm-members-list");
+    if (!el) return;
+    try {
+      const data = await apiFetch(`/pro/groups/${id}`);
+      const members = data.members || [];
+      if (!members.length) {
+        el.innerHTML = '<p style="font-size:0.83rem;color:var(--muted);">No members yet.</p>';
+        return;
+      }
+      el.innerHTML = members.map(m => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.45rem 0;border-bottom:1px solid var(--border);">
+          <div>
+            <span style="font-weight:600;font-size:0.85rem;">${_esc(m.name || m.did)}</span>
+            <span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem;">${m.did.slice(0, 32)}…</span>
+          </div>
+          <button class="agent-action-btn danger gmm-remove-btn" data-did="${_esc(m.did)}" style="font-size:0.78rem;color:var(--red);">Remove</button>
+        </div>`).join("");
+      el.querySelectorAll(".gmm-remove-btn").forEach(btn =>
+        btn.addEventListener("click", async () => {
+          try {
+            await apiFetch(`/pro/groups/${_currentGroupId}/members`, {
+              method: "DELETE",
+              body: JSON.stringify({ dids: [btn.dataset.did] }),
+            });
+            await _loadGroupMembers(_currentGroupId);
+            _loadGroups();
+          } catch(e) { _showToast(`Error: ${e.message}`, true); }
+        })
+      );
+    } catch(e) {
+      el.innerHTML = `<p style="color:var(--red);font-size:0.83rem;">${e.message}</p>`;
+    }
+  }
+
+  document.getElementById("gmm-close")?.addEventListener("click", () => {
+    document.getElementById("group-members-modal").style.display = "none";
+  });
+
+  document.getElementById("gmm-add-btn")?.addEventListener("click", async () => {
+    const did = document.getElementById("gmm-agent-select").value;
+    if (!did) return;
+    try {
+      await apiFetch(`/pro/groups/${_currentGroupId}/members`, {
+        method: "POST",
+        body: JSON.stringify({ dids: [did] }),
+      });
+      await _loadGroupMembers(_currentGroupId);
+      _loadGroups();
+    } catch(e) { _showToast(`Error: ${e.message}`, true); }
+  });
 
   // Auto-login if key in sessionStorage and session not expired
   if (apiKey) {

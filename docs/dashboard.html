@@ -1493,7 +1493,62 @@
     </div>
   </div>
 
+  <!-- ── AGENT GROUPS ── -->
+  <div class="card" style="margin-bottom:2rem;">
+    <div class="card-header">
+      <div class="card-title">Agent Groups</div>
+      <button class="btn btn-outline" id="create-group-btn" style="font-size:0.8rem;padding:0.35rem 0.75rem;">+ New group</button>
+    </div>
+    <div id="groups-list" style="padding:0.75rem 1.25rem;min-height:60px;">
+      <p id="groups-empty" style="font-size:0.85rem;color:var(--muted);display:none;">No groups yet. Create one to organise your agents.</p>
+    </div>
+  </div>
+
 </div><!-- /dashboard -->
+
+<!-- ── CREATE GROUP MODAL ── -->
+<div id="group-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <span class="modal-title" id="group-modal-title">Create Group</span>
+      <button class="modal-close" id="group-modal-close">✕</button>
+    </div>
+    <div class="modal-body" style="padding:1.25rem;">
+      <div class="settings-field">
+        <label class="settings-label" for="group-name-input">Group name <span style="color:var(--red);">*</span></label>
+        <input id="group-name-input" class="settings-input" type="text" maxlength="80" placeholder="e.g. Production agents" autocomplete="off" />
+      </div>
+      <div class="settings-field">
+        <label class="settings-label" for="group-desc-input">Description</label>
+        <input id="group-desc-input" class="settings-input" type="text" placeholder="Optional description" autocomplete="off" />
+      </div>
+      <div id="group-modal-error" style="display:none;color:var(--red);font-size:0.82rem;margin-bottom:0.75rem;"></div>
+      <button class="btn btn-primary" id="group-modal-save" style="width:100%;">Create group</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── GROUP MEMBERS MODAL ── -->
+<div id="group-members-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-header">
+      <span class="modal-title" id="gmm-title">Group members</span>
+      <button class="modal-close" id="gmm-close">✕</button>
+    </div>
+    <div class="modal-body" style="padding:1.25rem;">
+      <div style="margin-bottom:1rem;">
+        <label class="settings-label">Add agents to this group</label>
+        <div style="display:flex;gap:0.5rem;">
+          <select id="gmm-agent-select" class="settings-input" style="flex:1;">
+            <option value="">— pick an agent —</option>
+          </select>
+          <button class="btn btn-outline" id="gmm-add-btn" style="white-space:nowrap;">Add</button>
+        </div>
+      </div>
+      <div id="gmm-members-list" style="min-height:60px;"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ── TEST VERIFY MODAL ── -->
 <div id="verify-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
