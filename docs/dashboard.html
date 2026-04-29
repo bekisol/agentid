@@ -867,6 +867,23 @@
       font-weight: 500;
     }
 
+    /* ── AGENT ACTION BUTTONS ── */
+    .agent-action-btn {
+      font-size: 0.72rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 5px;
+      border: 1px solid var(--border-dark);
+      background: var(--surface2);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .agent-action-btn:hover {
+      background: var(--accent-light);
+      border-color: var(--accent-border);
+      color: var(--accent);
+    }
+
     /* ── AGENT HEALTH DOT ── */
     .health-dot {
       display: inline-block;
@@ -1059,6 +1076,13 @@
             </select>
           </div>
 
+          <!-- Admin re-auth gate — shown only when admin scope is checked -->
+          <div id="admin-reauth-gate" style="display:none;margin-bottom:0.75rem;padding:0.75rem 1rem;background:var(--red-bg);border:1px solid var(--red);border-radius:8px;">
+            <div style="font-size:0.8rem;font-weight:600;color:var(--red);margin-bottom:0.4rem;">⚠ Admin scope requires confirmation</div>
+            <p style="font-size:0.78rem;color:var(--text-2);margin-bottom:0.6rem;">Re-enter your API key to confirm you intend to create an admin-scoped key.</p>
+            <input id="admin-reauth-input" class="settings-input" type="password" placeholder="agentid_pro_…" autocomplete="off" />
+          </div>
+
           <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.25rem;">
             <button class="btn btn-primary" id="team-key-create-btn">Create Team Key</button>
             <button class="btn btn-outline" id="team-invite-btn" title="Generate a one-time invite link instead of seeing the raw key">🔗 Create Invite Link</button>
@@ -1243,6 +1267,12 @@
       <div style="height:8px;background:var(--surface2);border-radius:999px;overflow:hidden;border:1px solid var(--border);">
         <div id="usage-fill" style="height:100%;width:0%;background:var(--accent);border-radius:999px;transition:width 0.6s ease;"></div>
       </div>
+      <div id="usage-roi" style="margin-top:0.65rem;font-size:0.78rem;color:var(--muted);"></div>
+      <div id="upgrade-prompt" style="display:none;margin-top:0.85rem;padding:0.75rem 1rem;background:var(--accent-light);border:1px solid var(--accent-border);border-radius:8px;">
+        <div style="font-size:0.82rem;font-weight:600;color:var(--accent);margin-bottom:0.2rem;">You're approaching your agent limit</div>
+        <div style="font-size:0.78rem;color:var(--text-2);margin-bottom:0.5rem;">Upgrade to Pro for 10,000 agents, analytics, webhooks, and more.</div>
+        <a href="index.html#pricing" style="font-size:0.78rem;font-weight:600;color:var(--accent);">View Pro plans →</a>
+      </div>
     </div>
   </div>
 
@@ -1251,6 +1281,7 @@
     <div class="card">
       <div class="card-header">
         <div class="card-title">Registrations — Last 30 Days</div>
+        <button id="export-trend-png" class="btn btn-outline" style="font-size:0.72rem;padding:0.2rem 0.6rem;" title="Export chart as PNG">↓ PNG</button>
       </div>
       <div class="chart-wrap">
         <canvas id="trend-chart"></canvas>
@@ -1259,6 +1290,7 @@
     <div class="card">
       <div class="card-header">
         <div class="card-title">Top Capabilities</div>
+        <button id="export-cap-png" class="btn btn-outline" style="font-size:0.72rem;padding:0.2rem 0.6rem;" title="Export chart as PNG">↓ PNG</button>
       </div>
       <div class="chart-wrap">
         <canvas id="cap-chart"></canvas>
@@ -1379,6 +1411,50 @@
   </div>
 
 </div><!-- /dashboard -->
+
+<!-- ── TEST VERIFY MODAL ── -->
+<div id="verify-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title">🔍 Test Verify — <span id="verify-modal-name"></span></span>
+      <button class="modal-close" id="verify-modal-close">✕</button>
+    </div>
+    <div class="modal-body" style="padding:1.25rem;">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;">Paste a signed payload and its signature to test verification against this agent's public key.</p>
+      <div class="settings-field">
+        <label class="settings-label">Payload (JSON)</label>
+        <textarea id="verify-payload-input" class="settings-input" rows="5" spellcheck="false" placeholder='{"action":"approve","timestamp":"2026-01-01T00:00:00Z"}'></textarea>
+      </div>
+      <div class="settings-field">
+        <label class="settings-label">Signature (base64)</label>
+        <input id="verify-sig-input" class="settings-input" type="text" spellcheck="false" placeholder="base64-encoded Ed25519 signature" autocomplete="off" />
+      </div>
+      <div id="verify-result" style="display:none;margin-bottom:1rem;padding:0.85rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:600;"></div>
+      <button class="btn btn-primary" id="verify-run-btn" style="width:100%;">Run Verification</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CODE SNIPPETS MODAL ── -->
+<div id="snippets-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header">
+      <span class="modal-title">&lt;/&gt; Code Snippets — <span id="snippets-modal-name"></span></span>
+      <button class="modal-close" id="snippets-modal-close">✕</button>
+    </div>
+    <div class="modal-body" style="padding:1.25rem;">
+      <div class="modal-tabs" id="snippets-tabs">
+        <div class="modal-tab active" data-stab="python">Python</div>
+        <div class="modal-tab" data-stab="js">JavaScript</div>
+        <div class="modal-tab" data-stab="curl">curl</div>
+      </div>
+      <div style="position:relative;margin-top:0.75rem;">
+        <pre id="snippets-code" style="background:var(--code-bg);color:#e5e7eb;border-radius:8px;padding:1rem 1.1rem;font-family:'JetBrains Mono',monospace;font-size:0.75rem;line-height:1.6;overflow-x:auto;white-space:pre;margin:0;"></pre>
+        <button id="snippets-copy-btn" style="position:absolute;top:0.5rem;right:0.6rem;font-size:0.7rem;padding:0.2rem 0.55rem;border-radius:4px;border:1px solid #374151;background:#1f2937;color:#9ca3af;cursor:pointer;">copy</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ── REGISTER AGENT MODAL ── -->
 <div id="register-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-label="Register Agent">

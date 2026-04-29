@@ -285,6 +285,21 @@ async function loadDashboard() {
   fill.style.width = (limit === Infinity ? 2 : pct) + "%";
   fill.style.background = pct > 90 ? "var(--red)" : pct > 70 ? "var(--yellow)" : "var(--accent)";
 
+  // ROI framing — ~2 min saved per verification vs manual
+  const verifyCount = (data.activity_last_7d || []).find(r => r.operation === "verify");
+  const verifies = Number(verifyCount?.count || 0);
+  const hrsSaved = Math.round((verifies * 2) / 60 * 10) / 10;
+  const roiEl = document.getElementById("usage-roi");
+  if (roiEl && verifies > 0) {
+    roiEl.textContent = `⏱ ~${hrsSaved}h of manual verification saved this week (${verifies.toLocaleString()} verifications × 2 min avg)`;
+  }
+
+  // Upgrade prompt — show when free tier and >70% full
+  const upgradeEl = document.getElementById("upgrade-prompt");
+  if (upgradeEl) {
+    upgradeEl.style.display = (tier === "free" && pct >= 70) ? "" : "none";
+  }
+
   // Badge, charts, audit, agents — load in parallel
   loadBadge(data.owner);
   try { renderCharts(data); } catch (e) { console.warn("Charts:", e); }
@@ -311,39 +326,75 @@ function renderCharts(data) {
     console.warn("Chart.js not loaded — charts skipped");
     return;
   }
-  const trendLabels = (data.registration_trend_30d || []).map(r => {
-    const d = new Date(r.date);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  });
+
+  const GRID  = "#F2F0EC";
+  const TICK  = "#78716C";
+  const TICK2 = "#44403C";
+  const FONT  = { family: "Inter", size: 11 };
+
+  const trendLabels = (data.registration_trend_30d || []).map(r =>
+    new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  );
   const trendData = (data.registration_trend_30d || []).map(r => Number(r.count) || 0);
+  const hasData   = trendData.some(v => v > 0);
 
   if (trendChart) trendChart.destroy();
   trendChart = new Chart(document.getElementById("trend-chart"), {
-    type: "bar",
+    type: "line",
     data: {
       labels: trendLabels.length ? trendLabels : ["No data"],
       datasets: [{
-        data: trendData.length ? trendData : [0],
-        backgroundColor: "rgba(194, 65, 12, 0.15)",
-        borderColor: "rgba(194, 65, 12, 0.8)",
-        borderWidth: 1.5, borderRadius: 5, borderSkipped: false,
+        data: hasData ? trendData : [0],
+        fill: true,
+        tension: 0.4,
+        borderColor: "rgba(194,65,12,0.9)",
+        borderWidth: 2,
+        backgroundColor: (ctx) => {
+          const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+          gradient.addColorStop(0, "rgba(194,65,12,0.18)");
+          gradient.addColorStop(1, "rgba(194,65,12,0.01)");
+          return gradient;
+        },
+        pointBackgroundColor: "rgba(194,65,12,0.9)",
+        pointRadius: 3,
+        pointHoverRadius: 5,
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1C1917", titleColor: "#F9F7F4",
+          bodyColor: "#D6D3D1", cornerRadius: 6, padding: 10,
+          callbacks: { title: items => items[0].label, label: item => `${item.raw} registration${item.raw !== 1 ? "s" : ""}` }
+        }
+      },
       scales: {
-        x: { ticks: { color: "#78716C", font: { size: 10, family: "Inter" }, maxRotation: 0, maxTicksLimit: 8 }, grid: { color: "#F2F0EC" }, border: { color: "#E5E2DB" } },
-        y: { ticks: { color: "#78716C", font: { size: 10, family: "Inter" }, stepSize: 1 }, grid: { color: "#F2F0EC" }, border: { color: "#E5E2DB" }, beginAtZero: true },
+        x: {
+          ticks: { color: TICK, font: FONT, maxRotation: 0, maxTicksLimit: 7 },
+          grid: { color: GRID }, border: { color: "#E5E2DB" }
+        },
+        y: {
+          ticks: { color: TICK, font: FONT, stepSize: 1, precision: 0 },
+          grid: { color: GRID }, border: { color: "#E5E2DB" }, beginAtZero: true
+        }
       }
     }
   });
 
+  // PNG export
+  document.getElementById("export-trend-png")?.addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.download = "registrations.png";
+    a.href = trendChart.toBase64Image("image/png", 1);
+    a.click();
+  });
+
   const capLabels = (data.top_capabilities || []).map(c => String(c.capability));
   const capData   = (data.top_capabilities || []).map(c => Number(c.agent_count) || 0);
-  const capColors = [
-    "rgba(194,65,12,0.7)", "rgba(5,150,105,0.7)", "rgba(37,99,235,0.7)",
-    "rgba(217,119,6,0.7)", "rgba(124,58,237,0.7)", "rgba(219,39,119,0.7)",
+  const PALETTE   = [
+    "#C2410C","#059669","#2563EB","#D97706","#7C3AED","#DB2777","#0891B2","#65A30D"
   ];
 
   if (capChart) capChart.destroy();
@@ -351,16 +402,35 @@ function renderCharts(data) {
     type: "bar",
     data: {
       labels: capLabels.length ? capLabels : ["No data"],
-      datasets: [{ data: capData.length ? capData : [0], backgroundColor: capColors, borderRadius: 5, borderSkipped: false }]
+      datasets: [{
+        data: capData.length ? capData : [0],
+        backgroundColor: capLabels.map((_, i) => PALETTE[i % PALETTE.length] + "CC"),
+        borderColor:     capLabels.map((_, i) => PALETTE[i % PALETTE.length]),
+        borderWidth: 1.5, borderRadius: 6, borderSkipped: false,
+      }]
     },
     options: {
       indexAxis: "y", responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1C1917", titleColor: "#F9F7F4",
+          bodyColor: "#D6D3D1", cornerRadius: 6, padding: 10,
+          callbacks: { label: item => `${item.raw} agent${item.raw !== 1 ? "s" : ""}` }
+        }
+      },
       scales: {
-        x: { ticks: { color: "#78716C", font: { size: 10, family: "Inter" }, stepSize: 1 }, grid: { color: "#F2F0EC" }, border: { color: "#E5E2DB" }, beginAtZero: true },
-        y: { ticks: { color: "#44403C", font: { size: 11, family: "Inter" } }, grid: { display: false }, border: { display: false } },
+        x: { ticks: { color: TICK, font: FONT, stepSize: 1, precision: 0 }, grid: { color: GRID }, border: { color: "#E5E2DB" }, beginAtZero: true },
+        y: { ticks: { color: TICK2, font: { ...FONT, size: 12 } }, grid: { display: false }, border: { display: false } }
       }
     }
+  });
+
+  document.getElementById("export-cap-png")?.addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.download = "capabilities.png";
+    a.href = capChart.toBase64Image("image/png", 1);
+    a.click();
   });
 }
 
@@ -484,6 +554,10 @@ function _renderAgentRow(a) {
     <td class="${lastActiveClass}">${esc(lastActiveStr)}</td>
     <td style="color:var(--muted);font-size:0.78rem;">${esc(createdStr)}</td>
     <td>${privacyBtn}</td>
+    <td style="white-space:nowrap;">
+      <button class="agent-action-btn" data-action="verify" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="Test verify a signed payload against this agent">Test</button>
+      <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="Copy-paste code snippets for this agent" style="margin-left:0.3rem;">&lt;/&gt;</button>
+    </td>
   </tr>`;
 }
 
@@ -615,6 +689,7 @@ async function loadAgentsTable() {
             <th>Last Active</th>
             <th>Registered</th>
             <th>Visibility</th>
+            <th></th>
           </tr></thead>
           <tbody>${_allAgents.map(_renderAgentRow).join("")}</tbody>
         </table>
@@ -1847,6 +1922,178 @@ document.addEventListener("DOMContentLoaded", () => {
       msgEl.style.color = "var(--red)";
     } finally { this.textContent = "🔗 Create Invite Link"; this.disabled = false; }
   });
+
+  // ── Test Verify modal ────────────────────────────────────────────────────────
+  let _verifyDid = "";
+  document.getElementById("verify-modal-close")?.addEventListener("click", () => {
+    document.getElementById("verify-modal").style.display = "none";
+  });
+  document.getElementById("verify-modal")?.addEventListener("click", function(e) {
+    if (e.target === this) this.style.display = "none";
+  });
+
+  function _openTestVerify(did, name) {
+    _verifyDid = did;
+    document.getElementById("verify-modal-name").textContent = name;
+    document.getElementById("verify-payload-input").value = JSON.stringify({ action: "approve", timestamp: new Date().toISOString() }, null, 2);
+    document.getElementById("verify-sig-input").value = "";
+    document.getElementById("verify-result").style.display = "none";
+    document.getElementById("verify-run-btn").textContent = "Run Verification";
+    document.getElementById("verify-modal").style.display = "flex";
+  }
+
+  document.getElementById("verify-run-btn")?.addEventListener("click", async function () {
+    const rawPayload = document.getElementById("verify-payload-input").value.trim();
+    const sig        = document.getElementById("verify-sig-input").value.trim();
+    const resultEl   = document.getElementById("verify-result");
+    resultEl.style.display = "none";
+    if (!rawPayload || !sig) {
+      resultEl.style.cssText = "display:block;padding:0.85rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:600;background:var(--red-bg);border:1px solid var(--red);color:var(--red);margin-bottom:1rem;";
+      resultEl.textContent = "Both payload and signature are required."; return;
+    }
+    let payload;
+    try { payload = JSON.parse(rawPayload); }
+    catch { resultEl.style.cssText = "display:block;padding:0.85rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:600;background:var(--red-bg);border:1px solid var(--red);color:var(--red);margin-bottom:1rem;";
+      resultEl.textContent = "Payload is not valid JSON."; return; }
+
+    this.textContent = "Verifying…"; this.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/agents/${encodeURIComponent(_verifyDid)}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+        body: JSON.stringify({ payload, signature: sig }),
+      });
+      const data = await res.json();
+      const valid = data.status === "valid";
+      resultEl.style.cssText = `display:block;padding:0.85rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:600;background:${valid ? "var(--green-bg)" : "var(--red-bg)"};border:1px solid ${valid ? "var(--green)" : "var(--red)"};color:${valid ? "var(--green)" : "var(--red)"};margin-bottom:1rem;`;
+      resultEl.textContent = valid ? "✓ Valid — signature verified successfully." : "✗ Invalid — signature does not match this agent's public key.";
+    } catch(e) {
+      resultEl.style.cssText = "display:block;padding:0.85rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:600;background:var(--red-bg);border:1px solid var(--red);color:var(--red);margin-bottom:1rem;";
+      resultEl.textContent = "Error: " + e.message;
+    } finally { this.textContent = "Run Verification"; this.disabled = false; }
+  });
+
+  // ── Code Snippets modal ───────────────────────────────────────────────────────
+  const _snippetTemplates = {
+    python: (did) =>
+`from agentid import Agent
+
+# Load your agent using the private key you downloaded
+agent = Agent.from_file("agentid-key.json")
+
+# Sign a payload
+payload = {"action": "approve", "timestamp": "2026-01-01T00:00:00Z"}
+signature = agent.sign(payload)
+
+# Verify against ${did}
+result = Agent.verify_from_did(
+    did="${did}",
+    payload=payload,
+    signature=signature,
+)
+print(result.status)   # "valid" or "invalid"`,
+
+    js: (did) =>
+`const BASE = "https://api.agentid-protocol.com";
+
+// Verify a signed payload against ${did}
+const res = await fetch(\`\${BASE}/agents/${did}/verify\`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": "YOUR_API_KEY",
+  },
+  body: JSON.stringify({
+    payload:   { action: "approve", timestamp: new Date().toISOString() },
+    signature: "BASE64_SIGNATURE_HERE",
+  }),
+});
+const { status } = await res.json();
+console.log(status);  // "valid" or "invalid"`,
+
+    curl: (did) =>
+`# Resolve agent
+curl https://api.agentid-protocol.com/agents/${did}
+
+# Verify a signed payload
+curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{
+    "payload":   {"action":"approve","timestamp":"2026-01-01T00:00:00Z"},
+    "signature": "BASE64_SIGNATURE_HERE"
+  }'`,
+  };
+
+  let _activeSnippetTab = "python";
+  let _currentSnippetDid = "";
+
+  document.getElementById("snippets-modal-close")?.addEventListener("click", () => {
+    document.getElementById("snippets-modal").style.display = "none";
+  });
+  document.getElementById("snippets-modal")?.addEventListener("click", function(e) {
+    if (e.target === this) this.style.display = "none";
+  });
+
+  function _renderSnippet() {
+    const code = _snippetTemplates[_activeSnippetTab]?.(_currentSnippetDid) || "";
+    document.getElementById("snippets-code").textContent = code;
+  }
+
+  function _openSnippets(did, name) {
+    _currentSnippetDid = did;
+    document.getElementById("snippets-modal-name").textContent = name;
+    _activeSnippetTab = "python";
+    document.querySelectorAll("[data-stab]").forEach(t => t.classList.toggle("active", t.dataset.stab === "python"));
+    _renderSnippet();
+    document.getElementById("snippets-modal").style.display = "flex";
+  }
+
+  document.getElementById("snippets-tabs")?.addEventListener("click", e => {
+    const tab = e.target.closest("[data-stab]");
+    if (!tab) return;
+    _activeSnippetTab = tab.dataset.stab;
+    document.querySelectorAll("[data-stab]").forEach(t => t.classList.toggle("active", t === tab));
+    _renderSnippet();
+  });
+
+  document.getElementById("snippets-copy-btn")?.addEventListener("click", function () {
+    const code = document.getElementById("snippets-code").textContent;
+    navigator.clipboard.writeText(code).catch(() => {});
+    this.textContent = "copied!";
+    setTimeout(() => { this.textContent = "copy"; }, 1800);
+  });
+
+  // ── Agent row action delegation ───────────────────────────────────────────────
+  document.getElementById("agents-table")?.addEventListener("click", e => {
+    const btn = e.target.closest(".agent-action-btn");
+    if (!btn) return;
+    const { action, did, name } = btn.dataset;
+    if (action === "verify")   _openTestVerify(did, name);
+    if (action === "snippets") _openSnippets(did, name);
+  });
+
+  // ── Admin re-auth gate ────────────────────────────────────────────────────────
+  document.querySelector('#tab-team-keys input[value="admin"]')?.addEventListener("change", function () {
+    const gate = document.getElementById("admin-reauth-gate");
+    if (gate) gate.style.display = this.checked ? "" : "none";
+    if (!this.checked && document.getElementById("admin-reauth-input"))
+      document.getElementById("admin-reauth-input").value = "";
+  });
+
+  // Patch team key create to enforce re-auth when admin is checked
+  const _origCreateTeamKey = window._createTeamKey;
+  document.getElementById("team-key-create-btn")?.addEventListener("click", function(e) {
+    const adminChecked = document.querySelector('#tab-team-keys input[value="admin"]')?.checked;
+    if (adminChecked) {
+      const reauth = (document.getElementById("admin-reauth-input")?.value || "").trim();
+      if (!reauth || reauth !== apiKey) {
+        const msgEl = document.getElementById("team-key-msg");
+        if (msgEl) { msgEl.textContent = "Re-enter your API key to confirm admin scope."; msgEl.style.color = "var(--red)"; }
+        return;
+      }
+    }
+  }, true);   // capture phase so it fires before the existing handler
 
   // Auto-login if key in sessionStorage and session not expired
   if (apiKey) {
