@@ -149,6 +149,14 @@
     .snippet-body { background:#1C1917; border-radius:0 0 8px 8px; padding:1rem; overflow:auto; max-height:320px; }
     .snippet-body pre { font-family:"JetBrains Mono",monospace; font-size:0.75rem; color:#D6D3D1; white-space:pre; margin:0; }
 
+    /* Pager */
+    .pager { display:flex; align-items:center; justify-content:center; gap:1rem; padding:0.85rem 1rem; border-top:1px solid var(--border); }
+    .pager-btn { width:2rem; height:2rem; border:1px solid var(--border); border-radius:6px; background:var(--surface2); color:var(--text); font-size:0.9rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.12s; }
+    .pager-btn:hover:not([disabled]) { border-color:var(--accent); color:var(--accent); }
+    .pager-btn[disabled] { opacity:0.35; cursor:default; }
+    .pager-label { font-size:0.82rem; color:var(--text); min-width:9rem; text-align:center; }
+    .pager-range { color:var(--muted); font-size:0.75rem; margin-left:0.35rem; }
+
     /* Register step display */
     .step-label { font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:0.75rem; }
     .did-box { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-family:"JetBrains Mono",monospace; font-size:0.72rem; word-break:break-all; color:var(--text-2); margin-bottom:0.75rem; }
@@ -272,6 +280,7 @@
       <div id="agents-container">
         <div class="empty"><div class="spinner"></div><div>Loading agents…</div></div>
       </div>
+      <div id="agents-pager"></div>
     </div>
 
   </div>
@@ -465,8 +474,11 @@ async function apiFetch(path, opts = {}) {
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let _allAgents = [];
-let _searchMode = "all";
+let _allAgents   = [];   // full list from API
+let _filtered    = [];   // after search/filter
+let _searchMode  = "all";
+const PER_PAGE   = 20;
+let _page        = 1;
 
 // ── RENDER AGENT ROW ──────────────────────────────────────────────────────────
 function renderAgentRow(a) {
@@ -517,35 +529,79 @@ function renderAgentRow(a) {
   </tr>`;
 }
 
-// ── APPLY SEARCH/FILTER ───────────────────────────────────────────────────────
-function applyFilter() {
-  const q       = (document.getElementById("agent-search")?.value || "").trim().toLowerCase();
+// ── FILTER + PAGINATE ─────────────────────────────────────────────────────────
+function _buildFiltered() {
+  const q          = (document.getElementById("agent-search")?.value || "").trim().toLowerCase();
   const activeOnly = document.getElementById("filter-active-only")?.checked;
-  const tbody   = document.querySelector("#agents-container tbody");
-  const label   = document.getElementById("agents-count-label");
-  const status  = document.getElementById("search-status");
-  if (!tbody) return;
-  let visible = 0;
-  Array.from(tbody.querySelectorAll("tr")).forEach(row => {
-    let show = true;
-    if (activeOnly && row.dataset.active !== "1") show = false;
-    if (show && q) {
-      const name = row.dataset.name || "";
-      const did  = row.dataset.did  || "";
-      const caps = row.dataset.caps || "";
-      const match = _searchMode === "name" ? name.includes(q)
-                  : _searchMode === "did"  ? did.includes(q)
-                  : _searchMode === "cap"  ? caps.split(" ").some(c => c.includes(q))
-                  : name.includes(q) || did.includes(q) || caps.includes(q);
-      show = match;
-    }
-    row.classList.toggle("row-hidden", !show);
-    row.classList.toggle("row-highlight", show && q.length > 0);
-    if (show) visible++;
+  _filtered = _allAgents.filter(a => {
+    if (activeOnly && a.last_activity) {
+      if (Date.now() - new Date(a.last_activity).getTime() >= 86400000 * 7) return false;
+    } else if (activeOnly) return false;
+    if (!q) return true;
+    const name = (a.name || "").toLowerCase();
+    const did  = (a.did  || "").toLowerCase();
+    const caps = (Array.isArray(a.capabilities) ? a.capabilities : []).join(" ").toLowerCase();
+    return _searchMode === "name" ? name.includes(q)
+         : _searchMode === "did"  ? did.includes(q)
+         : _searchMode === "cap"  ? caps.split(" ").some(c => c.includes(q))
+         : name.includes(q) || did.includes(q) || caps.includes(q);
   });
-  const total = _allAgents.length;
-  label.textContent = q || activeOnly ? `${visible} of ${total} agent${total !== 1 ? "s" : ""}` : `${total} agent${total !== 1 ? "s" : ""}`;
-  status.textContent = visible === 0 && (q || activeOnly) ? "No agents match the current filter." : "";
+}
+
+function _renderPage() {
+  const container = document.getElementById("agents-container");
+  const label     = document.getElementById("agents-count-label");
+  const status    = document.getElementById("search-status");
+  const total     = _filtered.length;
+  const pages     = Math.max(1, Math.ceil(total / PER_PAGE));
+  _page = Math.min(_page, pages);
+  const start  = (_page - 1) * PER_PAGE;
+  const slice  = _filtered.slice(start, start + PER_PAGE);
+  const q      = (document.getElementById("agent-search")?.value || "").trim();
+  const activeOnly = document.getElementById("filter-active-only")?.checked;
+
+  label.textContent = (q || activeOnly)
+    ? `${total} of ${_allAgents.length} agent${_allAgents.length !== 1 ? "s" : ""}`
+    : `${_allAgents.length} agent${_allAgents.length !== 1 ? "s" : ""}`;
+  status.textContent = total === 0 && (q || activeOnly) ? "No agents match the current filter." : "";
+
+  if (!slice.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><p>No agents match the current filter.</p></div>`;
+  } else {
+    container.innerHTML = `
+      <div class="table-wrap">
+        <table class="agents-table">
+          <thead><tr>
+            <th>Name</th><th>DID</th><th>Capabilities</th>
+            <th>Audit Events</th><th>Last Active</th><th>Registered</th>
+            <th>Visibility</th><th></th>
+          </tr></thead>
+          <tbody>${slice.map(renderAgentRow).join("")}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // Pager
+  const pagerEl = document.getElementById("agents-pager");
+  if (pages <= 1) { pagerEl.innerHTML = ""; return; }
+  const end = Math.min(_page * PER_PAGE, total);
+  pagerEl.innerHTML = `
+    <div class="pager">
+      <button class="pager-btn" id="pager-prev" ${_page <= 1 ? "disabled" : ""}>&#8592;</button>
+      <span class="pager-label">
+        <strong>${_page}</strong> of <strong>${pages}</strong>
+        <span class="pager-range">(${start + 1}–${end} of ${total})</span>
+      </span>
+      <button class="pager-btn" id="pager-next" ${_page >= pages ? "disabled" : ""}>&#8594;</button>
+    </div>`;
+  document.getElementById("pager-prev")?.addEventListener("click", () => { _page--; _renderPage(); });
+  document.getElementById("pager-next")?.addEventListener("click", () => { _page++; _renderPage(); });
+}
+
+function applyFilter() {
+  _page = 1;
+  _buildFiltered();
+  _renderPage();
 }
 
 // ── PRIVACY TOGGLE ────────────────────────────────────────────────────────────
@@ -612,22 +668,13 @@ async function loadAgents() {
         <button class="btn btn-primary" onclick="document.getElementById('register-modal').style.display='flex'">+ Register Agent</button>
       </div>`;
       document.getElementById("agents-count-label").textContent = "0 agents";
+      document.getElementById("agents-pager").innerHTML = "";
       return;
     }
 
-    container.innerHTML = `
-      <div class="table-wrap">
-        <table class="agents-table">
-          <thead><tr>
-            <th>Name</th><th>DID</th><th>Capabilities</th>
-            <th>Audit Events</th><th>Last Active</th><th>Registered</th>
-            <th>Visibility</th><th></th>
-          </tr></thead>
-          <tbody>${_allAgents.map(renderAgentRow).join("")}</tbody>
-        </table>
-      </div>`;
-    document.getElementById("agents-count-label").textContent = `${_allAgents.length} agent${_allAgents.length !== 1 ? "s" : ""}`;
-    applyFilter();
+    _page = 1;
+    _buildFiltered();
+    _renderPage();
   } catch(e) {
     container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load agents: ${esc(e.message)}</p></div>`;
   }
