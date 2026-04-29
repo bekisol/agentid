@@ -866,6 +866,40 @@
       color: var(--green);
       font-weight: 500;
     }
+
+    /* ── AGENT HEALTH DOT ── */
+    .health-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    .health-dot-green  { background: var(--green); }
+    .health-dot-yellow { background: var(--yellow); }
+    .health-dot-grey   { background: var(--muted); }
+
+    /* ── REGISTER AGENT MODAL ── */
+    .cap-pill-removable {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      background: var(--accent-light);
+      color: var(--accent);
+      border: 1px solid var(--accent-border, #FDBA74);
+      font-weight: 500;
+      cursor: default;
+    }
+    .cap-pill-removable button {
+      background: none; border: none; cursor: pointer;
+      color: var(--accent); font-size: 0.75rem; padding: 0;
+      line-height: 1;
+    }
+    .cap-pill-removable button:hover { color: var(--red); }
   </style>
 </head>
 <body>
@@ -1015,8 +1049,35 @@
             </div>
           </div>
 
-          <button class="btn btn-primary" id="team-key-create-btn">Create Team Key</button>
+          <div class="settings-field">
+            <label class="settings-label" for="team-key-expiry">Expires in</label>
+            <select id="team-key-expiry" class="settings-input" style="width:auto;">
+              <option value="48">48 hours (default)</option>
+              <option value="168">7 days</option>
+              <option value="720">30 days</option>
+              <option value="0">Never</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.25rem;">
+            <button class="btn btn-primary" id="team-key-create-btn">Create Team Key</button>
+            <button class="btn btn-outline" id="team-invite-btn" title="Generate a one-time invite link instead of seeing the raw key">🔗 Create Invite Link</button>
+          </div>
           <div id="team-key-msg" class="modal-msg"></div>
+
+          <!-- Invite link reveal -->
+          <div id="team-invite-reveal" style="display:none;margin-top:0.75rem;">
+            <div class="key-reveal">
+              <div class="key-reveal-label">🔗 Invite link created</div>
+              <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:0.5rem;line-height:1.5;">Share this link with your teammate. They'll accept it to generate their own key — you never see the raw value.</p>
+              <div class="key-reveal-value" id="team-invite-url" style="word-break:break-all;"></div>
+              <div style="display:flex;gap:0.5rem;margin-top:0.6rem;">
+                <button class="btn btn-outline" id="team-invite-copy-btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;">Copy link</button>
+                <span id="team-invite-meta" style="font-size:0.75rem;color:var(--muted);align-self:center;"></span>
+              </div>
+              <div class="key-reveal-warning">⚠ Link expires. Each link can only be used once.</div>
+            </div>
+          </div>
 
           <!-- Key reveal — shown once after creation -->
           <div id="team-key-reveal" style="display:none;">
@@ -1239,6 +1300,19 @@
       <span id="signing-count-label" style="font-size:0.8rem;color:var(--muted);"></span>
     </div>
 
+    <!-- Filters row -->
+    <div style="padding:0.65rem 1.25rem;border-bottom:1px solid var(--border);display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;">
+      <select id="signing-status-filter" style="font-size:0.8rem;padding:0.3rem 0.6rem;border:1px solid var(--border-dark);border-radius:6px;background:var(--surface);color:var(--text);outline:none;">
+        <option value="">All statuses</option>
+        <option value="valid">Valid only</option>
+        <option value="invalid">Invalid only</option>
+      </select>
+      <input type="date" id="signing-from-date" style="font-size:0.8rem;padding:0.3rem 0.6rem;border:1px solid var(--border-dark);border-radius:6px;background:var(--surface);color:var(--text);outline:none;" title="From date" />
+      <span style="font-size:0.78rem;color:var(--muted);">to</span>
+      <input type="date" id="signing-to-date" style="font-size:0.8rem;padding:0.3rem 0.6rem;border:1px solid var(--border-dark);border-radius:6px;background:var(--surface);color:var(--text);outline:none;" title="To date" />
+      <button id="signing-filter-clear" style="font-size:0.78rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:0.2rem 0.4rem;border-radius:4px;" title="Clear filters">✕ Clear</button>
+    </div>
+
     <!-- Search bar -->
     <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);">
       <div class="agent-search-wrap">
@@ -1272,7 +1346,10 @@
   <div class="card" style="margin-bottom:2rem;">
     <div class="card-header">
       <div class="card-title">My Agents</div>
-      <span id="agents-count-label" style="font-size:0.8rem;color:var(--muted);"></span>
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <span id="agents-count-label" style="font-size:0.8rem;color:var(--muted);"></span>
+        <button class="btn btn-primary" id="register-agent-btn" style="font-size:0.8rem;padding:0.3rem 0.85rem;">+ Register Agent</button>
+      </div>
     </div>
 
     <!-- Search bar -->
@@ -1302,6 +1379,84 @@
   </div>
 
 </div><!-- /dashboard -->
+
+<!-- ── REGISTER AGENT MODAL ── -->
+<div id="register-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-label="Register Agent">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <span class="modal-title">🤖 Register New Agent</span>
+      <button class="modal-close" id="register-modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" style="padding:1.25rem;">
+
+      <!-- Step 1: fill details -->
+      <div id="reg-step-1">
+        <div class="settings-field">
+          <label class="settings-label" for="reg-name">Agent Name <span style="color:var(--red);">*</span></label>
+          <input id="reg-name" class="settings-input" type="text" placeholder="e.g. Payment Verifier" maxlength="256" autocomplete="off" />
+        </div>
+
+        <div class="settings-field">
+          <label class="settings-label" for="reg-caps-input">Capabilities</label>
+          <div style="display:flex;gap:0.5rem;margin-bottom:0.4rem;">
+            <input id="reg-caps-input" class="settings-input" type="text" placeholder="Type a capability and press Enter" style="flex:1;" autocomplete="off" />
+            <button id="reg-caps-add-btn" class="btn btn-outline" style="font-size:0.8rem;padding:0.3rem 0.7rem;white-space:nowrap;">Add</button>
+          </div>
+          <div id="reg-caps-pills" style="display:flex;flex-wrap:wrap;gap:0.35rem;min-height:1.5rem;"></div>
+          <p class="settings-hint">Common: sign, verify, negotiate, delegate, execute, read, write</p>
+        </div>
+
+        <div class="settings-field" style="display:flex;align-items:center;gap:0.75rem;">
+          <label class="settings-label" style="margin:0;">Private agent</label>
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.85rem;">
+            <input type="checkbox" id="reg-private" style="width:15px;height:15px;" />
+            <span style="color:var(--muted);">Hidden from public registry</span>
+          </label>
+        </div>
+
+        <div id="reg-step1-msg" class="modal-msg"></div>
+        <button class="btn btn-primary" id="reg-generate-btn" style="width:100%;margin-top:0.5rem;">Generate Keys &amp; Preview</button>
+      </div>
+
+      <!-- Step 2: review keys + register -->
+      <div id="reg-step-2" style="display:none;">
+        <div style="background:var(--green-bg);border:1px solid var(--green);border-radius:8px;padding:0.9rem;margin-bottom:1rem;">
+          <div style="font-size:0.75rem;font-weight:700;color:var(--green);margin-bottom:0.3rem;">✓ Key pair generated in your browser</div>
+          <div style="font-size:0.78rem;color:var(--text-2);">Your private key never leaves this page. Download it before registering.</div>
+        </div>
+
+        <div class="settings-field">
+          <label class="settings-label">Your DID</label>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;word-break:break-all;color:var(--text-2);" id="reg-did-display"></div>
+        </div>
+
+        <div style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap;">
+          <button class="btn btn-outline" id="reg-download-key-btn" style="flex:1;">⬇ Download Private Key</button>
+          <button class="btn btn-outline" id="reg-back-btn" style="font-size:0.8rem;">← Back</button>
+        </div>
+
+        <div id="reg-download-warning" style="font-size:0.78rem;color:var(--red);margin-bottom:0.75rem;display:none;">
+          ⚠ Download your private key first — it cannot be recovered after registration.
+        </div>
+
+        <div id="reg-step2-msg" class="modal-msg"></div>
+        <button class="btn btn-primary" id="reg-register-btn" style="width:100%;">Register Agent</button>
+
+        <!-- Success state -->
+        <div id="reg-success" style="display:none;text-align:center;padding:1.5rem 0;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">✅</div>
+          <div style="font-weight:700;font-size:1.05rem;margin-bottom:0.3rem;">Agent registered!</div>
+          <div id="reg-success-did" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--muted);word-break:break-all;margin-bottom:1rem;"></div>
+          <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
+            <button class="btn btn-outline" id="reg-view-btn">View Profile →</button>
+            <button class="btn btn-primary" id="reg-another-btn">Register Another</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <script src="dashboard.js"></script>
 

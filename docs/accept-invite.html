@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentID — Accept Team Key Invite</title>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src https://fonts.gstatic.com;
+             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
+             img-src 'self' data:;
+             frame-ancestors 'none';" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #F9F7F4; --surface: #FFFFFF; --surface2: #F2F0EC;
+      --border: #E5E2DB; --border-dark: #C9C5BC;
+      --text: #1C1917; --text-2: #44403C; --muted: #78716C;
+      --accent: #C2410C; --accent-light: #FFF7ED; --accent-border: #FDBA74;
+      --green: #059669; --green-bg: #ECFDF5;
+      --red: #DC2626; --red-bg: #FEF2F2;
+      --yellow: #D97706; --yellow-bg: #FFFBEB;
+    }
+    body { background:var(--bg); color:var(--text); font-family:"Inter",-apple-system,sans-serif; line-height:1.6; font-size:15px; min-height:100vh; -webkit-font-smoothing:antialiased; }
+    a { color:var(--accent); text-decoration:none; }
+    .topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 2rem; height:56px; display:flex; align-items:center; justify-content:space-between; }
+    .topbar-brand { font-weight:800; font-size:1.1rem; letter-spacing:-0.02em; }
+    .topbar-brand span { color:var(--accent); }
+    .container { max-width:480px; margin:3rem auto; padding:0 1.5rem; }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:2rem; margin-bottom:1rem; }
+    .card-title { font-size:1.2rem; font-weight:700; margin-bottom:0.25rem; }
+    .card-sub { font-size:0.85rem; color:var(--muted); margin-bottom:1.5rem; }
+    .info-row { display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--border); font-size:0.875rem; }
+    .info-row:last-child { border-bottom:none; }
+    .info-key { color:var(--muted); font-weight:500; }
+    .info-val { font-weight:600; text-align:right; }
+    .scope-badge { display:inline-block; font-size:0.72rem; font-weight:600; padding:0.15rem 0.45rem; border-radius:4px; background:var(--accent-light); color:var(--accent); border:1px solid var(--accent-border); margin:0.1rem; }
+    .field { margin-bottom:1rem; }
+    .field label { display:block; font-size:0.8rem; font-weight:600; margin-bottom:0.3rem; }
+    .field input { width:100%; padding:0.5rem 0.75rem; border:1px solid var(--border-dark); border-radius:8px; font-size:0.875rem; color:var(--text); outline:none; }
+    .field input:focus { border-color:var(--accent); }
+    .btn { padding:0.55rem 1.25rem; border-radius:8px; font-size:0.875rem; font-weight:600; cursor:pointer; border:none; }
+    .btn-primary { background:var(--accent); color:#fff; width:100%; }
+    .btn-primary:hover { background:#a83509; }
+    .btn-primary:disabled { opacity:0.5; cursor:default; }
+    .key-box { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:0.85rem; font-family:"JetBrains Mono",monospace; font-size:0.75rem; word-break:break-all; color:var(--text-2); margin-bottom:0.75rem; }
+    .copy-btn { font-size:0.8rem; padding:0.35rem 0.9rem; border:1px solid var(--border-dark); border-radius:6px; background:var(--surface); cursor:pointer; }
+    .warning { font-size:0.78rem; color:var(--red); margin-top:0.5rem; }
+    .empty { text-align:center; padding:3rem 1rem; color:var(--muted); }
+    .empty-icon { font-size:2.5rem; margin-bottom:0.5rem; }
+    .empty-title { font-size:1.1rem; font-weight:700; color:var(--text); margin-bottom:0.3rem; }
+    @media(max-width:600px) { .topbar{padding:0 1rem;} .container{padding:0 1rem;margin:1.5rem auto;} }
+  </style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-brand">Agent<span>ID</span></div>
+  <a href="dashboard.html" style="font-size:0.85rem;color:var(--muted);">← Dashboard</a>
+</div>
+
+<div class="container" id="main">
+  <div class="empty"><div class="empty-icon">⏳</div><div>Loading invite…</div></div>
+</div>
+
+<script>
+const BASE = "https://api.agentid-protocol.com";
+function esc(s) { return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function getToken() { return new URLSearchParams(location.search).get("token"); }
+
+function renderError(msg) {
+  document.getElementById("main").innerHTML = `
+    <div class="card empty">
+      <div class="empty-icon">❌</div>
+      <div class="empty-title">Invite Unavailable</div>
+      <p>${esc(msg)}</p>
+    </div>`;
+}
+
+function renderSuccess(key, scopes, label) {
+  document.getElementById("main").innerHTML = `
+    <div class="card">
+      <div class="card-title">✅ Key Created</div>
+      <div class="card-sub">Copy and store your API key now — it won't be shown again.</div>
+      <div class="key-box" id="new-key-val">${esc(key)}</div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <button class="copy-btn" id="copy-key-btn">Copy key</button>
+        <span style="font-size:0.78rem;color:var(--muted);align-self:center;">Scopes: ${esc(scopes)}</span>
+      </div>
+      <div class="warning">⚠ This key is shown once. Store it in a password manager or secrets vault.</div>
+    </div>
+    <div style="text-align:center;margin-top:1rem;">
+      <a href="dashboard.html" style="font-size:0.85rem;">Open Dashboard with this key →</a>
+    </div>`;
+  document.getElementById("copy-key-btn").addEventListener("click", function () {
+    navigator.clipboard.writeText(key).catch(() => {});
+    this.textContent = "Copied!";
+    setTimeout(() => { this.textContent = "Copy key"; }, 1800);
+  });
+}
+
+function renderForm(info) {
+  document.getElementById("main").innerHTML = `
+    <div class="card">
+      <div class="card-title">Team Key Invite</div>
+      <div class="card-sub">You've been invited to generate an API key for the AgentID registry.</div>
+
+      <div class="info-row"><span class="info-key">Account</span><span class="info-val">${esc(info.owner_preview)}</span></div>
+      <div class="info-row"><span class="info-key">Tier</span><span class="info-val">${esc(info.tier)}</span></div>
+      <div class="info-row" style="flex-direction:column;align-items:flex-start;gap:0.3rem;">
+        <span class="info-key">Scopes granted</span>
+        <div>${(info.scopes||"").split(",").map(s=>s.trim()).filter(Boolean).map(s=>`<span class="scope-badge">${esc(s)}</span>`).join("")}</div>
+      </div>
+      <div class="info-row"><span class="info-key">Expires</span><span class="info-val">${new Date(info.expires_at).toLocaleString()}</span></div>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label for="accept-label">Key label (optional)</label>
+        <input id="accept-label" type="text" placeholder="${esc(info.label || "team-key")}" maxlength="128" value="${esc(info.label || "")}" />
+      </div>
+      <button class="btn btn-primary" id="accept-btn">Accept &amp; Generate Key</button>
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.75rem;text-align:center;">
+        By accepting you'll receive a one-time API key scoped to the permissions above.
+        This invite can only be used once.
+      </p>
+    </div>`;
+
+  document.getElementById("accept-btn").addEventListener("click", async function () {
+    const label = document.getElementById("accept-label").value.trim();
+    this.textContent = "Generating…"; this.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/pro/keys/invite/${encodeURIComponent(getToken())}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: label || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || res.status);
+      renderSuccess(data.key, data.scopes, data.label);
+    } catch (e) {
+      this.textContent = "Accept & Generate Key"; this.disabled = false;
+      document.getElementById("main").insertAdjacentHTML("beforeend",
+        `<p style="color:var(--red);font-size:0.85rem;margin-top:0.5rem;">Error: ${esc(e.message)}</p>`);
+    }
+  });
+}
+
+async function init() {
+  const token = getToken();
+  if (!token) { renderError("No invite token in URL."); return; }
+  try {
+    const res = await fetch(`${BASE}/pro/keys/invite/${encodeURIComponent(token)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Invite not found");
+    renderForm(data);
+  } catch (e) {
+    renderError(e.message);
+  }
+}
+init();
+</script>
+</body>
+</html>

@@ -461,11 +461,23 @@ function _renderAgentRow(a) {
   const rotBadge = a.rotation_pending
     ? `<span title="Key rotation in progress" style="margin-left:0.35rem;font-size:0.68rem;padding:0.1rem 0.4rem;border-radius:4px;background:var(--yellow-bg,#fff8e1);color:var(--yellow,#b45309);border:1px solid var(--yellow,#b45309);vertical-align:middle;">⟳ rotation</span>`
     : "";
+
+  // Health dot based on last_activity
+  let healthDot = "";
+  if (a.last_activity) {
+    const ageMs = Date.now() - new Date(a.last_activity).getTime();
+    const cls = ageMs < 86400000      ? "health-dot-green"   // < 1 day  → green
+              : ageMs < 86400000 * 7  ? "health-dot-yellow"  // < 7 days → amber
+              : "health-dot-grey";                            // older    → grey
+    healthDot = `<span class="health-dot ${cls}" title="Last active ${timeAgo(a.last_activity)}"></span>`;
+  } else {
+    healthDot = `<span class="health-dot health-dot-grey" title="Never active"></span>`;
+  }
   return `<tr
     data-name="${esc(a.name.toLowerCase())}"
     data-did="${esc((a.did || "").toLowerCase())}"
     data-caps="${esc(capsArr.join(" ").toLowerCase())}">
-    <td class="agent-name">${esc(a.name)}${rotBadge}</td>
+    <td class="agent-name" style="display:flex;align-items:center;gap:0;">${healthDot}${esc(a.name)}${rotBadge}</td>
     <td class="did-mono" title="${esc(a.did || "")}">${esc(shortDid(a.did))}</td>
     <td>${caps || '<span style="color:var(--muted);font-size:0.8rem;">none</span>'}</td>
     <td style="text-align:center;font-weight:600;">${esc(String(a.audit_events ?? 0))}</td>
@@ -622,7 +634,7 @@ async function loadAgentsTable() {
 
 // ── SIGNING ACTIVITY ──────────────────────────────────────────────────────────
 
-const _signing = { page: 1, pages: 1, total: 0, perPage: 20, didQuery: "" };
+const _signing = { page: 1, pages: 1, total: 0, perPage: 20, didQuery: "", status: "", fromDate: "", toDate: "" };
 
 function payloadSummary(payload) {
   if (!payload) return "—";
@@ -883,12 +895,15 @@ async function loadSigningActivity() {
   const el    = document.getElementById("signing-table");
   const label = document.getElementById("signing-count-label");
   try {
-    const qParam = _signing.didQuery
-      ? `&q=${encodeURIComponent(_signing.didQuery)}`
-      : "";
-    const data = await apiFetch(
-      `/pro/analytics/signing?page=${_signing.page}&per_page=${_signing.perPage}${qParam}`
-    );
+    const params = new URLSearchParams({
+      page:     _signing.page,
+      per_page: _signing.perPage,
+    });
+    if (_signing.didQuery)  params.set("q",       _signing.didQuery);
+    if (_signing.status)    params.set("status",  _signing.status);
+    if (_signing.fromDate)  params.set("from_ts", _signing.fromDate);
+    if (_signing.toDate)    params.set("to_ts",   _signing.toDate);
+    const data = await apiFetch(`/pro/analytics/signing?${params}`);
     const events = data.events || [];
 
     // Sync pagination state from server response
@@ -1582,6 +1597,255 @@ document.addEventListener("DOMContentLoaded", () => {
       if (e.message === "403") alert("PDF reports require a Pro or Enterprise plan.");
       else alert("Could not generate PDF — please try again.");
     } finally { btn.textContent = original; btn.disabled = false; }
+  });
+
+  // ── Signing filters ──────────────────────────────────────────────────────────
+  function _applySigningFilters() {
+    _signing.status   = document.getElementById("signing-status-filter")?.value || "";
+    _signing.fromDate = document.getElementById("signing-from-date")?.value || "";
+    _signing.toDate   = document.getElementById("signing-to-date")?.value || "";
+    _signing.page = 1;
+    loadSigningActivity();
+  }
+  document.getElementById("signing-status-filter")?.addEventListener("change", _applySigningFilters);
+  document.getElementById("signing-from-date")?.addEventListener("change", _applySigningFilters);
+  document.getElementById("signing-to-date")?.addEventListener("change", _applySigningFilters);
+  document.getElementById("signing-filter-clear")?.addEventListener("click", function () {
+    document.getElementById("signing-status-filter").value = "";
+    document.getElementById("signing-from-date").value = "";
+    document.getElementById("signing-to-date").value = "";
+    _signing.status = ""; _signing.fromDate = ""; _signing.toDate = "";
+    _signing.page = 1;
+    loadSigningActivity();
+  });
+
+  // ── Register Agent modal ─────────────────────────────────────────────────────
+  const _reg = { kp: null, did: null, pubB64: null, seedB64: null, capsArr: [], downloaded: false };
+
+  function _base58Encode(bytes) {
+    const ALPHA = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    let n = BigInt("0x" + [...bytes].map(b => b.toString(16).padStart(2, "0")).join(""));
+    let out = "";
+    while (n > 0n) { out = ALPHA[Number(n % 58n)] + out; n /= 58n; }
+    for (const b of bytes) { if (b !== 0) break; out = ALPHA[0] + out; }
+    return out;
+  }
+
+  function _canonicalJSON(obj) {
+    if (typeof obj !== "object" || obj === null) return JSON.stringify(obj);
+    if (Array.isArray(obj)) return "[" + obj.map(_canonicalJSON).join(",") + "]";
+    return "{" + Object.keys(obj).sort().map(k => JSON.stringify(k) + ":" + _canonicalJSON(obj[k])).join(",") + "}";
+  }
+
+  async function _generateKeyPair() {
+    const kp      = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+    const pubRaw  = await crypto.subtle.exportKey("raw", kp.publicKey);
+    const pubBytes = new Uint8Array(pubRaw);
+    const privJwk = await crypto.subtle.exportKey("jwk", kp.privateKey);
+    const seedB64url = privJwk.d;
+    const seedB64 = seedB64url.replace(/-/g, "+").replace(/_/g, "/").padEnd(
+      seedB64url.length + (4 - seedB64url.length % 4) % 4, "="
+    );
+    const did   = "did:agentid:" + _base58Encode(pubBytes);
+    const pubB64 = btoa(String.fromCharCode(...pubBytes));
+    return { kp, did, pubB64, seedB64, pubBytes };
+  }
+
+  async function _signPayload(kp, payload) {
+    const msg = new TextEncoder().encode(_canonicalJSON(payload));
+    const sig = await crypto.subtle.sign("Ed25519", kp.privateKey, msg);
+    return btoa(String.fromCharCode(...new Uint8Array(sig)));
+  }
+
+  function _renderCapPills() {
+    const wrap = document.getElementById("reg-caps-pills");
+    if (!wrap) return;
+    wrap.innerHTML = _reg.capsArr.map((c, i) => `
+      <span class="cap-pill-removable">${esc(c)}
+        <button data-cap-idx="${i}" title="Remove">×</button>
+      </span>`).join("");
+    wrap.querySelectorAll("button[data-cap-idx]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        _reg.capsArr.splice(Number(btn.dataset.capIdx), 1);
+        _renderCapPills();
+      });
+    });
+  }
+
+  function _regAddCap() {
+    const input = document.getElementById("reg-caps-input");
+    const val = (input?.value || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    if (!val || _reg.capsArr.includes(val)) { if (input) input.value = ""; return; }
+    _reg.capsArr.push(val);
+    if (input) input.value = "";
+    _renderCapPills();
+  }
+
+  function _regReset() {
+    _reg.kp = null; _reg.did = null; _reg.pubB64 = null; _reg.seedB64 = null;
+    _reg.capsArr = []; _reg.downloaded = false;
+    document.getElementById("reg-step-1").style.display = "";
+    document.getElementById("reg-step-2").style.display = "none";
+    document.getElementById("reg-name").value = "";
+    document.getElementById("reg-caps-input").value = "";
+    document.getElementById("reg-private").checked = false;
+    document.getElementById("reg-caps-pills").innerHTML = "";
+    document.getElementById("reg-step1-msg").textContent = "";
+    document.getElementById("reg-step2-msg").textContent = "";
+    document.getElementById("reg-success").style.display = "none";
+    document.getElementById("reg-download-warning").style.display = "none";
+    const regBtn = document.getElementById("reg-register-btn");
+    if (regBtn) regBtn.style.display = "";
+  }
+
+  document.getElementById("register-agent-btn")?.addEventListener("click", () => {
+    _regReset();
+    document.getElementById("register-modal").style.display = "flex";
+  });
+  document.getElementById("register-modal-close")?.addEventListener("click", () => {
+    document.getElementById("register-modal").style.display = "none";
+  });
+  document.getElementById("register-modal")?.addEventListener("click", function (e) {
+    if (e.target === this) this.style.display = "none";
+  });
+
+  document.getElementById("reg-caps-add-btn")?.addEventListener("click", _regAddCap);
+  document.getElementById("reg-caps-input")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); _regAddCap(); }
+  });
+  document.getElementById("reg-back-btn")?.addEventListener("click", () => {
+    document.getElementById("reg-step-1").style.display = "";
+    document.getElementById("reg-step-2").style.display = "none";
+  });
+
+  document.getElementById("reg-generate-btn")?.addEventListener("click", async function () {
+    const name = (document.getElementById("reg-name")?.value || "").trim();
+    const msgEl = document.getElementById("reg-step1-msg");
+    msgEl.textContent = "";
+    if (!name) { msgEl.textContent = "Agent name is required."; msgEl.style.color = "var(--red)"; return; }
+    this.textContent = "Generating…"; this.disabled = true;
+    try {
+      const keypair = await _generateKeyPair();
+      _reg.kp = keypair.kp; _reg.did = keypair.did;
+      _reg.pubB64 = keypair.pubB64; _reg.seedB64 = keypair.seedB64;
+      document.getElementById("reg-did-display").textContent = keypair.did;
+      document.getElementById("reg-step-1").style.display = "none";
+      document.getElementById("reg-step-2").style.display = "";
+      document.getElementById("reg-success").style.display = "none";
+      document.getElementById("reg-register-btn").style.display = "";
+    } catch (e) {
+      msgEl.textContent = "Key generation failed — your browser may not support Ed25519. Try Chrome 113+ or Firefox 130+.";
+      msgEl.style.color = "var(--red)";
+    } finally { this.textContent = "Generate Keys & Preview"; this.disabled = false; }
+  });
+
+  document.getElementById("reg-download-key-btn")?.addEventListener("click", function () {
+    if (!_reg.did) return;
+    const name = (document.getElementById("reg-name")?.value || "").trim();
+    const payload = JSON.stringify({
+      did:              _reg.did,
+      name:             name,
+      public_key_b64:   _reg.pubB64,
+      private_key_b64:  _reg.seedB64,
+      created_at:       new Date().toISOString(),
+      warning:          "Keep this file secret. Anyone with your private key can sign as this agent.",
+    }, null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = "agentid-key-" + _reg.did.slice(-12) + ".json";
+    a.click();
+    URL.revokeObjectURL(url);
+    _reg.downloaded = true;
+    document.getElementById("reg-download-warning").style.display = "none";
+    this.textContent = "⬇ Downloaded ✓";
+    this.style.borderColor = "var(--green)";
+    this.style.color = "var(--green)";
+  });
+
+  document.getElementById("reg-register-btn")?.addEventListener("click", async function () {
+    if (!_reg.did) return;
+    if (!_reg.downloaded) {
+      document.getElementById("reg-download-warning").style.display = "";
+      return;
+    }
+    const name      = (document.getElementById("reg-name")?.value || "").trim();
+    const isPrivate = document.getElementById("reg-private")?.checked || false;
+    const owner     = document.getElementById("dash-title")?.textContent || "";
+    const msgEl     = document.getElementById("reg-step2-msg");
+    msgEl.textContent = "";
+    this.textContent = "Registering…"; this.disabled = true;
+
+    try {
+      const createdAt = new Date().toISOString();
+      const payload = {
+        did:          _reg.did,
+        name,
+        capabilities: [..._reg.capsArr],
+        owner,
+        public_key:   _reg.pubB64,
+        created_at:   createdAt,
+        metadata:     {},
+        private:      isPrivate,
+      };
+      const proof = await _signPayload(_reg.kp, payload);
+      const res = await fetch(`${BASE}/agents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+        body: JSON.stringify({ ...payload, proof }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || res.status);
+
+      document.getElementById("reg-register-btn").style.display = "none";
+      document.getElementById("reg-success").style.display = "";
+      document.getElementById("reg-success-did").textContent = _reg.did;
+      document.getElementById("reg-view-btn").onclick = () => {
+        window.open(`agent.html?did=${encodeURIComponent(_reg.did)}`, "_blank");
+      };
+      document.getElementById("reg-another-btn").onclick = () => {
+        _regReset();
+      };
+      loadAgentsTable();  // refresh the agents table
+    } catch (e) {
+      msgEl.textContent = "Registration failed: " + e.message;
+      msgEl.style.color = "var(--red)";
+    } finally { this.textContent = "Register Agent"; this.disabled = false; }
+  });
+
+  // ── Team key invite link ─────────────────────────────────────────────────────
+  document.getElementById("team-invite-btn")?.addEventListener("click", async function () {
+    const label  = (document.getElementById("team-key-label")?.value || "").trim();
+    const expiry = document.getElementById("team-key-expiry")?.value || "48";
+    const scopes = [...document.querySelectorAll("#tab-team-keys input[type=checkbox]:checked")]
+      .map(cb => cb.value).join(",");
+    const msgEl = document.getElementById("team-key-msg");
+    msgEl.textContent = "";
+    document.getElementById("team-invite-reveal").style.display = "none";
+    document.getElementById("team-key-reveal").style.display = "none";
+
+    if (!scopes) { msgEl.textContent = "Select at least one scope."; msgEl.style.color = "var(--red)"; return; }
+    this.textContent = "Creating…"; this.disabled = true;
+    try {
+      const res = await apiFetch("/pro/keys/invite", {
+        method: "POST",
+        body: JSON.stringify({ scopes, label, expires_in_hours: Number(expiry) || 48 }),
+      });
+      const inviteUrl = `${location.origin}${location.pathname.replace("dashboard.html","accept-invite.html")}?token=${encodeURIComponent(res.token)}`;
+      document.getElementById("team-invite-url").textContent = inviteUrl;
+      document.getElementById("team-invite-meta").textContent =
+        `Scopes: ${res.scopes} · Expires ${new Date(res.expires_at).toLocaleString()}`;
+      document.getElementById("team-invite-reveal").style.display = "";
+      document.getElementById("team-invite-copy-btn").onclick = function () {
+        navigator.clipboard.writeText(inviteUrl).catch(() => {});
+        this.textContent = "Copied!";
+        setTimeout(() => { this.textContent = "Copy link"; }, 1800);
+      };
+    } catch (e) {
+      msgEl.textContent = "Failed to create invite: " + (e.message || "unknown error");
+      msgEl.style.color = "var(--red)";
+    } finally { this.textContent = "🔗 Create Invite Link"; this.disabled = false; }
   });
 
   // Auto-login if key in sessionStorage and session not expired
