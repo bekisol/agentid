@@ -507,7 +507,10 @@ async function loadAuditLog() {
 
 // ── AGENTS TABLE ──────────────────────────────────────────────────────────────
 
-let _allAgents = [];   // cached for client-side search
+let _allAgents  = [];   // full list from API
+let _agFiltered = [];   // after search filter
+let _agPage     = 1;
+const _AG_PER_PAGE = 20;
 
 function _renderAgentRow(a) {
   const capsArr = Array.isArray(a.capabilities) ? a.capabilities : [];
@@ -563,63 +566,86 @@ function _renderAgentRow(a) {
   </tr>`;
 }
 
-function _applyAgentSearch() {
-  const q      = (document.getElementById("agent-search")?.value || "").trim().toLowerCase();
-  const mode   = document.querySelector(".search-tag-active")?.dataset.mode || "all";
-  const status = document.getElementById("agent-search-status");
-  const tbody  = document.querySelector("#agents-table tbody");
-  const label  = document.getElementById("agents-count-label");
-  if (!tbody) return;
-
-  const rows = Array.from(tbody.querySelectorAll("tr"));
-  let visible = 0;
-
-  rows.forEach(row => {
-    if (!q) {
-      row.classList.remove("agent-row-hidden", "agent-row-highlight");
-      visible++;
-      return;
-    }
-    const name = row.dataset.name || "";
-    const did  = row.dataset.did  || "";
-    const caps = row.dataset.caps || "";
-
-    let match = false;
-    if (mode === "all")  match = name.includes(q) || did.includes(q) || caps.includes(q);
-    if (mode === "name") match = name.includes(q);
-    if (mode === "did")  match = did.includes(q);
-    if (mode === "cap")  match = caps.split(" ").some(c => c.includes(q));
-
-    row.classList.toggle("agent-row-hidden",    !match);
-    row.classList.toggle("agent-row-highlight",  match && q.length > 0);
-    if (match) visible++;
+function _buildAgFiltered() {
+  const q    = (document.getElementById("agent-search")?.value || "").trim().toLowerCase();
+  const mode = document.querySelector("#agent-search-tags .search-tag-active")?.dataset.mode || "all";
+  _agFiltered = !q ? [..._allAgents] : _allAgents.filter(a => {
+    const name = (a.name || "").toLowerCase();
+    const did  = (a.did  || "").toLowerCase();
+    const caps = (Array.isArray(a.capabilities) ? a.capabilities : []).join(" ").toLowerCase();
+    return mode === "name" ? name.includes(q)
+         : mode === "did"  ? did.includes(q)
+         : mode === "cap"  ? caps.split(" ").some(c => c.includes(q))
+         : name.includes(q) || did.includes(q) || caps.includes(q);
   });
+}
 
-  const total = _allAgents.length;
+function _renderAgPage() {
+  const el     = document.getElementById("agents-table");
+  const label  = document.getElementById("agents-count-label");
+  const status = document.getElementById("agent-search-status");
+  const q      = (document.getElementById("agent-search")?.value || "").trim();
+  const total  = _agFiltered.length;
+  const pages  = Math.max(1, Math.ceil(total / _AG_PER_PAGE));
+  _agPage      = Math.min(_agPage, pages);
+  const start  = (_agPage - 1) * _AG_PER_PAGE;
+  const slice  = _agFiltered.slice(start, start + _AG_PER_PAGE);
+
   if (q) {
-    label.textContent = `${visible} of ${total} agent${total !== 1 ? "s" : ""}`;
-    status.textContent = visible === 0
-      ? `No agents match "${q}" — try a different term or switch filter`
-      : `${visible} result${visible !== 1 ? "s" : ""} for "${q}"`;
+    label.textContent  = `${total} of ${_allAgents.length} agent${_allAgents.length !== 1 ? "s" : ""}`;
+    status.textContent = total === 0 ? `No agents match "${q}" — try a different term or switch filter` : `${total} result${total !== 1 ? "s" : ""} for "${q}"`;
   } else {
-    label.textContent = `${total} agent${total !== 1 ? "s" : ""}`;
+    label.textContent  = `${_allAgents.length} agent${_allAgents.length !== 1 ? "s" : ""}`;
     status.textContent = "";
   }
+
+  el.innerHTML = `
+    <div style="overflow:auto;">
+      <table class="agents-table">
+        <thead><tr>
+          <th>Name</th><th>DID</th><th>Capabilities</th>
+          <th>Audit Events</th><th>Last Active</th><th>Registered</th>
+          <th>Visibility</th><th></th>
+        </tr></thead>
+        <tbody>${slice.map(_renderAgentRow).join("")}</tbody>
+      </table>
+    </div>`;
+
+  // Pager
+  const pagerEl = document.getElementById("agents-pager-wrap");
+  if (!pagerEl) return;
+  if (pages <= 1) { pagerEl.innerHTML = ""; return; }
+  const end = Math.min(_agPage * _AG_PER_PAGE, total);
+  pagerEl.innerHTML = `
+    <div class="signing-pager">
+      <button class="pager-btn" id="ag-pager-prev" ${_agPage <= 1 ? "disabled" : ""}>&#8592;</button>
+      <span class="pager-label">
+        <strong>${_agPage}</strong> of <strong>${pages}</strong>
+        <span class="pager-range">(${start + 1}–${end} of ${total})</span>
+      </span>
+      <button class="pager-btn" id="ag-pager-next" ${_agPage >= pages ? "disabled" : ""}>&#8594;</button>
+    </div>`;
+  document.getElementById("ag-pager-prev")?.addEventListener("click", () => { _agPage--; _renderAgPage(); });
+  document.getElementById("ag-pager-next")?.addEventListener("click", () => { _agPage++; _renderAgPage(); });
+}
+
+function _applyAgentSearch() {
+  _agPage = 1;
+  _buildAgFiltered();
+  _renderAgPage();
 }
 
 function _initAgentSearch() {
   const input = document.getElementById("agent-search");
-  const tags  = document.querySelectorAll(".search-tag");
+  const tags  = document.querySelectorAll("#agent-search-tags .search-tag");
   if (!input) return;
 
   input.addEventListener("input", _applyAgentSearch);
 
-  // Clear on Escape
   input.addEventListener("keydown", e => {
     if (e.key === "Escape") { input.value = ""; _applyAgentSearch(); input.blur(); }
   });
 
-  // Mode pills
   tags.forEach(tag => {
     tag.addEventListener("click", () => {
       tags.forEach(t => t.classList.remove("search-tag-active"));
@@ -667,40 +693,23 @@ function _initPrivacyToggles() {
 }
 
 async function loadAgentsTable() {
-  const el    = document.getElementById("agents-table");
-  const label = document.getElementById("agents-count-label");
+  const el = document.getElementById("agents-table");
   try {
     const data = await apiFetch("/pro/analytics/agents");
     _allAgents = data.agents || [];
 
-    label.textContent = `${_allAgents.length} agent${_allAgents.length !== 1 ? "s" : ""}`;
-
     if (!_allAgents.length) {
       el.innerHTML = '<div class="empty"><div class="empty-icon">🤖</div><p>No agents registered yet</p></div>';
+      document.getElementById("agents-count-label").textContent = "0 agents";
+      document.getElementById("agents-pager-wrap").innerHTML = "";
       return;
     }
 
-    el.innerHTML = `
-      <div style="overflow:auto;">
-        <table class="agents-table">
-          <thead><tr>
-            <th>Name</th>
-            <th>DID</th>
-            <th>Capabilities</th>
-            <th>Audit Events</th>
-            <th>Last Active</th>
-            <th>Registered</th>
-            <th>Visibility</th>
-            <th></th>
-          </tr></thead>
-          <tbody>${_allAgents.map(_renderAgentRow).join("")}</tbody>
-        </table>
-      </div>`;
+    _agPage = 1;
+    _buildAgFiltered();
+    _renderAgPage();
 
-    // Re-apply any pending search query (e.g. user typed before data loaded)
-    _applyAgentSearch();
-
-    // Initialise search + privacy controls once per load
+    // Init search and privacy controls once per full load
     _initAgentSearch();
     _initPrivacyToggles();
 
