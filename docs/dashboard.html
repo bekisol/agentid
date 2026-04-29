@@ -1028,6 +1028,7 @@
         <div class="modal-tab" data-tab="team-keys">Team Keys</div>
         <div class="modal-tab" data-tab="key-rotation">Key Rotation</div>
         <div class="modal-tab" data-tab="webhooks">Webhooks</div>
+        <div class="modal-tab" data-tab="sandbox">Sandbox</div>
       </div>
 
       <div class="modal-body">
@@ -1249,6 +1250,44 @@
               <div class="key-reveal-warning">⚠ The secret will not be shown again. Store it to verify incoming signatures.</div>
             </div>
           </div>
+        </div>
+
+        <!-- ── SANDBOX TAB ── -->
+        <div class="modal-panel" id="tab-sandbox" style="display:none;">
+          <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1.25rem;line-height:1.55;">
+            Sandbox mode gives you an isolated environment to test agent registration,
+            verification, and signing — with no rate limits, no webhooks fired, and a
+            separate agent table. Perfect for CI/CD pipelines and development.
+          </p>
+
+          <div id="sandbox-status-wrap" style="background:var(--surface2);border-radius:8px;padding:0.85rem 1rem;margin-bottom:1.25rem;font-size:0.83rem;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+              <span id="sandbox-status-dot" style="width:9px;height:9px;border-radius:50%;background:var(--muted);display:inline-block;"></span>
+              <span id="sandbox-status-text">Checking…</span>
+            </div>
+            <div id="sandbox-usage" style="margin-top:0.4rem;color:var(--muted);font-size:0.78rem;display:none;"></div>
+          </div>
+
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+            <button class="btn btn-outline" id="sandbox-enable-btn" style="font-size:0.82rem;">Enable sandbox mode</button>
+            <button class="btn btn-outline danger" id="sandbox-reset-btn" style="font-size:0.82rem;color:var(--red);border-color:var(--red);">Reset sandbox</button>
+          </div>
+
+          <div id="sandbox-msg" style="display:none;font-size:0.82rem;margin-bottom:1rem;padding:0.6rem 0.85rem;border-radius:8px;"></div>
+
+          <div style="background:var(--code-bg);border-radius:8px;padding:0.9rem 1rem;font-size:0.76rem;font-family:'JetBrains Mono',monospace;color:#D6D3D1;line-height:1.7;">
+            <div style="color:#9ca3af;margin-bottom:0.4rem;"># Sandbox quick-start (Python SDK)</div>
+            <div>client = <span style="color:#7dd3fc;">AgentIDClient</span>.sandbox(<span style="color:#86efac;">api_key=</span><span style="color:#fca5a5;">"ak_..."</span>)</div>
+            <div>result = client.agents.register(</div>
+            <div>&nbsp;&nbsp;name=<span style="color:#fca5a5;">"Test Agent"</span>,</div>
+            <div>&nbsp;&nbsp;capabilities=[<span style="color:#fca5a5;">"sign"</span>, <span style="color:#fca5a5;">"verify"</span>],</div>
+            <div>)</div>
+          </div>
+
+          <p style="font-size:0.77rem;color:var(--muted);margin-top:1rem;">
+            Sandbox agents use the <code style="background:var(--surface2);padding:0.1rem 0.3rem;border-radius:3px;">did:sandbox:</code> prefix and are completely
+            isolated from production. You can reset the sandbox at any time without affecting real agents.
+          </p>
         </div>
 
       </div><!-- /modal-body -->
@@ -1483,6 +1522,9 @@
       <button class="agent-action-btn pg-preset" data-method="GET" data-path="/pro/webhooks">Webhooks</button>
       <button class="agent-action-btn pg-preset" data-method="GET" data-path="/pro/audit-log?page=1&per_page=10">Audit log</button>
       <button class="agent-action-btn pg-preset" data-method="GET" data-path="/pro/anomalies">Anomalies</button>
+      <button class="agent-action-btn pg-preset" data-method="GET" data-path="/pro/groups">Groups</button>
+      <button class="agent-action-btn pg-preset" data-method="GET" data-path="/pro/sandbox/status">Sandbox</button>
+      <button class="agent-action-btn pg-preset" data-method="GET" data-path="/pro/integrity/seals">Integrity seals</button>
     </div>
     <div id="pg-response" style="padding:1rem 1.25rem;display:none;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">

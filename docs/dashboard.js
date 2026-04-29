@@ -1880,6 +1880,7 @@ function _switchSettingsTab(tab) {
   // Lazy-load heavy tabs only when opened
   if (tab === "key-rotation") _loadRotationAgentList();
   if (tab === "webhooks") { _initWebhookEventGrid(); _loadWebhooks(); }
+  if (tab === "sandbox") _loadSandboxStatus();
 }
 
 // ── EVENT LISTENERS ───────────────────────────────────────────────────────────
@@ -2494,6 +2495,57 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
       }
     }
   }, true);   // capture phase so it fires before the existing handler
+
+  // ── Sandbox ──────────────────────────────────────────────────────────────────
+
+  async function _loadSandboxStatus() {
+    const dot  = document.getElementById("sandbox-status-dot");
+    const text = document.getElementById("sandbox-status-text");
+    const usage = document.getElementById("sandbox-usage");
+    if (!dot) return;
+    try {
+      const data = await apiFetch("/pro/sandbox/status");
+      if (data.sandbox_mode) {
+        dot.style.background  = "var(--green, #22c55e)";
+        text.textContent = "Sandbox mode is ACTIVE";
+        usage.style.display = "block";
+        usage.textContent = `${data.agent_count} / ${data.agent_cap} agents used`;
+      } else {
+        dot.style.background = "var(--muted)";
+        text.textContent = "Sandbox mode is disabled";
+        usage.style.display = "none";
+      }
+    } catch(e) {
+      text.textContent = "Could not fetch sandbox status";
+    }
+  }
+
+  function _sbMsg(msg, ok = true) {
+    const el = document.getElementById("sandbox-msg");
+    if (!el) return;
+    el.textContent = msg;
+    el.style.background = ok ? "var(--green-bg, #dcfce7)" : "var(--red-bg, #fef2f2)";
+    el.style.color = ok ? "var(--green, #15803d)" : "var(--red)";
+    el.style.display = "block";
+    setTimeout(() => { el.style.display = "none"; }, 4000);
+  }
+
+  document.getElementById("sandbox-enable-btn")?.addEventListener("click", async () => {
+    try {
+      await apiFetch("/pro/sandbox/enable", { method: "POST" });
+      _sbMsg("Sandbox mode enabled! Use did:sandbox: prefix for test agents.");
+      await _loadSandboxStatus();
+    } catch(e) { _sbMsg(e.message, false); }
+  });
+
+  document.getElementById("sandbox-reset-btn")?.addEventListener("click", async () => {
+    if (!confirm("Reset sandbox? All sandbox agents and logs will be permanently deleted.")) return;
+    try {
+      const res = await apiFetch("/pro/sandbox/reset", { method: "POST" });
+      _sbMsg(`Sandbox reset — ${res.agents_deleted} agent${res.agents_deleted !== 1 ? "s" : ""} deleted.`);
+      await _loadSandboxStatus();
+    } catch(e) { _sbMsg(e.message, false); }
+  });
 
   // ── Agent Groups ─────────────────────────────────────────────────────────────
 
