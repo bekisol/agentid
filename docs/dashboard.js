@@ -656,39 +656,74 @@ function _initAgentSearch() {
   });
 }
 
+function _applyPrivacyResult(btn, newPrivate) {
+  btn.dataset.private  = String(newPrivate);
+  btn.title            = newPrivate ? "Private — click to make public" : "Public — click to make private";
+  btn.style.border     = `1px solid ${newPrivate ? "var(--yellow)" : "var(--border-dark)"}`;
+  btn.style.background = newPrivate ? "var(--yellow-bg)" : "var(--surface2)";
+  btn.style.color      = newPrivate ? "var(--yellow)" : "var(--muted)";
+  btn.textContent      = newPrivate ? "🔒 private" : "🌐 public";
+  btn.disabled         = false;
+}
+
+async function _doPrivacyChange(btn, did, newPrivate) {
+  btn.disabled = true;
+  btn.textContent = "…";
+  try {
+    const res = await fetch(
+      `${BASE}/agents/${encodeURIComponent(did)}/visibility?private=${newPrivate}`,
+      { method: "PATCH", headers: { "x-api-key": apiKey } }
+    );
+    if (!res.ok) throw new Error((await res.json()).detail || res.status);
+    _applyPrivacyResult(btn, newPrivate);
+  } catch (e) {
+    btn.textContent = "error";
+    setTimeout(() => { _applyPrivacyResult(btn, !newPrivate); }, 1500);
+  }
+}
+
 function _initPrivacyToggles() {
   const el = document.getElementById("agents-table");
   if (!el) return;
-  el.addEventListener("click", async (ev) => {
-    const btn = ev.target.closest(".privacy-toggle");
-    if (!btn) return;
-    const did        = btn.dataset.did;
-    const isPrivate  = btn.dataset.private === "true";
-    const newPrivate = !isPrivate;
-    btn.disabled = true;
-    btn.textContent = "…";
-    try {
-      const res = await fetch(
-        `${BASE}/agents/${encodeURIComponent(did)}/visibility?private=${newPrivate}`,
-        { method: "PATCH", headers: { "x-api-key": apiKey } }
-      );
-      if (!res.ok) throw new Error((await res.json()).detail || res.status);
-      // Update button in place without full reload
-      btn.dataset.private = String(newPrivate);
-      btn.title     = newPrivate ? "Private — click to make public" : "Public — click to make private";
-      btn.style.border     = `1px solid ${newPrivate ? "var(--yellow)" : "var(--border-dark)"}`;
-      btn.style.background = newPrivate ? "var(--yellow-bg)" : "var(--surface2)";
-      btn.style.color      = newPrivate ? "var(--yellow)" : "var(--muted)";
-      btn.textContent      = newPrivate ? "🔒 private" : "🌐 public";
-    } catch (e) {
-      btn.textContent = "error";
-      setTimeout(() => {
-        btn.textContent = isPrivate ? "🔒 private" : "🌐 public";
-        btn.disabled = false;
-      }, 1500);
+  el.addEventListener("click", (ev) => {
+    // Confirm step: clicking "Make public?" confirm button
+    const confirmBtn = ev.target.closest(".privacy-confirm-yes");
+    if (confirmBtn) {
+      const did = confirmBtn.dataset.did;
+      const cell = confirmBtn.closest("td");
+      // Find or reconstruct the original button to reuse styling logic
+      const wrapper = confirmBtn.closest(".privacy-confirm-wrap");
+      const btn = wrapper?._origBtn;
+      if (btn) { cell.replaceChild(btn, wrapper); _doPrivacyChange(btn, did, false); }
       return;
     }
-    btn.disabled = false;
+
+    // Cancel step
+    const cancelBtn = ev.target.closest(".privacy-confirm-no");
+    if (cancelBtn) {
+      const wrapper = cancelBtn.closest(".privacy-confirm-wrap");
+      const btn = wrapper?._origBtn;
+      if (btn) cancelBtn.closest("td").replaceChild(btn, wrapper);
+      return;
+    }
+
+    // Initial toggle click
+    const btn = ev.target.closest(".privacy-toggle");
+    if (!btn) return;
+    const did       = btn.dataset.did;
+    const isPrivate = btn.dataset.private === "true";
+
+    if (isPrivate) {
+      // private → public: show inline confirm
+      const wrapper = document.createElement("span");
+      wrapper.className = "privacy-confirm-wrap";
+      wrapper._origBtn  = btn;
+      wrapper.innerHTML = `<span style="font-size:0.72rem;color:var(--text-2);font-weight:500;margin-right:0.25rem;">Make public?</span><button class="privacy-confirm-yes" data-did="${esc(did)}" style="font-size:0.72rem;padding:0.1rem 0.45rem;border-radius:4px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);cursor:pointer;margin-right:0.2rem;font-family:inherit;">Yes</button><button class="privacy-confirm-no" style="font-size:0.72rem;padding:0.1rem 0.45rem;border-radius:4px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;">Cancel</button>`;
+      btn.parentNode.replaceChild(wrapper, btn);
+    } else {
+      // public → private: no confirmation needed
+      _doPrivacyChange(btn, did, true);
+    }
   });
 }
 
