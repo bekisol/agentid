@@ -659,6 +659,9 @@ async function loadDashboard() {
   loadBadge(data.owner);
   loadAgentsTable();
 
+  // Trust scores — always attempt; the widget hides itself if the API returns nothing
+  _loadTrustScoreWidget();
+
   // Pro-only loaders — free tier sees locked overlays instead
   if (isPro()) {
     try { renderCharts(data); } catch (e) { console.warn("Charts:", e); }
@@ -668,7 +671,6 @@ async function loadDashboard() {
     loadDiscoveryStats();
     loadAnomalies();
     _loadGroups();
-    _loadTrustScoreWidget();
     loadPeerBenchmarks();
 
     // Start real-time SSE feed (or restart if already running)
@@ -4947,7 +4949,10 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
 
     try {
       const data = await apiFetch("/pro/trust-scores");
-      if (!data || !data.agents || data.agents.length === 0) return;
+      if (!data || !data.agents || data.agents.length === 0) {
+        card.style.display = "none";
+        return;
+      }
 
       card.style.display = "";
 
