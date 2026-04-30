@@ -1701,6 +1701,42 @@
       line-height: 1.55;
       margin: 0 0 0.6rem 0;
     }
+    .welcome-choices {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .welcome-choice {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+      text-align: left;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 0.95rem 1.1rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.12s, background 0.12s, transform 0.05s;
+    }
+    .welcome-choice:hover {
+      border-color: var(--accent);
+      background: var(--accent-light, var(--surface));
+    }
+    .welcome-choice:active { transform: translateY(1px); }
+    .welcome-choice-icon { font-size: 1.2rem; }
+    .welcome-choice-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+    .welcome-choice-sub {
+      font-size: 0.78rem;
+      color: var(--text-2);
+      line-height: 1.45;
+    }
+
     .welcome-key-row {
       display: flex;
       gap: 0.5rem;
@@ -3263,29 +3299,49 @@ curl https://api.agentid-protocol.com/agents \
   </div>
 </div>
 
-<!-- ── WELCOME MODAL (first sign-in) ──────────────────────────────────────── -->
+<!-- ── WELCOME MODAL (first sign-in — choose your path) ─────────────────────── -->
 <div id="welcome-modal" class="welcome-modal">
   <div class="welcome-panel">
     <div class="welcome-head">
       <div class="welcome-icon">🎉</div>
       <h2>Welcome to AgentID</h2>
-      <p id="welcome-subtitle">Your account is ready. Here's everything you need to start signing your first agent.</p>
+      <p id="welcome-subtitle">Your account is ready. How would you like to start?</p>
     </div>
 
-    <div class="welcome-section">
-      <div class="welcome-section-title">Your API key</div>
+    <!-- ── STEP 1: choose path ──────────────────────────────────────── -->
+    <div id="welcome-step-choose" class="welcome-section">
+      <div class="welcome-choices">
+        <button class="welcome-choice" data-welcome-choice="generate">
+          <span class="welcome-choice-icon">🔑</span>
+          <span class="welcome-choice-title">Generate a starter API key</span>
+          <span class="welcome-choice-sub">We'll mint a key for you and show it once. Recommended for new users.</span>
+        </button>
+        <button class="welcome-choice" data-welcome-choice="existing">
+          <span class="welcome-choice-icon">🔁</span>
+          <span class="welcome-choice-title">I already have an API key</span>
+          <span class="welcome-choice-sub">Skip key creation. Use your existing key directly with the SDK.</span>
+        </button>
+        <button class="welcome-choice" data-welcome-choice="skip">
+          <span class="welcome-choice-icon">⏭</span>
+          <span class="welcome-choice-title">I'll create keys later</span>
+          <span class="welcome-choice-sub">Mint keys yourself any time in <em>Settings → API Keys</em>.</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── STEP 2a: starter key created ─────────────────────────────── -->
+    <div id="welcome-step-key" class="welcome-section" style="display:none;">
+      <div class="welcome-section-title">Your new API key</div>
       <p class="welcome-section-desc">
-        We've generated a starter key for you. <strong>Copy it now</strong> — it won't be shown in full again.
-        You can mint, label, or revoke more keys any time in <em>Settings → API Keys</em>.
+        <strong>Copy it now</strong> — the full value won't be shown again.
+        You can revoke or mint more in <em>Settings → API Keys</em>.
       </p>
       <div class="welcome-key-row">
         <code id="welcome-key-value" class="welcome-key">—</code>
         <button id="welcome-copy-key" class="btn btn-primary" style="white-space:nowrap;">📋 Copy</button>
       </div>
-    </div>
 
-    <div class="welcome-section">
-      <div class="welcome-section-title">Use it in your code</div>
+      <div class="welcome-section-title" style="margin-top:1.25rem;">Use it in your code</div>
       <div class="welcome-tabs">
         <button class="welcome-tab active" data-welcome-lang="python">Python</button>
         <button class="welcome-tab" data-welcome-lang="node">Node</button>
@@ -3321,7 +3377,37 @@ fmt.Println(agent.DID)</code></pre>
       <button id="welcome-copy-snippet" class="btn btn-outline" style="margin-top:0.65rem;font-size:0.78rem;">📋 Copy snippet</button>
     </div>
 
-    <div class="welcome-section welcome-links">
+    <!-- ── STEP 2b: existing key chosen ─────────────────────────────── -->
+    <div id="welcome-step-existing" class="welcome-section" style="display:none;">
+      <div class="welcome-section-title">Use your existing key</div>
+      <p class="welcome-section-desc">
+        Drop your existing <code>agentid_…</code> key into the SDK directly.
+        It will work with this account as long as the key's <em>owner</em>
+        field matches your signed-in email
+        (<strong id="welcome-existing-owner">your email</strong>).
+        If your key was minted for a different owner, that's a separate
+        account — you can still sign into the dashboard via the
+        <em>API key</em> tab on the login page.
+      </p>
+      <div class="welcome-tabs">
+        <button class="welcome-tab active" data-welcome-elang="python">Python</button>
+        <button class="welcome-tab" data-welcome-elang="node">Node</button>
+        <button class="welcome-tab" data-welcome-elang="curl">curl</button>
+      </div>
+      <pre class="welcome-code" data-welcome-epanel="python"><code># pip install agentid-sdk
+from agentid_sdk import AgentIDClient
+
+client = AgentIDClient(api_key="YOUR_EXISTING_KEY")   # paste your key here
+agent  = client.agents.create(name="hello", capabilities=["chat"])</code></pre>
+      <pre class="welcome-code" data-welcome-epanel="node" style="display:none;"><code>// npm install @agentid/sdk
+import { AgentIDClient } from "@agentid/sdk";
+const client = new AgentIDClient({ apiKey: "YOUR_EXISTING_KEY" });</code></pre>
+      <pre class="welcome-code" data-welcome-epanel="curl" style="display:none;"><code>curl https://api.agentid-protocol.com/pro/keys/me \
+  -H "x-api-key: YOUR_EXISTING_KEY"</code></pre>
+    </div>
+
+    <!-- ── Footer (varies per step) ─────────────────────────────────── -->
+    <div class="welcome-section welcome-links" id="welcome-links" style="display:none;">
       <a href="docs/" target="_blank" class="welcome-link-card">
         <strong>Read the docs →</strong>
         <span>Quickstart, full reference, tier features</span>
@@ -3332,8 +3418,10 @@ fmt.Println(agent.DID)</code></pre>
       </a>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;gap:0.55rem;margin-top:1.1rem;">
-      <button class="btn btn-outline" id="welcome-dismiss" style="font-size:0.86rem;">I've copied the key — close</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:0.55rem;margin-top:1.1rem;">
+      <button class="btn btn-ghost" id="welcome-back" style="font-size:0.78rem;display:none;">← Back</button>
+      <span style="flex:1;"></span>
+      <button class="btn btn-outline" id="welcome-dismiss" style="font-size:0.86rem;display:none;">Close</button>
     </div>
   </div>
 </div>
@@ -3385,7 +3473,7 @@ fmt.Println(agent.DID)</code></pre>
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260430-7"></script>
+<script src="dashboard.js?v=20260430-8"></script>
 
 </body>
 </html>

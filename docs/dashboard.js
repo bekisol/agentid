@@ -3378,85 +3378,147 @@ function _initNotifications() {
   }, 60000);
 }
 
-// ── WELCOME MODAL — first-run API key handoff ──────────────────────────────
+// ── WELCOME MODAL — first-run choose-your-path ──────────────────────────────
 
 async function _maybeShowWelcome() {
-  // Only run for session-mode users (Google/email signup); apikey-mode users
-  // already have a key by definition.
   if (authMode !== "session") return;
-  // Skip if we've already shown it for this user (deduped by email).
-  const me = sessionStorage.getItem("agentid_welcome_seen_for");
   const currentEmail = document.getElementById("dash-title")?.textContent || "";
-  if (me === currentEmail) return;
+  if (sessionStorage.getItem("agentid_welcome_seen_for") === currentEmail) return;
 
   let r;
   try { r = await apiFetch("/auth/welcome"); }
   catch (_) { return; }
-  if (!r || !r.is_new || !r.key) {
-    // Mark seen so we don't keep re-checking
+  // If account already has keys, skip the welcome entirely
+  if (!r || r.has_key) {
     sessionStorage.setItem("agentid_welcome_seen_for", currentEmail);
     return;
   }
-
-  _showWelcomeModal(r.key, r);
+  _showWelcomeChoose(r);
   sessionStorage.setItem("agentid_welcome_seen_for", currentEmail);
 }
 
-function _showWelcomeModal(key, info) {
+function _welcomeShowStep(name) {
   const modal = document.getElementById("welcome-modal");
-  if (!modal) return;
-  document.getElementById("welcome-key-value").textContent = key;
+  modal.querySelector("#welcome-step-choose").style.display   = name === "choose"   ? "" : "none";
+  modal.querySelector("#welcome-step-key").style.display      = name === "key"      ? "" : "none";
+  modal.querySelector("#welcome-step-existing").style.display = name === "existing" ? "" : "none";
+  modal.querySelector("#welcome-links").style.display = (name === "key" || name === "existing") ? "" : "none";
+  modal.querySelector("#welcome-back").style.display    = name === "choose" ? "none" : "";
+  modal.querySelector("#welcome-dismiss").style.display = name === "choose" ? "none" : "";
+
+  // Step-specific subtitle
   const sub = document.getElementById("welcome-subtitle");
   if (sub) {
-    sub.innerHTML = `Signed in as <strong>${esc(info.owner)}</strong> on the <strong>${esc(info.tier)}</strong> tier. Your starter key is below.`;
+    if (name === "choose")        sub.textContent = "Your account is ready. How would you like to start?";
+    else if (name === "key")      sub.textContent = "Here's your starter API key + a copy-paste snippet.";
+    else if (name === "existing") sub.textContent = "Use your existing API key directly with the SDK.";
+  }
+}
+
+function _showWelcomeChoose(info) {
+  const modal = document.getElementById("welcome-modal");
+  if (!modal) return;
+
+  // Subtitle with email + tier
+  const sub = document.getElementById("welcome-subtitle");
+  if (sub) {
+    sub.innerHTML = `Signed in as <strong>${esc(info.owner)}</strong> on the <strong>${esc(info.tier)}</strong> tier. How would you like to start?`;
   }
 
-  // Inject the key into every code snippet
-  ["python", "node", "curl", "go"].forEach(lang => {
-    const el = document.getElementById("welcome-snippet-" + lang);
-    if (el) el.textContent = el.textContent.replace(/YOUR_KEY/g, key);
-  });
-
-  modal.classList.add("open");
-
-  // Tab switching
-  modal.querySelectorAll(".welcome-tab").forEach(t => {
-    t.onclick = () => {
-      const lang = t.getAttribute("data-welcome-lang");
-      modal.querySelectorAll(".welcome-tab").forEach(x => x.classList.toggle("active", x === t));
-      modal.querySelectorAll(".welcome-code").forEach(c =>
-        c.style.display = c.getAttribute("data-welcome-panel") === lang ? "" : "none");
+  // Wire choice buttons
+  modal.querySelectorAll("[data-welcome-choice]").forEach(btn => {
+    btn.onclick = async () => {
+      const choice = btn.getAttribute("data-welcome-choice");
+      if (choice === "generate") return _welcomeGenerate(info);
+      if (choice === "existing") return _welcomeShowExisting(info);
+      if (choice === "skip")     return _closeWelcome();
     };
   });
 
-  // Copy key
-  document.getElementById("welcome-copy-key").onclick = () => {
-    navigator.clipboard.writeText(key).catch(()=>{});
-    const btn = document.getElementById("welcome-copy-key");
-    btn.textContent = "✓ Copied";
-    setTimeout(() => { btn.textContent = "📋 Copy"; }, 1500);
-  };
-
-  // Copy snippet
-  document.getElementById("welcome-copy-snippet").onclick = () => {
-    const visible = modal.querySelector(".welcome-code:not([style*='display: none'])");
-    if (!visible) return;
-    navigator.clipboard.writeText(visible.textContent).catch(()=>{});
-    const btn = document.getElementById("welcome-copy-snippet");
-    btn.textContent = "✓ Copied";
-    setTimeout(() => { btn.textContent = "📋 Copy snippet"; }, 1500);
-  };
-
-  // CTA: register agent
+  // Wire footer buttons
+  document.getElementById("welcome-back").onclick    = () => _welcomeShowStep("choose");
+  document.getElementById("welcome-dismiss").onclick = () => _closeWelcome();
   document.getElementById("welcome-register-cta").onclick = (e) => {
     e.preventDefault();
-    modal.classList.remove("open");
+    _closeWelcome();
     document.getElementById("register-agent-btn")?.click();
   };
 
-  document.getElementById("welcome-dismiss").onclick = () => {
-    modal.classList.remove("open");
+  _welcomeShowStep("choose");
+  modal.classList.add("open");
+}
+
+async function _welcomeGenerate(info) {
+  const choice = document.querySelector('[data-welcome-choice="generate"]');
+  if (choice) {
+    choice.disabled = true;
+    choice.querySelector(".welcome-choice-title").textContent = "Generating…";
+  }
+  let resp;
+  try {
+    resp = await apiFetch("/auth/welcome/generate", {
+      method: "POST",
+      body: JSON.stringify({ label: "starter" }),
+    });
+  } catch (e) {
+    alert("Could not generate key: " + (e.message || ""));
+    if (choice) {
+      choice.disabled = false;
+      choice.querySelector(".welcome-choice-title").textContent = "Generate a starter API key";
+    }
+    return;
+  }
+  // Show key in step 2a
+  document.getElementById("welcome-key-value").textContent = resp.key;
+  ["python", "node", "curl", "go"].forEach(lang => {
+    const el = document.getElementById("welcome-snippet-" + lang);
+    if (el) el.textContent = el.textContent.replace(/YOUR_KEY/g, resp.key);
+  });
+
+  const modal = document.getElementById("welcome-modal");
+  modal.querySelectorAll("[data-welcome-lang]").forEach(t => {
+    t.onclick = () => {
+      const lang = t.getAttribute("data-welcome-lang");
+      modal.querySelectorAll("[data-welcome-lang]").forEach(x => x.classList.toggle("active", x === t));
+      modal.querySelectorAll("[data-welcome-panel]").forEach(c =>
+        c.style.display = c.getAttribute("data-welcome-panel") === lang ? "" : "none");
+    };
+  });
+  document.getElementById("welcome-copy-key").onclick = () => {
+    navigator.clipboard.writeText(resp.key).catch(()=>{});
+    const b = document.getElementById("welcome-copy-key");
+    b.textContent = "✓ Copied";
+    setTimeout(() => { b.textContent = "📋 Copy"; }, 1500);
   };
+  document.getElementById("welcome-copy-snippet").onclick = () => {
+    const visible = modal.querySelector("[data-welcome-panel]:not([style*='display: none'])");
+    if (!visible) return;
+    navigator.clipboard.writeText(visible.textContent).catch(()=>{});
+    const b = document.getElementById("welcome-copy-snippet");
+    b.textContent = "✓ Copied";
+    setTimeout(() => { b.textContent = "📋 Copy snippet"; }, 1500);
+  };
+  _welcomeShowStep("key");
+}
+
+function _welcomeShowExisting(info) {
+  const owner = document.getElementById("welcome-existing-owner");
+  if (owner) owner.textContent = info.owner || "your email";
+  const modal = document.getElementById("welcome-modal");
+  // Wire its own tab switcher (separate panel)
+  modal.querySelectorAll("[data-welcome-elang]").forEach(t => {
+    t.onclick = () => {
+      const lang = t.getAttribute("data-welcome-elang");
+      modal.querySelectorAll("[data-welcome-elang]").forEach(x => x.classList.toggle("active", x === t));
+      modal.querySelectorAll("[data-welcome-epanel]").forEach(c =>
+        c.style.display = c.getAttribute("data-welcome-epanel") === lang ? "" : "none");
+    };
+  });
+  _welcomeShowStep("existing");
+}
+
+function _closeWelcome() {
+  document.getElementById("welcome-modal")?.classList.remove("open");
 }
 
 // ── THEME TOGGLE (light / dark / auto) ───────────────────────────────────────
