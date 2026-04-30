@@ -2619,21 +2619,104 @@ curl https://api.agentid-protocol.com/agents \
 
         <!-- ── ACCOUNT TAB ── -->
         <div class="modal-panel active" id="tab-account">
-          <div id="account-info-rows">
-            <div class="info-row"><span class="info-key">Loading…</span></div>
+
+          <!-- Profile card -->
+          <div id="account-profile-card" style="display:flex;align-items:center;gap:1rem;padding:0.85rem 1rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:1.1rem;">
+            <div id="account-avatar" style="width:42px;height:42px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;flex-shrink:0;">?</div>
+            <div style="flex:1;min-width:0;">
+              <div id="account-email-display" style="font-weight:600;font-size:0.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Loading…</div>
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.25rem;">
+                <span id="account-tier-badge" style="font-size:0.7rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:99px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent-border);">—</span>
+                <span id="account-auth-kind" style="font-size:0.72rem;color:var(--muted);"></span>
+              </div>
+            </div>
           </div>
 
-          <hr class="settings-divider">
-
-          <div class="settings-field">
-            <label class="settings-label" for="allowlist-input">IP Allowlist</label>
-            <textarea id="allowlist-input" class="settings-input"
-              rows="2" placeholder="e.g. 203.0.113.0/24, 192.168.1.10  (leave blank = unrestricted)"
-              spellcheck="false"></textarea>
-            <p class="settings-hint">Comma-separated IPs or CIDR ranges. Requests from other IPs will be rejected. Leave blank to remove all restrictions.</p>
-            <div id="allowlist-msg" class="modal-msg"></div>
+          <!-- Usage -->
+          <div class="modal-section" id="account-usage-section" style="display:none;">
+            <div class="modal-section-title">Usage this period</div>
+            <div id="account-usage-rows" style="display:flex;flex-direction:column;gap:0.65rem;"></div>
           </div>
-          <button class="btn btn-primary" id="allowlist-save-btn" style="margin-top:0.25rem;">Save Allowlist</button>
+
+          <!-- Appearance -->
+          <div class="modal-section">
+            <div class="modal-section-title">Appearance</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Theme</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Controls the dashboard colour scheme</div>
+              </div>
+              <div style="display:flex;gap:0.4rem;">
+                <button class="btn btn-outline theme-opt-btn" data-theme-val="light" style="font-size:0.75rem;padding:0.25rem 0.7rem;">Light</button>
+                <button class="btn btn-outline theme-opt-btn" data-theme-val="dark"  style="font-size:0.75rem;padding:0.25rem 0.7rem;">Dark</button>
+                <button class="btn btn-outline theme-opt-btn" data-theme-val="auto"  style="font-size:0.75rem;padding:0.25rem 0.7rem;">Auto</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="modal-section">
+            <div class="modal-section-title">Security</div>
+
+            <!-- Change password (session users only) -->
+            <div id="change-pw-section">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+                <div style="font-size:0.84rem;font-weight:500;">Password</div>
+                <button class="btn btn-outline" id="change-pw-toggle-btn" style="font-size:0.75rem;padding:0.25rem 0.7rem;">Change</button>
+              </div>
+              <div id="change-pw-form" style="display:none;margin-bottom:0.75rem;">
+                <input id="change-pw-current" class="settings-input" type="password" placeholder="Current password" autocomplete="current-password" style="margin-bottom:0.4rem;" />
+                <input id="change-pw-new"     class="settings-input" type="password" placeholder="New password (8+ chars)" autocomplete="new-password" style="margin-bottom:0.4rem;" />
+                <input id="change-pw-confirm" class="settings-input" type="password" placeholder="Confirm new password" autocomplete="new-password" />
+                <div id="change-pw-msg" class="modal-msg" style="margin-top:0.4rem;"></div>
+                <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+                  <button class="btn btn-primary" id="change-pw-save-btn" style="font-size:0.8rem;">Update password</button>
+                  <button class="btn btn-outline" id="change-pw-cancel-btn" style="font-size:0.8rem;">Cancel</button>
+                </div>
+              </div>
+            </div>
+
+            <hr class="settings-divider" style="margin:0.6rem 0;" />
+
+            <!-- IP allowlist -->
+            <div style="margin-bottom:0.5rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
+                <div>
+                  <div style="font-size:0.84rem;font-weight:500;">IP Allowlist</div>
+                  <div style="font-size:0.75rem;color:var(--muted);">Restrict API key usage to these IPs / CIDRs</div>
+                </div>
+              </div>
+              <textarea id="allowlist-input" class="settings-input" rows="2"
+                placeholder="203.0.113.0/24, 192.168.1.10  — leave blank for unrestricted"
+                spellcheck="false"></textarea>
+              <div id="allowlist-msg" class="modal-msg"></div>
+              <button class="btn btn-primary" id="allowlist-save-btn" style="margin-top:0.4rem;font-size:0.82rem;">Save allowlist</button>
+            </div>
+
+            <hr class="settings-divider" style="margin:0.6rem 0;" />
+
+            <!-- Sign out everywhere -->
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Sessions</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Sign out of every device and browser</div>
+              </div>
+              <button class="btn btn-outline" id="signout-all-btn" style="font-size:0.75rem;padding:0.25rem 0.7rem;color:var(--red);border-color:var(--red);">Sign out everywhere</button>
+            </div>
+          </div>
+
+          <!-- Danger zone -->
+          <div class="modal-section">
+            <div class="modal-section-title" style="color:var(--red);">Danger zone</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Delete account</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Permanently removes your account and all agents</div>
+              </div>
+              <button class="btn btn-outline" id="delete-account-btn" style="font-size:0.75rem;padding:0.25rem 0.7rem;color:var(--red);border-color:var(--red);">Delete account</button>
+            </div>
+          </div>
+
         </div>
 
         <!-- ── API KEYS TAB ── -->
@@ -3596,7 +3679,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260430-12"></script>
+<script src="dashboard.js?v=20260430-13"></script>
 
 </body>
 </html>

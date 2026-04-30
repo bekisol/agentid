@@ -2337,30 +2337,78 @@ function _modalMsgClear(id) {
 // ── Account tab ───────────────────────────────────────────────────────────────
 
 async function _loadAccountInfo() {
-  const wrap = document.getElementById("account-info-rows");
-  if (!wrap) return;
   try {
-    const data = await apiFetch("/pro/keys/me");
-    const rows = [
-      ["Owner",       esc(data.owner),      false],
-      ["Tier",        esc(data.tier),        false],
-      ["Label",       esc(data.label || "—"), false],
-      ["Created",     esc(String(data.created_at || "—").slice(0, 10)), false],
-      ["Scopes",      data.scopes ? esc(data.scopes) : "full access", false],
-      ["IP Allowlist",data.allowed_ips ? esc(data.allowed_ips) : "unrestricted", true],
-    ];
-    wrap.innerHTML = rows.map(([k, v, mono]) =>
-      `<div class="info-row">
-        <span class="info-key">${k}</span>
-        <span class="info-val${mono ? " mono" : ""}">${v}</span>
-       </div>`
-    ).join("");
+    // Fetch both key info and session/me info in parallel
+    const [keyData, meData] = await Promise.allSettled([
+      apiFetch("/pro/keys/me"),
+      apiFetch("/auth/me"),
+    ]);
+    const key = keyData.status === "fulfilled" ? keyData.value : null;
+    const me  = meData.status  === "fulfilled" ? meData.value  : null;
 
-    // Pre-fill allowlist textarea
+    const email = me?.email || key?.owner || "—";
+    const tier  = me?.tier  || key?.tier  || "free";
+    const authKind = me?.auth_kind || (key ? "api-key" : "unknown");
+
+    // Avatar initials
+    const avatar = document.getElementById("account-avatar");
+    if (avatar) avatar.textContent = email.slice(0, 1).toUpperCase();
+
+    // Email
+    const emailEl = document.getElementById("account-email-display");
+    if (emailEl) emailEl.textContent = email;
+
+    // Tier badge
+    const tierBadge = document.getElementById("account-tier-badge");
+    if (tierBadge) {
+      const tierColors = { enterprise: "#059669", pro: "#2563EB", free: "#78716C" };
+      const tierLabels = { enterprise: "Enterprise ✓", pro: "Pro ✓", free: "Free" };
+      tierBadge.textContent = tierLabels[tier] || tier;
+      tierBadge.style.background = "transparent";
+      tierBadge.style.color  = tierColors[tier] || "var(--muted)";
+      tierBadge.style.border = `1px solid ${tierColors[tier] || "var(--border)"}`;
+    }
+
+    // Auth kind
+    const authEl = document.getElementById("account-auth-kind");
+    if (authEl) authEl.textContent = authKind === "session" ? "signed in with " + (me?.email?.includes("@") ? "email / OAuth" : "OAuth") : "API key";
+
+    // Show/hide change-password section (only for session auth)
+    const changePwSection = document.getElementById("change-pw-section");
+    if (changePwSection) changePwSection.style.display = authKind === "session" ? "block" : "none";
+
+    // Pre-fill allowlist
     const ta = document.getElementById("allowlist-input");
-    if (ta) ta.value = data.allowed_ips || "";
-  } catch {
-    wrap.innerHTML = `<div class="info-row"><span class="info-key" style="color:var(--red);">Could not load key info</span></div>`;
+    if (ta && key?.allowed_ips) ta.value = key.allowed_ips;
+
+    // Usage section — fetch agent count
+    try {
+      const agents = await apiFetch("/agents?limit=1");
+      const total  = agents?.total ?? agents?.length ?? null;
+      const tierLimits = { free: 100, pro: 10000, enterprise: null };
+      const max = tierLimits[tier];
+      const usageSection = document.getElementById("account-usage-section");
+      const usageRows    = document.getElementById("account-usage-rows");
+      if (usageSection && usageRows && total !== null) {
+        usageSection.style.display = "block";
+        const pct = max ? Math.min(100, Math.round(100 * total / max)) : 0;
+        usageRows.innerHTML = `
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.3rem;">
+              <span>Agents registered</span>
+              <span style="font-weight:600;">${total}${max ? " / " + max : " / unlimited"}</span>
+            </div>
+            <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${pct > 80 ? "var(--red)" : "var(--accent)"};border-radius:99px;transition:width 0.4s;"></div>
+            </div>
+            ${max && pct > 80 ? '<div style="font-size:0.72rem;color:var(--red);margin-top:0.2rem;">Approaching limit — consider upgrading</div>' : ""}
+          </div>`;
+      }
+    } catch (_) {}
+
+  } catch (err) {
+    const emailEl = document.getElementById("account-email-display");
+    if (emailEl) emailEl.textContent = "Could not load account info";
   }
 }
 
@@ -2838,73 +2886,108 @@ function _adTabOverview(d) {
   const t = d.trust;
   const totalSign = s.sign_valid + s.sign_invalid;
   const failPct   = totalSign > 0 ? Math.round(100 * s.sign_invalid / totalSign) : 0;
-  const sevPill   = t.compromised
-    ? `<span class="status-pill status-pill-bad">⚠ ${esc(t.severity || "compromised")} · ${t.report_count} report${t.report_count !== 1 ? 's' : ''}</span>`
-    : '<span class="status-pill status-pill-good">✓ trusted</span>';
-  const deprPill  = d.deprecation
-    ? `<span class="status-pill status-pill-warn">deprecated</span>`
-    : '';
+
+  // Status line — most important thing first
+  const statusParts = [];
+  if (t.compromised)
+    statusParts.push(`<span class="status-pill status-pill-bad">⚠ ${esc(t.severity || "compromised")}</span>`);
+  else
+    statusParts.push('<span class="status-pill status-pill-good">✓ trusted</span>');
+  if (d.deprecation)
+    statusParts.push('<span class="status-pill status-pill-warn">deprecated</span>');
+  statusParts.push(a.private
+    ? '<span class="status-pill status-pill-warn">private</span>'
+    : '<span class="status-pill status-pill-good">public</span>');
+
+  // Mini activity feed — last 3 events
+  const recentEvents = (d.activity || []).slice(0, 3);
+  const miniActivity = recentEvents.length
+    ? recentEvents.map(e => {
+        const pill = e.status === "valid"
+          ? '<span class="status-pill status-pill-good" style="font-size:0.65rem;padding:0.1rem 0.4rem;">valid</span>'
+          : '<span class="status-pill status-pill-bad"  style="font-size:0.65rem;padding:0.1rem 0.4rem;">invalid</span>';
+        const who = e.is_self_signer
+          ? (e.verifier_name || (e.verifier_did ? e.verifier_did.slice(-8) : "external"))
+          : (e.signer_name   || (e.signer_did   ? e.signer_did.slice(-8)   : "external"));
+        const arrow = e.is_self_signer ? "signed →" : "verified by ←";
+        return `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.78rem;">
+          ${pill}
+          <span style="color:var(--muted);flex:1;">${esc(arrow)} <strong style="color:var(--text-2);">${esc(who)}</strong></span>
+          <span style="color:var(--muted);font-size:0.72rem;white-space:nowrap;">${esc(_relativeTime(e.ts))}</span>
+        </div>`;
+      }).join("")
+    : `<div style="color:var(--muted);font-size:0.78rem;padding:0.5rem 0;">No activity yet — sign or verify a message to see it here.</div>`;
+
   return `
-    <!-- Stats grid -->
-    <div class="ad-stats-grid">
-      <div class="ad-stat">
-        <div class="ad-stat-num">${s.sign_valid + s.sign_invalid}</div>
-        <div class="ad-stat-lbl">Verifies signed</div>
-        <div class="ad-stat-sub">${s.sign_valid} valid · ${s.sign_invalid} invalid</div>
+    <!-- Identity header -->
+    <div class="ad-section" style="padding-bottom:0;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;margin-bottom:0.55rem;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:1rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(a.name)}</div>
+          <div style="font-size:0.7rem;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0.15rem;">${esc(a.did)}</div>
+        </div>
+        <div style="display:flex;gap:0.35rem;flex-wrap:wrap;flex-shrink:0;">${statusParts.join("")}</div>
       </div>
-      <div class="ad-stat">
-        <div class="ad-stat-num">${s.verif_valid + s.verif_invalid}</div>
-        <div class="ad-stat-lbl">Times verified</div>
-        <div class="ad-stat-sub">${s.verif_valid} ok · ${s.verif_invalid} failed</div>
+
+      <!-- Capabilities -->
+      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.55rem;">
+        ${(a.capabilities||[]).map(c => `<span class="op-pill op-pill-other">${esc(c)}</span>`).join("") || '<span style="color:var(--muted);font-size:0.78rem;">no capabilities</span>'}
+        ${(d.tags||[]).map(tg => `<span class="status-pill status-pill-info">${esc(tg)}</span>`).join("")}
       </div>
-      <div class="ad-stat">
-        <div class="ad-stat-num">${failPct}%</div>
-        <div class="ad-stat-lbl">Invalid rate</div>
-        <div class="ad-stat-sub" style="color:${failPct > 20 ? 'var(--red)' : 'var(--muted)'}">${failPct > 20 ? "above network avg" : "in expected range"}</div>
-      </div>
-      <div class="ad-stat">
-        <div class="ad-stat-num">${s.sign_24h}</div>
-        <div class="ad-stat-lbl">Signed in 24h</div>
-        <div class="ad-stat-sub">${s.last_seen ? "last seen " + esc(_relativeTime(s.last_seen)) : "no activity yet"}</div>
+
+      <div style="font-size:0.75rem;color:var(--muted);">
+        Created ${esc(_relativeTime(a.created_at) || a.created_at || "—")}
+        ${s.last_seen ? " · last active " + esc(_relativeTime(s.last_seen)) : " · never active"}
       </div>
     </div>
 
-    <div class="ad-section">
-      <h4>Identity</h4>
-      <div class="ad-kv">
-        <span class="k">Name</span><span class="v">${esc(a.name)}</span>
-        <span class="k">Owner</span><span class="v">${esc(a.owner)}</span>
-        <span class="k">Visibility</span><span class="v">${a.private ? '<span class="status-pill status-pill-warn">private</span>' : '<span class="status-pill status-pill-good">public</span>'}</span>
-        <span class="k">Created</span><span class="v">${esc(a.created_at || "—")} <span style="color:var(--muted);">· ${esc(_relativeTime(a.created_at))}</span></span>
-        <span class="k">Capabilities</span><span class="v">${(a.capabilities||[]).map(c => '<span class="op-pill op-pill-other" style="margin-right:0.3rem;">'+esc(c)+'</span>').join("") || '<span style="color:var(--muted);">none</span>'}</span>
-        <span class="k">Tags</span><span class="v">${(d.tags||[]).map(t => `<span class="status-pill status-pill-info" style="margin-right:0.3rem;">${esc(t)}</span>`).join("") || '<span style="color:var(--muted);">none</span>'}</span>
-        <span class="k">Public key</span><span class="v"><code style="font-size:0.72rem;word-break:break-all;">${esc(a.public_key)}</code></span>
-        <span class="k">DID</span><span class="v"><code style="font-size:0.72rem;word-break:break-all;">${esc(a.did)}</code></span>
-      </div>
+    <!-- Mini stats row -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin:0.85rem 0;">
+      ${[
+        [s.sign_valid + s.sign_invalid, "Signed",     `${s.sign_valid}✓ ${s.sign_invalid}✗`],
+        [s.verif_valid + s.verif_invalid,"Verified",  `${s.verif_valid}✓ ${s.verif_invalid}✗`],
+        [failPct + "%",                  "Fail rate",  failPct > 20 ? "⚠ high" : "normal"],
+        [s.sign_24h,                     "Last 24h",   s.last_seen ? _relativeTime(s.last_seen) : "—"],
+      ].map(([n,l,sub]) => `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.7rem;text-align:center;">
+          <div style="font-size:1.05rem;font-weight:700;color:var(--text);">${n}</div>
+          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:0.1rem 0;">${l}</div>
+          <div style="font-size:0.65rem;color:var(--muted);">${sub}</div>
+        </div>`).join("")}
     </div>
 
+    <!-- Recent activity -->
     <div class="ad-section">
-      <h4>Trust network</h4>
-      <div class="ad-kv">
-        <span class="k">Reputation</span><span class="v">${sevPill} ${deprPill}</span>
-        <span class="k">Live badge</span><span class="v">
-          <img src="${BASE}/trust/badge/${encodeURIComponent(a.did)}.svg" alt="trust badge" style="vertical-align:middle;height:22px;border-radius:3px;" />
-          <button class="btn btn-outline" data-copy-trust-badge="${esc(a.did)}" style="font-size:0.72rem;padding:0.2rem 0.55rem;margin-left:0.4rem;">Copy &lt;img&gt;</button>
-          <a href="${BASE}/trust/badge/${encodeURIComponent(a.did)}.svg" target="_blank" style="font-size:0.72rem;margin-left:0.4rem;color:var(--muted);">Open</a>
-        </span>
-        ${d.deprecation ? `<span class="k">Deprecated</span><span class="v">${esc(d.deprecation.reason)}${d.deprecation.successor_did ? ' · → <code>'+esc(d.deprecation.successor_did)+'</code>' : ''}</span>` : ''}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+        <h4 style="margin:0;">Recent activity</h4>
+        <button class="btn btn-outline" data-ad-action="full-activity" style="font-size:0.72rem;padding:0.2rem 0.55rem;">See all →</button>
       </div>
+      ${miniActivity}
     </div>
 
+    <!-- Quick actions -->
     <div class="ad-section">
-      <h4>Quick actions</h4>
+      <h4>Actions</h4>
       <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
         <button class="btn btn-outline" data-ad-action="test"     style="font-size:0.78rem;padding:0.3rem 0.7rem;">Test verify</button>
         <button class="btn btn-outline" data-ad-action="snippets" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Code snippets</button>
-        <button class="btn btn-outline" data-ad-action="badge"    style="font-size:0.78rem;padding:0.3rem 0.7rem;">Open badge</button>
+        <button class="btn btn-outline" data-copy-trust-badge="${esc(a.did)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Copy badge</button>
         <button class="btn btn-outline" data-ad-action="copy-did" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Copy DID</button>
       </div>
-    </div>`;
+    </div>
+
+    <!-- Expandable: identity detail -->
+    <details class="ad-section" style="cursor:pointer;">
+      <summary style="font-size:0.8rem;font-weight:600;color:var(--muted);list-style:none;display:flex;align-items:center;gap:0.35rem;">
+        <span>▸</span> Full identity &amp; keys
+      </summary>
+      <div class="ad-kv" style="margin-top:0.6rem;">
+        <span class="k">Owner</span><span class="v">${esc(a.owner)}</span>
+        <span class="k">Public key</span><span class="v"><code style="font-size:0.7rem;word-break:break-all;">${esc(a.public_key)}</code></span>
+        <span class="k">DID</span><span class="v"><code style="font-size:0.7rem;word-break:break-all;">${esc(a.did)}</code></span>
+        ${d.deprecation ? `<span class="k">Deprecated</span><span class="v">${esc(d.deprecation.reason)}</span>` : ""}
+      </div>
+    </details>`;
 }
 
 function _adTabActivity(d) {
@@ -4191,8 +4274,95 @@ document.addEventListener("DOMContentLoaded", () => {
     tab.addEventListener("click", () => _switchSettingsTab(tab.dataset.tab));
   });
 
-  // Account tab actions
+  // ── Account tab actions ────────────────────────────────────────────────────
+
   document.getElementById("allowlist-save-btn").addEventListener("click", _saveAllowlist);
+
+  // Theme buttons
+  document.querySelectorAll(".theme-opt-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const val = btn.getAttribute("data-theme-val");
+      localStorage.setItem(_THEME_KEY, val);
+      _applyTheme(val === "auto" ? null : val);
+      _highlightThemeBtn();
+    });
+  });
+
+  function _highlightThemeBtn() {
+    const cur = localStorage.getItem(_THEME_KEY) || "auto";
+    document.querySelectorAll(".theme-opt-btn").forEach(b => {
+      const active = b.getAttribute("data-theme-val") === cur;
+      b.style.background     = active ? "var(--accent)"  : "";
+      b.style.color          = active ? "#fff"           : "";
+      b.style.borderColor    = active ? "var(--accent)"  : "";
+    });
+  }
+  _highlightThemeBtn();
+
+  // Change password toggle
+  document.getElementById("change-pw-toggle-btn")?.addEventListener("click", () => {
+    const form = document.getElementById("change-pw-form");
+    if (form) form.style.display = form.style.display === "none" ? "block" : "none";
+  });
+  document.getElementById("change-pw-cancel-btn")?.addEventListener("click", () => {
+    document.getElementById("change-pw-form").style.display = "none";
+    ["change-pw-current","change-pw-new","change-pw-confirm"].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = "";
+    });
+    _modalMsgClear("change-pw-msg");
+  });
+  document.getElementById("change-pw-save-btn")?.addEventListener("click", async () => {
+    const cur     = document.getElementById("change-pw-current")?.value || "";
+    const next    = document.getElementById("change-pw-new")?.value     || "";
+    const confirm = document.getElementById("change-pw-confirm")?.value  || "";
+    const btn     = document.getElementById("change-pw-save-btn");
+    _modalMsgClear("change-pw-msg");
+    if (!cur || !next) { _modalMsg("change-pw-msg", "Fill in all fields.", "error"); return; }
+    if (next.length < 8) { _modalMsg("change-pw-msg", "New password must be at least 8 characters.", "error"); return; }
+    if (next !== confirm) { _modalMsg("change-pw-msg", "Passwords do not match.", "error"); return; }
+    btn.disabled = true; btn.textContent = "Updating…";
+    try {
+      // Re-auth with current password then set new one via request-reset flow
+      // Simplest: call a dedicated change-password endpoint if available,
+      // otherwise use the reset flow with current password verification
+      const res = await apiFetch("/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ current_password: cur, new_password: next }),
+      });
+      _modalMsg("change-pw-msg", "Password updated successfully.", "ok");
+      document.getElementById("change-pw-form").style.display = "none";
+      ["change-pw-current","change-pw-new","change-pw-confirm"].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = "";
+      });
+    } catch (e) {
+      _modalMsg("change-pw-msg", e.message || "Failed to update password.", "error");
+    } finally {
+      btn.disabled = false; btn.textContent = "Update password";
+    }
+  });
+
+  // Sign out everywhere
+  document.getElementById("signout-all-btn")?.addEventListener("click", async () => {
+    if (!confirm("Sign out of all devices and browsers?\n\nYou'll need to sign in again everywhere.")) return;
+    const btn = document.getElementById("signout-all-btn");
+    btn.disabled = true; btn.textContent = "Signing out…";
+    try {
+      await apiFetch("/auth/logout-all", { method: "POST" });
+    } catch (_) {}
+    logout();
+  });
+
+  // Delete account
+  document.getElementById("delete-account-btn")?.addEventListener("click", () => {
+    const confirmed = prompt(
+      'This permanently deletes your account, all agents, and all data.\n\n' +
+      'Type DELETE to confirm:'
+    );
+    if (confirmed !== "DELETE") return;
+    apiFetch("/auth/delete-account", { method: "DELETE" })
+      .then(() => logout())
+      .catch(e => alert("Could not delete account: " + e.message));
+  });
 
   // Team Keys tab
   document.getElementById("team-key-create-btn").addEventListener("click", _createTeamKey);
