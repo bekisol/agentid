@@ -10,7 +10,7 @@
              script-src 'self' https://cdn.jsdelivr.net;
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src https://fonts.gstatic.com;
-             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
+             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net;
              img-src 'self' data:;
              frame-ancestors 'none';" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -3679,7 +3679,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260501-1"></script>
+<script src="dashboard.js?v=20260501-2"></script>
 
 </body>
 </html>
