@@ -1009,14 +1009,16 @@
       background: #a8421f;
     }
     /* Tabs that are tier-locked still show in the nav but are dimmed */
+    .modal-tab[data-locked="1"],
     .nav-tab[data-locked="1"] {
-      opacity: 0.55;
+      opacity: 0.6;
       position: relative;
     }
+    .modal-tab[data-locked="1"]::after,
     .nav-tab[data-locked="1"]::after {
       content: "🔒";
       font-size: 0.7rem;
-      margin-left: 0.3rem;
+      margin-left: 0.35rem;
     }
   </style>
 </head>
@@ -1104,10 +1106,10 @@
 
       <div class="modal-tabs">
         <div class="modal-tab active" data-tab="account">Account</div>
-        <div class="modal-tab" data-tab="team-keys">Team Keys</div>
-        <div class="modal-tab" data-tab="key-rotation">Key Rotation</div>
-        <div class="modal-tab" data-tab="webhooks">Webhooks</div>
-        <div class="modal-tab" data-tab="sandbox">Sandbox</div>
+        <div class="modal-tab" data-tab="team-keys" data-min-tier="pro">Team Keys</div>
+        <div class="modal-tab" data-tab="key-rotation" data-min-tier="pro">Key Rotation</div>
+        <div class="modal-tab" data-tab="webhooks" data-min-tier="pro">Webhooks</div>
+        <div class="modal-tab" data-tab="sandbox" data-min-tier="pro">Sandbox</div>
       </div>
 
       <div class="modal-body">
@@ -1132,7 +1134,7 @@
         </div>
 
         <!-- ── TEAM KEYS TAB ── -->
-        <div class="modal-panel" id="tab-team-keys">
+        <div class="modal-panel" id="tab-team-keys" data-min-tier="pro" data-lock-feature="Team keys">
           <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
             Create a restricted API key that can be shared with team members or CI systems.
             It inherits your owner and tier but is limited to the scopes you choose.
@@ -1230,7 +1232,7 @@
         </div>
 
         <!-- ── KEY ROTATION TAB ── -->
-        <div class="modal-panel" id="tab-key-rotation">
+        <div class="modal-panel" id="tab-key-rotation" data-min-tier="pro" data-lock-feature="Key rotation">
           <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
             Rotate an agent's signing key without losing its DID or history.
             Both keys are accepted during the grace period so in-flight
@@ -1273,7 +1275,7 @@
         </div>
 
         <!-- ── WEBHOOKS TAB ── -->
-        <div class="modal-panel" id="tab-webhooks">
+        <div class="modal-panel" id="tab-webhooks" data-min-tier="pro" data-lock-feature="Webhooks">
           <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
             Receive HTTP callbacks when events happen on your account.
             All deliveries are signed with HMAC-SHA256 via the <code style="background:var(--surface2);padding:0.1rem 0.3rem;border-radius:4px;font-size:0.75rem;">X-AgentID-Signature</code> header.
@@ -1332,7 +1334,7 @@
         </div>
 
         <!-- ── SANDBOX TAB ── -->
-        <div class="modal-panel" id="tab-sandbox">
+        <div class="modal-panel" id="tab-sandbox" data-min-tier="pro" data-lock-feature="Sandbox">
           <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1.25rem;line-height:1.55;">
             Sandbox mode gives you an isolated environment to test agent registration,
             verification, and signing — with no rate limits, no webhooks fired, and a

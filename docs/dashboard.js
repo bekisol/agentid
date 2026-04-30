@@ -269,10 +269,18 @@ function applyTierLocks(tier) {
   elements.forEach(el => {
     // clean up previous run
     el.classList.remove("tier-locked");
+    el.removeAttribute("data-locked");
     el.querySelectorAll(":scope > .tier-lock-overlay").forEach(o => o.remove());
 
     const required = el.getAttribute("data-min-tier");
     if (_meetsTier(tier, required)) return;
+
+    // Tabs (e.g. Settings → Team Keys) — just dim + add lock icon, don't overlay.
+    // The corresponding panel will get the overlay treatment when shown.
+    if (el.classList.contains("modal-tab") || el.classList.contains("nav-tab")) {
+      el.setAttribute("data-locked", "1");
+      return;
+    }
 
     const feature = el.getAttribute("data-lock-feature") || "this feature";
     const tierLabel = required === "enterprise" ? "Enterprise" : "Pro";
