@@ -1821,6 +1821,98 @@
       .welcome-key-row { flex-direction: column; align-items: stretch; }
     }
 
+    /* ── Chooser-first login: big stacked method cards ── */
+    .auth-method {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.95rem 1.05rem;
+      background: var(--surface);
+      border: 1px solid var(--border-dark);
+      border-radius: 10px;
+      margin-bottom: 0.55rem;
+      cursor: pointer;
+      text-decoration: none;
+      color: var(--text);
+      font-family: inherit;
+      width: 100%;
+      text-align: left;
+      transition: border-color 0.12s, transform 0.05s, background 0.12s;
+    }
+    .auth-method:hover {
+      border-color: var(--accent);
+      background: var(--accent-light, var(--surface));
+    }
+    .auth-method:active { transform: translateY(1px); }
+    .auth-method-icon {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface2);
+      border-radius: 8px;
+      font-size: 1.05rem;
+    }
+    .auth-method-text {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      min-width: 0;
+    }
+    .auth-method-text strong {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .auth-method-text span {
+      font-size: 0.76rem;
+      color: var(--text-2);
+      line-height: 1.4;
+    }
+    .auth-method-text code {
+      background: var(--surface2);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      font-size: 0.72rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .auth-method-arrow {
+      flex-shrink: 0;
+      color: var(--muted);
+      font-size: 1.1rem;
+      opacity: 0;
+      transition: opacity 0.12s, transform 0.12s;
+    }
+    .auth-method:hover .auth-method-arrow {
+      opacity: 1;
+      transform: translateX(2px);
+      color: var(--accent);
+    }
+
+    /* Show/hide pane state — chooser is default */
+    #auth-pane-login,
+    #auth-pane-apikey {
+      display: none;
+    }
+    .login-card.show-login   #auth-pane-login   { display: block; }
+    .login-card.show-login   #auth-chooser      { display: none; }
+    .login-card.show-apikey  #auth-pane-apikey  { display: block; }
+    .login-card.show-apikey  #auth-chooser      { display: none; }
+
+    .auth-back {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+      padding: 0.25rem 0;
+      font-family: inherit;
+    }
+    .auth-back:hover { color: var(--accent); }
+
     /* ── OAuth buttons ── */
     .oauth-row {
       display: flex;
@@ -2310,63 +2402,99 @@
   <div class="login-wrap">
     <div class="login-header">
       <div class="login-icon-wrap">🔑</div>
-      <h1>Sign in</h1>
-      <p id="login-tagline">Sign in to access analytics, audit logs, and agent activity.</p>
+      <h1 id="login-h1">Sign in to AgentID</h1>
+      <p id="login-tagline">Pick how you'd like to authenticate.</p>
     </div>
 
     <div class="login-card">
-      <!-- Tabs: Sign in · Sign up · API key -->
-      <div class="auth-tabs">
-        <button type="button" class="auth-tab active" data-auth-tab="login">Sign in</button>
-        <button type="button" class="auth-tab"        data-auth-tab="signup">Sign up</button>
-        <button type="button" class="auth-tab"        data-auth-tab="apikey">API key</button>
+      <!-- ── STEP 1: chooser ── -->
+      <div id="auth-chooser">
+        <a class="auth-method" href="https://api.agentid-protocol.com/auth/oauth/google/start">
+          <span class="auth-method-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.08-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.86 2.69-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.9-2.26c-.81.54-1.83.86-3.05.86-2.34 0-4.32-1.58-5.04-3.7H.96v2.32A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.96 10.71A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.17.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.43 1.34l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.96l3 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+          </span>
+          <span class="auth-method-text">
+            <strong>Continue with Google</strong>
+            <span>Fastest. One click to sign in or create your account.</span>
+          </span>
+          <span class="auth-method-arrow">→</span>
+        </a>
+
+        <a class="auth-method" href="https://api.agentid-protocol.com/auth/oauth/github/start">
+          <span class="auth-method-icon">
+            <svg width="18" height="18" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          </span>
+          <span class="auth-method-text">
+            <strong>Continue with GitHub</strong>
+            <span>Recommended for developer accounts.</span>
+          </span>
+          <span class="auth-method-arrow">→</span>
+        </a>
+
+        <button type="button" class="auth-method" data-auth-pick="login">
+          <span class="auth-method-icon">📧</span>
+          <span class="auth-method-text">
+            <strong>Email and password</strong>
+            <span>Sign in if you already have an account, or create one.</span>
+          </span>
+          <span class="auth-method-arrow">→</span>
+        </button>
+
+        <button type="button" class="auth-method" data-auth-pick="apikey">
+          <span class="auth-method-icon">🔐</span>
+          <span class="auth-method-text">
+            <strong>Use an API key</strong>
+            <span>Paste an existing <code>agentid_…</code> key. Recommended for SDK / CI access.</span>
+          </span>
+          <span class="auth-method-arrow">→</span>
+        </button>
       </div>
 
-      <!-- Sign in panel -->
-      <div class="auth-panel active" data-auth-panel="login">
-        <div class="oauth-row">
-          <a class="oauth-btn" href="https://api.agentid-protocol.com/auth/oauth/google/start">
-            <svg width="14" height="14" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.08-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.86 2.69-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.9-2.26c-.81.54-1.83.86-3.05.86-2.34 0-4.32-1.58-5.04-3.7H.96v2.32A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.96 10.71A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.17.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.43 1.34l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.96l3 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
-            Google
-          </a>
-          <a class="oauth-btn" href="https://api.agentid-protocol.com/auth/oauth/github/start">
-            <svg width="14" height="14" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-            GitHub
-          </a>
+      <!-- ── STEP 2a: email + password ── -->
+      <div id="auth-pane-login" class="auth-pane">
+        <button type="button" class="auth-back" data-auth-pick="chooser">← Choose a different method</button>
+
+        <div class="auth-tabs" style="margin-top:0.65rem;">
+          <button type="button" class="auth-tab active" data-auth-tab="login">Sign in</button>
+          <button type="button" class="auth-tab"        data-auth-tab="signup">Sign up</button>
         </div>
-        <div class="oauth-divider"><span>or with password</span></div>
-        <label class="field-label" for="login-email">Email</label>
-        <input class="auth-input" id="login-email" type="email" placeholder="you@company.com" autocomplete="email" />
-        <label class="field-label" for="login-password" style="margin-top:0.6rem;">Password</label>
-        <input class="auth-input" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" />
-        <button class="btn btn-primary auth-submit" id="account-login-btn">Sign in</button>
-        <div class="login-footer-note" style="text-align:center;margin-top:0.55rem;">
-          <a href="#" id="forgot-password-link">Forgot password?</a>
+
+        <!-- Sign in -->
+        <div class="auth-panel active" data-auth-panel="login">
+          <label class="field-label" for="login-email">Email</label>
+          <input class="auth-input" id="login-email" type="email" placeholder="you@company.com" autocomplete="email" />
+          <label class="field-label" for="login-password" style="margin-top:0.6rem;">Password</label>
+          <input class="auth-input" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" />
+          <button class="btn btn-primary auth-submit" id="account-login-btn">Sign in</button>
+          <div class="login-footer-note" style="text-align:center;margin-top:0.55rem;">
+            <a href="#" id="forgot-password-link">Forgot password?</a>
+          </div>
+        </div>
+
+        <!-- Sign up -->
+        <div class="auth-panel" data-auth-panel="signup">
+          <label class="field-label" for="signup-email">Email</label>
+          <input class="auth-input" id="signup-email" type="email" placeholder="you@company.com" autocomplete="email" />
+          <label class="field-label" for="signup-password" style="margin-top:0.6rem;">Password (8+ characters)</label>
+          <input class="auth-input" id="signup-password" type="password" placeholder="at least 8 characters" autocomplete="new-password" />
+          <button class="btn btn-primary auth-submit" id="account-signup-btn">Create account</button>
+          <div class="login-footer-note">
+            By signing up you agree to the <a href="https://agentid-protocol.com/terms" target="_blank">Terms</a>
+            and <a href="https://agentid-protocol.com/privacy" target="_blank">Privacy Policy</a>.
+          </div>
         </div>
       </div>
 
-      <!-- Sign up panel -->
-      <div class="auth-panel" data-auth-panel="signup">
-        <label class="field-label" for="signup-email">Email</label>
-        <input class="auth-input" id="signup-email" type="email" placeholder="you@company.com" autocomplete="email" />
-        <label class="field-label" for="signup-password" style="margin-top:0.6rem;">Password</label>
-        <input class="auth-input" id="signup-password" type="password" placeholder="at least 8 characters" autocomplete="new-password" />
-        <button class="btn btn-primary auth-submit" id="account-signup-btn">Create account</button>
-        <div class="login-footer-note">
-          By signing up you agree to the <a href="https://agentid-protocol.com/terms" target="_blank">Terms</a>
-          and <a href="https://agentid-protocol.com/privacy" target="_blank">Privacy Policy</a>.
-        </div>
-      </div>
-
-      <!-- API key panel (legacy / SDK users) -->
-      <div class="auth-panel" data-auth-panel="apikey">
-        <label class="field-label" for="api-key-input">API Key</label>
+      <!-- ── STEP 2b: API key ── -->
+      <div id="auth-pane-apikey" class="auth-pane">
+        <button type="button" class="auth-back" data-auth-pick="chooser">← Choose a different method</button>
+        <p class="login-footer-note" style="margin-top:0.65rem;">
+          Paste an existing <code>agentid_…</code> key. The dashboard will use it directly — best for power users and CI.
+        </p>
+        <label class="field-label" for="api-key-input">API key</label>
         <div class="input-row">
           <input type="password" id="api-key-input" placeholder="agentid_..." autocomplete="off" spellcheck="false" />
           <button class="btn btn-primary" id="login-btn" style="flex-shrink:0;">Connect</button>
-        </div>
-        <div class="login-footer-note">
-          Recommended for SDKs and CI. For dashboard access, sign in with email instead.
         </div>
       </div>
 
@@ -3505,7 +3633,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260430-10"></script>
+<script src="dashboard.js?v=20260430-11"></script>
 
 </body>
 </html>

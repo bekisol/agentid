@@ -4140,7 +4140,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   })();
 
-  // Tab switcher (Sign in / Sign up / API key)
+  // Tab switcher inside the email-and-password pane (Sign in / Sign up)
   document.querySelectorAll(".auth-tab").forEach(tab => {
     tab.addEventListener("click", () => {
       const target = tab.getAttribute("data-auth-tab");
@@ -4150,6 +4150,33 @@ document.addEventListener("DOMContentLoaded", () => {
       _clearAuthError();
     });
   });
+
+  // ── Chooser navigation (Email | API key | back to chooser) ───────────────
+  // Cards in the chooser have data-auth-pick="login" / "apikey" / "chooser".
+  // OAuth method cards are real <a> links so they navigate naturally.
+  document.querySelectorAll("[data-auth-pick]").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      const pick = el.getAttribute("data-auth-pick");
+      _showAuthPick(pick);
+    });
+  });
+
+  function _showAuthPick(pick) {
+    const card = document.querySelector(".login-card");
+    if (!card) return;
+    card.classList.remove("show-login", "show-apikey");
+    if (pick === "login")  card.classList.add("show-login");
+    if (pick === "apikey") card.classList.add("show-apikey");
+    _clearAuthError();
+    // Focus the first input in the revealed pane for snappy UX
+    setTimeout(() => {
+      const target =
+        pick === "login"  ? document.getElementById("login-email")     :
+        pick === "apikey" ? document.getElementById("api-key-input")   : null;
+      if (target) target.focus();
+    }, 30);
+  }
   document.getElementById("refresh-btn").addEventListener("click", () => {
     if (trendChart) { trendChart.destroy(); trendChart = null; }
     if (capChart)   { capChart.destroy();   capChart = null; }
