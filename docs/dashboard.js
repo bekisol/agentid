@@ -641,18 +641,115 @@ function renderCharts(data) {
 
 // ── ACTIVITY ──────────────────────────────────────────────────────────────────
 
+// Map an operation name → consistent color token + pretty pill class.
+function _opPalette(op) {
+  const k = (op || "").toLowerCase();
+  if (k === "register")   return { cls: "op-pill-register",   bg: "var(--op-register-bg)",   fg: "var(--op-register-fg)" };
+  if (k === "verify")     return { cls: "op-pill-verify",     bg: "var(--op-verify-bg)",     fg: "var(--op-verify-fg)" };
+  if (k === "resolve")    return { cls: "op-pill-resolve",    bg: "var(--op-resolve-bg)",    fg: "var(--op-resolve-fg)" };
+  if (k === "update")     return { cls: "op-pill-update",     bg: "var(--op-update-bg)",     fg: "var(--op-update-fg)" };
+  if (k === "deregister") return { cls: "op-pill-deregister", bg: "var(--op-deregister-bg)", fg: "var(--op-deregister-fg)" };
+  return { cls: "op-pill-other", bg: "var(--op-other-bg)", fg: "var(--op-other-fg)" };
+}
+
+/**
+ * Render the "Activity — last 7 days" card.
+ *
+ * Server returns a flat list:  [{operation, count}, ...]   (operation totals)
+ * or                           [{date, operation, count}, ...]  (per-day breakdown)
+ *
+ * We probe for a 'date'/'day' field and render either:
+ *   • a stacked-bar chart with one column per day, segments per operation
+ *   • or, if only totals are available, a clean per-operation list
+ */
 function renderActivity(activity) {
   const actEl = document.getElementById("activity-list");
+  const totalEl = document.getElementById("activity-total");
+  if (!actEl) return;
   if (!activity.length) {
     actEl.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>No activity in the last 7 days</p></div>';
+    if (totalEl) totalEl.textContent = "0";
     return;
   }
-  actEl.innerHTML = activity.map(r => `
-    <div class="activity-row">
-      <span class="op-pill ${opClass(r.operation)}">${esc(r.operation)}</span>
-      <span class="activity-count">${esc(Number(r.count).toLocaleString())}</span>
-    </div>
-  `).join("");
+
+  const totalAll = activity.reduce((s, r) => s + Number(r.count || 0), 0);
+  if (totalEl) {
+    totalEl.textContent = totalAll.toLocaleString() + " events";
+    totalEl.className = "status-pill " + (totalAll > 0 ? "status-pill-info" : "status-pill-muted");
+  }
+
+  // If the server gave us per-day rows, build the 7-day stacked grid.
+  const hasDay = activity.some(r => r.date || r.day || r.bucket);
+  const ops = Array.from(new Set(activity.map(r => (r.operation || "other").toLowerCase()))).sort();
+
+  if (hasDay) {
+    // bucket by day
+    const byDay = {};
+    for (const r of activity) {
+      const d = String(r.date || r.day || r.bucket).slice(0, 10);
+      byDay[d] = byDay[d] || {};
+      byDay[d][(r.operation || "other").toLowerCase()] =
+        (byDay[d][(r.operation || "other").toLowerCase()] || 0) + Number(r.count || 0);
+    }
+    // ensure 7 days even if some are empty
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setUTCDate(d.getUTCDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    const dayTotals = days.map(d => Object.values(byDay[d] || {}).reduce((s, n) => s + n, 0));
+    const peak = Math.max(...dayTotals, 1);
+
+    const cells = days.map((d, i) => {
+      const total = dayTotals[i];
+      const heightPct = (total / peak) * 100;
+      const segs = ops.map(op => {
+        const v = (byDay[d] || {})[op] || 0;
+        if (!v || total === 0) return "";
+        const segH = (v / total) * 100;
+        return `<div title="${esc(op)} ${v.toLocaleString()}" style="height:${segH}%;background:${_opPalette(op).bg};"></div>`;
+      }).join("");
+      const dow = new Date(d + "T00:00:00Z").toLocaleDateString(undefined, { weekday: "short" });
+      return `
+        <div class="activity-day" title="${esc(d)} · ${total.toLocaleString()} events">
+          <span class="day-total">${total > 0 ? total.toLocaleString() : ""}</span>
+          <div class="day-bars" style="height:${heightPct}%;min-height:${total > 0 ? 4 : 0}px;">${segs}</div>
+          <span class="day-label">${esc(dow)}</span>
+        </div>`;
+    }).join("");
+
+    const legend = ops.map(op =>
+      `<span><span class="legend-swatch" style="background:${_opPalette(op).bg};"></span>${esc(op)}</span>`
+    ).join("");
+
+    actEl.innerHTML =
+      `<div class="activity-week">${cells}</div>
+       <div class="activity-legend">${legend}</div>`;
+    return;
+  }
+
+  // Fallback: server only sent totals — render a tidy list.
+  const opSums = {};
+  for (const r of activity) {
+    const op = (r.operation || "other").toLowerCase();
+    opSums[op] = (opSums[op] || 0) + Number(r.count || 0);
+  }
+  const max = Math.max(...Object.values(opSums), 1);
+  actEl.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+      ${Object.entries(opSums).sort((a,b) => b[1]-a[1]).map(([op, n]) => {
+        const pct = (n / max) * 100;
+        const pal = _opPalette(op);
+        return `
+          <div style="display:flex;align-items:center;gap:0.6rem;">
+            <span class="op-pill ${pal.cls}" style="min-width:64px;justify-content:center;">${esc(op)}</span>
+            <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">
+              <div style="width:${pct}%;height:100%;background:${pal.bg};"></div>
+            </div>
+            <span style="font-variant-numeric:tabular-nums;font-weight:600;font-size:0.82rem;min-width:60px;text-align:right;">${esc(n.toLocaleString())}</span>
+          </div>`;
+      }).join("")}
+    </div>`;
 }
 
 // ── BADGE ─────────────────────────────────────────────────────────────────────
@@ -679,32 +776,77 @@ async function loadBadge(owner) {
 
 // ── AUDIT LOG ─────────────────────────────────────────────────────────────────
 
+function _statusPill(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "ok" || s === "valid")
+    return '<span class="status-pill status-pill-good"><span class="dot"></span>' + esc(s) + '</span>';
+  if (s === "invalid" || s === "failed" || s === "error")
+    return '<span class="status-pill status-pill-bad"><span class="dot"></span>' + esc(s) + '</span>';
+  if (s === "revoked" || s === "deprecated")
+    return '<span class="status-pill status-pill-warn"><span class="dot"></span>' + esc(s) + '</span>';
+  return '<span class="status-pill status-pill-muted">' + esc(s || "—") + '</span>';
+}
+
 async function loadAuditLog() {
   const el = document.getElementById("audit-list");
+  const countEl = document.getElementById("audit-count");
   try {
-    const data = await apiFetch("/pro/audit-log/json");
-    const logs = (data.logs || []).slice(0, 10);
+    const data = await apiFetch("/pro/audit-log/json?limit=15");
+    const logs = (data.logs || []).slice(0, 15);
+    if (countEl) {
+      countEl.textContent = (data.count != null ? data.count : logs.length).toLocaleString() + " total";
+      countEl.className = "status-pill status-pill-info";
+    }
     if (!logs.length) {
-      el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>No audit events yet</p></div>';
+      el.innerHTML = '<div class="empty" style="padding:1.25rem;"><div class="empty-icon">📋</div><p>No audit events yet</p></div>';
       return;
     }
+
+    const rows = logs.map(r => {
+      const ts = r.timestamp || "";
+      const dt = new Date(ts);
+      const hh = String(dt.getUTCHours()).padStart(2, "0");
+      const mm = String(dt.getUTCMinutes()).padStart(2, "0");
+      const ss = String(dt.getUTCSeconds()).padStart(2, "0");
+      const day = dt.toISOString().slice(0, 10);
+      const today = new Date().toISOString().slice(0, 10);
+      const timeLabel = day === today ? `${hh}:${mm}:${ss}` : `${day} ${hh}:${mm}`;
+
+      const op = (r.operation || "other").toLowerCase();
+      const pal = _opPalette(op);
+      const did = r.did || "";
+      const shortened = did.length > 32 ? did.slice(0, 22) + "…" + did.slice(-6) : did;
+      return `
+        <tr>
+          <td class="audit-time" title="${esc(ts)}">${esc(timeLabel)}</td>
+          <td><span class="op-pill ${pal.cls}">${esc(op)}</span></td>
+          <td class="audit-did" title="${esc(did)}">${esc(shortened || "—")}</td>
+          <td>${_statusPill(r.status)}</td>
+          <td style="color:var(--muted);font-size:0.72rem;font-variant-numeric:tabular-nums;">${esc(r.ip || "—")}</td>
+        </tr>`;
+    }).join("");
+
     el.innerHTML = `
-      <div style="overflow:auto;">
-        <table class="audit-table">
-          <thead><tr><th>Time</th><th>Operation</th><th>DID</th><th>Status</th></tr></thead>
-          <tbody>
-            ${logs.map(r => `
-              <tr>
-                <td class="time-cell">${esc(String(r.timestamp).slice(11, 19))}</td>
-                <td><span class="op-pill ${opClass(r.operation)}">${esc(r.operation)}</span></td>
-                <td class="did-mono">${esc(shortDid(r.did))}</td>
-                <td class="${r.status === "ok" ? "status-ok" : "status-invalid"}">${esc(r.status)}</td>
-              </tr>`).join("")}
-          </tbody>
+      <div style="max-height:340px;overflow:auto;">
+        <table class="audit-log-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Operation</th>
+              <th>DID</th>
+              <th>Status</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
         </table>
       </div>`;
   } catch {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Could not load audit log</p></div>';
+    if (countEl) {
+      countEl.textContent = "error";
+      countEl.className = "status-pill status-pill-bad";
+    }
+    el.innerHTML = '<div class="empty" style="padding:1.25rem;"><div class="empty-icon">⚠️</div><p>Could not load audit log</p></div>';
   }
 }
 
@@ -1636,14 +1778,39 @@ function _renderAnomalyDetail(a) {
 
 async function loadAnomalies() {
   const el = document.getElementById("anomaly-list");
+  const pill = document.getElementById("anomaly-status-pill");
+  const stamp = document.getElementById("anomaly-last-updated");
   if (!el) return;
   try {
     const data = await apiFetch("/pro/anomalies");
     const anomalies = data.anomalies || [];
+
+    // Header pill: summarise severity + count
+    if (pill) {
+      if (!anomalies.length) {
+        pill.textContent = "all clear";
+        pill.className = "status-pill status-pill-good";
+      } else {
+        const counts = anomalies.reduce((acc, a) => {
+          const s = a.severity || "low";
+          acc[s] = (acc[s] || 0) + 1;
+          return acc;
+        }, {});
+        const worst = counts.high ? "bad" : counts.medium ? "warn" : "info";
+        const label = anomalies.length + " active" +
+          (counts.high   ? " · " + counts.high   + " high"   : "") +
+          (counts.medium ? " · " + counts.medium + " medium" : "") +
+          (counts.low    ? " · " + counts.low    + " low"    : "");
+        pill.textContent = label;
+        pill.className = "status-pill status-pill-" + worst;
+      }
+    }
+    if (stamp) stamp.textContent = "updated " + (new Date()).toLocaleTimeString();
+
     if (!anomalies.length) {
-      el.innerHTML = `<div class="anomaly-clear">
-        <span style="font-size:1.2rem;">✅</span>
-        <span>No anomalies detected</span>
+      el.innerHTML = `<div class="anomaly-clear" style="display:flex;align-items:center;gap:0.5rem;color:var(--text-2);font-size:0.85rem;padding:0.5rem 0;">
+        <span style="font-size:1.1rem;">✓</span>
+        <span>No anomalies detected · all signal patterns within expected bounds</span>
       </div>`;
       return;
     }
@@ -1696,9 +1863,28 @@ async function loadAnomalies() {
       });
     });
   } catch {
-    if (el) el.innerHTML = `<div class="anomaly-clear" style="color:var(--muted);font-size:0.8rem;">Could not load anomaly data</div>`;
+    if (pill) {
+      pill.textContent = "error";
+      pill.className = "status-pill status-pill-bad";
+    }
+    if (el) el.innerHTML = `<div class="anomaly-clear" style="color:var(--muted);font-size:0.8rem;padding:0.5rem 0;">Could not load anomaly data</div>`;
   }
 }
+
+// Wire the manual refresh button (delegated, attaches once on first load)
+document.addEventListener("click", (e) => {
+  if (e.target.closest("#anomaly-refresh")) {
+    e.preventDefault();
+    const btn = e.target.closest("#anomaly-refresh");
+    btn.style.transform = "rotate(360deg)";
+    btn.style.transition = "transform 0.5s";
+    setTimeout(() => {
+      btn.style.transform = "";
+      btn.style.transition = "";
+    }, 600);
+    loadAnomalies();
+  }
+});
 
 // ── REAL-TIME SSE ─────────────────────────────────────────────────────────────
 

@@ -953,6 +953,168 @@
     }
     .cap-pill-removable button:hover { color: var(--red); }
 
+    /* ── Pro-grade card chrome ── */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      letter-spacing: 0.02em;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .status-pill-muted   { background: var(--surface2); color: var(--muted); }
+    .status-pill-good    { background: #d8f5e3; color: #0c6b34; }
+    .status-pill-warn    { background: #fff1d6; color: #8a4a00; }
+    .status-pill-bad     { background: #fadcdc; color: #9b1f1f; }
+    .status-pill-info    { background: #e0ebff; color: #1f3e8e; }
+    .status-pill .dot    { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.85; }
+
+    .btn-icon {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      width: 24px; height: 24px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s;
+    }
+    .btn-icon:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Activity 7-day grid ── */
+    .activity-week {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.4rem;
+      align-items: end;
+      height: 110px;
+      margin-bottom: 0.6rem;
+    }
+    .activity-day {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 2px;
+      height: 100%;
+      cursor: default;
+    }
+    .activity-day .day-bars {
+      display: flex;
+      flex-direction: column-reverse;
+      width: 100%;
+      max-width: 38px;
+      border-radius: 3px;
+      overflow: hidden;
+      transition: filter 0.15s;
+    }
+    .activity-day:hover .day-bars { filter: brightness(0.9); }
+    .activity-day .day-label {
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 0.3rem;
+    }
+    .activity-day .day-total {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .activity-legend {
+      display: flex;
+      gap: 0.85rem;
+      flex-wrap: wrap;
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding-top: 0.65rem;
+      border-top: 1px solid var(--border);
+    }
+    .activity-legend .legend-swatch {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      margin-right: 0.3rem;
+      vertical-align: middle;
+    }
+
+    /* op color tokens — used by activity bars + audit pills */
+    :root {
+      --op-register-bg: #c1efd1;   --op-register-fg: #0c6b34;
+      --op-verify-bg:   #ffe4b3;   --op-verify-fg:   #8a4a00;
+      --op-resolve-bg:  #e0ebff;   --op-resolve-fg:  #1f3e8e;
+      --op-update-bg:   #f4e1ff;   --op-update-fg:   #5a1f87;
+      --op-deregister-bg: #fad4d4; --op-deregister-fg: #9b1f1f;
+      --op-other-bg:    #ececec;   --op-other-fg:    #555;
+    }
+
+    /* ── Audit log table ── */
+    .audit-log-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+    .audit-log-table thead th {
+      font-size: 0.66rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: left;
+      padding: 0.55rem 0.85rem;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+    }
+    .audit-log-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    .audit-log-table tbody tr:hover { background: var(--surface2); }
+    .audit-log-table tbody tr:last-child { border-bottom: none; }
+    .audit-log-table td {
+      padding: 0.5rem 0.85rem;
+      vertical-align: middle;
+    }
+    .audit-log-table .audit-time {
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      white-space: nowrap;
+      font-size: 0.74rem;
+    }
+    .audit-log-table .audit-did {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.72rem;
+      color: var(--text-2);
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .op-pill {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      letter-spacing: 0.02em;
+      line-height: 1.4;
+    }
+    .op-pill-register   { background: var(--op-register-bg);   color: var(--op-register-fg); }
+    .op-pill-verify     { background: var(--op-verify-bg);     color: var(--op-verify-fg); }
+    .op-pill-resolve    { background: var(--op-resolve-bg);    color: var(--op-resolve-fg); }
+    .op-pill-update     { background: var(--op-update-bg);     color: var(--op-update-fg); }
+    .op-pill-deregister { background: var(--op-deregister-bg); color: var(--op-deregister-fg); }
+    .op-pill-other      { background: var(--op-other-bg);      color: var(--op-other-fg); }
+
     /* ── Expandable anomaly cards ── */
     .anomaly-card { transition: background 0.15s; }
     .anomaly-card:hover { filter: brightness(0.97); }
@@ -1561,11 +1723,17 @@
 
   <!-- Anomaly Detection -->
   <div class="card" style="margin-bottom:1.25rem;" id="anomaly-card" data-min-tier="pro" data-lock-feature="Anomaly detection">
-    <div class="card-header">
-      <div class="card-title">⚠️ Anomaly Detection</div>
-      <span style="font-size:0.72rem;color:var(--muted);">Updated every 60 s</span>
+    <div class="card-header" style="display:flex;align-items:center;gap:0.75rem;">
+      <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+        Anomaly detection
+        <span id="anomaly-status-pill" class="status-pill status-pill-muted">checking…</span>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;color:var(--muted);">
+        <span id="anomaly-last-updated">—</span>
+        <button id="anomaly-refresh" class="btn-icon" title="Refresh now" aria-label="Refresh">↻</button>
+      </div>
     </div>
-    <div id="anomaly-list" style="padding:0.75rem 1.25rem;">
+    <div id="anomaly-list" style="padding:0.65rem 1rem 1rem 1rem;">
       <div class="loading"><div class="spinner"></div> Checking…</div>
     </div>
   </div>
@@ -1573,16 +1741,23 @@
   <!-- Activity + Audit -->
   <div class="two-col" data-min-tier="pro" data-lock-feature="Activity & audit log">
     <div class="card">
-      <div class="card-header">
-        <div class="card-title">Activity — Last 7 Days</div>
+      <div class="card-header" style="display:flex;align-items:center;gap:0.5rem;">
+        <div class="card-title">Activity — last 7 days</div>
+        <span id="activity-total" class="status-pill status-pill-muted" style="margin-left:auto;">—</span>
       </div>
-      <div id="activity-list"><div class="loading"><div class="spinner"></div> Loading…</div></div>
+      <div id="activity-list" style="padding:0.85rem 1rem 1rem 1rem;">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
     </div>
     <div class="card">
-      <div class="card-header">
-        <div class="card-title">Recent Audit Log</div>
+      <div class="card-header" style="display:flex;align-items:center;gap:0.5rem;">
+        <div class="card-title">Recent audit log</div>
+        <span id="audit-count" class="status-pill status-pill-muted" style="margin-left:auto;">—</span>
+        <a href="#" id="audit-open-full" style="font-size:0.72rem;color:var(--muted);text-decoration:none;">View all →</a>
       </div>
-      <div id="audit-list"><div class="loading"><div class="spinner"></div> Loading…</div></div>
+      <div id="audit-list" style="padding:0;">
+        <div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>
+      </div>
     </div>
   </div>
 
