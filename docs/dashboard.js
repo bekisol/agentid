@@ -2951,6 +2951,106 @@ function _initNotifications() {
   }, 60000);
 }
 
+// ── THEME TOGGLE (light / dark / auto) ───────────────────────────────────────
+
+const _THEME_KEY = "agentid_theme";
+
+function _applyTheme(mode /* "light" | "dark" | "auto" */) {
+  const html = document.documentElement;
+  if (mode === "auto") {
+    html.removeAttribute("data-theme");
+  } else {
+    html.setAttribute("data-theme", mode);
+  }
+  // Sync the icon
+  const sun  = document.getElementById("theme-icon-sun");
+  const moon = document.getElementById("theme-icon-moon");
+  if (sun && moon) {
+    const isDark = mode === "dark" ||
+      (mode === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+    sun.style.display  = isDark ? "none" : "";
+    moon.style.display = isDark ? "" : "none";
+  }
+}
+
+function _initTheme() {
+  const saved = localStorage.getItem(_THEME_KEY) || "auto";
+  _applyTheme(saved);
+  document.getElementById("theme-toggle")?.addEventListener("click", () => {
+    const cur = localStorage.getItem(_THEME_KEY) || "auto";
+    // 3-way cycle: auto → dark → light → auto
+    const next = cur === "auto" ? "dark" : (cur === "dark" ? "light" : "auto");
+    localStorage.setItem(_THEME_KEY, next);
+    _applyTheme(next);
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
+    if ((localStorage.getItem(_THEME_KEY) || "auto") === "auto") _applyTheme("auto");
+  });
+}
+
+// ── KEYBOARD CHEAT SHEET + GLOBAL SHORTCUTS ──────────────────────────────────
+
+function _kbdShow()  { document.getElementById("kbd-cheatsheet")?.classList.add("open"); }
+function _kbdHide()  { document.getElementById("kbd-cheatsheet")?.classList.remove("open"); }
+
+function _initKeyboardShortcuts() {
+  document.getElementById("kbd-cheatsheet")?.addEventListener("click", (e) => {
+    if (e.target.id === "kbd-cheatsheet") _kbdHide();
+  });
+  document.addEventListener("keydown", (e) => {
+    // Don't trigger global shortcuts while typing in inputs
+    const tag = (e.target?.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || e.target?.isContentEditable) return;
+
+    // ? — open cheat sheet
+    if ((e.key === "?" || (e.key === "/" && e.shiftKey)) && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      const panel = document.getElementById("kbd-cheatsheet");
+      panel?.classList.toggle("open");
+      return;
+    }
+    // Esc — close cheat sheet
+    if (e.key === "Escape") _kbdHide();
+
+    // Cmd/Ctrl+Shift+D — toggle dark mode
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "d" || e.key === "D")) {
+      e.preventDefault();
+      const cur = localStorage.getItem(_THEME_KEY) || "auto";
+      const next = cur === "dark" ? "light" : "dark";
+      localStorage.setItem(_THEME_KEY, next);
+      _applyTheme(next);
+      return;
+    }
+    // Cmd/Ctrl+Shift+Q — sign out
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "q" || e.key === "Q")) {
+      e.preventDefault();
+      logout();
+      return;
+    }
+
+    // Single-key shortcuts (only when dashboard visible)
+    const dashVisible = document.getElementById("dashboard")?.style.display !== "none";
+    if (!dashVisible) return;
+
+    if (e.key === "r" || e.key === "R") {
+      e.preventDefault();
+      document.getElementById("refresh-btn")?.click();
+    }
+    if (e.key === "n" && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById("register-agent-btn")?.click();
+    }
+    if (e.key === "N" && e.shiftKey) {
+      e.preventDefault();
+      document.getElementById("notif-btn")?.click();
+    }
+    if (e.key === ",") {
+      e.preventDefault();
+      document.getElementById("settings-btn")?.click();
+    }
+  });
+}
+
 // ── COMMAND PALETTE / GLOBAL SEARCH ──────────────────────────────────────────
 
 const _cmdk = { open: false, items: [], cursor: 0, lastQuery: "" };
@@ -3230,6 +3330,8 @@ document.addEventListener("DOMContentLoaded", () => {
   _initSigningPager();   // one-time — survives every table redraw
   _initSigningSearch();  // one-time — survives every table redraw
 
+  _initTheme();
+  _initKeyboardShortcuts();
   _cmdkInit();
   _initNotifications();
   document.getElementById("login-btn")?.addEventListener("click", login);

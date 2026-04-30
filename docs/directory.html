@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentID Public Directory — Browse AI Agents</title>
+<meta name="description" content="Browse the public registry of AI agents on the AgentID Protocol. Each agent is identified by a verifiable Ed25519-backed DID with on-network trust score.">
+<style>
+  :root {
+    --bg: #fafaf7;
+    --surface: #ffffff;
+    --surface2: #f5f4ef;
+    --text: #1f1f1f;
+    --text-2: #4a4a4a;
+    --muted: #888;
+    --border: #ebe9e2;
+    --accent: #c9532f;
+    --green: #107a3a;
+    --red:   #9b1f1f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171a;
+      --surface: #1f2024;
+      --surface2: #25262b;
+      --text: #f0f0f0;
+      --text-2: #c0c0c0;
+      --muted: #8a8a8a;
+      --border: #2e2f33;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, -apple-system, system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.95rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .nav .brand {
+    display: inline-flex; align-items: center; gap: 0.55rem;
+    font-weight: 700; text-decoration: none; color: var(--text);
+  }
+  .nav .brand .logo {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--accent), #e9824f);
+    color: white; font-weight: 700;
+    border-radius: 7px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.95rem;
+  }
+  .nav-links { display: flex; gap: 1.25rem; font-size: 0.86rem; }
+  .nav-links a { color: var(--text-2); text-decoration: none; }
+  .nav-links a:hover { color: var(--accent); }
+  .hero {
+    max-width: 880px;
+    margin: 2rem auto 1.25rem auto;
+    padding: 0 1.5rem;
+  }
+  .hero h1 { margin: 0 0 0.4rem 0; font-size: 1.85rem; }
+  .hero p  { color: var(--text-2); margin: 0 0 1rem 0; font-size: 1rem; }
+  .badges {
+    display: flex; gap: 0.4rem; flex-wrap: wrap;
+    font-size: 0.74rem; color: var(--muted);
+    margin-bottom: 1.25rem;
+  }
+  .badges span {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+  }
+  .filters {
+    max-width: 880px;
+    margin: 0 auto 1rem auto;
+    padding: 0 1.5rem;
+    display: flex; gap: 0.5rem; flex-wrap: wrap;
+  }
+  .filters input, .filters select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.86rem;
+    font-family: inherit;
+    outline: none;
+  }
+  .filters input { flex: 1; min-width: 220px; }
+  .filters input:focus, .filters select:focus { border-color: var(--accent); }
+
+  .results {
+    max-width: 880px;
+    margin: 0.5rem auto 4rem auto;
+    padding: 0 1.5rem;
+  }
+  .agent {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.15rem;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.15s, transform 0.05s;
+  }
+  .agent:hover { border-color: var(--accent); }
+  .agent-head {
+    display: flex; align-items: center; gap: 0.6rem;
+    margin-bottom: 0.45rem;
+  }
+  .agent-name { font-weight: 600; font-size: 0.95rem; }
+  .agent-did {
+    color: var(--muted); font-size: 0.74rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1;
+  }
+  .agent-caps { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.4rem; }
+  .cap-pill {
+    background: var(--surface2);
+    color: var(--text-2);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+  }
+  .agent-meta {
+    display: flex; gap: 1rem;
+    font-size: 0.74rem;
+    color: var(--muted);
+    margin-top: 0.55rem;
+  }
+  .agent-badge img {
+    height: 22px; vertical-align: middle; border-radius: 3px;
+  }
+  .pager {
+    display: flex; gap: 0.4rem; align-items: center; justify-content: center;
+    margin-top: 1.5rem;
+    font-size: 0.86rem;
+  }
+  .pager button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 0.4rem 0.85rem;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.86rem;
+  }
+  .pager button:hover { border-color: var(--accent); }
+  .pager button[disabled] { opacity: 0.4; cursor: not-allowed; }
+  .empty, .loading {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--muted);
+  }
+  .footer {
+    text-align: center;
+    padding: 2rem 1rem 4rem 1rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="brand"><span class="logo">A</span> AgentID</a>
+  <div class="nav-links">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="docs/">Docs</a>
+    <a href="status.html">Status</a>
+    <a href="https://github.com/bekisol/agentid">GitHub</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <h1>Public agent directory</h1>
+  <p>Every agent registered on the AgentID Protocol with a public visibility flag. Identities are cryptographically verifiable — each row's DID is derived from an Ed25519 public key. Click an agent's badge to verify live trust.</p>
+  <div class="badges">
+    <span id="stat-agents">— agents</span>
+    <span id="stat-caps">— unique capabilities</span>
+    <span id="stat-network">network signal: live</span>
+  </div>
+</section>
+
+<div class="filters">
+  <input type="search" id="q" placeholder="Search by name…" autocomplete="off" />
+  <select id="cap-filter">
+    <option value="">All capabilities</option>
+  </select>
+  <select id="sort">
+    <option value="created_desc">Newest first</option>
+    <option value="created">Oldest first</option>
+    <option value="name">Name A–Z</option>
+    <option value="name_desc">Name Z–A</option>
+  </select>
+</div>
+
+<div class="results" id="results">
+  <div class="loading">Loading directory…</div>
+</div>
+
+<div class="footer">
+  Want your agent to show up here? <a href="dashboard.html">Sign up</a> for free, register an agent, and leave the <code>private</code> flag off.
+  <br>
+  Powered by AgentID Protocol · <a href="docs/">docs</a> · <a href="https://github.com/bekisol/agentid">GitHub</a>
+</div>
+
+<script>
+const API = "https://api.agentid-protocol.com";
+const PER_PAGE = 20;
+let page = 1, total = 0;
+let qDebounce = null;
+
+async function fetchPage() {
+  const q    = document.getElementById("q").value.trim();
+  const cap  = document.getElementById("cap-filter").value;
+  const sort = document.getElementById("sort").value;
+  const params = new URLSearchParams({ page: String(page), per_page: String(PER_PAGE), sort });
+  if (q)   params.set("q", q);
+  if (cap) params.append("capability", cap);
+
+  const res = document.getElementById("results");
+  res.innerHTML = '<div class="loading">Loading…</div>';
+
+  try {
+    const r = await fetch(`${API}/search?${params}`);
+    const data = await r.json();
+    render(data);
+  } catch (e) {
+    res.innerHTML = '<div class="empty">Could not load directory — try again shortly.</div>';
+  }
+}
+
+function render(data) {
+  total = data.total ?? 0;
+  document.getElementById("stat-agents").textContent =
+    total.toLocaleString() + (total === 1 ? " agent" : " agents");
+  const caps = new Set();
+  (data.agents || []).forEach(a => (a.capabilities || []).forEach(c => caps.add(c)));
+  document.getElementById("stat-caps").textContent =
+    caps.size + " unique capabilit" + (caps.size === 1 ? "y" : "ies") + " on this page";
+
+  const res = document.getElementById("results");
+  if (!data.agents || !data.agents.length) {
+    res.innerHTML = '<div class="empty">No agents matched your filter.</div>';
+    return;
+  }
+
+  res.innerHTML = data.agents.map(a => {
+    const shortDid = (a.did || "").length > 50 ? (a.did.slice(0, 36) + "…" + a.did.slice(-8)) : a.did;
+    return `<div class="agent">
+      <div class="agent-head">
+        <span class="agent-name">${escapeHtml(a.name || "(unnamed)")}</span>
+        <span class="agent-did">${escapeHtml(shortDid)}</span>
+        <span class="agent-badge"><img src="${API}/trust/badge/${encodeURIComponent(a.did)}.svg" alt="trust badge"></span>
+      </div>
+      <div class="agent-caps">
+        ${(a.capabilities || []).slice(0, 8).map(c => `<span class="cap-pill">${escapeHtml(c)}</span>`).join("")}
+        ${(a.capabilities || []).length > 8 ? `<span class="cap-pill">+${(a.capabilities||[]).length - 8} more</span>` : ""}
+      </div>
+      <div class="agent-meta">
+        <span>Owner: ${escapeHtml(a.owner || "—")}</span>
+        <span>Registered: ${escapeHtml(String(a.created_at || "").slice(0, 10) || "—")}</span>
+        <span><a href="#" class="copy-did" data-did="${escapeAttr(a.did)}" style="color:var(--accent);text-decoration:none;">Copy DID</a></span>
+      </div>
+    </div>`;
+  }).join("") + renderPager();
+
+  // Wire pager + copy buttons
+  res.querySelectorAll(".copy-did").forEach(a => a.addEventListener("click", (e) => {
+    e.preventDefault();
+    const did = a.getAttribute("data-did");
+    navigator.clipboard.writeText(did).then(() => {
+      const orig = a.textContent;
+      a.textContent = "Copied!";
+      setTimeout(() => { a.textContent = orig; }, 1200);
+    });
+  }));
+  res.querySelectorAll("[data-pager]").forEach(b => b.addEventListener("click", () => {
+    page = Number(b.getAttribute("data-pager"));
+    fetchPage();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }));
+
+  // Populate cap-filter once with the union of caps we've seen so far
+  populateCapFilter(Array.from(caps));
+}
+
+function renderPager() {
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  if (pages <= 1) return "";
+  const prev = page > 1 ? page - 1 : null;
+  const next = page < pages ? page + 1 : null;
+  return `<div class="pager">
+    <button ${prev ? `data-pager="${prev}"` : "disabled"}>← Prev</button>
+    <span>Page ${page} of ${pages.toLocaleString()} · ${total.toLocaleString()} total</span>
+    <button ${next ? `data-pager="${next}"` : "disabled"}>Next →</button>
+  </div>`;
+}
+
+const _seenCaps = new Set();
+function populateCapFilter(caps) {
+  caps.forEach(c => _seenCaps.add(c));
+  const sel = document.getElementById("cap-filter");
+  const current = sel.value;
+  const options = ['<option value="">All capabilities</option>']
+    .concat(Array.from(_seenCaps).sort().map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`));
+  sel.innerHTML = options.join("");
+  sel.value = current;
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
+
+// Wire filters
+document.getElementById("q").addEventListener("input", () => {
+  clearTimeout(qDebounce);
+  qDebounce = setTimeout(() => { page = 1; fetchPage(); }, 220);
+});
+document.getElementById("cap-filter").addEventListener("change", () => { page = 1; fetchPage(); });
+document.getElementById("sort").addEventListener("change",       () => { page = 1; fetchPage(); });
+
+fetchPage();
+</script>
+
+</body>
+</html>

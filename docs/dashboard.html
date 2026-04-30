@@ -46,6 +46,186 @@
       --code-bg:      #1C1917;
     }
 
+    /* Dark mode — applied via [data-theme="dark"] on <html> (set from JS).
+       Also kicks in automatically when prefers-color-scheme: dark and the
+       user hasn't explicitly chosen a light theme. */
+    html[data-theme="dark"] {
+      --bg:           #0e0f12;
+      --surface:      #17181c;
+      --surface2:     #1f2025;
+      --border:       #2a2c33;
+      --border-dark:  #3a3d45;
+      --text:         #f0eee9;
+      --text-2:       #c5c1b8;
+      --muted:        #8a847a;
+      --accent:       #ee7d4a;
+      --accent-light: #2a1d12;
+      --accent-border:#7a4824;
+      --green:        #4ade80;
+      --green-bg:     #0f2f1d;
+      --red:          #f87171;
+      --red-bg:       #2f1414;
+      --yellow:       #facc15;
+      --yellow-bg:    #2f240a;
+      --blue:         #60a5fa;
+      --blue-bg:      #122335;
+      --code-bg:      #0a0b0d;
+    }
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme="light"]) {
+        --bg:           #0e0f12;
+        --surface:      #17181c;
+        --surface2:     #1f2025;
+        --border:       #2a2c33;
+        --border-dark:  #3a3d45;
+        --text:         #f0eee9;
+        --text-2:       #c5c1b8;
+        --muted:        #8a847a;
+        --accent:       #ee7d4a;
+        --accent-light: #2a1d12;
+        --accent-border:#7a4824;
+        --green:        #4ade80;
+        --green-bg:     #0f2f1d;
+        --red:          #f87171;
+        --red-bg:       #2f1414;
+        --yellow:       #facc15;
+        --yellow-bg:    #2f240a;
+        --blue:         #60a5fa;
+        --blue-bg:      #122335;
+        --code-bg:      #0a0b0d;
+      }
+    }
+
+    /* ── Mobile responsive ── */
+    @media (max-width: 768px) {
+      nav { padding: 0 1rem; height: 52px; }
+      .nav-logo { font-size: 0.88rem; }
+      .nav-actions { gap: 0.4rem !important; }
+      .nav-actions .btn-outline,
+      .nav-actions .btn-ghost { font-size: 0.74rem; padding: 0.3rem 0.55rem; }
+      #cmdk-btn { display: none !important; }
+      #notif-btn { width: 32px; height: 32px; }
+
+      .dash-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.6rem;
+      }
+      .dash-header > div:last-child {
+        flex-wrap: wrap;
+        gap: 0.4rem !important;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+      .two-col {
+        grid-template-columns: 1fr !important;
+      }
+
+      /* Hide low-priority columns in tables on mobile */
+      .audit-log-table th:nth-child(5),
+      .audit-log-table td:nth-child(5) { display: none; }
+
+      .agents-table th:nth-child(n+5):nth-last-child(n+2),
+      .agents-table td:nth-child(n+5):nth-last-child(n+2) {
+        /* Hide capability + middle columns; keep name, did, actions */
+        /* Implementation detail varies; teams can override per-table */
+      }
+
+      /* First-run hero: stack instead of two-col */
+      #first-run-hero > div:first-child {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.5rem;
+      }
+
+      /* Settings modal full-screen on mobile */
+      #settings-modal .modal-card {
+        max-width: 100% !important;
+        max-height: 100% !important;
+        height: 100vh;
+        border-radius: 0 !important;
+      }
+
+      /* Agent drawer covers full screen */
+      .agent-drawer-panel { width: 100% !important; }
+
+      /* Card padding tighter */
+      .card { padding: 0; }
+      .card-header { padding: 0.65rem 0.85rem !important; }
+
+      /* Activity grid: smaller bars on mobile */
+      .activity-week { height: 80px !important; gap: 0.25rem !important; }
+      .activity-day .day-label { font-size: 0.55rem; }
+
+      /* Benchmarks: stack the row instead of 3-col grid */
+      .bm-row {
+        grid-template-columns: 1fr !important;
+        gap: 0.4rem !important;
+      }
+      .bm-values { align-items: flex-start !important; }
+    }
+
+    /* ── Keyboard shortcuts cheat sheet ── */
+    .kbd-cheatsheet {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 9800;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(2px);
+    }
+    .kbd-cheatsheet.open { display: flex; }
+    .kbd-cheatsheet .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      width: min(440px, 92vw);
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.25);
+    }
+    .kbd-cheatsheet h3 {
+      margin: 0 0 0.85rem 0;
+      font-size: 1rem;
+    }
+    .kbd-cheatsheet .row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.4rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.86rem;
+    }
+    .kbd-cheatsheet .row:last-child { border-bottom: none; }
+    .kbd-cheatsheet .keys {
+      display: inline-flex; gap: 0.25rem;
+    }
+    .kbd-cheatsheet kbd {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.78rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--text-2);
+    }
+
+    /* Theme toggle button */
+    .theme-toggle {
+      width: 32px; height: 32px;
+      border-radius: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      color: var(--muted);
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
     body {
       background: var(--bg);
       color: var(--text);
@@ -1809,6 +1989,14 @@
     </div>
   </div>
 
+  <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+    <svg id="theme-icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+    </svg>
+    <svg id="theme-icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+  </button>
   <button class="btn btn-outline" id="cmdk-btn" title="Search (⌘K)" style="display:none;font-size:0.78rem;padding:0.35rem 0.7rem;">
     <span style="display:inline-flex;align-items:center;gap:0.45rem;">
       <span style="opacity:0.7;">Search</span>
@@ -2829,6 +3017,34 @@ curl https://api.agentid-protocol.com/agents \
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- ── KEYBOARD SHORTCUTS CHEAT SHEET ─────────────────────────────────────── -->
+<div id="kbd-cheatsheet" class="kbd-cheatsheet">
+  <div class="panel">
+    <h3>Keyboard shortcuts</h3>
+    <div class="row"><span>Open command palette</span>
+      <span class="keys"><kbd>⌘</kbd><kbd>K</kbd></span></div>
+    <div class="row"><span>Show this cheat sheet</span>
+      <span class="keys"><kbd>?</kbd></span></div>
+    <div class="row"><span>Toggle dark mode</span>
+      <span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>D</kbd></span></div>
+    <div class="row"><span>Refresh dashboard</span>
+      <span class="keys"><kbd>R</kbd></span></div>
+    <div class="row"><span>Register agent</span>
+      <span class="keys"><kbd>N</kbd></span></div>
+    <div class="row"><span>Settings</span>
+      <span class="keys"><kbd>,</kbd></span></div>
+    <div class="row"><span>Notifications</span>
+      <span class="keys"><kbd>⇧</kbd><kbd>N</kbd></span></div>
+    <div class="row"><span>Sign out</span>
+      <span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>Q</kbd></span></div>
+    <div class="row"><span>Close any open panel</span>
+      <span class="keys"><kbd>Esc</kbd></span></div>
+    <div style="margin-top:0.85rem;font-size:0.74rem;color:var(--muted);">
+      Press <kbd>?</kbd> again or click outside to close.
     </div>
   </div>
 </div>
