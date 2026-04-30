@@ -1084,6 +1084,153 @@ async function loadAgentsTable() {
 
 const _signing = { page: 1, pages: 1, total: 0, perPage: 20, didQuery: "", status: "", fromDate: "", toDate: "" };
 
+function _relativeTime(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60)    return Math.round(diff) + "s ago";
+    if (diff < 3600)  return Math.round(diff / 60) + "m ago";
+    if (diff < 86400) return Math.round(diff / 3600) + "h ago";
+    return Math.round(diff / 86400) + "d ago";
+  } catch { return ""; }
+}
+
+function _formatBytes(n) {
+  if (n == null) return "—";
+  if (n < 1024) return n + " B";
+  return (n / 1024).toFixed(1) + " KB";
+}
+
+/**
+ * Build the full-width expanded panel for a signing event.
+ * Layout: a stacked vertical sequence of sections, each spanning the
+ * full table width.  Each section has a heading row with a copy button
+ * where useful.
+ */
+function _signingDetailPanel(e, i, payloadObj, payloadJson, sigFull, summary) {
+  const innerMessage = payloadObj && (payloadObj.message || payloadObj.reason || payloadObj.action);
+  const nonce        = payloadObj && payloadObj.nonce;
+  const payloadTs    = payloadObj && payloadObj.timestamp;
+  const sigBytes     = e.signature ? Math.floor(e.signature.length * 3 / 4) : null; // base64 → bytes
+
+  // Drift between client-signed timestamp and the server-stored audit ts.
+  let drift = "";
+  if (payloadTs && e.timestamp) {
+    try {
+      const d = (new Date(e.timestamp).getTime() / 1000) - Number(payloadTs);
+      drift = (d >= 0 ? "+" : "") + d.toFixed(1) + "s";
+    } catch {}
+  }
+
+  const isValid = e.status === "valid";
+  const statusBadge = isValid
+    ? '<span style="background:#d1f4dd;color:#107a3a;font-size:0.72rem;font-weight:600;padding:0.15rem 0.55rem;border-radius:4px;">✓ valid</span>'
+    : '<span style="background:#fbe2e2;color:#a82828;font-size:0.72rem;font-weight:600;padding:0.15rem 0.55rem;border-radius:4px;">✗ invalid</span>';
+
+  const tsAbs = e.timestamp || "";
+  const tsRel = _relativeTime(e.timestamp);
+
+  const heading = (icon, label, copyText, copyKey) =>
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;">' +
+      '<span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);">' +
+        icon + ' ' + label +
+      '</span>' +
+      (copyText
+        ? '<button data-copy-text="' + esc(copyText) + '" data-copy-key="' + copyKey + '" ' +
+              'style="background:none;border:1px solid var(--border-dark);border-radius:4px;padding:0.05rem 0.45rem;' +
+              'font-size:0.68rem;cursor:pointer;color:var(--muted);">copy</button>'
+        : '') +
+    '</div>';
+
+  const sigCopy = e.signature
+    ? '<button data-copy-text="' + esc(e.signature) + '" data-copy-key="sig-' + i + '" ' +
+          'style="background:none;border:1px solid var(--border-dark);border-radius:4px;padding:0.05rem 0.45rem;' +
+          'font-size:0.68rem;cursor:pointer;color:var(--muted);">copy</button>'
+    : '';
+
+  const detailRow = (label, value, mono) =>
+    '<div style="display:flex;align-items:baseline;gap:0.6rem;font-size:0.78rem;padding:0.18rem 0;">' +
+      '<span style="color:var(--muted);min-width:130px;">' + label + '</span>' +
+      '<span style="' + (mono ? 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.74rem;' : '') +
+        'color:var(--text);word-break:break-all;flex:1;">' + value + '</span>' +
+    '</div>';
+
+  return (
+    '<div class="signing-detail" style="padding:0.85rem 1.1rem;display:flex;flex-direction:column;gap:0.85rem;">' +
+
+      // ─── Verification metadata ─────────────────────────────────────
+      '<div>' +
+        heading('🔍', 'Verification') +
+        detailRow('Result', statusBadge + (isValid ? '' :
+          ' <span style="color:var(--muted);font-size:0.72rem;">— signature did not match the agent\'s public key</span>')) +
+        detailRow('Recorded at', esc(tsAbs) + (tsRel ? ' <span style="color:var(--muted);">· ' + esc(tsRel) + '</span>' : '')) +
+        (e.ip ? detailRow('Source IP', '<code style="font-size:0.74rem;">' + esc(e.ip) + '</code>', false) : '') +
+      '</div>' +
+
+      // ─── Parties ───────────────────────────────────────────────────
+      '<div>' +
+        heading('👥', 'Parties') +
+        detailRow('Signer',
+          (e.signer_name ? '<strong>' + esc(e.signer_name) + '</strong> · ' : '') +
+          '<code style="font-size:0.74rem;">' + esc(e.signer_did || '—') + '</code>',
+          false) +
+        detailRow('Verifier',
+          e.verifier_did
+            ? (e.verifier_name ? '<strong>' + esc(e.verifier_name) + '</strong> · ' : '') +
+              '<code style="font-size:0.74rem;">' + esc(e.verifier_did) + '</code>'
+            : '<span style="color:var(--muted);font-style:italic;">external (not in your registry)</span>',
+          false) +
+      '</div>' +
+
+      // ─── Message + payload internals ───────────────────────────────
+      '<div>' +
+        heading('💬', 'Message',
+          innerMessage ? String(innerMessage) : null,
+          'msg-' + i) +
+        '<div style="font-size:0.82rem;color:var(--text);background:var(--surface);border:1px solid var(--border);' +
+          'border-radius:4px;padding:0.45rem 0.6rem;line-height:1.45;word-break:break-word;">' +
+          (innerMessage ? esc(String(innerMessage)) : '<span style="color:var(--muted);font-style:italic;">' + (summary || 'no message field') + '</span>') +
+        '</div>' +
+        (nonce || payloadTs ?
+          '<div style="margin-top:0.45rem;display:flex;flex-wrap:wrap;gap:0.4rem 1.5rem;font-size:0.73rem;color:var(--muted);">' +
+            (nonce ? '<span><strong>Nonce:</strong> <code>' + esc(String(nonce).slice(0,16)) + (String(nonce).length > 16 ? '…' : '') + '</code></span>' : '') +
+            (payloadTs ? '<span><strong>Payload TS:</strong> ' + esc(new Date(Number(payloadTs)*1000).toISOString().slice(0,19) + 'Z') +
+              (drift ? ' <span style="color:var(--muted);">(drift ' + esc(drift) + ')</span>' : '') + '</span>' : '') +
+          '</div>' : '') +
+      '</div>' +
+
+      // ─── Signed payload (full JSON) ────────────────────────────────
+      '<div>' +
+        heading('📋', 'Signed payload (full)',
+          payloadObj ? JSON.stringify(payloadObj) : null,
+          'payload-' + i) +
+        '<pre style="background:var(--surface);border:1px solid var(--border);border-radius:4px;' +
+          'padding:0.6rem 0.75rem;font-size:0.72rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;' +
+          'color:var(--text);white-space:pre-wrap;line-height:1.5;margin:0;max-height:240px;overflow:auto;">' +
+          payloadJson +
+        '</pre>' +
+      '</div>' +
+
+      // ─── Signature ─────────────────────────────────────────────────
+      '<div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;">' +
+          '<span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);">' +
+            '🔏 Signature ' +
+            (e.signature ? '<span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">' +
+              '· Ed25519 · ' + _formatBytes(sigBytes) + ' (base64)</span>' : '') +
+          '</span>' +
+          sigCopy +
+        '</div>' +
+        '<div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;' +
+          'padding:0.55rem 0.7rem;font-size:0.72rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;' +
+          'color:var(--text);word-break:break-all;line-height:1.5;">' + sigFull + '</div>' +
+      '</div>' +
+
+    '</div>'
+  );
+}
+
 function payloadSummary(payload) {
   if (!payload) return "—";
   const msg = payload.reason || payload.message || payload.action || null;
@@ -1153,24 +1300,8 @@ function _signingRows(events) {
         </td>
       </tr>
       <tr data-detail="${i}" style="display:none;background:var(--surface2);">
-        <td colspan="6" style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);">
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;">
-            <div>
-              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">💬 Message</div>
-              <div style="font-size:0.8rem;color:var(--text-2);">${summary || "—"}</div>
-            </div>
-            <div>
-              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">📋 Signed Payload</div>
-              <pre style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);white-space:pre-wrap;line-height:1.5;margin:0;">${payloadJson}</pre>
-            </div>
-            <div style="grid-column:1/-1;">
-              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.2rem;">
-                🔏 Signature
-                ${e.signature ? `<button data-copy="${i}" style="background:none;border:1px solid var(--border-dark);border-radius:5px;padding:0.1rem 0.45rem;font-size:0.7rem;cursor:pointer;color:var(--muted);margin-left:0.4rem;">copy</button>` : ""}
-              </div>
-              <div data-sig="${i}" style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);word-break:break-all;">${sigFull}</div>
-            </div>
-          </div>
+        <td colspan="6" style="padding:0;border-bottom:1px solid var(--border);">
+          ${_signingDetailPanel(e, i, payloadObj, payloadJson, sigFull, summary)}
         </td>
       </tr>`;
   }).join("");
@@ -1212,8 +1343,21 @@ function _attachRowListeners() {
   const tbody = document.getElementById("signing-tbody");
   if (!tbody) return;
   tbody.addEventListener("click", function (ev) {
+    // New: generic per-section copy buttons inside the detail panel.
+    const copyTextBtn = ev.target.closest("[data-copy-text]");
+    if (copyTextBtn) {
+      ev.stopPropagation();
+      const txt = copyTextBtn.getAttribute("data-copy-text") || "";
+      navigator.clipboard.writeText(txt).catch(() => {});
+      const orig = copyTextBtn.textContent;
+      copyTextBtn.textContent = "copied!";
+      setTimeout(() => { copyTextBtn.textContent = orig; }, 1500);
+      return;
+    }
+    // Legacy signature copy (still used elsewhere)
     const copyBtn = ev.target.closest("[data-copy]");
     if (copyBtn) {
+      ev.stopPropagation();
       const sigEl = this.querySelector(`[data-sig="${copyBtn.dataset.copy}"]`);
       if (sigEl) navigator.clipboard.writeText(sigEl.textContent).catch(() => {});
       copyBtn.textContent = "copied!";
