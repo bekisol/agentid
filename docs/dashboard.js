@@ -2670,10 +2670,35 @@ async function _openAgentDetail(did, name) {
     _adState.data = data;
     _adRender();
   } catch (e) {
-    body.innerHTML = `<div style="padding:1rem;color:var(--red);font-size:0.85rem;">
-      Could not load agent: ${esc(String(e.message || ""))}<br>
-      <span style="color:var(--muted);font-size:0.78rem;">Hard-refresh the dashboard if Railway recently redeployed.</span>
-    </div>`;
+    const msg = String(e.message || "");
+    // 401 from server = auth dropped. Diagnose & guide the user to recovery.
+    if (msg.toLowerCase().includes("api key") || msg === "401") {
+      const hasKey   = !!(apiKey || sessionStorage.getItem("agentid_key"));
+      const hasMode  = sessionStorage.getItem("agentid_auth_mode") || "(unset)";
+      body.innerHTML = `
+        <div style="padding:1.4rem;">
+          <div style="color:var(--red);font-weight:600;margin-bottom:0.55rem;">Session has dropped — please sign in again</div>
+          <div style="font-size:0.82rem;color:var(--text-2);line-height:1.55;margin-bottom:1rem;">
+            Your authentication didn't reach the server. The session cookie or API key is missing or expired.
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.75rem 0.9rem;font-size:0.78rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.6;margin-bottom:1rem;">
+            <div>auth mode  : <strong>${esc(hasMode)}</strong></div>
+            <div>API key in storage: <strong>${hasKey ? "yes" : "no"}</strong></div>
+            <div>server reply: <strong>${esc(msg)}</strong></div>
+          </div>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="btn btn-primary" id="ad-relogin">Sign out and sign in again</button>
+            <button class="btn btn-outline" id="ad-hardrefresh">Hard refresh</button>
+          </div>
+        </div>`;
+      document.getElementById("ad-relogin")?.addEventListener("click", () => logout());
+      document.getElementById("ad-hardrefresh")?.addEventListener("click", () => location.reload(true));
+    } else {
+      body.innerHTML = `<div style="padding:1rem;color:var(--red);font-size:0.85rem;">
+        Could not load agent: ${esc(msg)}<br>
+        <span style="color:var(--muted);font-size:0.78rem;">Hard-refresh the dashboard if Railway recently redeployed.</span>
+      </div>`;
+    }
   }
 }
 
@@ -4657,7 +4682,13 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
   //   2. Otherwise probe /auth/me — if the server still has a session
   //      cookie for us, log straight in. The browser handles the cookie;
   //      JS never sees it.
+  //   3. If neither works, show the login screen (no banner).
+  //   4. If we WERE previously logged in (stored auth_mode) but auth has
+  //      now dropped, surface a "session expired" banner so the user
+  //      knows to re-authenticate instead of being silently logged out.
   (async () => {
+    const previouslyLoggedIn = !!sessionStorage.getItem("agentid_auth_mode");
+
     if (apiKey) {
       if (getSessionAge() >= SESSION_TTL_MS) {
         expireSession();
@@ -4668,12 +4699,14 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
       try {
         await loadDashboard();
         scheduleSessionExpiry();
-      } catch {
+        return;
+      } catch (e) {
         sessionStorage.removeItem("agentid_key");
         sessionStorage.removeItem("agentid_login_ts");
         apiKey = "";
+        if (previouslyLoggedIn) _showSessionExpiredBanner(String(e.message || ""));
+        return;
       }
-      return;
     }
 
     // No raw key — try the cookie path silently.
@@ -4686,8 +4719,29 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
           sessionStorage.getItem("agentid_login_ts") || String(Date.now()));
         await loadDashboard();
         scheduleSessionExpiry();
+        return;
       }
-      // 401 = no cookie / expired → leave login screen visible. No error needed.
+      if (previouslyLoggedIn) _showSessionExpiredBanner("Your session has expired");
     } catch (_) { /* network failure — leave login screen */ }
   })();
 });
+
+// Visible banner shown on the login screen when a previously-authenticated
+// user's session has dropped, so they don't sit confused on the login page.
+function _showSessionExpiredBanner(detail) {
+  const screen = document.getElementById("login-screen");
+  if (!screen) return;
+  let b = document.getElementById("session-expired-banner");
+  if (!b) {
+    b = document.createElement("div");
+    b.id = "session-expired-banner";
+    b.style.cssText = "background:#fff1d6;border:1px solid #f5d696;color:#8a4a00;padding:0.85rem 1.2rem;border-radius:8px;margin-bottom:1.25rem;font-size:0.88rem;line-height:1.55;max-width:420px;";
+    const wrap = screen.querySelector(".login-wrap") || screen;
+    wrap.insertBefore(b, wrap.firstChild);
+  }
+  b.innerHTML = `
+    <strong>⚠ Your session has expired.</strong> Please sign in again to continue.
+    <div style="font-size:0.74rem;color:#a86515;margin-top:0.4rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+      ${esc(detail).slice(0, 140)}
+    </div>`;
+}
