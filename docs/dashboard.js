@@ -394,6 +394,8 @@ async function logout() {
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
   document.getElementById("logout-btn").style.display = "none";
+  const cmdkBtn = document.getElementById("cmdk-btn");
+  if (cmdkBtn) cmdkBtn.style.display = "none";
   const apiInput = document.getElementById("api-key-input");
   if (apiInput) apiInput.value = "";
   ["login-email","login-password","signup-email","signup-password"].forEach(id => {
@@ -491,6 +493,8 @@ async function loadDashboard() {
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("dashboard").style.display = "block";
   document.getElementById("logout-btn").style.display = "flex";
+  const cmdkBtn = document.getElementById("cmdk-btn");
+  if (cmdkBtn) cmdkBtn.style.display = "inline-flex";
 
   const tier = String(data.tier);
 
@@ -2630,6 +2634,153 @@ async function _createWebhook() {
 
 // ── Modal open / close / tab switching ───────────────────────────────────────
 
+// ── COMMAND PALETTE / GLOBAL SEARCH ──────────────────────────────────────────
+
+const _cmdk = { open: false, items: [], cursor: 0, lastQuery: "" };
+
+function cmdkOpen() {
+  if (!apiKey && authMode !== "session") return;
+  const overlay = document.getElementById("cmdk-overlay");
+  const input   = document.getElementById("cmdk-input");
+  if (!overlay) return;
+  overlay.classList.add("open");
+  _cmdk.open = true;
+  input.value = "";
+  _cmdk.cursor = 0;
+  _cmdkRender([
+    { kind: "tip", icon: "💡", label: "Type to search agents, groups, capabilities, audit events…" },
+  ]);
+  setTimeout(() => input.focus(), 30);
+}
+
+function cmdkClose() {
+  document.getElementById("cmdk-overlay")?.classList.remove("open");
+  _cmdk.open = false;
+}
+
+function _cmdkRender(items) {
+  const list = document.getElementById("cmdk-results");
+  if (!list) return;
+  _cmdk.items = items;
+  if (!items.length) {
+    list.innerHTML = '<div class="cmdk-empty">No results — try a different query</div>';
+    return;
+  }
+  list.innerHTML = items.map((it, i) => {
+    if (it.kind === "section") {
+      return `<div class="cmdk-section-title">${esc(it.label)}</div>`;
+    }
+    if (it.kind === "tip") {
+      return `<div class="cmdk-row" style="cursor:default;"><span class="cmdk-icon">${esc(it.icon)}</span><span class="cmdk-label">${esc(it.label)}</span></div>`;
+    }
+    return `<div class="cmdk-row ${i === _cmdk.cursor ? "active" : ""}" data-cmdk-idx="${i}">
+      <span class="cmdk-icon">${esc(it.icon || "•")}</span>
+      <span class="cmdk-label">${esc(it.label)}</span>
+      ${it.meta ? `<span class="cmdk-meta">${esc(it.meta)}</span>` : ""}
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".cmdk-row[data-cmdk-idx]").forEach(row => {
+    row.addEventListener("click", () => _cmdkActivate(Number(row.dataset.cmdkIdx)));
+  });
+}
+
+function _cmdkActivate(idx) {
+  const it = _cmdk.items[idx];
+  if (!it || !it.action) return;
+  cmdkClose();
+  it.action();
+}
+
+let _cmdkSearchTimer = null;
+async function _cmdkSearch(q) {
+  q = q.trim();
+  if (!q) {
+    _cmdkRender([
+      { kind: "section", label: "Quick actions" },
+      { kind: "row", icon: "🤖", label: "Register agent",       action: () => document.getElementById("register-agent-btn")?.click() },
+      { kind: "row", icon: "🔑", label: "Manage API keys",      action: () => { document.getElementById("settings-btn")?.click(); setTimeout(() => document.querySelector(".modal-tab[data-tab='api-keys']")?.click(), 200); } },
+      { kind: "row", icon: "📥", label: "Download audit log (CSV)", action: () => document.getElementById("csv-btn")?.click() },
+      { kind: "row", icon: "📊", label: "Refresh dashboard",    action: () => document.getElementById("refresh-btn")?.click() },
+      { kind: "row", icon: "🚪", label: "Sign out",             action: () => logout() },
+    ]);
+    return;
+  }
+  _cmdk.lastQuery = q;
+  _cmdkRender([{ kind: "tip", icon: "🔍", label: "Searching…" }]);
+  try {
+    const data = await apiFetch("/pro/search?q=" + encodeURIComponent(q) + "&per_page=8");
+    if (q !== _cmdk.lastQuery) return;   // newer query in flight
+    const agents = data.agents || [];
+    if (!agents.length) {
+      _cmdkRender([{ kind: "tip", icon: "🚫", label: `No agents matched "${q}"` }]);
+      return;
+    }
+    const items = [{ kind: "section", label: `Agents (${data.total})` }];
+    agents.forEach(a => {
+      items.push({
+        kind: "row",
+        icon: "🤖",
+        label: a.name + (a.private ? "  · private" : ""),
+        meta:  shortDid(a.did),
+        action: () => {
+          // Open agent detail drawer (or just scroll to the table for now)
+          const rowEl = document.querySelector(`[data-did="${a.did}"]`);
+          if (rowEl) {
+            rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+            rowEl.style.background = "var(--accent-bg)";
+            setTimeout(() => { rowEl.style.background = ""; }, 1500);
+          }
+        },
+      });
+    });
+    _cmdkRender(items);
+  } catch (e) {
+    _cmdkRender([{ kind: "tip", icon: "⚠️", label: "Search failed: " + (e.message || "unknown") }]);
+  }
+}
+
+function _cmdkInit() {
+  const overlay = document.getElementById("cmdk-overlay");
+  const input   = document.getElementById("cmdk-input");
+  if (!overlay || !input) return;
+
+  document.getElementById("cmdk-btn")?.addEventListener("click", cmdkOpen);
+
+  // ⌘K / Ctrl-K from anywhere
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+      e.preventDefault();
+      _cmdk.open ? cmdkClose() : cmdkOpen();
+    }
+    if (e.key === "Escape" && _cmdk.open) {
+      cmdkClose();
+    }
+    if (_cmdk.open && e.key === "ArrowDown") {
+      e.preventDefault();
+      _cmdk.cursor = Math.min(_cmdk.items.length - 1, _cmdk.cursor + 1);
+      _cmdkRender(_cmdk.items);
+    }
+    if (_cmdk.open && e.key === "ArrowUp") {
+      e.preventDefault();
+      _cmdk.cursor = Math.max(0, _cmdk.cursor - 1);
+      _cmdkRender(_cmdk.items);
+    }
+    if (_cmdk.open && e.key === "Enter") {
+      e.preventDefault();
+      _cmdkActivate(_cmdk.cursor);
+    }
+  });
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) cmdkClose();
+  });
+
+  input.addEventListener("input", () => {
+    clearTimeout(_cmdkSearchTimer);
+    _cmdkSearchTimer = setTimeout(() => _cmdkSearch(input.value), 180);
+  });
+}
+
 function openSettings() {
   document.getElementById("settings-modal").style.display = "flex";
   document.body.style.overflow = "hidden";
@@ -2762,6 +2913,7 @@ document.addEventListener("DOMContentLoaded", () => {
   _initSigningPager();   // one-time — survives every table redraw
   _initSigningSearch();  // one-time — survives every table redraw
 
+  _cmdkInit();
   document.getElementById("login-btn")?.addEventListener("click", login);
   document.getElementById("logout-btn")?.addEventListener("click", logout);
   document.getElementById("api-key-input")?.addEventListener("keydown", (e) => {

@@ -953,6 +953,120 @@
     }
     .cap-pill-removable button:hover { color: var(--red); }
 
+    /* ── Command palette / global search ── */
+    .cmdk-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 9000;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 12vh;
+      backdrop-filter: blur(2px);
+    }
+    .cmdk-overlay.open { display: flex; }
+    .cmdk-modal {
+      width: min(640px, 92vw);
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 48px rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+      max-height: 70vh;
+      overflow: hidden;
+    }
+    .cmdk-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.95rem 1.1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    #cmdk-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 1rem;
+      font-family: inherit;
+      background: transparent;
+      color: var(--text);
+    }
+    #cmdk-input::placeholder { color: var(--muted); }
+    .cmdk-kbd-hint {
+      font-size: 0.7rem;
+      color: var(--muted);
+      background: var(--surface2);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      font-family: inherit;
+    }
+    .cmdk-results {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.4rem 0;
+    }
+    .cmdk-section-title {
+      font-size: 0.66rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      padding: 0.65rem 1.1rem 0.35rem 1.1rem;
+    }
+    .cmdk-row {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.55rem 1.1rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .cmdk-row:hover, .cmdk-row.active {
+      background: var(--surface2);
+    }
+    .cmdk-row .cmdk-icon {
+      font-size: 0.95rem;
+      width: 22px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .cmdk-row .cmdk-label {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cmdk-row .cmdk-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .cmdk-empty {
+      padding: 1.5rem 1.1rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .cmdk-footer {
+      display: flex;
+      gap: 1rem;
+      padding: 0.55rem 1.1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .cmdk-footer kbd {
+      background: var(--surface2);
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      font-family: inherit;
+      font-size: 0.7rem;
+      margin-right: 0.3rem;
+    }
+
     /* ── First-run hero ── */
     .fr-step {
       background: rgba(255,255,255,0.55);
@@ -1424,9 +1538,35 @@
   <div class="nav-right">
     <a href="index.html" class="btn btn-ghost">Home</a>
     <a href="https://github.com/bekisol/agentid" target="_blank" class="btn btn-ghost">GitHub</a>
-    <button class="btn btn-outline" id="logout-btn" style="display:none;">Sign out</button>
+    <button class="btn btn-outline" id="cmdk-btn" title="Search (⌘K)" style="display:none;font-size:0.78rem;padding:0.35rem 0.7rem;">
+    <span style="display:inline-flex;align-items:center;gap:0.45rem;">
+      <span style="opacity:0.7;">Search</span>
+      <kbd style="background:var(--surface2);padding:0.1rem 0.35rem;border-radius:3px;font-size:0.7rem;font-family:inherit;border:1px solid var(--border);color:var(--muted);">⌘K</kbd>
+    </span>
+  </button>
+  <button class="btn btn-outline" id="logout-btn" style="display:none;">Sign out</button>
   </div>
 </nav>
+
+<!-- ── COMMAND PALETTE / GLOBAL SEARCH (⌘K) ── -->
+<div id="cmdk-overlay" class="cmdk-overlay">
+  <div class="cmdk-modal">
+    <div class="cmdk-input-wrap">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="flex-shrink:0;color:var(--muted);">
+        <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M13 13l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <input id="cmdk-input" type="text" placeholder="Search agents, capabilities, groups, audit events…" autocomplete="off" />
+      <kbd class="cmdk-kbd-hint">esc</kbd>
+    </div>
+    <div id="cmdk-results" class="cmdk-results"></div>
+    <div class="cmdk-footer">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+      <span><kbd>↵</kbd> open</span>
+      <span><kbd>esc</kbd> close</span>
+    </div>
+  </div>
+</div>
 
 <!-- LOGIN -->
 <div id="login-screen">
