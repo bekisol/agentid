@@ -102,21 +102,29 @@ function scheduleSessionExpiry() {
 }
 
 function expireSession() {
+  // Clear ALL auth artefacts so we can never end up in the half-state
+  // "auth_mode = apikey but no key in storage" that confuses the next
+  // page load.
   sessionStorage.removeItem("agentid_key");
   sessionStorage.removeItem("agentid_login_ts");
+  sessionStorage.removeItem("agentid_auth_mode");
   apiKey = "";
+  authMode = "session";
   clearTimeout(sessionTimer);
   clearInterval(_anomalyTimer);
   stopSse();
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
   document.getElementById("logout-btn").style.display = "none";
-  document.getElementById("api-key-input").value = "";
+  const apiInput = document.getElementById("api-key-input");
+  if (apiInput) apiInput.value = "";
   if (trendChart) { trendChart.destroy(); trendChart = null; }
   if (capChart)   { capChart.destroy();   capChart = null; }
   const err = document.getElementById("error-msg");
-  err.textContent = "Your session expired after 8 hours. Please sign in again.";
-  err.style.display = "block";
+  if (err) {
+    err.textContent = "Your session expired. Please sign in again.";
+    err.style.display = "block";
+  }
 }
 
 // Tier agent limits
@@ -4688,6 +4696,15 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
   //      knows to re-authenticate instead of being silently logged out.
   (async () => {
     const previouslyLoggedIn = !!sessionStorage.getItem("agentid_auth_mode");
+
+    // Detect the half-state: auth_mode says "apikey" but no key is present.
+    // This happens when the session-expiry timer fired, the key was cleared,
+    // but auth_mode wasn't (older bug). Clean it up so we don't try a doomed
+    // apikey-mode load.
+    if (sessionStorage.getItem("agentid_auth_mode") === "apikey" && !apiKey) {
+      sessionStorage.removeItem("agentid_auth_mode");
+      authMode = "session";
+    }
 
     if (apiKey) {
       if (getSessionAge() >= SESSION_TTL_MS) {
