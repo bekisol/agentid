@@ -213,10 +213,17 @@ async function login() {
     }
     scheduleSessionExpiry();
   } catch (e) {
-    const status = e.message;
-    if (status === "401" || status === "403") {
+    const msg = String(e.message || "");
+    // Tier-gate 403s come back with structured detail mentioning "tier"
+    const isTierError = msg.toLowerCase().includes("tier");
+    if (msg === "401") {
       err.textContent = "Invalid API key — please check and try again.";
-    } else if (status === "429") {
+    } else if (msg === "403" || isTierError) {
+      err.innerHTML =
+        "This dashboard requires a <strong>Pro</strong> or <strong>Enterprise</strong> key. " +
+        "Your key looks valid but is on the free tier. " +
+        '<a href="https://agentid-protocol.com/pricing" target="_blank" style="color:#c9532f;text-decoration:underline">Upgrade →</a>';
+    } else if (msg === "429") {
       err.textContent = "Too many attempts — please wait a moment.";
     } else {
       err.textContent = "Could not connect to the registry. Try again shortly.";
