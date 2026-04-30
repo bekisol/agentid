@@ -953,6 +953,154 @@
     }
     .cap-pill-removable button:hover { color: var(--red); }
 
+    /* ── Peer benchmarks ── */
+    .bm-row {
+      display: grid;
+      grid-template-columns: 220px 1fr 130px;
+      gap: 1rem;
+      align-items: center;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .bm-row:last-child { border-bottom: none; }
+    .bm-label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .bm-label-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .bm-label-desc {
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .bm-bar-wrap {
+      position: relative;
+      height: 20px;
+      background: var(--surface2);
+      border-radius: 10px;
+      overflow: visible;
+    }
+    .bm-bar-you {
+      position: absolute;
+      top: 0; bottom: 0; left: 0;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #c9532f, #e9824f);
+    }
+    .bm-bar-net {
+      position: absolute;
+      top: -3px;
+      bottom: -3px;
+      width: 2px;
+      background: var(--text-2);
+    }
+    .bm-bar-net::after {
+      content: "median";
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .bm-values {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.15rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .bm-you-val {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .bm-tone {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .bm-tone-good { color: #107a3a; }
+    .bm-tone-meh  { color: #888; }
+    .bm-tone-bad  { color: #9b1f1f; }
+
+    /* ── Notification panel ── */
+    .notif-panel {
+      display: none;
+      position: absolute;
+      top: 56px;
+      right: 1rem;
+      width: 360px;
+      max-height: 480px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      z-index: 8500;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .notif-panel.open { display: flex; }
+    .notif-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .notif-list {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 380px;
+    }
+    .notif-row {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .notif-row:hover { background: var(--surface2); }
+    .notif-row:last-child { border-bottom: none; }
+    .notif-row .notif-title {
+      font-size: 0.84rem;
+      font-weight: 600;
+      margin-bottom: 0.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .notif-row .notif-desc {
+      font-size: 0.76rem;
+      color: var(--text-2);
+      line-height: 1.4;
+    }
+    .notif-row .notif-time {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+    .notif-empty {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .notif-sev-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .notif-sev-dot.high   { background: #9b1f1f; }
+    .notif-sev-dot.medium { background: #c98e1d; }
+    .notif-sev-dot.low    { background: #1f3e8e; }
+    .notif-sev-dot.ok     { background: #107a3a; }
+
     /* ── Command palette / global search ── */
     .cmdk-overlay {
       display: none;
@@ -1538,7 +1686,25 @@
   <div class="nav-right">
     <a href="index.html" class="btn btn-ghost">Home</a>
     <a href="https://github.com/bekisol/agentid" target="_blank" class="btn btn-ghost">GitHub</a>
-    <button class="btn btn-outline" id="cmdk-btn" title="Search (⌘K)" style="display:none;font-size:0.78rem;padding:0.35rem 0.7rem;">
+    <!-- Notification bell (top-right) -->
+  <button class="btn-icon" id="notif-btn" title="Notifications" style="display:none;position:relative;width:36px;height:36px;border-radius:8px;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <span id="notif-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--red, #9b1f1f);color:white;font-size:0.6rem;font-weight:700;border-radius:999px;min-width:14px;height:14px;line-height:14px;padding:0 3px;"></span>
+  </button>
+  <div id="notif-panel" class="notif-panel">
+    <div class="notif-header">
+      <span style="font-weight:600;">Notifications</span>
+      <button id="notif-clear" style="background:none;border:none;font-size:0.74rem;color:var(--muted);cursor:pointer;">Mark all read</button>
+    </div>
+    <div id="notif-list" class="notif-list">
+      <div class="notif-empty">Loading…</div>
+    </div>
+  </div>
+
+  <button class="btn btn-outline" id="cmdk-btn" title="Search (⌘K)" style="display:none;font-size:0.78rem;padding:0.35rem 0.7rem;">
     <span style="display:inline-flex;align-items:center;gap:0.45rem;">
       <span style="opacity:0.7;">Search</span>
       <kbd style="background:var(--surface2);padding:0.1rem 0.35rem;border-radius:3px;font-size:0.7rem;font-family:inherit;border:1px solid var(--border);color:var(--muted);">⌘K</kbd>
@@ -2151,6 +2317,20 @@ curl https://api.agentid-protocol.com/agents \
         <div style="font-size:0.78rem;color:var(--text-2);margin-bottom:0.5rem;">Upgrade to Pro for 10,000 agents, analytics, webhooks, and more.</div>
         <a href="index.html#pricing" style="font-size:0.78rem;font-weight:600;color:var(--accent);">View Pro plans →</a>
       </div>
+    </div>
+  </div>
+
+  <!-- Peer benchmarks (FOMO) -->
+  <div class="card" id="benchmarks-card" data-min-tier="pro" data-lock-feature="Peer benchmarks" style="margin-bottom:1.25rem;">
+    <div class="card-header" style="display:flex;align-items:center;gap:0.6rem;">
+      <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+        How you compare
+        <span class="status-pill status-pill-info">vs. network median</span>
+      </div>
+      <span style="margin-left:auto;font-size:0.72rem;color:var(--muted);" id="benchmarks-source">—</span>
+    </div>
+    <div id="benchmarks-list" style="padding:0.6rem 1rem 1rem 1rem;">
+      <div class="loading"><div class="spinner"></div> Loading…</div>
     </div>
   </div>
 

@@ -396,6 +396,8 @@ async function logout() {
   document.getElementById("logout-btn").style.display = "none";
   const cmdkBtn = document.getElementById("cmdk-btn");
   if (cmdkBtn) cmdkBtn.style.display = "none";
+  const notifBtn = document.getElementById("notif-btn");
+  if (notifBtn) notifBtn.style.display = "none";
   const apiInput = document.getElementById("api-key-input");
   if (apiInput) apiInput.value = "";
   ["login-email","login-password","signup-email","signup-password"].forEach(id => {
@@ -495,6 +497,9 @@ async function loadDashboard() {
   document.getElementById("logout-btn").style.display = "flex";
   const cmdkBtn = document.getElementById("cmdk-btn");
   if (cmdkBtn) cmdkBtn.style.display = "inline-flex";
+  const notifBtn = document.getElementById("notif-btn");
+  if (notifBtn) notifBtn.style.display = "inline-flex";
+  loadNotifications();   // populate badge on first load
 
   const tier = String(data.tier);
 
@@ -570,6 +575,7 @@ async function loadDashboard() {
     loadAnomalies();
     _loadGroups();
     _loadTrustScoreWidget();
+    loadPeerBenchmarks();
 
     // Start real-time SSE feed (or restart if already running)
     startSse();
@@ -2634,6 +2640,174 @@ async function _createWebhook() {
 
 // ── Modal open / close / tab switching ───────────────────────────────────────
 
+// ── PEER BENCHMARKS (FOMO seed) ──────────────────────────────────────────────
+
+function _toneClass(t) {
+  const s = String(t || "").toLowerCase();
+  if (s.includes("better") || s.includes("above") && !s.includes("worse")) return "bm-tone-good";
+  if (s.includes("worse") || s.includes("below") || s.includes("investigate")) return "bm-tone-bad";
+  return "bm-tone-meh";
+}
+
+async function loadPeerBenchmarks() {
+  const list = document.getElementById("benchmarks-list");
+  const src  = document.getElementById("benchmarks-source");
+  if (!list) return;
+  try {
+    const data = await apiFetch("/pro/benchmarks");
+    const metrics = data.metrics || [];
+    if (src) src.textContent = data.source === "seeded-network-median"
+      ? "Network median (industry-seeded — switching to live aggregates soon)"
+      : "Network median · live";
+
+    if (!metrics.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:0.5rem 0;">No data yet — check back after some agents register and verify.</div>';
+      return;
+    }
+
+    list.innerHTML = metrics.map(m => {
+      const has = m.you !== null && m.you !== undefined;
+      // Bar maths: scale longest of (you, net*2) to 100%
+      const max = Math.max((m.you ?? 0), (m.network ?? 0) * 2, 1);
+      const youPct = has ? Math.min(100, (m.you / max) * 100) : 0;
+      const netPct = Math.min(100, (m.network / max) * 100);
+      return `<div class="bm-row">
+        <div class="bm-label">
+          <span class="bm-label-title">${esc(m.label)}</span>
+          <span class="bm-label-desc">${esc(m.description)}</span>
+        </div>
+        <div class="bm-bar-wrap" title="You: ${esc(String(m.you ?? '—'))}${esc(m.unit||'')} · network median: ${esc(String(m.network))}${esc(m.unit||'')}">
+          <div class="bm-bar-you" style="width:${youPct}%;${has ? '' : 'opacity:0.2;'}"></div>
+          <div class="bm-bar-net" style="left:${netPct}%;"></div>
+        </div>
+        <div class="bm-values">
+          <span class="bm-you-val">${has ? esc(String(m.you)) + esc(m.unit||"") : '—'}</span>
+          <span class="bm-tone ${_toneClass(m.tone)}">${esc(m.tone)}</span>
+          <span style="font-size:0.7rem;color:var(--muted);">network: ${esc(String(m.network))}${esc(m.unit||'')}</span>
+        </div>
+      </div>`;
+    }).join("");
+  } catch (e) {
+    list.innerHTML = `<div style="color:var(--muted);font-size:0.8rem;padding:0.5rem 0;">Could not load benchmarks: ${esc(String(e.message || ""))}</div>`;
+  }
+}
+
+// ── NOTIFICATION CENTER ──────────────────────────────────────────────────────
+
+const _NOTIF_READ_KEY = "agentid_notif_read_ids";
+let   _notifs = [];
+
+function _getReadIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(_NOTIF_READ_KEY) || "[]")); }
+  catch { return new Set(); }
+}
+function _setReadIds(set) {
+  try { localStorage.setItem(_NOTIF_READ_KEY, JSON.stringify(Array.from(set))); } catch {}
+}
+
+async function loadNotifications() {
+  const list = document.getElementById("notif-list");
+  if (!list) return;
+  try {
+    // For now: anomalies = the only system-pushed notifications.
+    // Audit log + webhook deliveries can be merged in later.
+    const data = await apiFetch("/pro/anomalies");
+    const anomalies = data.anomalies || [];
+
+    _notifs = anomalies.map(a => ({
+      id:    `${a.type}-${a.detected_at}`,
+      kind:  "anomaly",
+      severity: a.severity,
+      title:    a.title,
+      desc:     a.description,
+      time:     a.detected_at,
+      action:   () => {
+        const card = document.getElementById("anomaly-card");
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    }));
+
+    _renderNotifs();
+  } catch (_) {
+    list.innerHTML = '<div class="notif-empty">Could not load notifications</div>';
+  }
+}
+
+function _renderNotifs() {
+  const list  = document.getElementById("notif-list");
+  const badge = document.getElementById("notif-badge");
+  if (!list) return;
+
+  const read = _getReadIds();
+  const unread = _notifs.filter(n => !read.has(n.id));
+
+  if (badge) {
+    if (unread.length > 0) {
+      badge.style.display = "inline-block";
+      badge.textContent = unread.length > 9 ? "9+" : String(unread.length);
+    } else {
+      badge.style.display = "none";
+    }
+  }
+
+  if (!_notifs.length) {
+    list.innerHTML = '<div class="notif-empty">✓ All clear — no notifications</div>';
+    return;
+  }
+  list.innerHTML = _notifs.map(n => {
+    const isUnread = !read.has(n.id);
+    return `<div class="notif-row" data-notif-id="${esc(n.id)}" style="${isUnread ? "background: rgba(201,83,47,0.04);" : ""}">
+      <div class="notif-title">
+        <span class="notif-sev-dot ${esc(n.severity || "low")}"></span>
+        ${esc(n.title)}
+      </div>
+      <div class="notif-desc">${esc(n.desc || "")}</div>
+      <div class="notif-time">${esc(_relativeTime(n.time))}</div>
+    </div>`;
+  }).join("");
+
+  list.querySelectorAll(".notif-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const id = row.getAttribute("data-notif-id");
+      const set = _getReadIds();
+      set.add(id);
+      _setReadIds(set);
+      const n = _notifs.find(x => x.id === id);
+      if (n?.action) n.action();
+      _renderNotifs();
+      document.getElementById("notif-panel")?.classList.remove("open");
+    });
+  });
+}
+
+function _initNotifications() {
+  const btn   = document.getElementById("notif-btn");
+  const panel = document.getElementById("notif-panel");
+  const clear = document.getElementById("notif-clear");
+  if (!btn || !panel) return;
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    panel.classList.toggle("open");
+    if (panel.classList.contains("open")) loadNotifications();
+  });
+  clear?.addEventListener("click", () => {
+    const set = _getReadIds();
+    _notifs.forEach(n => set.add(n.id));
+    _setReadIds(set);
+    _renderNotifs();
+  });
+  document.addEventListener("click", (e) => {
+    if (!panel.contains(e.target) && !btn.contains(e.target)) {
+      panel.classList.remove("open");
+    }
+  });
+  // Refresh count every 60 s
+  setInterval(() => {
+    if (apiKey || authMode === "session") loadNotifications();
+  }, 60000);
+}
+
 // ── COMMAND PALETTE / GLOBAL SEARCH ──────────────────────────────────────────
 
 const _cmdk = { open: false, items: [], cursor: 0, lastQuery: "" };
@@ -2914,6 +3088,7 @@ document.addEventListener("DOMContentLoaded", () => {
   _initSigningSearch();  // one-time — survives every table redraw
 
   _cmdkInit();
+  _initNotifications();
   document.getElementById("login-btn")?.addEventListener("click", login);
   document.getElementById("logout-btn")?.addEventListener("click", logout);
   document.getElementById("api-key-input")?.addEventListener("keydown", (e) => {

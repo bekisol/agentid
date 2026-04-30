@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentID Status</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --surface: #ffffff;
+    --surface2: #f5f4ef;
+    --text: #1f1f1f;
+    --text-2: #4a4a4a;
+    --muted: #888;
+    --border: #ebe9e2;
+    --green: #107a3a;
+    --green-bg: #d8f5e3;
+    --red: #9b1f1f;
+    --red-bg: #fadcdc;
+    --yellow: #8a4a00;
+    --yellow-bg: #fff1d6;
+    --accent: #c9532f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, -apple-system, system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+  }
+  header { margin-bottom: 2rem; }
+  header h1 {
+    margin: 0 0 0.4rem 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+  header .sub {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .overall {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.4rem 1.6rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .overall.ok    { border-left: 4px solid var(--green); }
+  .overall.warn  { border-left: 4px solid var(--yellow); }
+  .overall.down  { border-left: 4px solid var(--red); }
+  .overall .dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 4px rgba(255,255,255,1);
+  }
+  .overall.ok    .dot { background: var(--green); animation: pulse-ok 2s infinite; }
+  .overall.warn  .dot { background: #c98e1d; }
+  .overall.down  .dot { background: var(--red); }
+  @keyframes pulse-ok {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16,122,58,0.4); }
+    50%       { box-shadow: 0 0 0 8px rgba(16,122,58,0); }
+  }
+  .overall .label {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .overall .meta {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 0.2rem;
+  }
+
+  .components {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .components h2 {
+    margin: 0;
+    padding: 1rem 1.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .component {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.95rem 1.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .component:last-child { border-bottom: none; }
+  .component .name {
+    flex: 1;
+    font-weight: 500;
+  }
+  .component .desc {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 0.15rem;
+  }
+  .pill {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+  }
+  .pill-ok    { background: var(--green-bg); color: var(--green); }
+  .pill-warn  { background: var(--yellow-bg); color: var(--yellow); }
+  .pill-down  { background: var(--red-bg); color: var(--red); }
+  .latency {
+    font-size: 0.74rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 60px;
+    text-align: right;
+  }
+  .uptime-bars {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+  }
+  .uptime-bar {
+    width: 5px;
+    height: 22px;
+    background: var(--green);
+    border-radius: 1px;
+  }
+  .uptime-bar.warn { background: #c98e1d; }
+  .uptime-bar.down { background: var(--red); }
+  .uptime-bar.unknown { background: #d6d3c8; }
+
+  .incidents {
+    margin-top: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.4rem 1.6rem;
+  }
+  .incidents h2 {
+    margin: 0 0 0.85rem 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .incidents .none {
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.78rem;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: space-between;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --surface: #232323;
+      --surface2: #2a2a2a;
+      --text: #e8e8e8;
+      --text-2: #c0c0c0;
+      --muted: #888;
+      --border: #333;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>AgentID Status</h1>
+    <div class="sub">Public status of the AgentID Protocol API and dashboard.</div>
+  </header>
+
+  <div id="overall" class="overall ok">
+    <span class="dot"></span>
+    <div>
+      <div class="label" id="overall-label">Checking…</div>
+      <div class="meta" id="overall-meta">Last updated: just now</div>
+    </div>
+  </div>
+
+  <div class="components">
+    <h2>Components</h2>
+    <div class="component" data-component="api">
+      <div style="flex:1;">
+        <div class="name">API · api.agentid-protocol.com</div>
+        <div class="desc">Core REST API for agent registration, verification, and resolution</div>
+      </div>
+      <div class="uptime-bars" id="api-bars"></div>
+      <div class="latency" id="api-latency">—</div>
+      <span class="pill pill-ok" id="api-pill">checking…</span>
+    </div>
+    <div class="component" data-component="dashboard">
+      <div style="flex:1;">
+        <div class="name">Dashboard · GitHub Pages</div>
+        <div class="desc">Pro analytics dashboard hosted on GitHub Pages</div>
+      </div>
+      <div class="uptime-bars" id="dashboard-bars"></div>
+      <div class="latency" id="dashboard-latency">—</div>
+      <span class="pill pill-ok" id="dashboard-pill">checking…</span>
+    </div>
+    <div class="component" data-component="docs">
+      <div style="flex:1;">
+        <div class="name">Documentation</div>
+        <div class="desc">Public docs and API reference</div>
+      </div>
+      <div class="uptime-bars" id="docs-bars"></div>
+      <div class="latency" id="docs-latency">—</div>
+      <span class="pill pill-ok" id="docs-pill">checking…</span>
+    </div>
+  </div>
+
+  <div class="incidents">
+    <h2>Recent incidents</h2>
+    <div class="none" id="incidents-list">No incidents in the last 30 days.</div>
+  </div>
+
+  <footer>
+    <span>Auto-refreshes every 60 seconds.</span>
+    <span>
+      <a href="https://github.com/bekisol/agentid" target="_blank">GitHub</a>
+      &middot;
+      <a href="dashboard.html">Dashboard</a>
+      &middot;
+      <a href="https://agentid-protocol.com">agentid-protocol.com</a>
+    </span>
+  </footer>
+</div>
+
+<script>
+const API_BASE = "https://api.agentid-protocol.com";
+
+// Track uptime samples in localStorage so the bars persist across refreshes
+const SAMPLES_KEY = "agentid_status_samples_v1";
+const MAX_BARS    = 60;   // 60 samples = 1 hour of history at 1/min
+
+function loadSamples() {
+  try { return JSON.parse(localStorage.getItem(SAMPLES_KEY) || "{}"); }
+  catch { return {}; }
+}
+function saveSamples(s) {
+  try { localStorage.setItem(SAMPLES_KEY, JSON.stringify(s)); } catch {}
+}
+
+function pushSample(name, status, latency) {
+  const all = loadSamples();
+  const arr = all[name] || [];
+  arr.push({ status, latency, ts: Date.now() });
+  if (arr.length > MAX_BARS) arr.splice(0, arr.length - MAX_BARS);
+  all[name] = arr;
+  saveSamples(all);
+  return arr;
+}
+
+function renderBars(name, samples) {
+  const el = document.getElementById(name + "-bars");
+  if (!el) return;
+  // Always render MAX_BARS slots; pad with "unknown" for missing history
+  const padded = Array(Math.max(0, MAX_BARS - samples.length)).fill({ status: "unknown" }).concat(samples);
+  el.innerHTML = padded.map(s =>
+    `<span class="uptime-bar ${s.status === "ok" ? "" : s.status}" title="${s.status === "unknown" ? "no data" : s.status + (s.latency ? " · " + s.latency + "ms" : "")}"></span>`
+  ).join("");
+}
+
+async function probe(name, url, opts = {}) {
+  const start = performance.now();
+  try {
+    const res = await fetch(url, { method: opts.method || "GET", mode: "cors" });
+    const latency = Math.round(performance.now() - start);
+    const status = res.ok ? "ok" : (res.status >= 500 ? "down" : "warn");
+    return { status, latency };
+  } catch {
+    return { status: "down", latency: null };
+  }
+}
+
+async function check() {
+  const checks = await Promise.all([
+    probe("api",        API_BASE + "/health"),
+    probe("dashboard",  location.origin + "/dashboard.html"),   // self
+    probe("docs",       location.origin + "/index.html"),
+  ]);
+  const names = ["api", "dashboard", "docs"];
+  const results = {};
+  checks.forEach((r, i) => {
+    const name = names[i];
+    results[name] = r;
+    const samples = pushSample(name, r.status, r.latency);
+    renderBars(name, samples);
+
+    const pill = document.getElementById(name + "-pill");
+    const lat  = document.getElementById(name + "-latency");
+    if (r.status === "ok") {
+      pill.className = "pill pill-ok";
+      pill.textContent = "Operational";
+    } else if (r.status === "warn") {
+      pill.className = "pill pill-warn";
+      pill.textContent = "Degraded";
+    } else {
+      pill.className = "pill pill-down";
+      pill.textContent = "Outage";
+    }
+    lat.textContent = r.latency != null ? r.latency + " ms" : "—";
+  });
+
+  // Overall — worst of any component
+  const worstOrder = ["ok", "warn", "down"];
+  const worst = Object.values(results).reduce((acc, r) =>
+    worstOrder.indexOf(r.status) > worstOrder.indexOf(acc) ? r.status : acc, "ok");
+  const overall = document.getElementById("overall");
+  const label   = document.getElementById("overall-label");
+  const meta    = document.getElementById("overall-meta");
+  overall.className = "overall " + worst;
+  label.textContent =
+    worst === "ok"   ? "All systems operational" :
+    worst === "warn" ? "Some systems degraded" :
+                       "Major outage detected";
+  meta.textContent = "Last checked: " + new Date().toLocaleTimeString();
+}
+
+// Init
+check();
+setInterval(check, 60000);
+</script>
+
+</body>
+</html>
