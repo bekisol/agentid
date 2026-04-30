@@ -953,6 +953,57 @@
     }
     .cap-pill-removable button:hover { color: var(--red); }
 
+    /* ── Auth tabs (login / signup / api key) ── */
+    .auth-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1rem;
+      margin-top: -0.4rem;
+    }
+    .auth-tab {
+      flex: 1;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 0.65rem 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .auth-tab:hover { color: var(--text); }
+    .auth-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+    .auth-panel {
+      display: none;
+    }
+    .auth-panel.active {
+      display: block;
+    }
+    .auth-input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background: var(--surface);
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .auth-input:focus { border-color: var(--accent); }
+    .auth-submit {
+      width: 100%;
+      margin-top: 0.85rem;
+    }
+
     /* ── Pro-grade card chrome ── */
     .status-pill {
       display: inline-flex;
@@ -1297,20 +1348,53 @@
   <div class="login-wrap">
     <div class="login-header">
       <div class="login-icon-wrap">🔑</div>
-      <h1>Dashboard</h1>
-      <p>Enter your Pro or Enterprise API key to access analytics, audit logs, and agent activity.</p>
+      <h1>Sign in</h1>
+      <p id="login-tagline">Sign in to access analytics, audit logs, and agent activity.</p>
     </div>
 
     <div class="login-card">
-      <label class="field-label" for="api-key-input">API Key</label>
-      <div class="input-row">
-        <input type="password" id="api-key-input" placeholder="agentid_pro_..." autocomplete="off" spellcheck="false" />
-        <button class="btn btn-primary" id="login-btn" style="flex-shrink:0;">Connect</button>
+      <!-- Tabs: Sign in · Sign up · API key -->
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" data-auth-tab="login">Sign in</button>
+        <button type="button" class="auth-tab"        data-auth-tab="signup">Sign up</button>
+        <button type="button" class="auth-tab"        data-auth-tab="apikey">API key</button>
       </div>
-      <div class="error-msg" id="error-msg">Invalid API key — please check and try again.</div>
-      <div class="login-footer-note">
-        Don't have a Pro key? <a href="index.html#pricing">View pricing →</a>
+
+      <!-- Sign in panel -->
+      <div class="auth-panel active" data-auth-panel="login">
+        <label class="field-label" for="login-email">Email</label>
+        <input class="auth-input" id="login-email" type="email" placeholder="you@company.com" autocomplete="email" />
+        <label class="field-label" for="login-password" style="margin-top:0.6rem;">Password</label>
+        <input class="auth-input" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" />
+        <button class="btn btn-primary auth-submit" id="account-login-btn">Sign in</button>
       </div>
+
+      <!-- Sign up panel -->
+      <div class="auth-panel" data-auth-panel="signup">
+        <label class="field-label" for="signup-email">Email</label>
+        <input class="auth-input" id="signup-email" type="email" placeholder="you@company.com" autocomplete="email" />
+        <label class="field-label" for="signup-password" style="margin-top:0.6rem;">Password</label>
+        <input class="auth-input" id="signup-password" type="password" placeholder="at least 8 characters" autocomplete="new-password" />
+        <button class="btn btn-primary auth-submit" id="account-signup-btn">Create account</button>
+        <div class="login-footer-note">
+          By signing up you agree to the <a href="https://agentid-protocol.com/terms" target="_blank">Terms</a>
+          and <a href="https://agentid-protocol.com/privacy" target="_blank">Privacy Policy</a>.
+        </div>
+      </div>
+
+      <!-- API key panel (legacy / SDK users) -->
+      <div class="auth-panel" data-auth-panel="apikey">
+        <label class="field-label" for="api-key-input">API Key</label>
+        <div class="input-row">
+          <input type="password" id="api-key-input" placeholder="agentid_..." autocomplete="off" spellcheck="false" />
+          <button class="btn btn-primary" id="login-btn" style="flex-shrink:0;">Connect</button>
+        </div>
+        <div class="login-footer-note">
+          Recommended for SDKs and CI. For dashboard access, sign in with email instead.
+        </div>
+      </div>
+
+      <div class="error-msg" id="error-msg" style="display:none;"></div>
     </div>
   </div>
 </div>

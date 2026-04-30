@@ -164,24 +164,37 @@ function timeAgo(isoStr) {
   return `${days}d ago`;
 }
 
+// Auth mode:
+//   "session" — logged in via /auth/login, server identifies us by cookie
+//   "apikey"  — legacy: raw key in sessionStorage, sent as x-api-key header
+let authMode = sessionStorage.getItem("agentid_auth_mode") || (apiKey ? "apikey" : "session");
+
 async function apiFetch(path, options = {}) {
-  // Self-heal: if our in-memory apiKey was cleared but sessionStorage still
-  // has one, reuse it. This avoids spurious 401s in narrow race conditions
-  // (e.g. cross-tab sync resetting the local var after a redirect/reload).
-  if (!apiKey) {
+  const headers = { ...options.headers };
+
+  // Self-heal API key from sessionStorage (cross-tab race safety)
+  if (authMode === "apikey" && !apiKey) {
     const stored = sessionStorage.getItem("agentid_key");
     if (stored) {
       apiKey = stored;
       console.warn("[apiFetch] in-memory apiKey was empty — recovered from sessionStorage");
-    } else {
-      console.warn("[apiFetch] No API key when calling " + path + " · sessionStorage also empty");
     }
   }
-  const headers = { "x-api-key": apiKey, ...options.headers };
+  if (authMode === "apikey" && apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
   if (options.body && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
-  const res = await fetch(BASE + path, { ...options, headers });
+
+  // credentials:"include" lets the browser carry the agentid_session cookie
+  // on cross-origin requests (api.agentid-protocol.com ↔ bekisol.github.io).
+  // Harmless when the cookie isn't present (apikey mode).
+  const res = await fetch(BASE + path, {
+    ...options,
+    credentials: "include",
+    headers,
+  });
   if (!res.ok) {
     let msg = res.status;
     try { const j = await res.json(); msg = j.detail || j.message || msg; } catch (_) {}
@@ -193,32 +206,156 @@ async function apiFetch(path, options = {}) {
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 
+function _showAuthError(text, html = false) {
+  const err = document.getElementById("error-msg");
+  if (!err) return;
+  if (html) err.innerHTML = text; else err.textContent = text;
+  err.style.display = "block";
+}
+
+function _clearAuthError() {
+  const err = document.getElementById("error-msg");
+  if (err) err.style.display = "none";
+}
+
+function _authMessageForStatus(msg) {
+  const isTierError = msg.toLowerCase().includes("tier");
+  if (msg === "401") return "Invalid email or password.";
+  if (msg === "403" || isTierError) {
+    return {
+      html: "This dashboard requires a <strong>Pro</strong> or <strong>Enterprise</strong> account. " +
+            "You're on the free tier. " +
+            '<a href="https://agentid-protocol.com/pricing" target="_blank" style="color:#c9532f;text-decoration:underline">Upgrade →</a>'
+    };
+  }
+  if (msg === "409") return "An account with that email already exists.";
+  if (msg === "429") return "Too many attempts — please wait a moment.";
+  if (msg.toLowerCase().includes("password")) return msg;  // surface server password complaints
+  if (msg.toLowerCase().includes("email"))    return msg;
+  return "Could not connect — try again shortly.";
+}
+
+/**
+ * Account login: POST /auth/login → server sets the agentid_session cookie.
+ * After this, every apiFetch carries the cookie automatically.
+ */
+async function accountLogin() {
+  const email = document.getElementById("login-email").value.trim();
+  const pw    = document.getElementById("login-password").value;
+  const btn   = document.getElementById("account-login-btn");
+
+  _clearAuthError();
+  if (!email || !pw) {
+    _showAuthError("Please enter your email and password.");
+    return;
+  }
+  btn.textContent = "Signing in…";
+  btn.disabled = true;
+  try {
+    const r = await fetch(BASE + "/auth/login", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: pw }),
+    });
+    if (!r.ok) {
+      let msg = String(r.status);
+      try { const j = await r.json(); msg = j.detail || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    // Cookie is now set; switch the dashboard into "session" auth mode.
+    authMode = "session";
+    sessionStorage.setItem("agentid_auth_mode", "session");
+    sessionStorage.setItem("agentid_login_ts", String(Date.now()));
+    apiKey = "";   // we don't carry a raw key in this mode
+    sessionStorage.removeItem("agentid_key");
+
+    await loadDashboard();
+    scheduleSessionExpiry();
+  } catch (e) {
+    const msg = String(e.message || "");
+    const result = _authMessageForStatus(msg);
+    if (typeof result === "object" && result.html) _showAuthError(result.html, true);
+    else _showAuthError(result || msg);
+  } finally {
+    btn.textContent = "Sign in";
+    btn.disabled = false;
+  }
+}
+
+/**
+ * Account signup: POST /auth/signup → server creates user, sets cookie.
+ */
+async function accountSignup() {
+  const email = document.getElementById("signup-email").value.trim();
+  const pw    = document.getElementById("signup-password").value;
+  const btn   = document.getElementById("account-signup-btn");
+
+  _clearAuthError();
+  if (!email || !pw) {
+    _showAuthError("Please enter your email and password.");
+    return;
+  }
+  if (pw.length < 8) {
+    _showAuthError("Password must be at least 8 characters.");
+    return;
+  }
+  btn.textContent = "Creating account…";
+  btn.disabled = true;
+  try {
+    const r = await fetch(BASE + "/auth/signup", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: pw }),
+    });
+    if (!r.ok) {
+      let msg = String(r.status);
+      try { const j = await r.json(); msg = j.detail || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    authMode = "session";
+    sessionStorage.setItem("agentid_auth_mode", "session");
+    sessionStorage.setItem("agentid_login_ts", String(Date.now()));
+    apiKey = "";
+    sessionStorage.removeItem("agentid_key");
+
+    await loadDashboard();
+    scheduleSessionExpiry();
+  } catch (e) {
+    const msg = String(e.message || "");
+    _showAuthError(_authMessageForStatus(msg) || msg);
+  } finally {
+    btn.textContent = "Create account";
+    btn.disabled = false;
+  }
+}
+
+/**
+ * Legacy API-key login — same flow as before, but now auto-sets authMode.
+ */
 async function login() {
   const input = document.getElementById("api-key-input");
   const btn   = document.getElementById("login-btn");
-  const err   = document.getElementById("error-msg");
+  _clearAuthError();
 
   apiKey = input.value.trim();
-  err.style.display = "none";
-
   if (!apiKey) {
-    err.textContent = "Please enter your API key.";
-    err.style.display = "block";
+    _showAuthError("Please enter your API key.");
     return;
   }
 
   btn.textContent = "Connecting…";
   btn.disabled = true;
-
   try {
+    authMode = "apikey";
+    sessionStorage.setItem("agentid_auth_mode", "apikey");
     await loadDashboard();
     sessionStorage.setItem("agentid_key", apiKey);
     sessionStorage.setItem("agentid_login_ts", String(Date.now()));
-    // Notify sibling tabs — BroadcastChannel (no storage) or localStorage fallback
     if (window._bcTabSync) {
       window._bcTabSync.postMessage({ type: "response", key: apiKey, ts: Date.now() });
     } else {
-      // Fallback: write then immediately delete — key in localStorage for ≤1 tick
       const sync = JSON.stringify({ key: apiKey, ts: Date.now(), origin: location.origin });
       localStorage.setItem("agentid_tab_sync", sync);
       setTimeout(() => localStorage.removeItem("agentid_tab_sync"), 0);
@@ -226,21 +363,9 @@ async function login() {
     scheduleSessionExpiry();
   } catch (e) {
     const msg = String(e.message || "");
-    // Tier-gate 403s come back with structured detail mentioning "tier"
-    const isTierError = msg.toLowerCase().includes("tier");
-    if (msg === "401") {
-      err.textContent = "Invalid API key — please check and try again.";
-    } else if (msg === "403" || isTierError) {
-      err.innerHTML =
-        "This dashboard requires a <strong>Pro</strong> or <strong>Enterprise</strong> key. " +
-        "Your key looks valid but is on the free tier. " +
-        '<a href="https://agentid-protocol.com/pricing" target="_blank" style="color:#c9532f;text-decoration:underline">Upgrade →</a>';
-    } else if (msg === "429") {
-      err.textContent = "Too many attempts — please wait a moment.";
-    } else {
-      err.textContent = "Could not connect to the registry. Try again shortly.";
-    }
-    err.style.display = "block";
+    const result = _authMessageForStatus(msg);
+    if (typeof result === "object" && result.html) _showAuthError(result.html, true);
+    else _showAuthError(result === "Invalid email or password." ? "Invalid API key — please check and try again." : (result || msg));
     apiKey = "";
   } finally {
     btn.textContent = "Connect";
@@ -248,17 +373,33 @@ async function login() {
   }
 }
 
-function logout() {
+async function logout() {
+  // If we're in session mode, tell the server to revoke the cookie.
+  if (authMode === "session") {
+    try {
+      await fetch(BASE + "/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (_) { /* network failure — local cleanup still happens */ }
+  }
   sessionStorage.removeItem("agentid_key");
   sessionStorage.removeItem("agentid_login_ts");
+  sessionStorage.removeItem("agentid_auth_mode");
   apiKey = "";
+  authMode = "session";   // default for next visit
   clearTimeout(sessionTimer);
   clearInterval(_anomalyTimer);
   stopSse();
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
   document.getElementById("logout-btn").style.display = "none";
-  document.getElementById("api-key-input").value = "";
+  const apiInput = document.getElementById("api-key-input");
+  if (apiInput) apiInput.value = "";
+  ["login-email","login-password","signup-email","signup-password"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
   if (trendChart) { trendChart.destroy(); trendChart = null; }
   if (capChart)   { capChart.destroy();   capChart = null; }
 }
@@ -324,9 +465,15 @@ const isPro        = () => CURRENT_TIER === "pro" || CURRENT_TIER === "enterpris
 const isEnterprise = () => CURRENT_TIER === "enterprise";
 
 async function loadDashboard() {
-  // First call — works for any tier including free. Validates the key and
-  // returns owner + tier so we know what to render.
-  const me = await apiFetch("/pro/keys/me");
+  // First call — works for any tier including free. Validates the credential
+  // (cookie or API key) and returns owner + tier so we know what to render.
+  // Session mode: hit /auth/me; API-key mode: hit /pro/keys/me (returns label etc.)
+  const meRaw = authMode === "session"
+    ? await apiFetch("/auth/me")
+    : await apiFetch("/pro/keys/me");
+  const me = authMode === "session"
+    ? { owner: meRaw.email, tier: meRaw.tier }
+    : meRaw;
   CURRENT_TIER = String(me.tier || "free");
 
   // Pro/Enterprise users get the full analytics payload. Free tier skips it.
@@ -2443,10 +2590,35 @@ document.addEventListener("DOMContentLoaded", () => {
   _initSigningPager();   // one-time — survives every table redraw
   _initSigningSearch();  // one-time — survives every table redraw
 
-  document.getElementById("login-btn").addEventListener("click", login);
-  document.getElementById("logout-btn").addEventListener("click", logout);
-  document.getElementById("api-key-input").addEventListener("keydown", (e) => {
+  document.getElementById("login-btn")?.addEventListener("click", login);
+  document.getElementById("logout-btn")?.addEventListener("click", logout);
+  document.getElementById("api-key-input")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") login();
+  });
+
+  // Account auth (email + password)
+  document.getElementById("account-login-btn")?.addEventListener("click", accountLogin);
+  document.getElementById("account-signup-btn")?.addEventListener("click", accountSignup);
+  ["login-email","login-password"].forEach(id => {
+    document.getElementById(id)?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") accountLogin();
+    });
+  });
+  ["signup-email","signup-password"].forEach(id => {
+    document.getElementById(id)?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") accountSignup();
+    });
+  });
+
+  // Tab switcher (Sign in / Sign up / API key)
+  document.querySelectorAll(".auth-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      const target = tab.getAttribute("data-auth-tab");
+      document.querySelectorAll(".auth-tab").forEach(t => t.classList.toggle("active", t === tab));
+      document.querySelectorAll(".auth-panel").forEach(p =>
+        p.classList.toggle("active", p.getAttribute("data-auth-panel") === target));
+      _clearAuthError();
+    });
   });
   document.getElementById("refresh-btn").addEventListener("click", () => {
     if (trendChart) { trendChart.destroy(); trendChart = null; }
@@ -3345,18 +3517,42 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
   // ── Trust Score Fleet Widget ──────────────────────────────────────────────
   document.getElementById("trust-score-refresh")?.addEventListener("click", _loadTrustScoreWidget);
 
-  // Auto-login if key in sessionStorage and session not expired
-  if (apiKey) {
-    if (getSessionAge() >= SESSION_TTL_MS) {
-      expireSession();
-    } else {
-      loadDashboard()
-        .then(() => scheduleSessionExpiry())
-        .catch(() => {
-          sessionStorage.removeItem("agentid_key");
-          sessionStorage.removeItem("agentid_login_ts");
-          apiKey = "";
-        });
+  // Auto-login on page load.
+  //   1. If we have a raw API key in sessionStorage → resume API-key mode
+  //   2. Otherwise probe /auth/me — if the server still has a session
+  //      cookie for us, log straight in. The browser handles the cookie;
+  //      JS never sees it.
+  (async () => {
+    if (apiKey) {
+      if (getSessionAge() >= SESSION_TTL_MS) {
+        expireSession();
+        return;
+      }
+      authMode = "apikey";
+      sessionStorage.setItem("agentid_auth_mode", "apikey");
+      try {
+        await loadDashboard();
+        scheduleSessionExpiry();
+      } catch {
+        sessionStorage.removeItem("agentid_key");
+        sessionStorage.removeItem("agentid_login_ts");
+        apiKey = "";
+      }
+      return;
     }
-  }
+
+    // No raw key — try the cookie path silently.
+    try {
+      const r = await fetch(BASE + "/auth/me", { credentials: "include" });
+      if (r.ok) {
+        authMode = "session";
+        sessionStorage.setItem("agentid_auth_mode", "session");
+        sessionStorage.setItem("agentid_login_ts",
+          sessionStorage.getItem("agentid_login_ts") || String(Date.now()));
+        await loadDashboard();
+        scheduleSessionExpiry();
+      }
+      // 401 = no cookie / expired → leave login screen visible. No error needed.
+    } catch (_) { /* network failure — leave login screen */ }
+  })();
 });
