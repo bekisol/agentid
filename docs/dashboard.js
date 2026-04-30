@@ -1226,7 +1226,8 @@ function _renderAgentRow(a) {
     <td style="color:var(--muted);font-size:0.78rem;">${esc(createdStr)}</td>
     <td>${privacyBtn}</td>
     <td style="white-space:nowrap;">
-      <button class="agent-action-btn" data-action="verify" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="Test verify a signed payload against this agent">Test</button>
+      <button class="agent-action-btn" data-action="details" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="View agent details, trust graph, recent activity">Details</button>
+      <button class="agent-action-btn" data-action="verify" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="Test verify a signed payload against this agent" style="margin-left:0.3rem;">Test</button>
       <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="Copy-paste code snippets for this agent" style="margin-left:0.3rem;">&lt;/&gt;</button>
     </td>
   </tr>`;
@@ -2640,6 +2641,148 @@ async function _createWebhook() {
 
 // ── Modal open / close / tab switching ───────────────────────────────────────
 
+// ── AGENT DETAIL DRAWER ──────────────────────────────────────────────────────
+
+async function _openAgentDetail(did, name) {
+  const drawer = document.getElementById("agent-drawer");
+  const body   = document.getElementById("ad-body");
+  if (!drawer) return;
+  document.getElementById("ad-name").textContent = name || "(unnamed)";
+  document.getElementById("ad-did").textContent  = did;
+  drawer.classList.add("open");
+  body.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+
+  try {
+    // Parallel fetches — keep it snappy
+    const [agent, edges, compromised] = await Promise.all([
+      apiFetch("/agents/" + encodeURIComponent(did)).catch(() => null),
+      apiFetch("/trust/graph/" + encodeURIComponent(did) + "?direction=both&limit=20").catch(() => null),
+      apiFetch("/trust/compromised/check/" + encodeURIComponent(did)).catch(() => null),
+    ]);
+
+    const sections = [];
+
+    // Section 1 — Agent
+    if (agent) {
+      sections.push(`
+        <div class="ad-section">
+          <h4>Agent</h4>
+          <div class="ad-kv">
+            <span class="k">Name</span><span class="v">${esc(agent.name || "—")}</span>
+            <span class="k">Owner</span><span class="v">${esc(agent.owner || "—")}</span>
+            <span class="k">Capabilities</span><span class="v">${(agent.capabilities||[]).map(c => '<span class="op-pill op-pill-other" style="margin-right:0.3rem;">'+esc(c)+'</span>').join("")}</span>
+            <span class="k">Visibility</span><span class="v">${agent.private ? '<span class="status-pill status-pill-warn">private</span>' : '<span class="status-pill status-pill-good">public</span>'}</span>
+            <span class="k">Created</span><span class="v">${esc(agent.created_at || "—")}</span>
+            <span class="k">Public key</span><span class="v"><code style="font-size:0.74rem;">${esc(agent.public_key || "—")}</code></span>
+          </div>
+        </div>`);
+    }
+
+    // Section 2 — Trust status
+    if (compromised) {
+      const isComp = compromised.compromised;
+      const sevPill = isComp
+        ? `<span class="status-pill status-pill-bad">⚠ ${esc(compromised.severity || "compromised")}</span>`
+        : '<span class="status-pill status-pill-good">✓ no reports</span>';
+      sections.push(`
+        <div class="ad-section">
+          <h4>Trust network status</h4>
+          <div class="ad-kv">
+            <span class="k">Reputation</span><span class="v">${sevPill}${isComp ? ` &middot; ${compromised.report_count} report${compromised.report_count !== 1 ? "s" : ""}` : ""}</span>
+            <span class="k">Trust badge</span><span class="v">
+              <img src="${BASE}/trust/badge/${encodeURIComponent(did)}.svg" alt="trust badge" style="vertical-align:middle;height:22px;border-radius:3px;" />
+              <button class="btn btn-outline" data-copy-trust-badge="${esc(did)}" style="font-size:0.72rem;padding:0.2rem 0.55rem;margin-left:0.4rem;">Copy &lt;img&gt;</button>
+            </span>
+          </div>
+        </div>`);
+    }
+
+    // Section 3 — Recent verification edges
+    if (edges) {
+      const ins  = (edges.in  || []).slice(0, 8);
+      const outs = (edges.out || []).slice(0, 8);
+      const formatEdge = e => `
+        <div style="display:flex;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid var(--border);font-size:0.78rem;align-items:center;">
+          <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.counterparty)}</span>
+          <span style="color:var(--muted);font-size:0.72rem;">${esc(_relativeTime(e.ts))}</span>
+          <span class="status-pill ${e.valid ? 'status-pill-good' : 'status-pill-bad'}">${e.valid ? "valid" : "invalid"}</span>
+        </div>`;
+      sections.push(`
+        <div class="ad-section">
+          <h4>Recent verifications (in)</h4>
+          ${ins.length ? ins.map(formatEdge).join("") : '<div style="color:var(--muted);font-size:0.78rem;">No incoming edges yet</div>'}
+        </div>
+        <div class="ad-section">
+          <h4>Recent verifications (out)</h4>
+          ${outs.length ? outs.map(formatEdge).join("") : '<div style="color:var(--muted);font-size:0.78rem;">No outgoing edges yet</div>'}
+        </div>`);
+    }
+
+    sections.push(`
+      <div class="ad-section">
+        <h4>Quick actions</h4>
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+          <button class="btn btn-outline" data-ad-action="test"     data-did="${esc(did)}" data-name="${esc(name)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Test verify</button>
+          <button class="btn btn-outline" data-ad-action="snippets" data-did="${esc(did)}" data-name="${esc(name)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Code snippets</button>
+          <button class="btn btn-outline" data-ad-action="report"   data-did="${esc(did)}"  style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--red);border-color:var(--red);">Report compromised</button>
+        </div>
+      </div>`);
+
+    body.innerHTML = sections.join("");
+
+    // Wire copy + actions
+    body.querySelectorAll("[data-copy-trust-badge]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const d = btn.getAttribute("data-copy-trust-badge");
+        navigator.clipboard.writeText(`<img src="${BASE}/trust/badge/${encodeURIComponent(d)}.svg" alt="AgentID trust badge" />`).catch(()=>{});
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = "Copy <img>"; }, 1500);
+      });
+    });
+    body.querySelectorAll("[data-ad-action]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const a = btn.getAttribute("data-ad-action");
+        const d = btn.getAttribute("data-did");
+        const n = btn.getAttribute("data-name");
+        if (a === "test")     { _closeDrawer(); _openTestVerify(d, n); }
+        if (a === "snippets") { _closeDrawer(); _openSnippets(d, n); }
+        if (a === "report")   { _openReportCompromised(d); }
+      });
+    });
+  } catch (e) {
+    body.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">Could not load agent: ${esc(String(e.message || ""))}</div>`;
+  }
+}
+
+function _closeDrawer() {
+  document.getElementById("agent-drawer")?.classList.remove("open");
+}
+
+async function _openReportCompromised(did) {
+  const reason = prompt("Why is this DID compromised? (key leak, impersonation, malicious behavior, deprecated)\n\nProvide a short explanation:");
+  if (!reason) return;
+  const kindRaw = prompt("Kind — one of: key_leak | impersonation | malicious_behavior | deprecated", "key_leak");
+  if (!kindRaw) return;
+  try {
+    await apiFetch("/trust/report", {
+      method: "POST",
+      body: JSON.stringify({ did, kind: kindRaw, reason, severity: "high" }),
+    });
+    alert("Report filed. Other customers' verify paths will start flagging this DID within seconds.");
+    _closeDrawer();
+  } catch (e) {
+    alert("Failed: " + (e.message || ""));
+  }
+}
+
+// Drawer close handlers (one-time wiring)
+document.addEventListener("click", (e) => {
+  if (e.target.matches("#ad-close, .agent-drawer-backdrop")) _closeDrawer();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") _closeDrawer();
+});
+
 // ── PEER BENCHMARKS (FOMO seed) ──────────────────────────────────────────────
 
 function _toneClass(t) {
@@ -3108,6 +3251,53 @@ document.addEventListener("DOMContentLoaded", () => {
       if (e.key === "Enter") accountSignup();
     });
   });
+
+  // Forgot-password — request a reset link
+  document.getElementById("forgot-password-link")?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("login-email").value.trim()
+                || prompt("Enter the email associated with your account:");
+    if (!email) return;
+    try {
+      await fetch(BASE + "/auth/request-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      _showAuthError(`If an account exists for ${email}, a reset link has been sent.`);
+    } catch (_) {
+      _showAuthError("Could not send reset link — try again shortly.");
+    }
+  });
+
+  // URL-fragment driven flows: #reset-password=TOKEN  or  #verify-email=TOKEN
+  (function _handleAuthFragment() {
+    const m = location.hash.match(/^#(reset-password|verify-email)=([\w-]+)/);
+    if (!m) return;
+    const kind = m[1], token = m[2];
+    if (kind === "reset-password") {
+      const pw = prompt("Enter a new password (8+ characters):");
+      if (!pw) return;
+      fetch(BASE + "/auth/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password: pw }),
+      }).then(r => r.ok
+        ? alert("Password updated! Please sign in with your new password.")
+        : r.json().then(j => alert("Failed: " + (j.detail || "invalid token")))
+      ).finally(() => { location.hash = ""; });
+    }
+    if (kind === "verify-email") {
+      fetch(BASE + "/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      }).then(r => r.ok
+        ? alert("Email verified ✓")
+        : r.json().then(j => alert("Failed: " + (j.detail || "invalid token")))
+      ).finally(() => { location.hash = ""; });
+    }
+  })();
 
   // Tab switcher (Sign in / Sign up / API key)
   document.querySelectorAll(".auth-tab").forEach(tab => {
@@ -3643,6 +3833,7 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
     const btn = e.target.closest(".agent-action-btn");
     if (!btn) return;
     const { action, did, name } = btn.dataset;
+    if (action === "details")  _openAgentDetail(did, name);
     if (action === "verify")   _openTestVerify(did, name);
     if (action === "snippets") _openSnippets(did, name);
   });
