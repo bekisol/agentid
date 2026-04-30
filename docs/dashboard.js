@@ -251,10 +251,75 @@ function logout() {
   if (capChart)   { capChart.destroy();   capChart = null; }
 }
 
+// ── TIER LOCKS ────────────────────────────────────────────────────────────────
+
+const _TIER_RANK = { free: 0, pro: 1, enterprise: 2 };
+
+function _meetsTier(actual, required) {
+  return (_TIER_RANK[actual] ?? 0) >= (_TIER_RANK[required] ?? 0);
+}
+
+/**
+ * Walk every element with [data-min-tier]; if the user's tier is below it,
+ * inject a locked-overlay CTA. Removes any existing overlay first so this
+ * is safe to call multiple times (e.g. after key swap).
+ */
+function applyTierLocks(tier) {
+  const elements = document.querySelectorAll("[data-min-tier]");
+  elements.forEach(el => {
+    // clean up previous run
+    el.classList.remove("tier-locked");
+    el.querySelectorAll(":scope > .tier-lock-overlay").forEach(o => o.remove());
+
+    const required = el.getAttribute("data-min-tier");
+    if (_meetsTier(tier, required)) return;
+
+    const feature = el.getAttribute("data-lock-feature") || "this feature";
+    const tierLabel = required === "enterprise" ? "Enterprise" : "Pro";
+    const cta = required === "enterprise"
+      ? '<a class="lock-cta" href="https://agentid-protocol.com/contact" target="_blank">Contact sales</a>'
+      : '<a class="lock-cta" href="https://agentid-protocol.com/pricing" target="_blank">Upgrade to Pro →</a>';
+
+    el.classList.add("tier-locked");
+    // Position relative is required for absolute overlay
+    if (getComputedStyle(el).position === "static") {
+      el.style.position = "relative";
+    }
+    const overlay = document.createElement("div");
+    overlay.className = "tier-lock-overlay";
+    overlay.innerHTML =
+      '<div class="lock-icon">🔒</div>' +
+      `<div class="lock-title">${feature} requires ${tierLabel}</div>` +
+      `<div class="lock-sub">You're on the <strong>${tier}</strong> plan. Upgrade to unlock this view, real-time updates, and the full Pro API.</div>` +
+      cta;
+    el.appendChild(overlay);
+  });
+}
+
 // ── MAIN DASHBOARD LOAD ───────────────────────────────────────────────────────
 
+// Tier helpers — set on every login so feature loaders can branch off them
+let CURRENT_TIER = "free";
+const isPro        = () => CURRENT_TIER === "pro" || CURRENT_TIER === "enterprise";
+const isEnterprise = () => CURRENT_TIER === "enterprise";
+
 async function loadDashboard() {
-  const data = await apiFetch("/pro/analytics/overview");
+  // First call — works for any tier including free. Validates the key and
+  // returns owner + tier so we know what to render.
+  const me = await apiFetch("/pro/keys/me");
+  CURRENT_TIER = String(me.tier || "free");
+
+  // Pro/Enterprise users get the full analytics payload. Free tier skips it.
+  let data;
+  if (isPro()) {
+    try {
+      data = await apiFetch("/pro/analytics/overview");
+    } catch (_) {
+      data = { owner: me.owner, tier: CURRENT_TIER, usage: {}, activity_last_7d: [] };
+    }
+  } else {
+    data = { owner: me.owner, tier: CURRENT_TIER, usage: {}, activity_last_7d: [] };
+  }
 
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("dashboard").style.display = "block";
@@ -262,9 +327,13 @@ async function loadDashboard() {
 
   const tier = String(data.tier);
 
+  // Apply tier-locked overlays to gated tabs/cards
+  applyTierLocks(tier);
+
   // Header
   document.getElementById("dash-title").textContent = data.owner;
-  document.getElementById("dash-sub").textContent = "Pro analytics dashboard";
+  document.getElementById("dash-sub").textContent =
+    isPro() ? "Pro analytics dashboard" : "Free tier — agent registry";
 
   const tierEl = document.createElement("span");
   tierEl.className = "tier-badge " + tierClass(tier);
@@ -316,27 +385,31 @@ async function loadDashboard() {
     upgradeEl.style.display = (tier === "free" && pct >= 70) ? "" : "none";
   }
 
-  // Badge, charts, audit, agents — load in parallel
+  // Badge + agents always load (work for any tier — public/CRUD endpoints)
   loadBadge(data.owner);
-  try { renderCharts(data); } catch (e) { console.warn("Charts:", e); }
-  renderActivity(data.activity_last_7d || []);
-  loadAuditLog();
-  loadSigningActivity();
   loadAgentsTable();
-  loadDiscoveryStats();
-  loadAnomalies();
-  _loadGroups();
-  _loadTrustScoreWidget();
 
-  // Start real-time SSE feed (or restart if already running)
-  startSse();
+  // Pro-only loaders — free tier sees locked overlays instead
+  if (isPro()) {
+    try { renderCharts(data); } catch (e) { console.warn("Charts:", e); }
+    renderActivity(data.activity_last_7d || []);
+    loadAuditLog();
+    loadSigningActivity();
+    loadDiscoveryStats();
+    loadAnomalies();
+    _loadGroups();
+    _loadTrustScoreWidget();
+
+    // Start real-time SSE feed (or restart if already running)
+    startSse();
+
+    // Anomaly auto-refresh every 60 s
+    clearInterval(_anomalyTimer);
+    _anomalyTimer = setInterval(loadAnomalies, 60000);
+  }
 
   // Onboarding checklist — shown until all steps done or dismissed
   _renderOnboarding(data);
-
-  // Anomaly auto-refresh every 60 s
-  clearInterval(_anomalyTimer);
-  _anomalyTimer = setInterval(loadAnomalies, 60000);
 
 }
 

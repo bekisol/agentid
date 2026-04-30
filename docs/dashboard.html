@@ -952,6 +952,72 @@
       line-height: 1;
     }
     .cap-pill-removable button:hover { color: var(--red); }
+
+    /* ── Tier-locked overlays (free/pro users see Pro/Enterprise features locked) ── */
+    .tier-locked {
+      position: relative;
+      pointer-events: none;
+    }
+    .tier-locked > * {
+      filter: blur(2px) grayscale(0.8);
+      opacity: 0.55;
+      user-select: none;
+    }
+    .tier-lock-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: rgba(255,255,255,0.55);
+      backdrop-filter: blur(1.5px);
+      border-radius: inherit;
+      pointer-events: auto;
+      z-index: 10;
+      text-align: center;
+      padding: 1.25rem;
+    }
+    .tier-lock-overlay .lock-icon {
+      font-size: 1.5rem;
+    }
+    .tier-lock-overlay .lock-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #1f1f1f;
+    }
+    .tier-lock-overlay .lock-sub {
+      font-size: 0.8rem;
+      color: #555;
+      max-width: 280px;
+      line-height: 1.4;
+    }
+    .tier-lock-overlay .lock-cta {
+      display: inline-block;
+      padding: 0.4rem 0.9rem;
+      background: var(--accent, #c9532f);
+      color: white;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 500;
+      margin-top: 0.25rem;
+      transition: background 0.15s;
+    }
+    .tier-lock-overlay .lock-cta:hover {
+      background: #a8421f;
+    }
+    /* Tabs that are tier-locked still show in the nav but are dimmed */
+    .nav-tab[data-locked="1"] {
+      opacity: 0.55;
+      position: relative;
+    }
+    .nav-tab[data-locked="1"]::after {
+      content: "🔒";
+      font-size: 0.7rem;
+      margin-left: 0.3rem;
+    }
   </style>
 </head>
 <body>
@@ -1338,7 +1404,7 @@
   </div>
 
   <!-- Trust Score Fleet Widget -->
-  <div class="card" id="trust-score-card" style="margin-bottom:1.25rem;display:none;">
+  <div class="card" id="trust-score-card" style="margin-bottom:1.25rem;display:none;" data-min-tier="pro" data-lock-feature="Trust scores">
     <div class="card-header">
       <div class="card-title">Fleet Trust Scores</div>
       <span id="trust-score-refresh" style="font-size:0.78rem;color:var(--muted);cursor:pointer;" title="Refresh">↻ Refresh</span>
@@ -1377,7 +1443,7 @@
   </div>
 
   <!-- Charts -->
-  <div class="two-col">
+  <div class="two-col" data-min-tier="pro" data-lock-feature="Analytics charts">
     <div class="card">
       <div class="card-header">
         <div class="card-title">Registrations — Last 30 Days</div>
@@ -1399,7 +1465,7 @@
   </div>
 
   <!-- Anomaly Detection -->
-  <div class="card" style="margin-bottom:1.25rem;" id="anomaly-card">
+  <div class="card" style="margin-bottom:1.25rem;" id="anomaly-card" data-min-tier="pro" data-lock-feature="Anomaly detection">
     <div class="card-header">
       <div class="card-title">⚠️ Anomaly Detection</div>
       <span style="font-size:0.72rem;color:var(--muted);">Updated every 60 s</span>
@@ -1410,7 +1476,7 @@
   </div>
 
   <!-- Activity + Audit -->
-  <div class="two-col">
+  <div class="two-col" data-min-tier="pro" data-lock-feature="Activity & audit log">
     <div class="card">
       <div class="card-header">
         <div class="card-title">Activity — Last 7 Days</div>
@@ -1426,7 +1492,7 @@
   </div>
 
   <!-- Signing Activity -->
-  <div class="card" style="margin-bottom:1.25rem;">
+  <div class="card" style="margin-bottom:1.25rem;" data-min-tier="pro" data-lock-feature="Signing activity">
     <div class="card-header">
       <div class="card-title">Signing Activity</div>
       <span id="signing-count-label" style="font-size:0.8rem;color:var(--muted);"></span>
