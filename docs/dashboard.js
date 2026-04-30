@@ -165,6 +165,18 @@ function timeAgo(isoStr) {
 }
 
 async function apiFetch(path, options = {}) {
+  // Self-heal: if our in-memory apiKey was cleared but sessionStorage still
+  // has one, reuse it. This avoids spurious 401s in narrow race conditions
+  // (e.g. cross-tab sync resetting the local var after a redirect/reload).
+  if (!apiKey) {
+    const stored = sessionStorage.getItem("agentid_key");
+    if (stored) {
+      apiKey = stored;
+      console.warn("[apiFetch] in-memory apiKey was empty — recovered from sessionStorage");
+    } else {
+      console.warn("[apiFetch] No API key when calling " + path + " · sessionStorage also empty");
+    }
+  }
   const headers = { "x-api-key": apiKey, ...options.headers };
   if (options.body && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
