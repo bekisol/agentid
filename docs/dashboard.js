@@ -665,12 +665,12 @@ async function loadDashboard() {
   // Pro-only loaders — free tier sees locked overlays instead
   if (isPro()) {
     try { renderCharts(data); } catch (e) { console.warn("Charts:", e); }
-    renderActivity(data.activity_last_7d || []);
-    loadAuditLog();
-    loadSigningActivity();
-    loadDiscoveryStats();
-    loadAnomalies();
-    _loadGroups();
+    try { renderActivity(data.activity_last_7d || []); } catch (e) { console.error("renderActivity:", e); }
+    loadAuditLog().catch(e => console.error("loadAuditLog:", e));
+    loadSigningActivity().catch(e => console.error("loadSigningActivity:", e));
+    loadDiscoveryStats().catch(e => console.error("loadDiscoveryStats:", e));
+    loadAnomalies().catch(e => console.error("loadAnomalies:", e));
+    _loadGroups().catch?.(e => console.error("loadGroups:", e));
     loadPeerBenchmarks();
 
     // Start real-time SSE feed (or restart if already running)
