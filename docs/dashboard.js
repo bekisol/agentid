@@ -172,24 +172,22 @@ let authMode = sessionStorage.getItem("agentid_auth_mode") || (apiKey ? "apikey"
 async function apiFetch(path, options = {}) {
   const headers = { ...options.headers };
 
-  // Self-heal API key from sessionStorage (cross-tab race safety)
-  if (authMode === "apikey" && !apiKey) {
-    const stored = sessionStorage.getItem("agentid_key");
-    if (stored) {
-      apiKey = stored;
-      console.warn("[apiFetch] in-memory apiKey was empty — recovered from sessionStorage");
-    }
-  }
-  if (authMode === "apikey" && apiKey) {
-    headers["x-api-key"] = apiKey;
+  // Belt-and-suspenders auth: send WHATEVER credentials we have, regardless
+  // of the declared authMode. The server tries session cookie first, then
+  // x-api-key — so passing both costs nothing and recovers cleanly when
+  // the cookie is missing (cross-subdomain edge cases) or when the
+  // session has expired but a stored API key is still valid.
+  const storedKey = apiKey || sessionStorage.getItem("agentid_key");
+  if (storedKey) {
+    apiKey = storedKey;            // re-hydrate in-memory copy
+    headers["x-api-key"] = storedKey;
   }
   if (options.body && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
 
   // credentials:"include" lets the browser carry the agentid_session cookie
-  // on cross-origin requests (api.agentid-protocol.com ↔ bekisol.github.io).
-  // Harmless when the cookie isn't present (apikey mode).
+  // on cross-origin requests. Harmless when the cookie isn't present.
   const res = await fetch(BASE + path, {
     ...options,
     credentials: "include",
@@ -197,7 +195,14 @@ async function apiFetch(path, options = {}) {
   });
   if (!res.ok) {
     let msg = res.status;
-    try { const j = await res.json(); msg = j.detail || j.message || msg; } catch (_) {}
+    try {
+      const j = await res.json();
+      msg = j.detail || j.message || msg;
+    } catch (_) {}
+    // 401 with no auth in flight = surface explicitly so callers can prompt re-login
+    if (res.status === 401 && !storedKey) {
+      console.warn("[apiFetch] 401 with no API key in sessionStorage and no session cookie — user needs to re-login");
+    }
     throw new Error(msg);
   }
   if (res.status === 204) return null;
