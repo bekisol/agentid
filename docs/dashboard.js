@@ -207,14 +207,58 @@ async function apiFetch(path, options = {}) {
       const j = await res.json();
       msg = j.detail || j.message || msg;
     } catch (_) {}
-    // 401 with no auth in flight = surface explicitly so callers can prompt re-login
-    if (res.status === 401 && !storedKey) {
-      console.warn("[apiFetch] 401 with no API key in sessionStorage and no session cookie — user needs to re-login");
+    // 401 self-recovery: if the server says we're unauthenticated, the
+    // dashboard's local session state is stale. Trigger a one-time global
+    // session-drop banner + force a clean logout so the user can re-auth.
+    // We do this exactly once per page load to avoid log-out storms when
+    // many requests are in flight.
+    if (res.status === 401) {
+      _triggerSessionDrop(msg);
     }
     throw new Error(msg);
   }
   if (res.status === 204) return null;
   return res.json();
+}
+
+let _sessionDropFired = false;
+function _triggerSessionDrop(detail) {
+  if (_sessionDropFired) return;
+  _sessionDropFired = true;
+  console.warn("[apiFetch] session dropped — clearing stale auth state.", detail);
+  // Clear ALL auth artefacts so the next page load can never repeat this.
+  sessionStorage.removeItem("agentid_key");
+  sessionStorage.removeItem("agentid_login_ts");
+  sessionStorage.removeItem("agentid_auth_mode");
+  apiKey = "";
+  authMode = "session";
+  // If the dashboard is currently visible, slide a banner across the top
+  // so the user sees what's happening instead of a silent failure cascade.
+  if (document.getElementById("dashboard")?.style.display !== "none") {
+    _showInlineSessionBanner(detail);
+  }
+}
+
+function _showInlineSessionBanner(detail) {
+  if (document.getElementById("inline-session-banner")) return;
+  const b = document.createElement("div");
+  b.id = "inline-session-banner";
+  b.style.cssText = `
+    position: fixed; top: 0; left: 0; right: 0;
+    background: #fbe2e2; color: #9b1f1f;
+    padding: 0.85rem 1.4rem; font-size: 0.88rem;
+    border-bottom: 1px solid #f5c0c0; z-index: 10000;
+    display: flex; align-items: center; gap: 0.85rem; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  `;
+  b.innerHTML = `
+    <strong>⚠ Your session has dropped.</strong>
+    <span style="opacity:0.85;">Some requests are failing. Click below to sign in again.</span>
+    <button id="banner-relogin" style="background:#9b1f1f;color:white;border:none;border-radius:5px;padding:0.4rem 0.9rem;font-size:0.82rem;cursor:pointer;font-weight:600;">Re-login</button>
+    <button id="banner-dismiss" style="background:none;border:none;cursor:pointer;color:#9b1f1f;opacity:0.6;font-size:1rem;">✕</button>`;
+  document.body.appendChild(b);
+  document.getElementById("banner-relogin")?.addEventListener("click", () => logout());
+  document.getElementById("banner-dismiss")?.addEventListener("click", () => b.remove());
 }
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
