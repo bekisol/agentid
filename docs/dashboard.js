@@ -4,7 +4,19 @@ const BASE = "https://api.agentid-protocol.com";
 // Key lives in sessionStorage (tab-scoped, cleared on browser close, not
 // readable across origins). A short-lived localStorage pulse lets new tabs
 // inherit an active session without permanently storing the raw key.
-let apiKey = sessionStorage.getItem("agentid_key") || "";
+// Bootstrap chain: this-tab session → cross-restart localStorage ("stay signed in") → empty.
+// localStorage is opt-in via the welcome modal's "Stay signed in" checkbox.
+let apiKey = sessionStorage.getItem("agentid_key")
+          || localStorage.getItem("agentid_persisted_key")
+          || "";
+if (apiKey && !sessionStorage.getItem("agentid_key")) {
+  // Mirror to sessionStorage so the rest of the app finds it where it expects.
+  sessionStorage.setItem("agentid_key", apiKey);
+  // If we restored from localStorage, we're functionally in apikey mode.
+  if (!sessionStorage.getItem("agentid_auth_mode")) {
+    sessionStorage.setItem("agentid_auth_mode", "apikey");
+  }
+}
 
 // ── CROSS-TAB SESSION SYNC ────────────────────────────────────────────────────
 // BroadcastChannel is preferred: messages are never persisted to disk/storage.
@@ -185,9 +197,16 @@ async function apiFetch(path, options = {}) {
   // x-api-key — so passing both costs nothing and recovers cleanly when
   // the cookie is missing (cross-subdomain edge cases) or when the
   // session has expired but a stored API key is still valid.
-  const storedKey = apiKey || sessionStorage.getItem("agentid_key");
+  // Fallback chain: in-memory → sessionStorage (this tab) → localStorage
+  // (set by "stay signed in" toggle, persists across refresh + close).
+  const storedKey = apiKey
+                  || sessionStorage.getItem("agentid_key")
+                  || localStorage.getItem("agentid_persisted_key");
   if (storedKey) {
     apiKey = storedKey;            // re-hydrate in-memory copy
+    if (!sessionStorage.getItem("agentid_key")) {
+      sessionStorage.setItem("agentid_key", storedKey);
+    }
     headers["x-api-key"] = storedKey;
   }
   if (options.body && !headers["Content-Type"]) {
@@ -459,6 +478,8 @@ async function logout() {
   sessionStorage.removeItem("agentid_key");
   sessionStorage.removeItem("agentid_login_ts");
   sessionStorage.removeItem("agentid_auth_mode");
+  // Also wipe the "stay signed in" persisted key so logout means logout.
+  localStorage.removeItem("agentid_persisted_key");
   apiKey = "";
   authMode = "session";   // default for next visit
   clearTimeout(sessionTimer);
@@ -3383,18 +3404,54 @@ function _initNotifications() {
 async function _maybeShowWelcome() {
   if (authMode !== "session") return;
   const currentEmail = document.getElementById("dash-title")?.textContent || "";
-  if (sessionStorage.getItem("agentid_welcome_seen_for") === currentEmail) return;
 
   let r;
   try { r = await apiFetch("/auth/welcome"); }
   catch (_) { return; }
-  // If account already has keys, skip the welcome entirely
-  if (!r || r.has_key) {
-    sessionStorage.setItem("agentid_welcome_seen_for", currentEmail);
+
+  // Dedup logic:
+  //  - If account already has keys, skip the modal forever (server-of-truth).
+  //  - If account has NO keys, only skip when the user has explicitly opted
+  //    out via "Don't show again" (localStorage flag, persists across logins).
+  //    Otherwise show the modal again on every login so they're not stuck
+  //    without a key by accident.
+  if (!r) return;
+  if (r.has_key) return;
+
+  const optedOut = localStorage.getItem("agentid_welcome_dismissed_" + currentEmail.toLowerCase()) === "1";
+  if (optedOut) {
+    _showInlineWelcomePrompt(r);   // small banner with a re-open link
     return;
   }
   _showWelcomeChoose(r);
-  sessionStorage.setItem("agentid_welcome_seen_for", currentEmail);
+}
+
+function _showInlineWelcomePrompt(info) {
+  // Tiny, unobtrusive banner shown when the user has previously dismissed
+  // the welcome modal but still hasn't created a key. Lets them re-open it.
+  if (document.getElementById("nokey-banner")) return;
+  const b = document.createElement("div");
+  b.id = "nokey-banner";
+  b.style.cssText = `
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.65rem 0.95rem;
+    margin: 0.85rem 1.25rem; font-size: 0.84rem;
+    display: flex; align-items: center; gap: 0.85rem;
+  `;
+  b.innerHTML = `
+    <span>🔑</span>
+    <span style="flex:1;color:var(--text-2);">
+      You don't have an API key yet — you'll need one to use the SDK.
+    </span>
+    <button id="nokey-setup" class="btn btn-primary" style="font-size:0.78rem;padding:0.35rem 0.75rem;">Set one up</button>
+    <button id="nokey-hide" class="btn btn-ghost" style="font-size:0.74rem;padding:0.25rem 0.45rem;">✕</button>`;
+  const dash = document.getElementById("dashboard");
+  if (dash) dash.insertBefore(b, dash.firstChild);
+  document.getElementById("nokey-setup")?.addEventListener("click", () => {
+    b.remove();
+    _showWelcomeChoose(info);
+  });
+  document.getElementById("nokey-hide")?.addEventListener("click", () => b.remove());
 }
 
 function _welcomeShowStep(name) {
@@ -3424,11 +3481,15 @@ function _showWelcomeChoose(info) {
   if (sub) {
     sub.innerHTML = `Signed in as <strong>${esc(info.owner)}</strong> on the <strong>${esc(info.tier)}</strong> tier. How would you like to start?`;
   }
+  // Reset the "don't show again" checkbox
+  const dontShow = document.getElementById("welcome-dont-show-again");
+  if (dontShow) dontShow.checked = false;
 
   // Wire choice buttons
   modal.querySelectorAll("[data-welcome-choice]").forEach(btn => {
     btn.onclick = async () => {
       const choice = btn.getAttribute("data-welcome-choice");
+      _maybeSetWelcomeOptOut(info);   // honour the checkbox regardless of path
       if (choice === "generate") return _welcomeGenerate(info);
       if (choice === "existing") return _welcomeShowExisting(info);
       if (choice === "skip")     return _closeWelcome();
@@ -3437,7 +3498,10 @@ function _showWelcomeChoose(info) {
 
   // Wire footer buttons
   document.getElementById("welcome-back").onclick    = () => _welcomeShowStep("choose");
-  document.getElementById("welcome-dismiss").onclick = () => _closeWelcome();
+  document.getElementById("welcome-dismiss").onclick = () => {
+    _maybeSetWelcomeOptOut(info);
+    _closeWelcome();
+  };
   document.getElementById("welcome-register-cta").onclick = (e) => {
     e.preventDefault();
     _closeWelcome();
@@ -3446,6 +3510,13 @@ function _showWelcomeChoose(info) {
 
   _welcomeShowStep("choose");
   modal.classList.add("open");
+}
+
+function _maybeSetWelcomeOptOut(info) {
+  const cb = document.getElementById("welcome-dont-show-again");
+  if (cb && cb.checked && info?.owner) {
+    localStorage.setItem("agentid_welcome_dismissed_" + info.owner.toLowerCase(), "1");
+  }
 }
 
 async function _welcomeGenerate(info) {
@@ -3468,6 +3539,8 @@ async function _welcomeGenerate(info) {
     }
     return;
   }
+  // Stash the key for the "stay signed in" toggle below to read.
+  _adState_pendingNewKey = resp.key;
   // Show key in step 2a
   document.getElementById("welcome-key-value").textContent = resp.key;
   ["python", "node", "curl", "go"].forEach(lang => {
@@ -3597,7 +3670,23 @@ function _welcomeShowExisting(info) {
   _welcomeShowStep("existing");
 }
 
+// Set when /auth/welcome/generate returns a key, so close-time logic can
+// honour the "stay signed in" checkbox even though the user never typed
+// the key themselves.
+let _adState_pendingNewKey = null;
+
 function _closeWelcome() {
+  // If a starter key was just generated and the user wants to stay signed
+  // in on this device, persist the key into localStorage so a refresh
+  // (which can drop the session cookie on Safari/3p-cookie-blocking
+  // browsers) still authenticates via x-api-key fallback.
+  const stayCb = document.getElementById("welcome-stay-signed-in");
+  if (_adState_pendingNewKey && stayCb && stayCb.checked) {
+    localStorage.setItem("agentid_persisted_key", _adState_pendingNewKey);
+    sessionStorage.setItem("agentid_key", _adState_pendingNewKey);
+    apiKey = _adState_pendingNewKey;
+  }
+  _adState_pendingNewKey = null;
   document.getElementById("welcome-modal")?.classList.remove("open");
 }
 

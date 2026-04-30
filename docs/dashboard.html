@@ -3327,6 +3327,10 @@ curl https://api.agentid-protocol.com/agents \
           <span class="welcome-choice-sub">Mint keys yourself any time in <em>Settings → API Keys</em>.</span>
         </button>
       </div>
+      <label style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;font-size:0.78rem;color:var(--muted);cursor:pointer;">
+        <input type="checkbox" id="welcome-dont-show-again" />
+        <span>Don't show this again on next login (you'll see a small banner instead).</span>
+      </label>
     </div>
 
     <!-- ── STEP 2a: starter key created ─────────────────────────────── -->
@@ -3340,6 +3344,14 @@ curl https://api.agentid-protocol.com/agents \
         <code id="welcome-key-value" class="welcome-key">—</code>
         <button id="welcome-copy-key" class="btn btn-primary" style="white-space:nowrap;">📋 Copy</button>
       </div>
+      <label style="display:flex;align-items:flex-start;gap:0.5rem;margin-top:0.85rem;padding:0.65rem 0.85rem;background:var(--surface2);border-radius:6px;font-size:0.78rem;color:var(--text-2);cursor:pointer;line-height:1.55;">
+        <input type="checkbox" id="welcome-stay-signed-in" checked style="margin-top:0.18rem;" />
+        <span>
+          <strong style="color:var(--text);">Stay signed in on this device</strong><br>
+          Saves a copy of this key in your browser so refresh/restart doesn't log you out.
+          Less secure than session-only auth — uncheck if you're on a shared computer.
+        </span>
+      </label>
 
       <div class="welcome-section-title" style="margin-top:1.25rem;">Use it in your code</div>
       <div class="welcome-tabs">
@@ -3493,7 +3505,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260430-9"></script>
+<script src="dashboard.js?v=20260430-10"></script>
 
 </body>
 </html>
