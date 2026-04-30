@@ -953,6 +953,91 @@
     }
     .cap-pill-removable button:hover { color: var(--red); }
 
+    /* ── First-run hero ── */
+    .fr-step {
+      background: rgba(255,255,255,0.55);
+      border: 1px solid #f5d696;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+    }
+    .fr-step-head {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.55rem;
+    }
+    .fr-step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: #c9532f;
+      color: white;
+      font-weight: 700;
+      font-size: 0.78rem;
+      flex-shrink: 0;
+    }
+    .fr-step-label {
+      font-weight: 600;
+      font-size: 0.92rem;
+      color: #6a3000;
+      flex: 1;
+    }
+    .fr-step-status {
+      font-size: 1rem;
+      color: var(--muted);
+    }
+    .fr-step.done .fr-step-num { background: #107a3a; }
+    .fr-step.done .fr-step-status { color: #107a3a; }
+    .fr-step-body {
+      font-size: 0.84rem;
+      color: var(--text-2);
+      line-height: 1.55;
+    }
+    .fr-step-body p { margin: 0 0 0.5rem 0; }
+    .fr-step-body code {
+      background: rgba(255,255,255,0.7);
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.78rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .fr-tabs {
+      display: flex;
+      gap: 0;
+      margin: 0.5rem 0 0 0;
+      border-bottom: 1px solid #f5d696;
+    }
+    .fr-tab {
+      background: none;
+      border: none;
+      padding: 0.4rem 0.85rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      font-family: inherit;
+    }
+    .fr-tab.active {
+      color: #c9532f;
+      border-bottom-color: #c9532f;
+      font-weight: 600;
+    }
+    .fr-code {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border-radius: 0 6px 6px 6px;
+      padding: 0.85rem 1rem;
+      font-size: 0.74rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin: 0;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
     /* ── Auth tabs (login / signup / api key) ── */
     .auth-tabs {
       display: flex;
@@ -1422,6 +1507,102 @@
         <span id="sse-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background 0.4s;" title="Offline"></span>
         <span>Live</span>
       </div>
+    </div>
+  </div>
+
+  <!-- ── FIRST-RUN HERO (shown only when zero agents) ── -->
+  <div id="first-run-hero" style="display:none;background:linear-gradient(135deg,#fff7e6 0%,#ffe8cc 100%);border:1px solid var(--accent-border);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+      <div>
+        <div style="font-size:1.15rem;font-weight:700;color:#8a4a00;">Welcome to AgentID — let's register your first agent</div>
+        <div style="font-size:0.84rem;color:var(--text-2);margin-top:0.25rem;">Three steps. About 2 minutes. Run them locally and watch the dashboard light up in real time.</div>
+      </div>
+      <button id="first-run-dismiss" style="background:none;border:1px solid #f5d696;color:#8a4a00;border-radius:6px;cursor:pointer;font-size:0.78rem;padding:0.35rem 0.75rem;">Skip — I'll explore</button>
+    </div>
+
+    <div id="fr-steps" style="display:flex;flex-direction:column;gap:0.85rem;">
+      <!-- Step 1 -->
+      <div class="fr-step">
+        <div class="fr-step-head">
+          <span class="fr-step-num">1</span>
+          <span class="fr-step-label">Create an API key</span>
+          <span class="fr-step-status" data-step="1">○</span>
+        </div>
+        <div class="fr-step-body">
+          <p>Click below to open the API Keys panel. Give it a label like <code>local-dev</code> and click Create.</p>
+          <button id="fr-open-keys" class="btn btn-primary" style="font-size:0.82rem;padding:0.4rem 0.85rem;">Open API Keys →</button>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="fr-step">
+        <div class="fr-step-head">
+          <span class="fr-step-num">2</span>
+          <span class="fr-step-label">Register an agent</span>
+          <span class="fr-step-status" data-step="2">○</span>
+        </div>
+        <div class="fr-step-body">
+          <p>Pick a language and run the snippet. Replace <code>YOUR_API_KEY</code> with the key you just created.</p>
+          <div class="fr-tabs">
+            <button class="fr-tab active" data-fr-lang="python">Python</button>
+            <button class="fr-tab" data-fr-lang="node">Node</button>
+            <button class="fr-tab" data-fr-lang="curl">curl</button>
+          </div>
+          <pre class="fr-code" data-fr-panel="python"><code>pip install agentid-protocol httpx
+
+from agentid.identity import generate_keypair, public_key_to_did
+from agentid.crypto   import sign
+from datetime import datetime, timezone
+import httpx
+
+priv, pub = generate_keypair()
+did = public_key_to_did(pub)
+body = {
+  "did": did, "name": "my-first-agent", "owner": "<your-email>",
+  "public_key": pub.decode() if hasattr(pub,'decode') else pub,
+  "capabilities": ["chat"],
+  "created_at": datetime.now(timezone.utc).isoformat(),
+  "metadata": {}, "private": False,
+}
+body["proof"] = sign(priv, body)
+print(httpx.post("https://api.agentid-protocol.com/agents",
+                 headers={"x-api-key":"YOUR_API_KEY"}, json=body).json())</code></pre>
+          <pre class="fr-code" data-fr-panel="node" style="display:none;"><code>npm install @agentid/sdk
+
+import { createAgent } from "@agentid/sdk";
+
+const agent = await createAgent({
+  name: "my-first-agent",
+  capabilities: ["chat"],
+  apiKey: "YOUR_API_KEY",
+});
+console.log(agent.did);</code></pre>
+          <pre class="fr-code" data-fr-panel="curl" style="display:none;"><code># Quickest: use the dashboard's "+ Register Agent" button instead.
+# (curl requires you to compute the proof signature manually.)
+curl https://api.agentid-protocol.com/agents \
+  -H "x-api-key: YOUR_API_KEY"</code></pre>
+          <button id="fr-copy-snippet" class="btn btn-outline" style="font-size:0.78rem;padding:0.3rem 0.7rem;margin-top:0.5rem;">Copy snippet</button>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="fr-step">
+        <div class="fr-step-head">
+          <span class="fr-step-num">3</span>
+          <span class="fr-step-label">See it appear</span>
+          <span class="fr-step-status" data-step="3">○</span>
+        </div>
+        <div class="fr-step-body">
+          <p>Once you've run the snippet, your agent shows up in <strong>My Agents</strong> below within seconds. The audit log will record the registration event.</p>
+          <button id="fr-refresh" class="btn btn-outline" style="font-size:0.82rem;padding:0.35rem 0.85rem;">↻ Refresh dashboard</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:1rem;padding-top:0.85rem;border-top:1px solid #f5d696;font-size:0.78rem;color:var(--muted);">
+      Need help? <a href="https://github.com/bekisol/agentid" target="_blank" style="color:#c9532f;">Read the docs →</a>
+      &nbsp;&middot;&nbsp;
+      <a href="#" id="fr-show-checklist" style="color:#c9532f;">Show full checklist instead</a>
     </div>
   </div>
 

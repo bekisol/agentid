@@ -584,7 +584,78 @@ async function loadDashboard() {
 
 const _ONBOARDING_KEY = "agentid_onboarding_dismissed";
 
+// ── FIRST-RUN HERO (shown when zero agents) ──────────────────────────────────
+const _FIRST_RUN_KEY = "agentid_first_run_dismissed";
+
+function _renderFirstRun(data) {
+  const hero = document.getElementById("first-run-hero");
+  if (!hero) return false;
+  const agentCount = Number(data.usage?.agents_registered) || 0;
+  const dismissed  = localStorage.getItem(_FIRST_RUN_KEY) === "1";
+  if (agentCount > 0 || dismissed) {
+    hero.style.display = "none";
+    return false;
+  }
+  hero.style.display = "";
+
+  // Tab switching for code samples
+  hero.querySelectorAll(".fr-tab").forEach(t => {
+    t.onclick = () => {
+      const lang = t.getAttribute("data-fr-lang");
+      hero.querySelectorAll(".fr-tab").forEach(x => x.classList.toggle("active", x === t));
+      hero.querySelectorAll(".fr-code").forEach(c =>
+        c.style.display = c.getAttribute("data-fr-panel") === lang ? "" : "none");
+    };
+  });
+
+  // Buttons
+  document.getElementById("fr-open-keys").onclick = () => {
+    document.getElementById("settings-btn")?.click();
+    setTimeout(() => document.querySelector(".modal-tab[data-tab='api-keys']")?.click(), 200);
+    _markFirstRunStep(1, true);
+  };
+  document.getElementById("fr-copy-snippet").onclick = () => {
+    const visible = hero.querySelector(".fr-code:not([style*='display: none'])");
+    if (visible) {
+      navigator.clipboard.writeText(visible.textContent).catch(() => {});
+      const btn = document.getElementById("fr-copy-snippet");
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = "Copy snippet"; }, 1500);
+      _markFirstRunStep(2, true);
+    }
+  };
+  document.getElementById("fr-refresh").onclick = () => {
+    if (trendChart) { trendChart.destroy(); trendChart = null; }
+    if (capChart)   { capChart.destroy();   capChart = null; }
+    loadDashboard();
+  };
+  document.getElementById("first-run-dismiss").onclick = () => {
+    localStorage.setItem(_FIRST_RUN_KEY, "1");
+    hero.style.display = "none";
+  };
+  document.getElementById("fr-show-checklist").onclick = (e) => {
+    e.preventDefault();
+    localStorage.setItem(_FIRST_RUN_KEY, "1");
+    hero.style.display = "none";
+    // Force the checklist back if it was previously dismissed
+    localStorage.removeItem(_ONBOARDING_KEY);
+    _renderOnboarding(data);
+  };
+
+  return true;   // signal to skip the regular checklist
+}
+
+function _markFirstRunStep(n, done) {
+  const step  = document.querySelector(`.fr-step:nth-of-type(${n})`);
+  const stat  = document.querySelector(`.fr-step-status[data-step="${n}"]`);
+  if (step && done) step.classList.add("done");
+  if (stat && done) stat.textContent = "✓";
+}
+
 function _renderOnboarding(data) {
+  // First-run hero takes priority for brand-new accounts
+  if (_renderFirstRun(data)) return;
+
   const card = document.getElementById("onboarding-card");
   if (!card) return;
   if (localStorage.getItem(_ONBOARDING_KEY) === "1") return;
