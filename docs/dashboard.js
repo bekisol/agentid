@@ -207,12 +207,12 @@ async function apiFetch(path, options = {}) {
       const j = await res.json();
       msg = j.detail || j.message || msg;
     } catch (_) {}
-    // 401 self-recovery: if the server says we're unauthenticated, the
-    // dashboard's local session state is stale. Trigger a one-time global
-    // session-drop banner + force a clean logout so the user can re-auth.
-    // We do this exactly once per page load to avoid log-out storms when
-    // many requests are in flight.
-    if (res.status === 401) {
+    // 401 self-recovery: surface a session-drop banner — but only after
+    // we've confirmed there's actually nothing the user can do. Skip it
+    // during a 5-second grace window after login (so background requests
+    // racing with cookie propagation don't spam a "session dropped"
+    // banner on what is in fact a brand-new session).
+    if (res.status === 401 && _shouldTriggerSessionDrop()) {
       _triggerSessionDrop(msg);
     }
     throw new Error(msg);
@@ -222,6 +222,19 @@ async function apiFetch(path, options = {}) {
 }
 
 let _sessionDropFired = false;
+let _loginGraceUntil  = 0;     // wall-clock ms after which we *will* fire a 401 banner
+
+function _shouldTriggerSessionDrop() {
+  if (_sessionDropFired) return false;
+  if (Date.now() < _loginGraceUntil) return false;
+  return true;
+}
+
+function _markFreshLogin(graceMs = 5000) {
+  _sessionDropFired = false;
+  _loginGraceUntil = Date.now() + graceMs;
+}
+
 function _triggerSessionDrop(detail) {
   if (_sessionDropFired) return;
   _sessionDropFired = true;
@@ -326,6 +339,7 @@ async function accountLogin() {
     sessionStorage.setItem("agentid_login_ts", String(Date.now()));
     apiKey = "";   // we don't carry a raw key in this mode
     sessionStorage.removeItem("agentid_key");
+    _markFreshLogin();   // 5s grace window so racing 401s don't spam a banner
 
     await loadDashboard();
     scheduleSessionExpiry();
@@ -376,6 +390,7 @@ async function accountSignup() {
     sessionStorage.setItem("agentid_login_ts", String(Date.now()));
     apiKey = "";
     sessionStorage.removeItem("agentid_key");
+    _markFreshLogin();   // 5s grace window so racing 401s don't spam a banner
 
     await loadDashboard();
     scheduleSessionExpiry();
@@ -407,6 +422,7 @@ async function login() {
   try {
     authMode = "apikey";
     sessionStorage.setItem("agentid_auth_mode", "apikey");
+    _markFreshLogin();
     await loadDashboard();
     sessionStorage.setItem("agentid_key", apiKey);
     sessionStorage.setItem("agentid_login_ts", String(Date.now()));
@@ -4757,6 +4773,7 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
       }
       authMode = "apikey";
       sessionStorage.setItem("agentid_auth_mode", "apikey");
+      _markFreshLogin();
       try {
         await loadDashboard();
         scheduleSessionExpiry();
@@ -4778,6 +4795,7 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
         sessionStorage.setItem("agentid_auth_mode", "session");
         sessionStorage.setItem("agentid_login_ts",
           sessionStorage.getItem("agentid_login_ts") || String(Date.now()));
+        _markFreshLogin();
         await loadDashboard();
         scheduleSessionExpiry();
         return;
