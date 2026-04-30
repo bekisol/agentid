@@ -2643,6 +2643,13 @@ async function _createWebhook() {
 
 // ── AGENT DETAIL DRAWER ──────────────────────────────────────────────────────
 
+// ── AGENT CONTROL PANEL DRAWER ───────────────────────────────────────────────
+// Four tabs. Loaded one-shot from /pro/agents/{did}/control, then refreshed
+// per-tab as needed. Built so the user feels in control: every action lives
+// here, not buried in separate modals.
+
+let _adState = { did: null, data: null, tab: "overview" };
+
 async function _openAgentDetail(did, name) {
   const drawer = document.getElementById("agent-drawer");
   const body   = document.getElementById("ad-body");
@@ -2651,107 +2658,425 @@ async function _openAgentDetail(did, name) {
   document.getElementById("ad-did").textContent  = did;
   drawer.classList.add("open");
   body.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+  _adState = { did, data: null, tab: "overview" };
 
   try {
-    // Parallel fetches — keep it snappy
-    const [agent, edges, compromised] = await Promise.all([
-      apiFetch("/agents/" + encodeURIComponent(did)).catch(() => null),
-      apiFetch("/trust/graph/" + encodeURIComponent(did) + "?direction=both&limit=20").catch(() => null),
-      apiFetch("/trust/compromised/check/" + encodeURIComponent(did)).catch(() => null),
-    ]);
-
-    const sections = [];
-
-    // Section 1 — Agent
-    if (agent) {
-      sections.push(`
-        <div class="ad-section">
-          <h4>Agent</h4>
-          <div class="ad-kv">
-            <span class="k">Name</span><span class="v">${esc(agent.name || "—")}</span>
-            <span class="k">Owner</span><span class="v">${esc(agent.owner || "—")}</span>
-            <span class="k">Capabilities</span><span class="v">${(agent.capabilities||[]).map(c => '<span class="op-pill op-pill-other" style="margin-right:0.3rem;">'+esc(c)+'</span>').join("")}</span>
-            <span class="k">Visibility</span><span class="v">${agent.private ? '<span class="status-pill status-pill-warn">private</span>' : '<span class="status-pill status-pill-good">public</span>'}</span>
-            <span class="k">Created</span><span class="v">${esc(agent.created_at || "—")}</span>
-            <span class="k">Public key</span><span class="v"><code style="font-size:0.74rem;">${esc(agent.public_key || "—")}</code></span>
-          </div>
-        </div>`);
-    }
-
-    // Section 2 — Trust status
-    if (compromised) {
-      const isComp = compromised.compromised;
-      const sevPill = isComp
-        ? `<span class="status-pill status-pill-bad">⚠ ${esc(compromised.severity || "compromised")}</span>`
-        : '<span class="status-pill status-pill-good">✓ no reports</span>';
-      sections.push(`
-        <div class="ad-section">
-          <h4>Trust network status</h4>
-          <div class="ad-kv">
-            <span class="k">Reputation</span><span class="v">${sevPill}${isComp ? ` &middot; ${compromised.report_count} report${compromised.report_count !== 1 ? "s" : ""}` : ""}</span>
-            <span class="k">Trust badge</span><span class="v">
-              <img src="${BASE}/trust/badge/${encodeURIComponent(did)}.svg" alt="trust badge" style="vertical-align:middle;height:22px;border-radius:3px;" />
-              <button class="btn btn-outline" data-copy-trust-badge="${esc(did)}" style="font-size:0.72rem;padding:0.2rem 0.55rem;margin-left:0.4rem;">Copy &lt;img&gt;</button>
-            </span>
-          </div>
-        </div>`);
-    }
-
-    // Section 3 — Recent verification edges
-    if (edges) {
-      const ins  = (edges.in  || []).slice(0, 8);
-      const outs = (edges.out || []).slice(0, 8);
-      const formatEdge = e => `
-        <div style="display:flex;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid var(--border);font-size:0.78rem;align-items:center;">
-          <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.counterparty)}</span>
-          <span style="color:var(--muted);font-size:0.72rem;">${esc(_relativeTime(e.ts))}</span>
-          <span class="status-pill ${e.valid ? 'status-pill-good' : 'status-pill-bad'}">${e.valid ? "valid" : "invalid"}</span>
-        </div>`;
-      sections.push(`
-        <div class="ad-section">
-          <h4>Recent verifications (in)</h4>
-          ${ins.length ? ins.map(formatEdge).join("") : '<div style="color:var(--muted);font-size:0.78rem;">No incoming edges yet</div>'}
-        </div>
-        <div class="ad-section">
-          <h4>Recent verifications (out)</h4>
-          ${outs.length ? outs.map(formatEdge).join("") : '<div style="color:var(--muted);font-size:0.78rem;">No outgoing edges yet</div>'}
-        </div>`);
-    }
-
-    sections.push(`
-      <div class="ad-section">
-        <h4>Quick actions</h4>
-        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
-          <button class="btn btn-outline" data-ad-action="test"     data-did="${esc(did)}" data-name="${esc(name)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Test verify</button>
-          <button class="btn btn-outline" data-ad-action="snippets" data-did="${esc(did)}" data-name="${esc(name)}" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Code snippets</button>
-          <button class="btn btn-outline" data-ad-action="report"   data-did="${esc(did)}"  style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--red);border-color:var(--red);">Report compromised</button>
-        </div>
-      </div>`);
-
-    body.innerHTML = sections.join("");
-
-    // Wire copy + actions
-    body.querySelectorAll("[data-copy-trust-badge]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const d = btn.getAttribute("data-copy-trust-badge");
-        navigator.clipboard.writeText(`<img src="${BASE}/trust/badge/${encodeURIComponent(d)}.svg" alt="AgentID trust badge" />`).catch(()=>{});
-        btn.textContent = "Copied!";
-        setTimeout(() => { btn.textContent = "Copy <img>"; }, 1500);
-      });
-    });
-    body.querySelectorAll("[data-ad-action]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const a = btn.getAttribute("data-ad-action");
-        const d = btn.getAttribute("data-did");
-        const n = btn.getAttribute("data-name");
-        if (a === "test")     { _closeDrawer(); _openTestVerify(d, n); }
-        if (a === "snippets") { _closeDrawer(); _openSnippets(d, n); }
-        if (a === "report")   { _openReportCompromised(d); }
-      });
-    });
+    const data = await apiFetch("/pro/agents/" + encodeURIComponent(did) + "/control");
+    _adState.data = data;
+    _adRender();
   } catch (e) {
-    body.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">Could not load agent: ${esc(String(e.message || ""))}</div>`;
+    body.innerHTML = `<div style="padding:1rem;color:var(--red);font-size:0.85rem;">
+      Could not load agent: ${esc(String(e.message || ""))}<br>
+      <span style="color:var(--muted);font-size:0.78rem;">Hard-refresh the dashboard if Railway recently redeployed.</span>
+    </div>`;
   }
+}
+
+function _adRender() {
+  const body = document.getElementById("ad-body");
+  if (!body || !_adState.data) return;
+
+  // Tab nav
+  const tabs = ["overview", "activity", "settings", "danger"];
+  const labels = { overview: "Overview", activity: "Activity", settings: "Settings", danger: "Danger" };
+
+  body.innerHTML = `
+    <div class="ad-tabs">
+      ${tabs.map(t => `
+        <button class="ad-tab ${_adState.tab === t ? 'active' : ''}" data-ad-tab="${t}">
+          ${labels[t]}
+          ${t === 'danger' ? '<span style="color:var(--red);margin-left:0.25rem;">●</span>' : ''}
+        </button>`).join("")}
+    </div>
+    <div id="ad-tab-content" style="padding:1rem 1.4rem;">
+      ${_adRenderTab(_adState.tab)}
+    </div>`;
+
+  body.querySelectorAll(".ad-tab").forEach(b => b.addEventListener("click", () => {
+    _adState.tab = b.getAttribute("data-ad-tab");
+    _adRender();
+  }));
+  _adWireTabActions();
+}
+
+function _adRenderTab(tab) {
+  const d = _adState.data;
+  if (!d) return "<div>Loading…</div>";
+  if (tab === "overview") return _adTabOverview(d);
+  if (tab === "activity") return _adTabActivity(d);
+  if (tab === "settings") return _adTabSettings(d);
+  if (tab === "danger")   return _adTabDanger(d);
+  return "";
+}
+
+function _adTabOverview(d) {
+  const a = d.agent;
+  const s = d.stats;
+  const t = d.trust;
+  const totalSign = s.sign_valid + s.sign_invalid;
+  const failPct   = totalSign > 0 ? Math.round(100 * s.sign_invalid / totalSign) : 0;
+  const sevPill   = t.compromised
+    ? `<span class="status-pill status-pill-bad">⚠ ${esc(t.severity || "compromised")} · ${t.report_count} report${t.report_count !== 1 ? 's' : ''}</span>`
+    : '<span class="status-pill status-pill-good">✓ trusted</span>';
+  const deprPill  = d.deprecation
+    ? `<span class="status-pill status-pill-warn">deprecated</span>`
+    : '';
+  return `
+    <!-- Stats grid -->
+    <div class="ad-stats-grid">
+      <div class="ad-stat">
+        <div class="ad-stat-num">${s.sign_valid + s.sign_invalid}</div>
+        <div class="ad-stat-lbl">Verifies signed</div>
+        <div class="ad-stat-sub">${s.sign_valid} valid · ${s.sign_invalid} invalid</div>
+      </div>
+      <div class="ad-stat">
+        <div class="ad-stat-num">${s.verif_valid + s.verif_invalid}</div>
+        <div class="ad-stat-lbl">Times verified</div>
+        <div class="ad-stat-sub">${s.verif_valid} ok · ${s.verif_invalid} failed</div>
+      </div>
+      <div class="ad-stat">
+        <div class="ad-stat-num">${failPct}%</div>
+        <div class="ad-stat-lbl">Invalid rate</div>
+        <div class="ad-stat-sub" style="color:${failPct > 20 ? 'var(--red)' : 'var(--muted)'}">${failPct > 20 ? "above network avg" : "in expected range"}</div>
+      </div>
+      <div class="ad-stat">
+        <div class="ad-stat-num">${s.sign_24h}</div>
+        <div class="ad-stat-lbl">Signed in 24h</div>
+        <div class="ad-stat-sub">${s.last_seen ? "last seen " + esc(_relativeTime(s.last_seen)) : "no activity yet"}</div>
+      </div>
+    </div>
+
+    <div class="ad-section">
+      <h4>Identity</h4>
+      <div class="ad-kv">
+        <span class="k">Name</span><span class="v">${esc(a.name)}</span>
+        <span class="k">Owner</span><span class="v">${esc(a.owner)}</span>
+        <span class="k">Visibility</span><span class="v">${a.private ? '<span class="status-pill status-pill-warn">private</span>' : '<span class="status-pill status-pill-good">public</span>'}</span>
+        <span class="k">Created</span><span class="v">${esc(a.created_at || "—")} <span style="color:var(--muted);">· ${esc(_relativeTime(a.created_at))}</span></span>
+        <span class="k">Capabilities</span><span class="v">${(a.capabilities||[]).map(c => '<span class="op-pill op-pill-other" style="margin-right:0.3rem;">'+esc(c)+'</span>').join("") || '<span style="color:var(--muted);">none</span>'}</span>
+        <span class="k">Tags</span><span class="v">${(d.tags||[]).map(t => `<span class="status-pill status-pill-info" style="margin-right:0.3rem;">${esc(t)}</span>`).join("") || '<span style="color:var(--muted);">none</span>'}</span>
+        <span class="k">Public key</span><span class="v"><code style="font-size:0.72rem;word-break:break-all;">${esc(a.public_key)}</code></span>
+        <span class="k">DID</span><span class="v"><code style="font-size:0.72rem;word-break:break-all;">${esc(a.did)}</code></span>
+      </div>
+    </div>
+
+    <div class="ad-section">
+      <h4>Trust network</h4>
+      <div class="ad-kv">
+        <span class="k">Reputation</span><span class="v">${sevPill} ${deprPill}</span>
+        <span class="k">Live badge</span><span class="v">
+          <img src="${BASE}/trust/badge/${encodeURIComponent(a.did)}.svg" alt="trust badge" style="vertical-align:middle;height:22px;border-radius:3px;" />
+          <button class="btn btn-outline" data-copy-trust-badge="${esc(a.did)}" style="font-size:0.72rem;padding:0.2rem 0.55rem;margin-left:0.4rem;">Copy &lt;img&gt;</button>
+          <a href="${BASE}/trust/badge/${encodeURIComponent(a.did)}.svg" target="_blank" style="font-size:0.72rem;margin-left:0.4rem;color:var(--muted);">Open</a>
+        </span>
+        ${d.deprecation ? `<span class="k">Deprecated</span><span class="v">${esc(d.deprecation.reason)}${d.deprecation.successor_did ? ' · → <code>'+esc(d.deprecation.successor_did)+'</code>' : ''}</span>` : ''}
+      </div>
+    </div>
+
+    <div class="ad-section">
+      <h4>Quick actions</h4>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+        <button class="btn btn-outline" data-ad-action="test"     style="font-size:0.78rem;padding:0.3rem 0.7rem;">Test verify</button>
+        <button class="btn btn-outline" data-ad-action="snippets" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Code snippets</button>
+        <button class="btn btn-outline" data-ad-action="badge"    style="font-size:0.78rem;padding:0.3rem 0.7rem;">Open badge</button>
+        <button class="btn btn-outline" data-ad-action="copy-did" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Copy DID</button>
+      </div>
+    </div>`;
+}
+
+function _adTabActivity(d) {
+  const events = d.activity || [];
+  if (!events.length) {
+    return `<div class="ad-section"><div class="empty" style="padding:2rem;color:var(--muted);text-align:center;">
+      No activity recorded yet for this agent.<br>
+      <span style="font-size:0.78rem;">Sign and verify a message and it'll appear here within seconds.</span>
+    </div></div>`;
+  }
+  const formatEv = e => {
+    const cp = e.is_self_signer ? e.verifier_did : e.signer_did;
+    const cpName = e.is_self_signer ? e.verifier_name : e.signer_name;
+    const arrow = e.is_self_signer ? '→' : '←';
+    const statusPill = e.status === 'valid'
+      ? '<span class="status-pill status-pill-good">valid</span>'
+      : e.status === 'invalid'
+        ? '<span class="status-pill status-pill-bad">invalid</span>'
+        : `<span class="status-pill status-pill-info">${esc(e.status || '?')}</span>`;
+    return `
+      <div class="ad-event">
+        <div class="ad-event-time">${esc(_relativeTime(e.ts))}</div>
+        <div class="ad-event-arrow">${arrow}</div>
+        <div class="ad-event-cp">
+          ${cpName ? '<strong>' + esc(cpName) + '</strong>' : '<em style="color:var(--muted);">external</em>'}
+          ${cp ? `<div style="font-size:0.7rem;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(cp.slice(0, 28) + '…' + cp.slice(-6))}</div>` : ''}
+        </div>
+        <div>${statusPill}</div>
+        <div style="color:var(--muted);font-size:0.7rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${esc(e.ip || '—')}</div>
+      </div>`;
+  };
+  return `
+    <div class="ad-section">
+      <h4>Recent activity (last ${events.length})</h4>
+      <div class="ad-events">${events.map(formatEv).join("")}</div>
+      <div style="text-align:center;margin-top:0.85rem;">
+        <button class="btn btn-outline" data-ad-action="full-activity" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Open full activity log →</button>
+      </div>
+    </div>`;
+}
+
+function _adTabSettings(d) {
+  const a = d.agent;
+  const tagsCsv = (d.tags || []).join(", ");
+  const metaJson = JSON.stringify(a.metadata || {}, null, 2);
+  return `
+    <div class="ad-section">
+      <h4>Identity & display</h4>
+      <label class="field-label">Name</label>
+      <input class="auth-input" id="ads-name" value="${esc(a.name || '')}" />
+      <label class="field-label" style="margin-top:0.6rem;">Capabilities (comma-separated)</label>
+      <input class="auth-input" id="ads-caps" value="${esc((a.capabilities || []).join(', '))}" placeholder="chat, search, code" />
+      <label class="field-label" style="margin-top:0.6rem;">Visibility</label>
+      <select class="auth-input" id="ads-private">
+        <option value="false" ${!a.private ? 'selected' : ''}>Public — listed in the public registry</option>
+        <option value="true"  ${ a.private ? 'selected' : ''}>Private — only your account can see it</option>
+      </select>
+      <button class="btn btn-primary" data-ad-action="save-identity" style="margin-top:0.85rem;">Save changes</button>
+      <div id="ads-identity-msg" class="modal-msg"></div>
+    </div>
+
+    <div class="ad-section">
+      <h4>Metadata</h4>
+      <p style="font-size:0.78rem;color:var(--muted);margin:0 0 0.4rem 0;">Free-form JSON object stored alongside the agent. Used for whatever your stack needs — env, region, model, customer ID, etc.</p>
+      <textarea id="ads-metadata" class="auth-input" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.78rem;min-height:120px;">${esc(metaJson)}</textarea>
+      <button class="btn btn-primary" data-ad-action="save-metadata" style="margin-top:0.6rem;">Save metadata</button>
+      <div id="ads-metadata-msg" class="modal-msg"></div>
+    </div>
+
+    <div class="ad-section">
+      <h4>Tags</h4>
+      <p style="font-size:0.78rem;color:var(--muted);margin:0 0 0.4rem 0;">Quick-filter labels — e.g. <code>production</code>, <code>customer-support</code>, <code>v2</code>.</p>
+      <input class="auth-input" id="ads-tags" value="${esc(tagsCsv)}" placeholder="comma, separated, list" />
+      <button class="btn btn-primary" data-ad-action="save-tags" style="margin-top:0.6rem;">Save tags</button>
+      <div id="ads-tags-msg" class="modal-msg"></div>
+    </div>
+
+    <div class="ad-section">
+      <h4>Notifications & webhooks</h4>
+      <p style="font-size:0.78rem;color:var(--muted);margin:0 0 0.4rem 0;">Webhooks fire on this agent's events when subscribed to verification.* or agent.* topics.</p>
+      ${(d.related_webhooks || []).length ? d.related_webhooks.map(w => `
+        <div style="display:flex;gap:0.5rem;align-items:center;font-size:0.78rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+          <span class="status-pill ${w.active ? 'status-pill-good' : 'status-pill-muted'}">${w.active ? 'active' : 'paused'}</span>
+          <code style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.74rem;">${esc(w.url)}</code>
+          <span style="color:var(--muted);font-size:0.7rem;">${(w.events||[]).length} events</span>
+        </div>`).join("") : '<div style="color:var(--muted);font-size:0.78rem;">No webhooks targeting this agent. Add one in Settings → Webhooks.</div>'}
+      <button class="btn btn-outline" data-ad-action="open-webhooks" style="margin-top:0.6rem;font-size:0.78rem;padding:0.3rem 0.7rem;">Manage webhooks →</button>
+    </div>`;
+}
+
+function _adTabDanger(d) {
+  const a = d.agent;
+  const isDeprecated = !!d.deprecation;
+  return `
+    <div class="ad-section">
+      <h4>Mark deprecated</h4>
+      <p style="font-size:0.78rem;color:var(--muted);margin:0 0 0.5rem 0;">
+        Deprecated agents stay registered, but every verify response includes a
+        <code>deprecated: true</code> warning so callers know to migrate.
+        Optionally point to a successor DID.
+      </p>
+      ${isDeprecated ? `
+        <div style="background:var(--yellow-bg);padding:0.6rem 0.85rem;border-radius:6px;font-size:0.82rem;margin-bottom:0.6rem;">
+          <strong>Currently deprecated:</strong> ${esc(d.deprecation.reason)}
+          ${d.deprecation.successor_did ? '<br>Successor: <code>'+esc(d.deprecation.successor_did)+'</code>' : ''}
+        </div>
+        <button class="btn btn-outline" data-ad-action="undeprecate" style="font-size:0.78rem;padding:0.3rem 0.7rem;">Remove deprecation</button>
+      ` : `
+        <input class="auth-input" id="ad-deprecate-reason" placeholder="Reason (e.g. replaced by v2)" />
+        <input class="auth-input" id="ad-successor-did" placeholder="Successor DID (optional)" style="margin-top:0.4rem;" />
+        <button class="btn btn-outline" data-ad-action="deprecate" style="margin-top:0.6rem;font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--yellow);border-color:var(--yellow);">Mark as deprecated</button>
+      `}
+    </div>
+
+    <div class="ad-section">
+      <h4>Report compromised</h4>
+      <p style="font-size:0.78rem;color:var(--muted);margin:0 0 0.5rem 0;">
+        Files an entry in the Trust Network compromised feed. Other customers'
+        verify paths flag this DID within seconds across the entire network.
+      </p>
+      <button class="btn btn-outline" data-ad-action="report" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--red);border-color:var(--red);">Report compromised…</button>
+    </div>
+
+    <div class="ad-section">
+      <h4 style="color:var(--red);">Permanent deregister</h4>
+      <p style="font-size:0.78rem;color:var(--muted);margin:0 0 0.5rem 0;">
+        Removes the agent from your registry. The DID becomes resolvable as a
+        tombstone. Audit history is retained.
+      </p>
+      <button class="btn btn-outline" data-ad-action="deregister" style="font-size:0.78rem;padding:0.3rem 0.7rem;color:var(--red);border-color:var(--red);">Deregister this agent…</button>
+    </div>`;
+}
+
+function _adWireTabActions() {
+  const body = document.getElementById("ad-body");
+  const did  = _adState.did;
+  const data = _adState.data;
+  if (!body || !did || !data) return;
+
+  body.querySelectorAll("[data-copy-trust-badge]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      navigator.clipboard.writeText(`<img src="${BASE}/trust/badge/${encodeURIComponent(did)}.svg" alt="AgentID trust badge" />`).catch(()=>{});
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = "Copy <img>"; }, 1500);
+    });
+  });
+
+  body.querySelectorAll("[data-ad-action]").forEach(btn => {
+    btn.addEventListener("click", () => _adRunAction(btn.getAttribute("data-ad-action")));
+  });
+}
+
+async function _adRunAction(action) {
+  const did = _adState.did;
+  const a   = _adState.data?.agent;
+  const name = a?.name;
+
+  if (action === "test")     { _closeDrawer(); _openTestVerify(did, name); return; }
+  if (action === "snippets") { _closeDrawer(); _openSnippets(did, name);   return; }
+  if (action === "badge")    { window.open(`${BASE}/trust/badge/${encodeURIComponent(did)}.svg`, "_blank"); return; }
+  if (action === "copy-did") {
+    navigator.clipboard.writeText(did).catch(()=>{});
+    _showToast?.("DID copied to clipboard");
+    return;
+  }
+  if (action === "open-webhooks") {
+    _closeDrawer();
+    document.getElementById("settings-btn")?.click();
+    setTimeout(() => document.querySelector(".modal-tab[data-tab='webhooks']")?.click(), 200);
+    return;
+  }
+  if (action === "full-activity") {
+    _closeDrawer();
+    const search = document.getElementById("signing-search");
+    if (search) {
+      search.value = did;
+      search.dispatchEvent(new Event("input"));
+      document.querySelector('#signing-table')?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    return;
+  }
+  if (action === "save-identity")   { return _adSaveIdentity(); }
+  if (action === "save-metadata")   { return _adSaveMetadata(); }
+  if (action === "save-tags")       { return _adSaveTags(); }
+  if (action === "deprecate")       { return _adDeprecate(); }
+  if (action === "undeprecate")     { return _adUndeprecate(); }
+  if (action === "report")          { return _openReportCompromised(did); }
+  if (action === "deregister")      { return _adDeregister(); }
+}
+
+async function _adSaveIdentity() {
+  const did   = _adState.did;
+  const name  = document.getElementById("ads-name").value.trim();
+  const caps  = document.getElementById("ads-caps").value.split(",").map(s => s.trim()).filter(Boolean);
+  const priv  = document.getElementById("ads-private").value === "true";
+  const msg   = document.getElementById("ads-identity-msg");
+  msg.textContent = "Saving…"; msg.className = "modal-msg";
+  try {
+    await apiFetch("/pro/agents/" + encodeURIComponent(did) + "/control", {
+      method: "PATCH",
+      body: JSON.stringify({ name, capabilities: caps, private: priv }),
+    });
+    msg.textContent = "Saved ✓"; msg.className = "modal-msg modal-msg-success";
+    // Refresh underlying data
+    _adState.data.agent.name = name;
+    _adState.data.agent.capabilities = caps;
+    _adState.data.agent.private = priv;
+    document.getElementById("ad-name").textContent = name;
+    setTimeout(() => { msg.textContent = ""; }, 2000);
+    if (typeof loadAgentsTable === "function") loadAgentsTable();
+  } catch (e) {
+    msg.textContent = "Failed: " + (e.message || ""); msg.className = "modal-msg modal-msg-error";
+  }
+}
+
+async function _adSaveMetadata() {
+  const did = _adState.did;
+  const raw = document.getElementById("ads-metadata").value;
+  const msg = document.getElementById("ads-metadata-msg");
+  let parsed;
+  try { parsed = JSON.parse(raw || "{}"); }
+  catch { msg.textContent = "Invalid JSON — fix syntax first"; msg.className = "modal-msg modal-msg-error"; return; }
+  msg.textContent = "Saving…"; msg.className = "modal-msg";
+  try {
+    await apiFetch("/pro/agents/" + encodeURIComponent(did) + "/control", {
+      method: "PATCH",
+      body: JSON.stringify({ metadata: parsed }),
+    });
+    msg.textContent = "Saved ✓"; msg.className = "modal-msg modal-msg-success";
+    _adState.data.agent.metadata = parsed;
+    setTimeout(() => { msg.textContent = ""; }, 2000);
+  } catch (e) {
+    msg.textContent = "Failed: " + (e.message || ""); msg.className = "modal-msg modal-msg-error";
+  }
+}
+
+async function _adSaveTags() {
+  const did = _adState.did;
+  const raw = document.getElementById("ads-tags").value;
+  const tags = raw.split(",").map(s => s.trim()).filter(Boolean);
+  const msg = document.getElementById("ads-tags-msg");
+  msg.textContent = "Saving…"; msg.className = "modal-msg";
+  try {
+    await apiFetch("/pro/agents/" + encodeURIComponent(did) + "/tags", {
+      method: "PUT",
+      body: JSON.stringify({ tags }),
+    });
+    msg.textContent = "Saved ✓"; msg.className = "modal-msg modal-msg-success";
+    _adState.data.tags = tags;
+    setTimeout(() => { msg.textContent = ""; }, 2000);
+  } catch (e) {
+    msg.textContent = "Failed: " + (e.message || ""); msg.className = "modal-msg modal-msg-error";
+  }
+}
+
+async function _adDeprecate() {
+  const did = _adState.did;
+  const reason = document.getElementById("ad-deprecate-reason").value.trim();
+  const successor = document.getElementById("ad-successor-did").value.trim();
+  if (!reason) { alert("Reason is required"); return; }
+  if (!confirm(`Mark this agent as deprecated?\n\nVerify responses will include a deprecation warning. The agent stays registered and signing still works.`)) return;
+  try {
+    await apiFetch("/pro/agents/" + encodeURIComponent(did) + "/deprecate", {
+      method: "POST",
+      body: JSON.stringify({ reason, successor_did: successor || null }),
+    });
+    _adState.data.deprecation = { reason, successor_did: successor };
+    _adRender();
+  } catch (e) { alert("Failed: " + (e.message || "")); }
+}
+
+async function _adUndeprecate() {
+  const did = _adState.did;
+  if (!confirm("Remove the deprecation flag from this agent?")) return;
+  try {
+    await apiFetch("/pro/agents/" + encodeURIComponent(did) + "/deprecate", { method: "DELETE" });
+    _adState.data.deprecation = null;
+    _adRender();
+  } catch (e) { alert("Failed: " + (e.message || "")); }
+}
+
+async function _adDeregister() {
+  const did = _adState.did;
+  const name = _adState.data?.agent?.name;
+  if (!confirm(`Permanently deregister "${name}"?\n\nThis cannot be undone. Audit history is retained, but the agent will no longer resolve to a public key.\n\nType "delete" to confirm in the next prompt.`)) return;
+  const conf = prompt('Type "delete" to confirm:');
+  if (conf !== "delete") return;
+  try {
+    await apiFetch("/pro/agents/bulk", {
+      method: "DELETE",
+      body: JSON.stringify({ dids: [did] }),
+    });
+    _closeDrawer();
+    if (typeof loadAgentsTable === "function") loadAgentsTable();
+  } catch (e) { alert("Failed: " + (e.message || "")); }
 }
 
 function _closeDrawer() {
