@@ -1445,6 +1445,7 @@
 
       <div class="modal-tabs">
         <div class="modal-tab active" data-tab="account">Account</div>
+        <div class="modal-tab" data-tab="api-keys">API Keys</div>
         <div class="modal-tab" data-tab="team-keys" data-min-tier="pro">Team Keys</div>
         <div class="modal-tab" data-tab="key-rotation" data-min-tier="pro">Key Rotation</div>
         <div class="modal-tab" data-tab="webhooks" data-min-tier="pro">Webhooks</div>
@@ -1470,6 +1471,55 @@
             <div id="allowlist-msg" class="modal-msg"></div>
           </div>
           <button class="btn btn-primary" id="allowlist-save-btn" style="margin-top:0.25rem;">Save Allowlist</button>
+        </div>
+
+        <!-- ── API KEYS TAB ── -->
+        <div class="modal-panel" id="tab-api-keys">
+          <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
+            API keys let your code authenticate against the AgentID Protocol API. Each key is bound
+            to your account and inherits your tier. <strong>Keep them secret.</strong>
+          </p>
+
+          <!-- Create form -->
+          <div class="modal-section">
+            <div class="modal-section-title">Create a new key</div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end;">
+              <div style="flex:1;min-width:160px;">
+                <label class="field-label" for="ak-label">Label</label>
+                <input id="ak-label" class="auth-input" type="text" placeholder="e.g. production, ci, laptop" />
+              </div>
+              <div style="min-width:200px;">
+                <label class="field-label" for="ak-scopes">Scopes</label>
+                <select id="ak-scopes" class="auth-input">
+                  <option value="">Full access</option>
+                  <option value="read">read only</option>
+                  <option value="read,verify">read + verify</option>
+                  <option value="read,write">read + write</option>
+                  <option value="read,write,verify">read + write + verify</option>
+                </select>
+              </div>
+              <button id="ak-create-btn" class="btn btn-primary" style="height:fit-content;">Create key</button>
+            </div>
+            <div id="ak-new-key-box" style="display:none;margin-top:0.85rem;padding:0.85rem;background:#fff7e6;border:1px solid #f5d696;border-radius:6px;">
+              <div style="font-size:0.78rem;font-weight:600;color:#8a4a00;margin-bottom:0.4rem;">⚠ Store this key now — it will not be shown again.</div>
+              <div style="display:flex;gap:0.5rem;align-items:center;">
+                <code id="ak-new-key-value" style="flex:1;font-size:0.78rem;background:white;padding:0.45rem 0.6rem;border-radius:4px;border:1px solid #e8d4a8;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;"></code>
+                <button id="ak-copy-new-btn" class="btn btn-outline" style="font-size:0.75rem;padding:0.35rem 0.75rem;">Copy</button>
+              </div>
+            </div>
+            <div id="ak-create-msg" class="modal-msg"></div>
+          </div>
+
+          <!-- Existing keys list -->
+          <div class="modal-section">
+            <div class="modal-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+              <span>Your keys</span>
+              <button id="ak-refresh-btn" class="btn-icon" title="Refresh">↻</button>
+            </div>
+            <div id="ak-list" style="font-size:0.82rem;">
+              <div class="loading"><div class="spinner"></div> Loading…</div>
+            </div>
+          </div>
         </div>
 
         <!-- ── TEAM KEYS TAB ── -->

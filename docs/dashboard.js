@@ -2564,6 +2564,107 @@ function openSettings() {
   document.body.style.overflow = "hidden";
   // Always reload account info when modal opens
   _loadAccountInfo();
+  _loadAccountKeys();
+}
+
+// ── ACCOUNT-SCOPED API KEYS (Settings → API Keys tab) ─────────────────────────
+
+async function _loadAccountKeys() {
+  const list = document.getElementById("ak-list");
+  if (!list) return;
+  // Only meaningful when signed in via session — API-key login already shows
+  // its own key info in the Account tab.
+  if (authMode !== "session") {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.78rem;padding:0.5rem 0;">Sign in with your email to manage account-scoped API keys.</div>';
+    return;
+  }
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+  try {
+    const data = await apiFetch("/auth/keys");
+    const keys = data.keys || [];
+    if (!keys.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:0.78rem;padding:0.5rem 0;">No keys yet — create one above.</div>';
+      return;
+    }
+    list.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--muted);font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);">Label</th>
+            <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--muted);font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);">Scopes</th>
+            <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--muted);font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);">Created</th>
+            <th style="text-align:left;padding:0.4rem 0.5rem;color:var(--muted);font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);">Last used</th>
+            <th style="border-bottom:1px solid var(--border);"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${keys.map(k => `
+            <tr>
+              <td style="padding:0.45rem 0.5rem;font-weight:600;">${esc(k.label || "(unlabelled)")}</td>
+              <td style="padding:0.45rem 0.5rem;color:var(--text-2);">${esc(k.scopes || "(full)")}</td>
+              <td style="padding:0.45rem 0.5rem;color:var(--muted);font-size:0.74rem;">${esc(_relativeTime(k.created_at) || "—")}</td>
+              <td style="padding:0.45rem 0.5rem;color:var(--muted);font-size:0.74rem;">${esc(_relativeTime(k.last_used) || "never")}</td>
+              <td style="padding:0.45rem 0.5rem;text-align:right;">
+                <button class="btn btn-outline ak-revoke-btn" data-label="${esc(k.label)}" style="font-size:0.72rem;padding:0.25rem 0.6rem;color:var(--red);border-color:var(--red);">Revoke</button>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+
+    // Wire revoke buttons
+    list.querySelectorAll(".ak-revoke-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const label = btn.getAttribute("data-label");
+        if (!confirm(`Revoke key "${label}"?\n\nAny code using this key will immediately stop working.`)) return;
+        btn.textContent = "Revoking…";
+        btn.disabled = true;
+        try {
+          await apiFetch("/auth/keys/" + encodeURIComponent(label), { method: "DELETE" });
+          _loadAccountKeys();
+        } catch (e) {
+          btn.textContent = "Revoke";
+          btn.disabled = false;
+          alert("Could not revoke: " + e.message);
+        }
+      });
+    });
+  } catch (e) {
+    list.innerHTML = `<div style="color:var(--red);font-size:0.78rem;padding:0.5rem 0;">Could not load keys: ${esc(String(e.message || ""))}</div>`;
+  }
+}
+
+async function _createAccountKey() {
+  const label  = document.getElementById("ak-label").value.trim();
+  const scopes = document.getElementById("ak-scopes").value;
+  const msg    = document.getElementById("ak-create-msg");
+  const btn    = document.getElementById("ak-create-btn");
+  const box    = document.getElementById("ak-new-key-box");
+  const code   = document.getElementById("ak-new-key-value");
+  if (!label) {
+    msg.textContent = "Label is required.";
+    msg.className = "modal-msg modal-msg-error";
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = "Creating…";
+  try {
+    const r = await apiFetch("/auth/keys", {
+      method: "POST",
+      body: JSON.stringify({ label, scopes }),
+    });
+    code.textContent = r.key;
+    box.style.display = "block";
+    msg.textContent = "";
+    msg.className = "modal-msg";
+    document.getElementById("ak-label").value = "";
+    _loadAccountKeys();
+  } catch (e) {
+    msg.textContent = "Failed: " + (e.message || "unknown error");
+    msg.className = "modal-msg modal-msg-error";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Create key";
+  }
 }
 
 function closeSettings() {
@@ -2629,6 +2730,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── Settings modal ──────────────────────────────────────────────────────────
   document.getElementById("settings-btn").addEventListener("click", openSettings);
   document.getElementById("settings-close").addEventListener("click", closeSettings);
+
+  // ── API Keys tab handlers ───────────────────────────────────────────────────
+  document.getElementById("ak-create-btn")?.addEventListener("click", _createAccountKey);
+  document.getElementById("ak-refresh-btn")?.addEventListener("click", _loadAccountKeys);
+  document.getElementById("ak-copy-new-btn")?.addEventListener("click", () => {
+    const code = document.getElementById("ak-new-key-value");
+    if (!code) return;
+    navigator.clipboard.writeText(code.textContent).then(() => {
+      const btn = document.getElementById("ak-copy-new-btn");
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+    }).catch(() => {});
+  });
 
   // Close on backdrop click
   document.getElementById("settings-modal").addEventListener("click", (e) => {
