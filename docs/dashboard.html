@@ -953,6 +953,99 @@
     }
     .cap-pill-removable button:hover { color: var(--red); }
 
+    /* ── Expandable anomaly cards ── */
+    .anomaly-card { transition: background 0.15s; }
+    .anomaly-card:hover { filter: brightness(0.97); }
+    .anomaly-detail {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s ease, margin-top 0.2s, padding-top 0.2s;
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0 solid transparent;
+    }
+    .anomaly-card.expanded .anomaly-detail {
+      max-height: 600px;
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid rgba(0,0,0,0.08);
+    }
+    .anomaly-metrics {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.25rem 1rem;
+      font-size: 0.78rem;
+      margin-bottom: 0.6rem;
+    }
+    .anomaly-metric-row {
+      display: contents;
+    }
+    .anomaly-metric-label {
+      color: var(--text-2);
+    }
+    .anomaly-metric-value {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .anomaly-dids-wrap {
+      margin-top: 0.4rem;
+    }
+    .anomaly-dids-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-2);
+      margin-bottom: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .anomaly-dids-list {
+      max-height: 220px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.04);
+      border-radius: 4px;
+      padding: 0.3rem;
+    }
+    .anomaly-did-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.2rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.72rem;
+    }
+    .anomaly-did-row:hover {
+      background: rgba(0,0,0,0.05);
+    }
+    .anomaly-did-row code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+    .anomaly-did-copy {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      padding: 0.1rem 0.4rem;
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+    .anomaly-did-copy:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .anomaly-meta {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+      font-style: italic;
+    }
+
     /* ── Tier-locked overlays (free/pro users see Pro/Enterprise features locked) ── */
     .tier-locked {
       position: relative;

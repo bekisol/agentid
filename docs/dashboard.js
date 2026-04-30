@@ -1420,6 +1420,76 @@ async function loadDiscoveryStats() {
 
 // ── ANOMALY DETECTION ─────────────────────────────────────────────────────────
 
+function _formatAnomalyTime(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    const now = Date.now();
+    const diff = (now - d.getTime()) / 1000;
+    if (diff < 60)        return Math.round(diff) + "s ago";
+    if (diff < 3600)      return Math.round(diff / 60) + "m ago";
+    if (diff < 86400)     return Math.round(diff / 3600) + "h ago";
+    return d.toLocaleString();
+  } catch { return iso; }
+}
+
+function _renderAnomalyDetail(a) {
+  // Build the expanded view: metric table + DID list (when present) + meta.
+  const m = a.metric || {};
+  const rows = [];
+  const fmt = v => {
+    if (typeof v === "number") return v.toLocaleString(undefined, {maximumFractionDigits: 2});
+    return String(v);
+  };
+
+  // Pretty labels for known metric keys
+  const LABELS = {
+    this_hour:         "Verifies this hour",
+    avg_per_hour:      "7-day hourly average",
+    ratio:             "Ratio (this hour / avg)",
+    total:             "Total verify events (24h)",
+    failed:            "Invalid verifies (24h)",
+    rate_pct:          "Invalid rate (%)",
+  };
+  for (const [k, v] of Object.entries(m)) {
+    if (k === "new_verifier_dids") continue;   // handled separately
+    rows.push(
+      '<div class="anomaly-metric-row">' +
+        '<span class="anomaly-metric-label">' + esc(LABELS[k] || k) + '</span>' +
+        '<span class="anomaly-metric-value">' + esc(fmt(v)) + '</span>' +
+      '</div>'
+    );
+  }
+
+  // New-verifier specific: list the DIDs as a vertical scrollable block
+  let didsHtml = "";
+  if (Array.isArray(m.new_verifier_dids) && m.new_verifier_dids.length) {
+    didsHtml =
+      '<div class="anomaly-dids-wrap">' +
+        '<div class="anomaly-dids-title">New verifier DIDs (' +
+          m.new_verifier_dids.length + ')</div>' +
+        '<div class="anomaly-dids-list">' +
+          m.new_verifier_dids.map(did =>
+            '<div class="anomaly-did-row" title="Click to copy">' +
+              '<code>' + esc(did) + '</code>' +
+              '<button class="anomaly-did-copy" data-did="' + esc(did) +
+                '" aria-label="Copy DID">⎘</button>' +
+            '</div>'
+          ).join("") +
+        '</div>' +
+      '</div>';
+  }
+
+  const detectedAt = a.detected_at ? _formatAnomalyTime(a.detected_at) : "";
+  return (
+    '<div class="anomaly-detail">' +
+      (rows.length ? '<div class="anomaly-metrics">' + rows.join("") + '</div>' : "") +
+      didsHtml +
+      (detectedAt ? '<div class="anomaly-meta">Detected ' + esc(detectedAt) + '</div>' : "") +
+    '</div>'
+  );
+}
+
 async function loadAnomalies() {
   const el = document.getElementById("anomaly-list");
   if (!el) return;
@@ -1433,18 +1503,54 @@ async function loadAnomalies() {
       </div>`;
       return;
     }
-    el.innerHTML = anomalies.map(a => {
+    el.innerHTML = anomalies.map((a, i) => {
       const sev = a.severity || "low";
       const sevColor = sev === "high" ? "var(--red)" : sev === "medium" ? "var(--yellow)" : "var(--blue)";
       const sevBg    = sev === "high" ? "var(--red-bg)" : sev === "medium" ? "var(--yellow-bg)" : "var(--blue-bg)";
-      return `<div class="anomaly-card" style="border-left:3px solid ${sevColor};background:${sevBg};border-radius:6px;padding:0.6rem 0.9rem;margin-bottom:0.5rem;">
-        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">
-          <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:${sevColor};border:1px solid ${sevColor};border-radius:999px;padding:0.1rem 0.45rem;">${esc(sev)}</span>
-          <span style="font-weight:600;font-size:0.88rem;">${esc(a.title)}</span>
-        </div>
-        <p style="font-size:0.8rem;color:var(--text-2);margin:0;">${esc(a.description)}</p>
-      </div>`;
+      return (
+        '<div class="anomaly-card" data-anomaly-idx="' + i + '" ' +
+              'style="border-left:3px solid ' + sevColor + ';background:' + sevBg +
+              ';border-radius:6px;padding:0.6rem 0.9rem;margin-bottom:0.5rem;cursor:pointer;">' +
+          '<div class="anomaly-summary" style="display:flex;align-items:center;gap:0.5rem;">' +
+            '<span class="anomaly-chevron" style="font-size:0.7rem;color:var(--muted);transition:transform 0.15s;">▶</span>' +
+            '<span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:' +
+              sevColor + ';border:1px solid ' + sevColor +
+              ';border-radius:999px;padding:0.1rem 0.45rem;">' + esc(sev) + '</span>' +
+            '<span style="font-weight:600;font-size:0.88rem;">' + esc(a.title) + '</span>' +
+            '<span style="font-size:0.72rem;color:var(--muted);margin-left:auto;">' +
+              esc(_formatAnomalyTime(a.detected_at)) + '</span>' +
+          '</div>' +
+          '<p style="font-size:0.8rem;color:var(--text-2);margin:0.3rem 0 0 1.2rem;">' +
+            esc(a.description) + '</p>' +
+          _renderAnomalyDetail(a) +
+        '</div>'
+      );
     }).join("");
+
+    // Expand/collapse handler
+    el.querySelectorAll(".anomaly-card").forEach(card => {
+      card.addEventListener("click", (e) => {
+        // Don't toggle when clicking the copy button on a DID row
+        if (e.target.closest(".anomaly-did-copy")) return;
+        card.classList.toggle("expanded");
+        const chev = card.querySelector(".anomaly-chevron");
+        if (chev) chev.style.transform = card.classList.contains("expanded") ? "rotate(90deg)" : "rotate(0deg)";
+      });
+    });
+
+    // DID copy handlers
+    el.querySelectorAll(".anomaly-did-copy").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const did = btn.getAttribute("data-did");
+        try {
+          await navigator.clipboard.writeText(did);
+          const orig = btn.textContent;
+          btn.textContent = "✓";
+          setTimeout(() => { btn.textContent = orig; }, 1200);
+        } catch {}
+      });
+    });
   } catch {
     if (el) el.innerHTML = `<div class="anomaly-clear" style="color:var(--muted);font-size:0.8rem;">Could not load anomaly data</div>`;
   }
