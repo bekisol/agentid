@@ -1648,6 +1648,143 @@
       overflow-y: auto;
     }
 
+    /* ── Welcome modal (first sign-in) ── */
+    .welcome-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 9700;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(3px);
+      padding: 1rem;
+    }
+    .welcome-modal.open { display: flex; }
+    .welcome-panel {
+      width: min(560px, 96vw);
+      max-height: 90vh;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.6rem 1.8rem 1.4rem;
+      overflow-y: auto;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+    }
+    .welcome-head {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .welcome-icon { font-size: 2rem; margin-bottom: 0.4rem; }
+    .welcome-head h2 {
+      margin: 0 0 0.35rem 0;
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+    .welcome-head p {
+      color: var(--text-2);
+      font-size: 0.9rem;
+      margin: 0;
+    }
+    .welcome-section { margin-bottom: 1.25rem; }
+    .welcome-section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+    .welcome-section-desc {
+      font-size: 0.84rem;
+      color: var(--text-2);
+      line-height: 1.55;
+      margin: 0 0 0.6rem 0;
+    }
+    .welcome-key-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .welcome-key {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 0.6rem 0.85rem;
+      border-radius: 7px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.78rem;
+      word-break: break-all;
+      color: var(--text);
+      user-select: all;
+    }
+    .welcome-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .welcome-tab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .welcome-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+    .welcome-code {
+      background: var(--code-bg, #1a1a1a);
+      color: #e4e4e4;
+      padding: 0.85rem 1rem;
+      border-radius: 0 6px 6px 6px;
+      font-size: 0.74rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-x: auto;
+      line-height: 1.55;
+      margin: 0;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .welcome-links {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.55rem;
+    }
+    .welcome-link-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      text-decoration: none;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.85rem;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .welcome-link-card:hover {
+      border-color: var(--accent);
+      background: var(--accent-light, var(--surface));
+    }
+    .welcome-link-card span {
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 600px) {
+      .welcome-links { grid-template-columns: 1fr; }
+      .welcome-key-row { flex-direction: column; align-items: stretch; }
+    }
+
     /* ── OAuth buttons ── */
     .oauth-row {
       display: flex;
@@ -3126,6 +3263,81 @@ curl https://api.agentid-protocol.com/agents \
   </div>
 </div>
 
+<!-- ── WELCOME MODAL (first sign-in) ──────────────────────────────────────── -->
+<div id="welcome-modal" class="welcome-modal">
+  <div class="welcome-panel">
+    <div class="welcome-head">
+      <div class="welcome-icon">🎉</div>
+      <h2>Welcome to AgentID</h2>
+      <p id="welcome-subtitle">Your account is ready. Here's everything you need to start signing your first agent.</p>
+    </div>
+
+    <div class="welcome-section">
+      <div class="welcome-section-title">Your API key</div>
+      <p class="welcome-section-desc">
+        We've generated a starter key for you. <strong>Copy it now</strong> — it won't be shown in full again.
+        You can mint, label, or revoke more keys any time in <em>Settings → API Keys</em>.
+      </p>
+      <div class="welcome-key-row">
+        <code id="welcome-key-value" class="welcome-key">—</code>
+        <button id="welcome-copy-key" class="btn btn-primary" style="white-space:nowrap;">📋 Copy</button>
+      </div>
+    </div>
+
+    <div class="welcome-section">
+      <div class="welcome-section-title">Use it in your code</div>
+      <div class="welcome-tabs">
+        <button class="welcome-tab active" data-welcome-lang="python">Python</button>
+        <button class="welcome-tab" data-welcome-lang="node">Node</button>
+        <button class="welcome-tab" data-welcome-lang="curl">curl</button>
+        <button class="welcome-tab" data-welcome-lang="go">Go</button>
+      </div>
+      <pre class="welcome-code" data-welcome-panel="python"><code id="welcome-snippet-python"># pip install agentid-sdk
+from agentid_sdk import AgentIDClient
+
+client = AgentIDClient(api_key="YOUR_KEY")
+agent = client.agents.create(name="my-first-agent", capabilities=["chat"])
+print(agent.did)</code></pre>
+      <pre class="welcome-code" data-welcome-panel="node" style="display:none;"><code id="welcome-snippet-node">// npm install @agentid/sdk
+import { AgentIDClient } from "@agentid/sdk";
+
+const client = new AgentIDClient({ apiKey: "YOUR_KEY" });
+const agent  = await client.agents.create({
+  name: "my-first-agent",
+  capabilities: ["chat"],
+});
+console.log(agent.did);</code></pre>
+      <pre class="welcome-code" data-welcome-panel="curl" style="display:none;"><code id="welcome-snippet-curl">curl https://api.agentid-protocol.com/pro/keys/me \
+  -H "x-api-key: YOUR_KEY"</code></pre>
+      <pre class="welcome-code" data-welcome-panel="go" style="display:none;"><code id="welcome-snippet-go">// go get github.com/bekisol/agentid-go
+client, _ := agentid.NewClient(agentid.Options{
+  APIKey: "YOUR_KEY",
+})
+agent, _ := client.Agents.Create(ctx, agentid.CreateAgentParams{
+  Name:         "my-first-agent",
+  Capabilities: []string{"chat"},
+})
+fmt.Println(agent.DID)</code></pre>
+      <button id="welcome-copy-snippet" class="btn btn-outline" style="margin-top:0.65rem;font-size:0.78rem;">📋 Copy snippet</button>
+    </div>
+
+    <div class="welcome-section welcome-links">
+      <a href="docs/" target="_blank" class="welcome-link-card">
+        <strong>Read the docs →</strong>
+        <span>Quickstart, full reference, tier features</span>
+      </a>
+      <a href="#" id="welcome-register-cta" class="welcome-link-card">
+        <strong>+ Register your first agent</strong>
+        <span>Generate keypair + DID locally and sign your first message</span>
+      </a>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:0.55rem;margin-top:1.1rem;">
+      <button class="btn btn-outline" id="welcome-dismiss" style="font-size:0.86rem;">I've copied the key — close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── KEYBOARD SHORTCUTS CHEAT SHEET ─────────────────────────────────────── -->
 <div id="kbd-cheatsheet" class="kbd-cheatsheet">
   <div class="panel">
@@ -3173,7 +3385,7 @@ curl https://api.agentid-protocol.com/agents \
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260430-6"></script>
+<script src="dashboard.js?v=20260430-7"></script>
 
 </body>
 </html>

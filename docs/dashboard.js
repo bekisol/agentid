@@ -661,6 +661,10 @@ async function loadDashboard() {
   // Onboarding checklist — shown until all steps done or dismissed
   _renderOnboarding(data);
 
+  // First-run welcome: if this is a brand-new account with no API keys
+  // yet, auto-mint a starter key and surface it with copy-paste snippets.
+  // No-op for existing accounts.
+  _maybeShowWelcome();
 }
 
 // ── ONBOARDING CHECKLIST ──────────────────────────────────────────────────────
@@ -3372,6 +3376,87 @@ function _initNotifications() {
   setInterval(() => {
     if (apiKey || authMode === "session") loadNotifications();
   }, 60000);
+}
+
+// ── WELCOME MODAL — first-run API key handoff ──────────────────────────────
+
+async function _maybeShowWelcome() {
+  // Only run for session-mode users (Google/email signup); apikey-mode users
+  // already have a key by definition.
+  if (authMode !== "session") return;
+  // Skip if we've already shown it for this user (deduped by email).
+  const me = sessionStorage.getItem("agentid_welcome_seen_for");
+  const currentEmail = document.getElementById("dash-title")?.textContent || "";
+  if (me === currentEmail) return;
+
+  let r;
+  try { r = await apiFetch("/auth/welcome"); }
+  catch (_) { return; }
+  if (!r || !r.is_new || !r.key) {
+    // Mark seen so we don't keep re-checking
+    sessionStorage.setItem("agentid_welcome_seen_for", currentEmail);
+    return;
+  }
+
+  _showWelcomeModal(r.key, r);
+  sessionStorage.setItem("agentid_welcome_seen_for", currentEmail);
+}
+
+function _showWelcomeModal(key, info) {
+  const modal = document.getElementById("welcome-modal");
+  if (!modal) return;
+  document.getElementById("welcome-key-value").textContent = key;
+  const sub = document.getElementById("welcome-subtitle");
+  if (sub) {
+    sub.innerHTML = `Signed in as <strong>${esc(info.owner)}</strong> on the <strong>${esc(info.tier)}</strong> tier. Your starter key is below.`;
+  }
+
+  // Inject the key into every code snippet
+  ["python", "node", "curl", "go"].forEach(lang => {
+    const el = document.getElementById("welcome-snippet-" + lang);
+    if (el) el.textContent = el.textContent.replace(/YOUR_KEY/g, key);
+  });
+
+  modal.classList.add("open");
+
+  // Tab switching
+  modal.querySelectorAll(".welcome-tab").forEach(t => {
+    t.onclick = () => {
+      const lang = t.getAttribute("data-welcome-lang");
+      modal.querySelectorAll(".welcome-tab").forEach(x => x.classList.toggle("active", x === t));
+      modal.querySelectorAll(".welcome-code").forEach(c =>
+        c.style.display = c.getAttribute("data-welcome-panel") === lang ? "" : "none");
+    };
+  });
+
+  // Copy key
+  document.getElementById("welcome-copy-key").onclick = () => {
+    navigator.clipboard.writeText(key).catch(()=>{});
+    const btn = document.getElementById("welcome-copy-key");
+    btn.textContent = "✓ Copied";
+    setTimeout(() => { btn.textContent = "📋 Copy"; }, 1500);
+  };
+
+  // Copy snippet
+  document.getElementById("welcome-copy-snippet").onclick = () => {
+    const visible = modal.querySelector(".welcome-code:not([style*='display: none'])");
+    if (!visible) return;
+    navigator.clipboard.writeText(visible.textContent).catch(()=>{});
+    const btn = document.getElementById("welcome-copy-snippet");
+    btn.textContent = "✓ Copied";
+    setTimeout(() => { btn.textContent = "📋 Copy snippet"; }, 1500);
+  };
+
+  // CTA: register agent
+  document.getElementById("welcome-register-cta").onclick = (e) => {
+    e.preventDefault();
+    modal.classList.remove("open");
+    document.getElementById("register-agent-btn")?.click();
+  };
+
+  document.getElementById("welcome-dismiss").onclick = () => {
+    modal.classList.remove("open");
+  };
 }
 
 // ── THEME TOGGLE (light / dark / auto) ───────────────────────────────────────
