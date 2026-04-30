@@ -3504,8 +3504,17 @@ async function _welcomeGenerate(info) {
 function _welcomeShowExisting(info) {
   const owner = document.getElementById("welcome-existing-owner");
   if (owner) owner.textContent = info.owner || "your email";
-  const modal = document.getElementById("welcome-modal");
-  // Wire its own tab switcher (separate panel)
+  const modal  = document.getElementById("welcome-modal");
+  const input  = document.getElementById("welcome-existing-input");
+  const verify = document.getElementById("welcome-existing-verify");
+  const status = document.getElementById("welcome-existing-status");
+  const snips  = document.getElementById("welcome-existing-snippets");
+  // Reset state every time the panel opens
+  if (input)  input.value = "";
+  if (status) { status.textContent = ""; status.style.color = ""; }
+  if (snips)  snips.style.display  = "none";
+
+  // Tab switcher for the snippets within this panel
   modal.querySelectorAll("[data-welcome-elang]").forEach(t => {
     t.onclick = () => {
       const lang = t.getAttribute("data-welcome-elang");
@@ -3514,6 +3523,77 @@ function _welcomeShowExisting(info) {
         c.style.display = c.getAttribute("data-welcome-epanel") === lang ? "" : "none");
     };
   });
+
+  const doVerify = async () => {
+    const key = (input.value || "").trim();
+    if (!key) {
+      status.textContent = "Paste your agentid_… key first.";
+      status.style.color = "var(--muted)";
+      return;
+    }
+    if (!/^agentid_/.test(key)) {
+      status.textContent = "Doesn't look right — keys start with `agentid_`.";
+      status.style.color = "var(--red)";
+      return;
+    }
+    verify.disabled = true; verify.textContent = "Verifying…";
+    status.textContent = "Checking the key against the API…";
+    status.style.color = "var(--muted)";
+
+    let info2;
+    try {
+      const r = await fetch(BASE + "/pro/keys/me", {
+        headers: { "x-api-key": key },
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.detail || `HTTP ${r.status}`);
+      }
+      info2 = await r.json();
+    } catch (e) {
+      status.innerHTML = '<strong style="color:var(--red);">✗ Invalid key.</strong> ' + esc(String(e.message || ""));
+      verify.disabled = false; verify.textContent = "Verify";
+      snips.style.display = "none";
+      return;
+    } finally {
+      verify.disabled = false; verify.textContent = "Verify";
+    }
+
+    const sameOwner = info2.owner && info.owner && info2.owner.toLowerCase() === info.owner.toLowerCase();
+    if (sameOwner) {
+      status.innerHTML =
+        `<strong style="color:#107a3a;">✓ Key works for this account.</strong> ` +
+        `Tier <strong>${esc(info2.tier)}</strong>, label “<strong>${esc(info2.label || "(unlabelled)")}</strong>”.` +
+        ` Snippets below are pre-filled with your key.`;
+    } else {
+      status.innerHTML =
+        `<strong style="color:#8a4a00;">⚠ Key is valid but for a different account.</strong> ` +
+        `Owner <code>${esc(info2.owner || "—")}</code> ≠ <code>${esc(info.owner)}</code>. ` +
+        `That's a separate account. Either sign in via the <em>API key</em> login tab to manage it, ` +
+        `or use this key directly in your code without changing your dashboard login.`;
+    }
+
+    // Inject the key into the snippet code blocks
+    ["python", "node", "curl", "go"].forEach(lang => {
+      const el = document.getElementById("welcome-esnip-" + lang);
+      if (el) el.textContent = el.textContent.replace(/YOUR_KEY/g, key);
+    });
+    snips.style.display = "";
+  };
+
+  verify.onclick = doVerify;
+  input.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); doVerify(); } };
+
+  // Copy snippet
+  const copyBtn = document.getElementById("welcome-existing-copy");
+  if (copyBtn) copyBtn.onclick = () => {
+    const visible = snips.querySelector("[data-welcome-epanel]:not([style*='display: none'])");
+    if (!visible) return;
+    navigator.clipboard.writeText(visible.textContent).catch(()=>{});
+    copyBtn.textContent = "✓ Copied";
+    setTimeout(() => { copyBtn.textContent = "📋 Copy snippet"; }, 1500);
+  };
+
   _welcomeShowStep("existing");
 }
 

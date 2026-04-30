@@ -3379,31 +3379,51 @@ fmt.Println(agent.DID)</code></pre>
 
     <!-- ── STEP 2b: existing key chosen ─────────────────────────────── -->
     <div id="welcome-step-existing" class="welcome-section" style="display:none;">
-      <div class="welcome-section-title">Use your existing key</div>
+      <div class="welcome-section-title">Paste your existing API key</div>
       <p class="welcome-section-desc">
-        Drop your existing <code>agentid_…</code> key into the SDK directly.
-        It will work with this account as long as the key's <em>owner</em>
-        field matches your signed-in email
-        (<strong id="welcome-existing-owner">your email</strong>).
-        If your key was minted for a different owner, that's a separate
-        account — you can still sign into the dashboard via the
-        <em>API key</em> tab on the login page.
+        We'll verify it works and show you ready-to-paste snippets.
+        The key's <em>owner</em> should match your signed-in email
+        (<strong id="welcome-existing-owner">your email</strong>) — if it
+        doesn't, we'll let you know.
       </p>
-      <div class="welcome-tabs">
-        <button class="welcome-tab active" data-welcome-elang="python">Python</button>
-        <button class="welcome-tab" data-welcome-elang="node">Node</button>
-        <button class="welcome-tab" data-welcome-elang="curl">curl</button>
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.4rem;">
+        <input id="welcome-existing-input" class="welcome-key" type="password"
+               placeholder="agentid_..."
+               autocomplete="off" spellcheck="false"
+               style="border:1px solid var(--border-dark);" />
+        <button id="welcome-existing-verify" class="btn btn-primary" style="white-space:nowrap;">
+          Verify
+        </button>
       </div>
-      <pre class="welcome-code" data-welcome-epanel="python"><code># pip install agentid-sdk
+      <div id="welcome-existing-status" style="font-size:0.82rem;min-height:1rem;line-height:1.55;margin-bottom:0.6rem;"></div>
+
+      <div id="welcome-existing-snippets" style="display:none;">
+        <div class="welcome-section-title" style="margin-top:0.85rem;">Use it in your code</div>
+        <div class="welcome-tabs">
+          <button class="welcome-tab active" data-welcome-elang="python">Python</button>
+          <button class="welcome-tab" data-welcome-elang="node">Node</button>
+          <button class="welcome-tab" data-welcome-elang="curl">curl</button>
+          <button class="welcome-tab" data-welcome-elang="go">Go</button>
+        </div>
+        <pre class="welcome-code" data-welcome-epanel="python"><code id="welcome-esnip-python"># pip install agentid-sdk
 from agentid_sdk import AgentIDClient
 
-client = AgentIDClient(api_key="YOUR_EXISTING_KEY")   # paste your key here
-agent  = client.agents.create(name="hello", capabilities=["chat"])</code></pre>
-      <pre class="welcome-code" data-welcome-epanel="node" style="display:none;"><code>// npm install @agentid/sdk
+client = AgentIDClient(api_key="YOUR_KEY")
+agent  = client.agents.create(name="hello", capabilities=["chat"])
+print(agent.did)</code></pre>
+        <pre class="welcome-code" data-welcome-epanel="node" style="display:none;"><code id="welcome-esnip-node">// npm install @agentid/sdk
 import { AgentIDClient } from "@agentid/sdk";
-const client = new AgentIDClient({ apiKey: "YOUR_EXISTING_KEY" });</code></pre>
-      <pre class="welcome-code" data-welcome-epanel="curl" style="display:none;"><code>curl https://api.agentid-protocol.com/pro/keys/me \
-  -H "x-api-key: YOUR_EXISTING_KEY"</code></pre>
+const client = new AgentIDClient({ apiKey: "YOUR_KEY" });
+const agent  = await client.agents.create({ name: "hello", capabilities: ["chat"] });</code></pre>
+        <pre class="welcome-code" data-welcome-epanel="curl" style="display:none;"><code id="welcome-esnip-curl">curl https://api.agentid-protocol.com/pro/keys/me \
+  -H "x-api-key: YOUR_KEY"</code></pre>
+        <pre class="welcome-code" data-welcome-epanel="go" style="display:none;"><code id="welcome-esnip-go">// go get github.com/bekisol/agentid-go
+client, _ := agentid.NewClient(agentid.Options{APIKey: "YOUR_KEY"})
+agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
+  Name: "hello", Capabilities: []string{"chat"},
+})</code></pre>
+        <button id="welcome-existing-copy" class="btn btn-outline" style="margin-top:0.65rem;font-size:0.78rem;">📋 Copy snippet</button>
+      </div>
     </div>
 
     <!-- ── Footer (varies per step) ─────────────────────────────────── -->
@@ -3473,7 +3493,7 @@ const client = new AgentIDClient({ apiKey: "YOUR_EXISTING_KEY" });</code></pre>
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260430-8"></script>
+<script src="dashboard.js?v=20260430-9"></script>
 
 </body>
 </html>
