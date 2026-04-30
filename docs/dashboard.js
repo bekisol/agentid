@@ -1862,12 +1862,20 @@ async function loadAnomalies() {
         } catch {}
       });
     });
-  } catch {
+  } catch (err) {
+    console.error("[anomaly] load failed:", err);
     if (pill) {
       pill.textContent = "error";
       pill.className = "status-pill status-pill-bad";
     }
-    if (el) el.innerHTML = `<div class="anomaly-clear" style="color:var(--muted);font-size:0.8rem;padding:0.5rem 0;">Could not load anomaly data</div>`;
+    if (el) {
+      const msg = (err && err.message) ? String(err.message) : "unknown error";
+      el.innerHTML = `<div class="anomaly-clear" style="color:var(--muted);font-size:0.8rem;padding:0.5rem 0;display:flex;flex-direction:column;gap:0.4rem;">
+        <span>Could not load anomaly data</span>
+        <code style="font-size:0.7rem;color:var(--red);background:var(--surface2);padding:0.2rem 0.4rem;border-radius:3px;display:inline-block;max-width:fit-content;">${esc(msg)}</code>
+        <span style="font-size:0.7rem;">Check the browser console for full details.</span>
+      </div>`;
+    }
   }
 }
 
