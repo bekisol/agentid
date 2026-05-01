@@ -422,7 +422,16 @@ function setupEvents(canvas) {
   });
 
   window.addEventListener("mouseup", () => {
-    if (_net.drag && !_net.drag.moved && _net.drag.node) selectNode(_net.drag.node);
+    if (_net.drag) {
+      if (_net.drag.moved && _net.drag.node) {
+        // Pin the node where the user dropped it so physics never moves it again
+        _net.drag.node.vx = 0;
+        _net.drag.node.vy = 0;
+        _net.drag.node.pinned = true;
+      } else if (_net.drag.node) {
+        selectNode(_net.drag.node);
+      }
+    }
     _net.drag=null; _net.pan=null;
     if (_net.canvas) _net.canvas.style.cursor="grab";
   });
@@ -479,34 +488,33 @@ function egoSimTick() {
     const ni=nodes[i], nj=nodes[j];
     const dx=nj.x-ni.x, dy=nj.y-ni.y;
     const d2=dx*dx+dy*dy+1, d=Math.sqrt(d2), f=K_REP/d2;
-    if (ni!==center && ni!==drag) { ni.vx-=f*dx/d; ni.vy-=f*dy/d; }
-    if (nj!==center && nj!==drag) { nj.vx+=f*dx/d; nj.vy+=f*dy/d; }
+    if (ni!==center && ni!==drag && !ni.pinned) { ni.vx-=f*dx/d; ni.vy-=f*dy/d; }
+    if (nj!==center && nj!==drag && !nj.pinned) { nj.vx+=f*dx/d; nj.vy+=f*dy/d; }
   }
 
   // Springs along edges
   for (const e of _net.edges) {
     const a=nmap[e.src], b=nmap[e.dst]; if(!a||!b) continue;
     const dx=b.x-a.x, dy=b.y-a.y, d=Math.sqrt(dx*dx+dy*dy)||1, f=K_SPR*(d-REST);
-    if (a!==center && a!==drag) { a.vx+=f*dx/d; a.vy+=f*dy/d; }
-    if (b!==center && b!==drag) { b.vx-=f*dx/d; b.vy-=f*dy/d; }
+    if (a!==center && a!==drag && !a.pinned) { a.vx+=f*dx/d; a.vy+=f*dy/d; }
+    if (b!==center && b!==drag && !b.pinned) { b.vx-=f*dx/d; b.vy-=f*dy/d; }
   }
 
-  // Damping + integrate (skip pinned center and dragged node)
+  // Damping + integrate — skip center, dragged, and user-pinned nodes
   nodes.forEach(n => {
-    if (n===center || n===drag) return;
+    if (n===center || n===drag || n.pinned) return;
     n.vx*=DAMP; n.vy*=DAMP; n.x+=n.vx; n.y+=n.vy;
   });
 
-  // Collision correction — skip pinned center AND currently-dragged node
-  const dragged = _net.drag?.node;
+  // Collision correction — skip center, dragged, and user-pinned nodes
   for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
     const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
     const d=Math.sqrt(dx*dx+dy*dy)||1;
     const minD=(nodes[i].r+nodes[j].r)*1.9+4;
     if (d<minD) {
       const push=(minD-d)/2/d;
-      const lockI = nodes[i]===center || nodes[i]===dragged;
-      const lockJ = nodes[j]===center || nodes[j]===dragged;
+      const lockI = nodes[i]===center || nodes[i]===drag || nodes[i].pinned;
+      const lockJ = nodes[j]===center || nodes[j]===drag || nodes[j].pinned;
       if (!lockI) { nodes[i].x-=dx*push; nodes[i].y-=dy*push; }
       if (!lockJ) { nodes[j].x+=dx*push; nodes[j].y+=dy*push; }
     }
@@ -519,7 +527,9 @@ function egoAnimate() {
   if (maxV > 0.1 && _egoStep < 300) {
     _egoAnimId = requestAnimationFrame(egoAnimate);
   } else {
-    fitView(); draw(); _egoAnimId = null;
+    // Do NOT call fitView() here — it would snap the viewport while the user
+    // may be panning/dragging, causing the "zoom jump after a few seconds" bug.
+    draw(); _egoAnimId = null;
   }
 }
 
@@ -563,8 +573,8 @@ function enterEgoMode(centerNode) {
   _net.nodes   = [centerNode, ...neighbours];
   _net.edges   = buildEdgesForDids(new Set(_net.nodes.map(n=>n.did)));
 
-  // Reset velocities so physics starts clean each time
-  _net.nodes.forEach(n=>{ n.vx=0; n.vy=0; });
+  // Reset velocities and pins so physics starts clean each time
+  _net.nodes.forEach(n=>{ n.vx=0; n.vy=0; n.pinned=false; });
   centerNode.x=0; centerNode.y=0;
 
   computeEgoLayout(centerNode, neighbours, W, H);
@@ -589,6 +599,8 @@ function exitEgoMode() {
   _net.selected  = null;
   _net.nodes     = _net.allNodes;
   _net.edges     = _net.allEdges;
+  // Clear pinned state so dropped nodes aren't frozen in the overview
+  _net.allNodes.forEach(n => { n.pinned=false; });
   renderDetailPanel(null);
   renderSidebar();
   fitView();
