@@ -78,7 +78,8 @@ let _allAgents   = [];
 let _allLogs     = [];
 let _edgeMap     = {};
 let _agentStats  = {};
-let _compromised = new Set();
+let _compromised     = new Set();
+let _compromisedInfo = {}; // did → full entry from /trust/compromised (reporter, reason, ts)
 let _sortBy      = "interactions";
 let _searchQ     = "";
 let _days        = 7;
@@ -544,6 +545,27 @@ function enterEgoMode(centerNode) {
     if (e.dst === centerNode.did) neighbourDids.add(e.src);
   }
 
+  // If this agent is flagged/compromised, inject whoever reported it
+  let flaggedByDid = null;
+  if (_compromised.has(centerNode.did)) {
+    const info = _compromisedInfo[centerNode.did] || {};
+    // Try common field names the API might use
+    flaggedByDid = info.reporter || info.reported_by || info.flagged_by ||
+                   info.flagging_agent || info.flaggedBy || null;
+    if (!flaggedByDid) {
+      // Fall back: scan audit logs for integrity_report_issued involving this agent
+      for (const ev of _allLogs) {
+        if (ev.counterparty === centerNode.did && ev.operation === "integrity_report_issued") {
+          flaggedByDid = ev.did; break;
+        }
+        if (ev.did === centerNode.did && ev.operation === "integrity_report_issued") {
+          flaggedByDid = ev.counterparty; break;
+        }
+      }
+    }
+    if (flaggedByDid) neighbourDids.add(flaggedByDid);
+  }
+
   // Build node list: center + neighbours (from allNodes or create minimal ones)
   const ownedDids = new Set(_allAgents.map(a=>a.did));
   const nodePool  = Object.fromEntries(_net.allNodes.map(n=>[n.did,n]));
@@ -564,6 +586,21 @@ function enterEgoMode(centerNode) {
   _net.egoMode = true;
   _net.nodes   = [centerNode, ...neighbours];
   _net.edges   = buildEdgesForDids(new Set(_net.nodes.map(n=>n.did)));
+
+  // Inject a synthetic "flagged by" red edge if we found the reporter
+  // and there isn't already a real edge between them
+  if (flaggedByDid) {
+    const alreadyLinked = _net.edges.some(e =>
+      (e.src===flaggedByDid && e.dst===centerNode.did) ||
+      (e.src===centerNode.did && e.dst===flaggedByDid)
+    );
+    if (!alreadyLinked && _net.nodes.find(n=>n.did===flaggedByDid)) {
+      _net.edges.push({
+        src: flaggedByDid, dst: centerNode.did,
+        count:1, lw:2.5, color:"#ef4444", label:"flagged", flagged:true,
+      });
+    }
+  }
 
   // Reset velocities so physics starts clean each time
   _net.nodes.forEach(n=>{ n.vx=0; n.vy=0; });
@@ -697,7 +734,13 @@ function renderDetailPanel(node) {
   outbound.sort((a,b)=>b.count-a.count);
 
   const flags=[];
-  if (isComp) flags.push({level:"critical",msg:"Marked as compromised"});
+  if (isComp) {
+    const ci = _compromisedInfo[node.did] || {};
+    const reporter = ci.reporter || ci.reported_by || ci.flagged_by || ci.flagging_agent || ci.flaggedBy;
+    const reason   = ci.reason || ci.description || "";
+    const byText   = reporter ? ` · flagged by ${_allAgents.find(a=>a.did===reporter)?.name || reporter.slice(-10)}` : "";
+    flags.push({level:"critical", msg:`Compromised${byText}${reason ? " — "+reason : ""}`});
+  }
   const allOps=Object.entries(stats.ops||{});
   if (allOps.length===1&&allOps[0][1]>2) flags.push({level:"warn",msg:`100% ${allOps[0][0]} — single op type`});
   if (inbound.length>0&&outbound.length===0) flags.push({level:"info",msg:`Only inbound — never initiates`});
@@ -913,7 +956,9 @@ async function loadNetwork() {
 
   _allAgents=agents;
   _allLogs=logs;
-  _compromised=new Set(compromised.map(c=>c.did));
+  _compromisedInfo={};
+  compromised.forEach(c=>{ if(c.did) _compromisedInfo[c.did]=c; });
+  _compromised=new Set(Object.keys(_compromisedInfo));
 
   const cutoff=Date.now()-_days*86400000;
   const windowLogs=logs.filter(ev=>{
