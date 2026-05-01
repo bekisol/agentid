@@ -225,10 +225,16 @@ function draw() {
     ctx.fillStyle="#fff";
     ctx.fillText(node.icon,node.x,node.y-2);
 
-    ctx.font=`bold ${Math.max(9,Math.round(r*.31))}px ui-monospace,monospace`;
-    ctx.fillStyle=isSel?"#f8fafc":node.external?"#fcd34d":"#e2e8f0";ctx.textBaseline="top";
-    ctx.fillText(node.name.length>16?node.name.slice(0,15)+"…":node.name,node.x,node.y+r+6);
-    ctx.textBaseline="alphabetic";ctx.globalAlpha=1;
+    // Only draw label when zoomed in enough for it not to collide with neighbours,
+    // or when the node is selected / hovered.
+    const showLabel = isSel || isHov || _net.zoom > 0.65;
+    if (showLabel) {
+      ctx.font=`bold ${Math.max(9,Math.round(r*.31))}px ui-monospace,monospace`;
+      ctx.fillStyle=isSel?"#f8fafc":node.external?"#fcd34d":"#e2e8f0";ctx.textBaseline="top";
+      ctx.fillText(node.name.length>16?node.name.slice(0,15)+"…":node.name,node.x,node.y+r+6);
+      ctx.textBaseline="alphabetic";
+    }
+    ctx.globalAlpha=1;
   }
 
   ctx.restore();
@@ -240,13 +246,14 @@ function simTick() {
   const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
   const N=nodes.length;
 
-  // Constants tuned per graph size
-  const K_REP = N>80?4500 : N>40?9000  : N>15?22000 : 52000;
-  const REST  = N>80?68   : N>40?95    : N>15?150   : 220;
-  const K_SPR = N>80?0.055: N>40?0.045 : 0.035;
-  const DAMP  = N>80?0.74 : N>40?0.80  : N>15?0.84  : 0.87;
-  const GRAV  = N>80?0.018: N>40?0.010 : N>15?0.006 : 0.003;
-  const MAX_V = 6;
+  // Constants tuned per graph size.
+  // Key insight: K_REP must dominate K_SPR so repulsion > spring clustering.
+  const K_REP = N>80?14000: N>40?22000  : N>15?36000 : 52000;
+  const REST  = N>80?55   : N>40?80     : N>15?140   : 220;
+  const K_SPR = N>80?0.010: N>40?0.020  : 0.030;
+  const DAMP  = N>80?0.76 : N>40?0.81   : N>15?0.85  : 0.87;
+  const GRAV  = N>80?0.008: N>40?0.006  : N>15?0.005 : 0.003;
+  const MAX_V = 5;
 
   // Repulsion + inline collision resolution (single O(N²) pass)
   for(let i=0;i<N;i++) for(let j=i+1;j<N;j++){
