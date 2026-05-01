@@ -238,28 +238,41 @@ function draw() {
 function simTick() {
   const nodes=_net.nodes,edges=_net.edges;
   const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
-  // Adaptive constants stored on _net by buildNetwork so they scale with N
-  const K_REP=_net.K_REP||52000,K_SPR=_net.K_SPR||0.025,REST=_net.REST||380,DAMP=0.86;
-  // Gravity scales with REST² so large graphs aren't crushed to center
-  const GRAV=0.004*(REST/380)**2;
+  const K_REP=_net.K_REP||52000,K_SPR=_net.K_SPR||0.025,REST=_net.REST||380,DAMP=0.88;
+  const MAX_V=REST*0.4; // velocity cap — prevents runaway on initial burst
+
+  // Repulsion between every pair
   for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
     const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
     const d2=dx*dx+dy*dy+1,d=Math.sqrt(d2),f=K_REP/d2;
     nodes[i].vx-=f*dx/d;nodes[i].vy-=f*dy/d;
     nodes[j].vx+=f*dx/d;nodes[j].vy+=f*dy/d;
   }
+
+  // Springs on edges
   for (const e of edges) {
     const a=nmap[e.src],b=nmap[e.dst];if(!a||!b) continue;
     const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=K_SPR*(d-REST);
     a.vx+=f*dx/d;a.vy+=f*dy/d;b.vx-=f*dx/d;b.vy-=f*dy/d;
   }
-  // Gravity toward origin — scaled so large graphs aren't pulled to center
-  nodes.forEach(n=>{ n.vx-=n.x*GRAV;n.vy-=n.y*GRAV; });
+
+  // Velocity cap + damping + integrate
   nodes.forEach(n=>{
     if(_net.drag?.node===n) return;
+    n.vx=Math.max(-MAX_V,Math.min(MAX_V,n.vx));
+    n.vy=Math.max(-MAX_V,Math.min(MAX_V,n.vy));
     n.vx*=DAMP;n.vy*=DAMP;n.x+=n.vx;n.y+=n.vy;
   });
-  // Direct collision correction — visual radius is r*1.7, so use that as min gap
+
+  // Centering: shift ALL nodes by the same offset so centroid stays at origin.
+  // Unlike per-node gravity (which pulls every node toward 0,0 individually and
+  // causes hub-and-spoke graphs to collapse), centering doesn't change relative
+  // positions — it only prevents the whole graph from drifting off-canvas.
+  const cx=nodes.reduce((s,n)=>s+n.x,0)/nodes.length;
+  const cy=nodes.reduce((s,n)=>s+n.y,0)/nodes.length;
+  nodes.forEach(n=>{ n.x-=cx*0.05;n.y-=cy*0.05; });
+
+  // Collision correction — visual glow drawn at r*1.7, use that as minimum gap
   for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
     const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
     const d=Math.sqrt(dx*dx+dy*dy)||1;
