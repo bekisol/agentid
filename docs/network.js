@@ -238,7 +238,10 @@ function draw() {
 function simTick() {
   const nodes=_net.nodes,edges=_net.edges;
   const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
-  const K_REP=52000,K_SPR=0.025,REST=380,DAMP=0.86;
+  // Adaptive constants stored on _net by buildNetwork so they scale with N
+  const K_REP=_net.K_REP||52000,K_SPR=0.025,REST=_net.REST||380,DAMP=0.86;
+  // Gravity scales with REST² so large graphs aren't crushed to center
+  const GRAV=0.004*(REST/380)**2;
   for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
     const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
     const d2=dx*dx+dy*dy+1,d=Math.sqrt(d2),f=K_REP/d2;
@@ -250,12 +253,22 @@ function simTick() {
     const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=K_SPR*(d-REST);
     a.vx+=f*dx/d;a.vy+=f*dy/d;b.vx-=f*dx/d;b.vy-=f*dy/d;
   }
-  // Weak gravity toward origin keeps the graph centered without crushing it
-  nodes.forEach(n=>{ n.vx-=n.x*.004;n.vy-=n.y*.004; });
+  // Gravity toward origin — scaled so large graphs aren't pulled to center
+  nodes.forEach(n=>{ n.vx-=n.x*GRAV;n.vy-=n.y*GRAV; });
   nodes.forEach(n=>{
     if(_net.drag?.node===n) return;
     n.vx*=DAMP;n.vy*=DAMP;n.x+=n.vx;n.y+=n.vy;
   });
+  // Direct collision correction — visual radius is r*1.7, so use that as min gap
+  for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+    const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
+    const d=Math.sqrt(dx*dx+dy*dy)||1;
+    const minD=(nodes[i].r+nodes[j].r)*1.9+4;
+    if(d<minD){const push=(minD-d)/2/d;
+      nodes[i].x-=dx*push;nodes[i].y-=dy*push;
+      nodes[j].x+=dx*push;nodes[j].y+=dy*push;
+    }
+  }
 }
 
 function animate() {
@@ -786,7 +799,18 @@ async function loadNetwork() {
   const stepR = minDim*0.011;  // 1.1% added per log2 doubling
   const capR  = minDim*0.15;   // 15%  — hard cap so giant hubs don't dominate
   const extR  = minDim*0.025;  // 2.5% — external / counterparty nodes
+  const N=nodeDids.length;
   const r0=Math.min(W,H)*.28;
+  // Adaptive REST: sqrt(canvas area / N) * 1.5 — nodes fill canvas at any N
+  // K_REP scales with REST² to keep the repulsion/spring ratio constant
+  _net.REST=Math.max(55,Math.min(380,Math.sqrt(W*H/Math.max(N,1))*1.5));
+  _net.K_REP=Math.round(52000*(_net.REST/380)**2);
+  // Grid start for N>30: avoids born-stacked-on-circle problem
+  // (150 nodes on r=168px circle = 7px between adjacent nodes — physics never recovers)
+  const useGrid=N>30;
+  const cols=useGrid?Math.ceil(Math.sqrt(N*(W/H)*1.1)):0;
+  const gx=useGrid?W/(cols+1):0;
+  const gy=useGrid?H/(Math.ceil(N/Math.max(cols,1))+1):0;
   _net.nodes=nodeDids.map((did,i)=>{
     const ag=agents.find(a=>a.did===did);
     const isExternal=!ownedDids.has(did);
@@ -796,14 +820,18 @@ async function loadNetwork() {
     const r=isExternal
       ? Math.round(extR)
       : Math.round(Math.min(capR, baseR + Math.log2(interacts+1)*stepR));
+    // Grid: ±15% jitter (was ±50% — adjacent nodes could start 0px apart)
+    // Circle: unchanged original behaviour for small graphs
+    const ix=useGrid?(i%cols+1)*gx-W/2+(Math.random()-.5)*gx*0.3
+                    :r0*Math.cos(angle)+(Math.random()-.5)*60;
+    const iy=useGrid?(Math.floor(i/cols)+1)*gy-H/2+(Math.random()-.5)*gy*0.3
+                    :r0*Math.sin(angle)+(Math.random()-.5)*60;
     return{
       did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
       color:isExternal?"#f59e0b":color,
       tags:ag?.tags||[],
       external:isExternal,
-      x:r0*Math.cos(angle)+(Math.random()-.5)*60,
-      y:r0*Math.sin(angle)+(Math.random()-.5)*60,
-      vx:0,vy:0,r,
+      x:ix,y:iy,vx:0,vy:0,r,
     };
   });
 
