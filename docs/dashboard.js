@@ -4194,6 +4194,60 @@ function _switchSettingsTab(tab) {
   if (tab === "sandbox") _loadSandboxStatus();
 }
 
+// ── Trust Score Fleet Widget ─────────────────────────────────────────────────
+
+async function _loadTrustScoreWidget() {
+  const card = document.getElementById("trust-score-card");
+  const list = document.getElementById("trust-score-list");
+  const distRow = document.getElementById("trust-dist-row");
+  if (!card || !list) return;
+
+  try {
+    const data = await apiFetch("/pro/trust-scores");
+    if (!data || !data.agents || data.agents.length === 0) {
+      card.style.display = "none";
+      return;
+    }
+
+    card.style.display = "";
+
+    // Distribution badges
+    const dist = data.distribution || {};
+    const levels = [
+      { key: "excellent", label: "Excellent", cls: "trust-level-excellent" },
+      { key: "good",      label: "Good",      cls: "trust-level-good"      },
+      { key: "moderate",  label: "Moderate",  cls: "trust-level-moderate"  },
+      { key: "low",       label: "Low",       cls: "trust-level-low"       },
+    ];
+    distRow.innerHTML = levels.map(l => {
+      const count = dist[l.key] || 0;
+      return `<span class="trust-dist-pill ${l.cls}">${l.label} <strong>${count}</strong></span>`;
+    }).join("") + `<span style="margin-left:auto;font-size:0.78rem;color:var(--muted);">Fleet avg: <strong>${(data.average_score || 0).toFixed(1)}</strong></span>`;
+
+    // Per-agent rows
+    const COLOR = { excellent: "#22c55e", good: "#3b82f6", moderate: "#f59e0b", low: "#ef4444" };
+    list.innerHTML = data.agents.map(a => {
+      const pct = Math.round(a.score);
+      const color = COLOR[a.level] || "#94a3b8";
+      return `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${a.did}">${a.name || a.did.slice(0, 28) + "…"}</div>
+          <div style="font-size:0.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.did}</div>
+        </div>
+        <div class="trust-score-bar-wrap" style="width:140px;flex-shrink:0;">
+          <div style="height:6px;border-radius:999px;background:var(--surface2);flex:1;overflow:hidden;">
+            <div class="trust-score-bar" style="width:${pct}%;background:${color};height:100%;"></div>
+          </div>
+          <span style="font-size:0.78rem;font-weight:700;color:${color};min-width:28px;text-align:right;">${pct}</span>
+        </div>
+        <span class="trust-level-badge trust-level-${a.level}" style="flex-shrink:0;">${a.level}</span>
+      </div>`;
+    }).join("");
+  } catch (e) {
+    // Silently skip if endpoint unavailable (feature gate)
+  }
+}
+
 // ── EVENT LISTENERS ───────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -4984,60 +5038,6 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
       }
     }
   }, true);   // capture phase so it fires before the existing handler
-
-  // ── Trust Score Fleet Widget ─────────────────────────────────────────────────
-
-  async function _loadTrustScoreWidget() {
-    const card = document.getElementById("trust-score-card");
-    const list = document.getElementById("trust-score-list");
-    const distRow = document.getElementById("trust-dist-row");
-    if (!card || !list) return;
-
-    try {
-      const data = await apiFetch("/pro/trust-scores");
-      if (!data || !data.agents || data.agents.length === 0) {
-        card.style.display = "none";
-        return;
-      }
-
-      card.style.display = "";
-
-      // Distribution badges
-      const dist = data.distribution || {};
-      const levels = [
-        { key: "excellent", label: "Excellent", cls: "trust-level-excellent" },
-        { key: "good",      label: "Good",      cls: "trust-level-good"      },
-        { key: "moderate",  label: "Moderate",  cls: "trust-level-moderate"  },
-        { key: "low",       label: "Low",       cls: "trust-level-low"       },
-      ];
-      distRow.innerHTML = levels.map(l => {
-        const count = dist[l.key] || 0;
-        return `<span class="trust-dist-pill ${l.cls}">${l.label} <strong>${count}</strong></span>`;
-      }).join("") + `<span style="margin-left:auto;font-size:0.78rem;color:var(--muted);">Fleet avg: <strong>${(data.average_score || 0).toFixed(1)}</strong></span>`;
-
-      // Per-agent rows
-      const COLOR = { excellent: "#22c55e", good: "#3b82f6", moderate: "#f59e0b", low: "#ef4444" };
-      list.innerHTML = data.agents.map(a => {
-        const pct = Math.round(a.score);
-        const color = COLOR[a.level] || "#94a3b8";
-        return `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:0.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${a.did}">${a.name || a.did.slice(0, 28) + "…"}</div>
-            <div style="font-size:0.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.did}</div>
-          </div>
-          <div class="trust-score-bar-wrap" style="width:140px;flex-shrink:0;">
-            <div style="height:6px;border-radius:999px;background:var(--surface2);flex:1;overflow:hidden;">
-              <div class="trust-score-bar" style="width:${pct}%;background:${color};height:100%;"></div>
-            </div>
-            <span style="font-size:0.78rem;font-weight:700;color:${color};min-width:28px;text-align:right;">${pct}</span>
-          </div>
-          <span class="trust-level-badge trust-level-${a.level}" style="flex-shrink:0;">${a.level}</span>
-        </div>`;
-      }).join("");
-    } catch (e) {
-      // Silently skip if endpoint unavailable (feature gate)
-    }
-  }
 
   // ── Sandbox ──────────────────────────────────────────────────────────────────
 
