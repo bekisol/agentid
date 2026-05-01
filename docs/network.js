@@ -160,7 +160,7 @@ function draw() {
     const ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
     const pk=[edge.src,edge.dst].sort().join("|");
     pairIdx[pk]=pairIdx[pk]??0;
-    const off=(pairIdx[pk]-(pairCnt[pk]-1)/2)*16; pairIdx[pk]++;
+    const off=(pairIdx[pk]-(pairCnt[pk]-1)/2)*30; pairIdx[pk]++;
     const ox=nx*off,oy=ny*off;
     const sx=a.x+ux*a.r+ox,sy=a.y+uy*a.r+oy;
     const ex=b.x-ux*b.r+ox,ey=b.y-uy*b.r+oy;
@@ -245,7 +245,7 @@ function draw() {
 function simTick() {
   const nodes=_net.nodes,edges=_net.edges;
   const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
-  const K_REP=9000,K_SPR=0.035,REST=220,DAMP=0.82;
+  const K_REP=52000,K_SPR=0.025,REST=380,DAMP=0.86;
   for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
     const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
     const d2=dx*dx+dy*dy+1,d=Math.sqrt(d2),f=K_REP/d2;
@@ -257,7 +257,8 @@ function simTick() {
     const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=K_SPR*(d-REST);
     a.vx+=f*dx/d;a.vy+=f*dy/d;b.vx-=f*dx/d;b.vy-=f*dy/d;
   }
-  nodes.forEach(n=>{ n.vx-=n.x*.008;n.vy-=n.y*.008; });
+  // Weak gravity toward origin keeps the graph centered without crushing it
+  nodes.forEach(n=>{ n.vx-=n.x*.004;n.vy-=n.y*.004; });
   nodes.forEach(n=>{
     if(_net.drag?.node===n) return;
     n.vx*=DAMP;n.vy*=DAMP;n.x+=n.vx;n.y+=n.vy;
@@ -471,12 +472,31 @@ function renderDetailPanel(node) {
   const tags=(ag?.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
   const desc=ag?.description?`<div class="detail-desc">${esc(ag.description)}</div>`:"";
   const created=ag?.created_at?new Date(ag.created_at).toLocaleDateString():"—";
+  const lastActive=stats.latestTs?relTime(stats.latestTs):"—";
+
+  // Top 3 ops breakdown
+  const topOps=Object.entries(stats.ops||{}).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const maxOp=topOps[0]?.[1]||1;
+  const opsHtml=topOps.length?`
+    <div class="detail-section-title">Top operations</div>
+    <div style="padding:0 1rem 0.75rem;">
+      ${topOps.map(([op,cnt])=>`
+        <div style="margin-bottom:0.45rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.68rem;margin-bottom:3px;">
+            <span style="color:${opColor(op)};">${esc(op.replace(/_/g," "))}</span>
+            <span style="color:var(--muted);">${cnt}</span>
+          </div>
+          <div style="height:3px;background:rgba(255,255,255,0.07);border-radius:2px;">
+            <div style="height:3px;background:${opColor(op)};border-radius:2px;width:${Math.round(cnt/maxOp*100)}%;"></div>
+          </div>
+        </div>`).join("")}
+    </div>`:"";
 
   panel.innerHTML=`
     <div class="detail-header">
       <div class="detail-icon">${node.icon}</div>
       <div style="min-width:0;flex:1;">
-        <div class="detail-name">${esc(node.name)}${isComp?` <span style="color:#ef4444;font-size:0.7rem;">⚠ flagged</span>`:""}</div>
+        <div class="detail-name">${esc(node.name)}${isComp?` <span style="color:#ef4444;font-size:0.7rem;">⚠ flagged</span>`:""}${node.external?` <span style="color:#475569;font-size:0.7rem;">external</span>`:""}</div>
         <div class="detail-did">${esc(node.did)}</div>
       </div>
       <button class="detail-close" id="dp-close">✕</button>
@@ -500,15 +520,12 @@ function renderDetailPanel(node) {
         <div class="stat-val">${connections.length}</div>
         <div class="stat-lbl">Connections</div>
       </div>
-      <div class="stat-box">
-        <div class="stat-val">${stats.outbound||0}</div>
-        <div class="stat-lbl">Outbound</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${stats.inbound||0}</div>
-        <div class="stat-lbl">Inbound</div>
+      <div class="stat-box" style="grid-column:span 2;">
+        <div class="stat-val" style="font-size:0.85rem;">${esc(lastActive)}</div>
+        <div class="stat-lbl">Last active</div>
       </div>
     </div>
+    ${opsHtml}
     ${connections.length?`
       <div class="detail-section-title">Connections (${connections.length})</div>
       ${topConnsHtml}
@@ -542,16 +559,24 @@ function renderDetailPanel(node) {
 }
 
 // ── Build stats ───────────────────────────────────────────────────────────
+function relTime(ts) {
+  const d=Date.now()-ts;
+  if(d<60000)    return "just now";
+  if(d<3600000)  return Math.floor(d/60000)+"m ago";
+  if(d<86400000) return Math.floor(d/3600000)+"h ago";
+  return Math.floor(d/86400000)+"d ago";
+}
+
 function buildStats(logs) {
   _agentStats={};
   for(const ev of logs) {
     const did=ev.did; if(!did) continue;
-    if(!_agentStats[did]) _agentStats[did]={interactions:0,verifyCount:0,latestTs:0,outbound:0,inbound:0};
+    if(!_agentStats[did]) _agentStats[did]={interactions:0,verifyCount:0,latestTs:0,ops:{}};
     const s=_agentStats[did];
     s.interactions++;
     const op=ev.operation||ev.action||"";
     if(op.startsWith("verify")) s.verifyCount++;
-    if(ev.direction==="outbound") s.outbound++; else s.inbound++;
+    s.ops[op]=(s.ops[op]||0)+1;
     const ts=ev.timestamp?new Date(ev.timestamp).getTime():0;
     if(ts>s.latestTs) s.latestTs=ts;
   }
@@ -639,20 +664,24 @@ async function loadNetwork() {
 
   // Build nodes with jittered circle start
   const ownedDids=new Set(agents.map(a=>a.did));
+  const maxI=Math.max(1,...Object.values(_agentStats).map(s=>s.interactions||0));
   const r0=Math.min(W,H)*.28;
   _net.nodes=nodeDids.map((did,i)=>{
     const ag=agents.find(a=>a.did===did);
     const isExternal=!ownedDids.has(did);
     const{color,icon}=roleMeta(ag?.name);
     const angle=(2*Math.PI*i/nodeDids.length)-Math.PI/2;
+    const interacts=_agentStats[did]?.interactions||0;
+    // Scale radius: external=22, owned scales 30→56 by interaction count
+    const r=isExternal?22:Math.round(30+(interacts/maxI)*26);
     return{
       did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
       color:isExternal?"#475569":color,
       tags:ag?.tags||[],
       external:isExternal,
-      x:r0*Math.cos(angle)+(Math.random()-.5)*50,
-      y:r0*Math.sin(angle)+(Math.random()-.5)*50,
-      vx:0,vy:0,r:isExternal?28:36,
+      x:r0*Math.cos(angle)+(Math.random()-.5)*60,
+      y:r0*Math.sin(angle)+(Math.random()-.5)*60,
+      vx:0,vy:0,r,
     };
   });
 
@@ -664,7 +693,7 @@ async function loadNetwork() {
 
   _net.tx=W/2;_net.ty=H/2;_net.zoom=1;
   _net.hover=null;_net.selected=null;_net.step=0;
-  _net.MAX_STEPS=Math.min(260,60+nodeDids.length*3);
+  _net.MAX_STEPS=Math.min(420,80+nodeDids.length*4);
 
   setupEvents(canvas);
   renderSidebar();
