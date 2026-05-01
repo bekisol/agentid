@@ -225,16 +225,10 @@ function draw() {
     ctx.fillStyle="#fff";
     ctx.fillText(node.icon,node.x,node.y-2);
 
-    // Only draw label when zoomed in enough for it not to collide with neighbours,
-    // or when the node is selected / hovered.
-    const showLabel = isSel || isHov || _net.zoom > 0.65;
-    if (showLabel) {
-      ctx.font=`bold ${Math.max(9,Math.round(r*.31))}px ui-monospace,monospace`;
-      ctx.fillStyle=isSel?"#f8fafc":node.external?"#fcd34d":"#e2e8f0";ctx.textBaseline="top";
-      ctx.fillText(node.name.length>16?node.name.slice(0,15)+"…":node.name,node.x,node.y+r+6);
-      ctx.textBaseline="alphabetic";
-    }
-    ctx.globalAlpha=1;
+    ctx.font=`bold ${Math.max(9,Math.round(r*.31))}px ui-monospace,monospace`;
+    ctx.fillStyle=isSel?"#f8fafc":node.external?"#fcd34d":"#e2e8f0";ctx.textBaseline="top";
+    ctx.fillText(node.name.length>16?node.name.slice(0,15)+"…":node.name,node.x,node.y+r+6);
+    ctx.textBaseline="alphabetic";ctx.globalAlpha=1;
   }
 
   ctx.restore();
@@ -244,49 +238,23 @@ function draw() {
 function simTick() {
   const nodes=_net.nodes,edges=_net.edges;
   const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
-  const N=nodes.length;
-
-  // Constants tuned per graph size.
-  // Key insight: K_REP must dominate K_SPR so repulsion > spring clustering.
-  const K_REP = N>80?14000: N>40?22000  : N>15?36000 : 52000;
-  const REST  = N>80?55   : N>40?80     : N>15?140   : 220;
-  const K_SPR = N>80?0.010: N>40?0.020  : 0.030;
-  const DAMP  = N>80?0.76 : N>40?0.81   : N>15?0.85  : 0.87;
-  const GRAV  = N>80?0.008: N>40?0.006  : N>15?0.005 : 0.003;
-  const MAX_V = 5;
-
-  // Repulsion + inline collision resolution (single O(N²) pass)
-  for(let i=0;i<N;i++) for(let j=i+1;j<N;j++){
-    const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
-    const d2=dx*dx+dy*dy+1, d=Math.sqrt(d2);
-    // Velocity-based repulsion
-    const f=K_REP/d2;
-    nodes[i].vx-=f*dx/d; nodes[i].vy-=f*dy/d;
-    nodes[j].vx+=f*dx/d; nodes[j].vy+=f*dy/d;
-    // Direct position push — use visual radius (r*1.7) not physical r
-    const minD=(nodes[i].r+nodes[j].r)*1.9+6;
-    if(d<minD){
-      const push=(minD-d)/d*0.5;
-      nodes[i].x-=dx*push; nodes[i].y-=dy*push;
-      nodes[j].x+=dx*push; nodes[j].y+=dy*push;
-    }
+  const K_REP=52000,K_SPR=0.025,REST=380,DAMP=0.86;
+  for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+    const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
+    const d2=dx*dx+dy*dy+1,d=Math.sqrt(d2),f=K_REP/d2;
+    nodes[i].vx-=f*dx/d;nodes[i].vy-=f*dy/d;
+    nodes[j].vx+=f*dx/d;nodes[j].vy+=f*dy/d;
   }
-
-  // Spring attraction along edges — stronger K_SPR pulls outliers back in
-  for(const e of edges){
+  for (const e of edges) {
     const a=nmap[e.src],b=nmap[e.dst];if(!a||!b) continue;
     const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=K_SPR*(d-REST);
     a.vx+=f*dx/d;a.vy+=f*dy/d;b.vx-=f*dx/d;b.vy-=f*dy/d;
   }
-
-  // Gravity + damping + velocity cap + integrate
+  // Weak gravity toward origin keeps the graph centered without crushing it
+  nodes.forEach(n=>{ n.vx-=n.x*.004;n.vy-=n.y*.004; });
   nodes.forEach(n=>{
     if(_net.drag?.node===n) return;
-    n.vx-=n.x*GRAV; n.vy-=n.y*GRAV;
-    n.vx*=DAMP;     n.vy*=DAMP;
-    n.vx=Math.max(-MAX_V,Math.min(MAX_V,n.vx));
-    n.vy=Math.max(-MAX_V,Math.min(MAX_V,n.vy));
-    n.x+=n.vx; n.y+=n.vy;
+    n.vx*=DAMP;n.vy*=DAMP;n.x+=n.vx;n.y+=n.vy;
   });
 }
 
@@ -809,52 +777,33 @@ async function loadNetwork() {
   canvas.style.width=W+"px"; canvas.style.height=H+"px";
   _net.canvas=canvas; _net.ctx=canvas.getContext("2d"); _net.ctx.scale(dpr,dpr);
 
-  // ── Node sizing — shrinks with density so nodes never overlap at rest ──────
-  const N=nodeDids.length;
+  // Build nodes with jittered circle start
   const minDim=Math.min(W,H);
-  // Hard per-bucket sizes: tested to be non-overlapping at each tier
-  const nodeSc = N>100?0.22 : N>60?0.30 : N>30?0.50 : N>15?0.72 : 1.0;
-  const baseR = minDim*0.032*nodeSc;
-  const stepR = minDim*0.011*nodeSc;
-  const capR  = minDim*0.09 *nodeSc;
-  const extR  = minDim*0.018*nodeSc;
-
-  // ── Initial placement ────────────────────────────────────────────────────
-  // For large graphs a single circle packs nodes too tightly.
-  // Use a grid in a VIRTUAL space larger than the canvas — gives nodes
-  // room to spread during physics.  fitView() auto-zooms to fit on settle.
-  const useGrid = N > 25;
-  const vScale  = N > 100 ? 2.0 : N > 50 ? 1.5 : 1.0;
-  const VW      = W * vScale;
-  const VH      = H * vScale;
-  const cols = useGrid ? Math.ceil(Math.sqrt(N*(VW/VH)*1.1)) : 0;
-  const rows = useGrid ? Math.ceil(N/cols) : 0;
-  const gx   = useGrid ? VW/(cols+1) : 0;
-  const gy   = useGrid ? VH/(rows+1) : 0;
-  const r0   = useGrid ? 0 : Math.min(W,H)*0.28;
-
+  // All sizes as % of canvas so the map scales correctly at any resolution.
+  // Absolute (not normalised to max): 17 audits is always bigger than 1,
+  // 100 audits is always bigger than 17 — nothing shifts when the max changes.
+  const baseR = minDim*0.032;  // 3.2% — zero-interaction owned node
+  const stepR = minDim*0.011;  // 1.1% added per log2 doubling
+  const capR  = minDim*0.15;   // 15%  — hard cap so giant hubs don't dominate
+  const extR  = minDim*0.025;  // 2.5% — external / counterparty nodes
+  const r0=Math.min(W,H)*.28;
   _net.nodes=nodeDids.map((did,i)=>{
     const ag=agents.find(a=>a.did===did);
     const isExternal=!ownedDids.has(did);
     const{color,icon}=roleMeta(ag?.name);
+    const angle=(2*Math.PI*i/nodeDids.length)-Math.PI/2;
     const interacts=_agentStats[did]?.interactions||0;
     const r=isExternal
       ? Math.round(extR)
       : Math.round(Math.min(capR, baseR + Math.log2(interacts+1)*stepR));
-    // Grid start: evenly fill the canvas with a small random jitter
-    // ±15% jitter — was ±50%, which let adjacent nodes start at 0px apart
-    const x = useGrid
-      ? (i%cols+1)*gx - VW/2 + (Math.random()-.5)*gx*0.3
-      : r0*Math.cos((2*Math.PI*i/N)-Math.PI/2)+(Math.random()-.5)*40;
-    const y = useGrid
-      ? (Math.floor(i/cols)+1)*gy - VH/2 + (Math.random()-.5)*gy*0.3
-      : r0*Math.sin((2*Math.PI*i/N)-Math.PI/2)+(Math.random()-.5)*40;
     return{
       did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
       color:isExternal?"#f59e0b":color,
       tags:ag?.tags||[],
       external:isExternal,
-      x,y,vx:0,vy:0,r,
+      x:r0*Math.cos(angle)+(Math.random()-.5)*60,
+      y:r0*Math.sin(angle)+(Math.random()-.5)*60,
+      vx:0,vy:0,r,
     };
   });
 
