@@ -720,11 +720,10 @@ async function loadNetwork() {
 
   _days=parseInt(document.getElementById("range-select")?.value||"7",10);
 
-  let agents=[],logs=[],compromised=[],_allRegistered=new Set();
+  let agents=[],logs=[],compromised=[];
   try {
-    const[ar,allAr,lr,cr]=await Promise.all([
+    const[ar,lr,cr]=await Promise.all([
       _authFetch("/agents?mine=true&limit=500"),
-      _authFetch("/agents?limit=1000"),
       _authFetch("/pro/audit-log/json?limit=1000"),
       _authFetch("/trust/compromised?limit=200").catch(()=>null),
     ]);
@@ -732,7 +731,6 @@ async function loadNetwork() {
     if(ar.ok)  agents=(await ar.json())||[];
     if(lr.ok)  logs=((await lr.json()).logs)||[];
     if(cr?.ok) compromised=((await cr.json()).feed)||[];
-    if(allAr.ok) _allRegistered=new Set((await allAr.json()).map(a=>a.did));
   } catch(_) {
     if(pill){pill.textContent="Connection error";pill.style.color="#ef4444";}
     if(loading) loading.style.display="none";
@@ -761,19 +759,14 @@ async function loadNetwork() {
     _edgeMap[key].ops[op]=(_edgeMap[key].ops[op]||0)+1;
   }
   const ownedDids=new Set(agents.map(a=>a.did));
-  // Drop edges where either endpoint is not a registered agent
+  // Only keep edges where at least one endpoint is an owned agent
   const rawEdges=Object.values(_edgeMap)
-    .filter(e=>(ownedDids.has(e.src)||_allRegistered.has(e.src))&&
-                (ownedDids.has(e.dst)||_allRegistered.has(e.dst)))
+    .filter(e=>ownedDids.has(e.src)||ownedDids.has(e.dst))
     .sort((a,b)=>b.count-a.count);
   const maxCount=rawEdges[0]?.count||1;
   const edgeDids=new Set();
-  rawEdges.forEach(e=>{
-    // Only include DIDs that are registered agents — filters out ghost/sybil counterparty DIDs
-    if(ownedDids.has(e.src)||_allRegistered.has(e.src)) edgeDids.add(e.src);
-    if(ownedDids.has(e.dst)||_allRegistered.has(e.dst)) edgeDids.add(e.dst);
-  });
-  // Only show agents that appear in at least one edge; if no edges, fall back to owned agents
+  rawEdges.forEach(e=>{edgeDids.add(e.src);edgeDids.add(e.dst);});
+  // Show agents in edges; if no edges at all, fall back to owned agents only
   const nodeDids=edgeDids.size>0?Array.from(edgeDids):Array.from(ownedDids);
 
   // HiDPI canvas
