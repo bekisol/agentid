@@ -3159,6 +3159,7 @@ curl https://api.agentid-protocol.com/agents \
           <option value="30">30 days</option>
         </select>
         <button id="network-refresh" class="btn-icon" title="Refresh">↻</button>
+        <a href="network.html" style="font-size:0.75rem;color:var(--muted);text-decoration:none;padding:0.2rem 0.55rem;border:1px solid var(--border-dark);border-radius:6px;transition:color .15s,border-color .15s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--muted)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border-dark)'">View full network →</a>
       </div>
     </div>
     <!-- Body: canvas + sidebar -->
@@ -3793,7 +3794,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260501-13"></script>
+<script src="dashboard.js?v=20260501-14"></script>
 
 </body>
 </html>
