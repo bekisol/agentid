@@ -723,8 +723,8 @@ async function loadNetwork() {
   let agents=[],logs=[],compromised=[];
   try {
     const[ar,lr,cr]=await Promise.all([
-      _authFetch("/agents?limit=200"),
-      _authFetch("/pro/audit-log/json?limit=500"),
+      _authFetch("/agents?mine=true&limit=500"),
+      _authFetch("/pro/audit-log/json?limit=1000"),
       _authFetch("/trust/compromised?limit=200").catch(()=>null),
     ]);
     if(ar.status===401){window.location.href="dashboard.html";return;}
