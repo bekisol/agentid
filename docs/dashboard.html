@@ -2169,8 +2169,16 @@
     .op-pill-other      { background: var(--op-other-bg);      color: var(--op-other-fg); }
 
     /* ── Expandable anomaly cards ── */
+    .net-zoom-btn { width:28px;height:28px;border-radius:6px;background:rgba(15,23,42,0.88);border:1px solid var(--border);color:var(--text);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;backdrop-filter:blur(4px); }
+    .net-zoom-btn:hover { background:var(--surface2,#1e293b); }
     .network-legend-row { display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;padding:0.18rem 0;color:var(--text-secondary); }
     .network-legend-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+    .network-legend-line { width:22px;height:3px;border-radius:2px;flex-shrink:0; }
+    .network-agent-row { display:flex;align-items:center;gap:0.5rem;padding:0.28rem 0;border-bottom:1px solid var(--surface,#0f172a);font-size:0.75rem; }
+    .network-agent-did { color:var(--muted);font-size:0.63rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px; }
+    .network-ev-row { display:flex;align-items:center;gap:0.4rem;font-size:0.7rem;padding:0.28rem 0;border-bottom:1px solid var(--surface,#0f172a); }
+    .network-ev-op { padding:0.08rem 0.35rem;border-radius:4px;font-size:0.62rem;font-weight:700;flex-shrink:0;white-space:nowrap; }
+    .network-ev-ts { color:var(--muted);font-size:0.6rem;margin-left:auto;flex-shrink:0; }
     #network-canvas { cursor:default; }
     .anomaly-card { transition: background 0.15s; }
     .anomaly-card:hover { filter: brightness(0.97); }
@@ -3136,14 +3144,15 @@ curl https://api.agentid-protocol.com/agents \
   </div>
 
   <!-- Agent Network Graph -->
-  <div class="card" style="margin-bottom:1.25rem;" id="network-graph-card" data-min-tier="pro" data-lock-feature="Agent network">
-    <div class="card-header" style="display:flex;align-items:center;gap:0.75rem;">
-      <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
-        Agent Interaction Network
-        <span id="network-live-pill" class="status-pill status-pill-muted">loading…</span>
+  <div id="network-graph-card" data-min-tier="pro" data-lock-feature="Agent network"
+       style="margin-bottom:1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius,10px);overflow:hidden;">
+    <!-- Header bar -->
+    <div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);">
+      <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">
+        AgentID · Agent Interaction Network
+        <span id="network-live-pill" class="status-pill status-pill-muted" style="text-transform:none;letter-spacing:0;">loading…</span>
       </div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;color:var(--muted);">
-        <span id="network-range-label">Last 7 days</span>
         <select id="network-range" style="font-size:0.75rem;padding:0.2rem 0.5rem;border:1px solid var(--border-dark);border-radius:6px;background:var(--surface);color:var(--text);outline:none;">
           <option value="1">24 h</option>
           <option value="7" selected>7 days</option>
@@ -3152,21 +3161,47 @@ curl https://api.agentid-protocol.com/agents \
         <button id="network-refresh" class="btn-icon" title="Refresh">↻</button>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 260px;gap:0;min-height:340px;">
-      <div style="position:relative;border-right:1px solid var(--border);">
-        <canvas id="network-canvas" style="display:block;width:100%;height:340px;"></canvas>
-        <div id="network-empty" style="display:none;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.82rem;color:var(--muted);pointer-events:none;">No interactions in this period</div>
+    <!-- Body: canvas + sidebar -->
+    <div style="display:grid;grid-template-columns:1fr 300px;">
+      <!-- Canvas -->
+      <div style="position:relative;background:var(--surface2,#1e293b);overflow:hidden;">
+        <canvas id="network-canvas" style="display:block;width:100%;height:560px;cursor:grab;"></canvas>
+        <!-- Zoom controls -->
+        <div style="position:absolute;bottom:14px;right:14px;display:flex;flex-direction:column;gap:4px;z-index:5;">
+          <button id="net-zoom-in"  class="net-zoom-btn" title="Zoom in">+</button>
+          <button id="net-zoom-fit" class="net-zoom-btn" title="Fit all" style="font-size:13px;">⊡</button>
+          <button id="net-zoom-out" class="net-zoom-btn" title="Zoom out">−</button>
+        </div>
+        <!-- Hint -->
+        <div style="position:absolute;bottom:14px;left:14px;font-size:0.6rem;color:rgba(100,116,139,0.6);pointer-events:none;user-select:none;">
+          Scroll to zoom · Drag to pan · Click node to inspect
+        </div>
+        <div id="network-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:0.82rem;color:var(--muted);pointer-events:none;">No agents found</div>
       </div>
-      <div style="padding:1rem;overflow-y:auto;max-height:340px;">
-        <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.6rem;">Legend</div>
-        <div class="network-legend-row"><div class="network-legend-dot" style="background:#3b82f6"></div>Verify DID</div>
-        <div class="network-legend-row"><div class="network-legend-dot" style="background:#f59e0b"></div>Delegate / Task</div>
-        <div class="network-legend-row"><div class="network-legend-dot" style="background:#10b981"></div>Research / Findings</div>
-        <div class="network-legend-row"><div class="network-legend-dot" style="background:#8b5cf6"></div>Code</div>
-        <div class="network-legend-row"><div class="network-legend-dot" style="background:#ef4444"></div>Review</div>
-        <div class="network-legend-row"><div class="network-legend-dot" style="background:#64748b"></div>Monitor / Report</div>
-        <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:0.85rem 0 0.5rem;">Top interactions</div>
-        <div id="network-edge-list" style="font-size:0.72rem;color:var(--text);"></div>
+      <!-- Sidebar -->
+      <div style="border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;height:560px;">
+        <!-- Agents -->
+        <div style="padding:0.85rem 1rem;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.6rem;">Agents</div>
+          <div id="network-agent-list"></div>
+        </div>
+        <!-- Legend -->
+        <div style="padding:0.85rem 1rem;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.6rem;">Legend</div>
+          <div class="network-legend-row"><div class="network-legend-line" style="background:#3b82f6"></div>Verify DID</div>
+          <div class="network-legend-row"><div class="network-legend-line" style="background:#f59e0b"></div>Delegate / Task</div>
+          <div class="network-legend-row"><div class="network-legend-line" style="background:#10b981"></div>Research / Findings</div>
+          <div class="network-legend-row"><div class="network-legend-line" style="background:#8b5cf6"></div>Code</div>
+          <div class="network-legend-row"><div class="network-legend-line" style="background:#ef4444"></div>Review</div>
+          <div class="network-legend-row"><div class="network-legend-line" style="background:#64748b"></div>Monitor / Report</div>
+        </div>
+        <!-- Event log -->
+        <div style="padding:0.85rem 1rem 0.5rem;display:flex;flex-direction:column;flex:1;overflow:hidden;">
+          <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem;">
+            Event Log <span id="network-event-count" style="text-transform:none;letter-spacing:0;font-weight:700;color:var(--text);">(0)</span>
+          </div>
+          <div id="network-event-list" style="overflow-y:auto;flex:1;"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -3758,7 +3793,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260501-12"></script>
+<script src="dashboard.js?v=20260501-13"></script>
 
 </body>
 </html>

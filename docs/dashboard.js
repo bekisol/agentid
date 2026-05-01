@@ -2279,6 +2279,9 @@ document.addEventListener("click", (e) => {
     clearTimeout(_networkRefreshTimer);
     loadNetworkGraph().catch(() => {});
   }
+  if (e.target.closest("#net-zoom-in"))  { _net.zoom = Math.min(8, _net.zoom * 1.3);  _netDraw(); }
+  if (e.target.closest("#net-zoom-out")) { _net.zoom = Math.max(0.06, _net.zoom / 1.3); _netDraw(); }
+  if (e.target.closest("#net-zoom-fit")) { _netFitView(); _netDraw(); }
 });
 
 // Wire the manual refresh button (delegated, attaches once on first load)
@@ -3449,28 +3452,389 @@ async function loadPeerBenchmarks() {
 // ── AGENT INTERACTION NETWORK GRAPH ──────────────────────────────────────────
 
 const _OP_COLORS = {
-  verify:               "#3b82f6",
-  verify_counterparty:  "#3b82f6",
-  verify_orchestrator:  "#3b82f6",
-  verify_researcher:    "#3b82f6",
-  verify_coder:         "#3b82f6",
-  verify_reviewer:      "#3b82f6",
-  verify_monitor:       "#3b82f6",
-  delegate_research:    "#f59e0b",
-  task_received:        "#10b981",
-  research_complete:    "#10b981",
-  research_received:    "#10b981",
-  code_complete:        "#8b5cf6",
-  code_received:        "#8b5cf6",
-  review_complete:      "#ef4444",
-  review_result_received:"#ef4444",
-  integrity_report_issued:"#64748b",
+  verify:                  "#3b82f6",
+  verify_counterparty:     "#3b82f6",
+  verify_orchestrator:     "#3b82f6",
+  verify_researcher:       "#3b82f6",
+  verify_coder:            "#3b82f6",
+  verify_reviewer:         "#3b82f6",
+  verify_monitor:          "#3b82f6",
+  delegate_research:       "#f59e0b",
+  task_received:           "#10b981",
+  research_complete:       "#10b981",
+  research_received:       "#10b981",
+  code_complete:           "#8b5cf6",
+  code_received:           "#8b5cf6",
+  review_complete:         "#ef4444",
+  review_result_received:  "#ef4444",
+  integrity_report_issued: "#64748b",
 };
+// ── Infinite-canvas interactive graph state ───────────────────────────────
+const _net = {
+  canvas: null, ctx: null,
+  nodes:  [],   // { did, name, icon, color, x, y, vx, vy, r }
+  edges:  [],   // { src, dst, count, lw, color, label }
+  tx: 0, ty: 0, zoom: 1,
+  drag:   null, // { node, moved }
+  pan:    null, // { x0, y0, tx0, ty0 }
+  hover:  null,
+  animId: null,
+  step:   0,
+  MAX_STEPS: 200,
+};
+
+function _netS2W(sx, sy) {
+  return [(sx - _net.tx) / _net.zoom, (sy - _net.ty) / _net.zoom];
+}
+
+function _netHit(sx, sy) {
+  const [wx, wy] = _netS2W(sx, sy);
+  return _net.nodes.find(n => (n.x - wx) ** 2 + (n.y - wy) ** 2 < n.r ** 2) || null;
+}
+
+function _netFitView() {
+  const c = _net.canvas;
+  if (!c || !_net.nodes.length) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = c.width / dpr, H = c.height / dpr;
+  const pad = 90;
+  const xs = _net.nodes.map(n => n.x), ys = _net.nodes.map(n => n.y);
+  const bx1 = Math.min(...xs) - pad, bx2 = Math.max(...xs) + pad;
+  const by1 = Math.min(...ys) - pad, by2 = Math.max(...ys) + pad;
+  const bw = bx2 - bx1 || 1, bh = by2 - by1 || 1;
+  const scale = Math.min(W / bw, H / bh, 2.5);
+  _net.zoom = scale;
+  _net.tx   = W / 2 - (bx1 + bw / 2) * scale;
+  _net.ty   = H / 2 - (by1 + bh / 2) * scale;
+}
+
+function _netDraw() {
+  const c = _net.canvas;
+  if (!c) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = c.width / dpr, H = c.height / dpr;
+  const ctx = _net.ctx;
+  ctx.clearRect(0, 0, W, H);
+
+  // Dot-grid — infinite board feel
+  const gs  = Math.max(8, 32 * _net.zoom);
+  const gox = ((_net.tx % gs) + gs) % gs;
+  const goy = ((_net.ty % gs) + gs) % gs;
+  ctx.fillStyle = "rgba(100,116,139,0.13)";
+  for (let gx = gox; gx < W; gx += gs)
+    for (let gy = goy; gy < H; gy += gs) {
+      ctx.beginPath(); ctx.arc(gx, gy, 1, 0, Math.PI * 2); ctx.fill();
+    }
+
+  ctx.save();
+  ctx.translate(_net.tx, _net.ty);
+  ctx.scale(_net.zoom, _net.zoom);
+
+  const nmap = Object.fromEntries(_net.nodes.map(n => [n.did, n]));
+
+  // Stacked-edge offset bookkeeping
+  const pairCnt = {}, pairIdx = {};
+  _net.edges.forEach(e => {
+    const k = [e.src, e.dst].sort().join("|");
+    pairCnt[k] = (pairCnt[k] || 0) + 1;
+  });
+
+  // Draw edges
+  for (const edge of _net.edges) {
+    const a = nmap[edge.src], b = nmap[edge.dst];
+    if (!a || !b) continue;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const nx = -uy, ny = ux;
+
+    const pk = [edge.src, edge.dst].sort().join("|");
+    pairIdx[pk] = pairIdx[pk] ?? 0;
+    const off = (pairIdx[pk] - (pairCnt[pk] - 1) / 2) * 16;
+    pairIdx[pk]++;
+    const ox = nx * off, oy = ny * off;
+
+    const sx = a.x + ux * a.r + ox, sy = a.y + uy * a.r + oy;
+    const ex = b.x - ux * b.r + ox, ey = b.y - uy * b.r + oy;
+    const isHov = a === _net.hover || b === _net.hover;
+
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
+    ctx.strokeStyle = edge.color;
+    ctx.lineWidth   = edge.lw;
+    ctx.globalAlpha = isHov ? 0.95 : 0.6;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Arrowhead
+    const ang = Math.atan2(ey - sy, ex - sx);
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - 11 * Math.cos(ang - 0.38), ey - 11 * Math.sin(ang - 0.38));
+    ctx.lineTo(ex - 11 * Math.cos(ang + 0.38), ey - 11 * Math.sin(ang + 0.38));
+    ctx.closePath();
+    ctx.fillStyle   = edge.color;
+    ctx.globalAlpha = isHov ? 1 : 0.75;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Label only on hover
+    if (isHov && edge.label) {
+      const mx = (sx + ex) / 2 + ox * 0.3, my = (sy + ey) / 2 + oy * 0.3 - 5;
+      ctx.font = "9px ui-monospace,monospace";
+      ctx.fillStyle   = edge.color;
+      ctx.globalAlpha = 0.9;
+      ctx.textAlign   = "center";
+      ctx.fillText(edge.label, mx, my);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Draw nodes on top
+  for (const node of _net.nodes) {
+    const isHov = node === _net.hover;
+    const r = node.r;
+
+    // Glow
+    const g = ctx.createRadialGradient(node.x, node.y, r * 0.2, node.x, node.y, r * 1.6);
+    g.addColorStop(0, node.color + (isHov ? "88" : "44"));
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(node.x, node.y, r * 1.6, 0, Math.PI * 2); ctx.fill();
+
+    // Circle
+    ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle   = "#1e293b";
+    ctx.fill();
+    ctx.strokeStyle = node.color;
+    ctx.lineWidth   = isHov ? 3.5 : 2.5;
+    ctx.stroke();
+
+    // Icon
+    ctx.font          = `${Math.round(r * 0.56)}px serif`;
+    ctx.textAlign     = "center";
+    ctx.textBaseline  = "middle";
+    ctx.fillStyle     = "#fff";
+    ctx.fillText(node.icon, node.x, node.y - 2);
+
+    // Name
+    ctx.font          = `bold ${Math.max(9, Math.round(r * 0.31))}px ui-monospace,monospace`;
+    ctx.fillStyle     = isHov ? "#f8fafc" : "#e2e8f0";
+    ctx.textBaseline  = "top";
+    ctx.fillText(node.name.length > 16 ? node.name.slice(0, 15) + "…" : node.name, node.x, node.y + r + 6);
+    ctx.textBaseline  = "alphabetic";
+  }
+
+  ctx.restore();
+}
+
+function _netSimTick() {
+  const nodes = _net.nodes, edges = _net.edges;
+  const nmap  = Object.fromEntries(nodes.map(n => [n.did, n]));
+  const K_REP = 9000, K_SPR = 0.035, REST = 220, DAMP = 0.82;
+
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y;
+      const d2 = dx * dx + dy * dy + 1, d = Math.sqrt(d2);
+      const f  = K_REP / d2;
+      nodes[i].vx -= f * dx / d; nodes[i].vy -= f * dy / d;
+      nodes[j].vx += f * dx / d; nodes[j].vy += f * dy / d;
+    }
+  }
+  for (const edge of edges) {
+    const a = nmap[edge.src], b = nmap[edge.dst];
+    if (!a || !b) continue;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d  = Math.sqrt(dx * dx + dy * dy) || 1;
+    const f  = K_SPR * (d - REST);
+    a.vx += f * dx / d; a.vy += f * dy / d;
+    b.vx -= f * dx / d; b.vy -= f * dy / d;
+  }
+  nodes.forEach(n => { n.vx -= n.x * 0.008; n.vy -= n.y * 0.008; });
+  nodes.forEach(n => {
+    if (_net.drag?.node === n) return;
+    n.vx *= DAMP; n.vy *= DAMP;
+    n.x  += n.vx; n.y  += n.vy;
+  });
+}
+
+function _netAnimate() {
+  if (_net.step < _net.MAX_STEPS) {
+    _netSimTick();
+    _netDraw();
+    _net.step++;
+    _net.animId = requestAnimationFrame(_netAnimate);
+  } else {
+    _netFitView();
+    _netDraw();
+    _net.animId = null;
+  }
+}
+
+function _netSetupEvents(canvas) {
+  if (canvas._netEventsAttached) return;
+  canvas._netEventsAttached = true;
+
+  const pos = e => {
+    const rect = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+  };
+
+  canvas.addEventListener("wheel", e => {
+    e.preventDefault();
+    const { x, y } = pos(e);
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    const nz = Math.min(8, Math.max(0.06, _net.zoom * factor));
+    _net.tx  = x - (x - _net.tx) * (nz / _net.zoom);
+    _net.ty  = y - (y - _net.ty) * (nz / _net.zoom);
+    _net.zoom = nz;
+    _netDraw();
+  }, { passive: false });
+
+  canvas.addEventListener("mousedown", e => {
+    const { x, y } = pos(e);
+    const hit = _netHit(x, y);
+    if (hit) {
+      _net.drag = { node: hit, moved: false };
+      canvas.style.cursor = "grabbing";
+    } else {
+      _net.pan = { x0: x, y0: y, tx0: _net.tx, ty0: _net.ty };
+      canvas.style.cursor = "grabbing";
+    }
+  });
+
+  window.addEventListener("mousemove", e => {
+    if (!_net.canvas) return;
+    const rect = _net.canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    if (_net.drag) {
+      const [wx, wy] = _netS2W(sx, sy);
+      _net.drag.node.x = wx; _net.drag.node.y = wy;
+      _net.drag.node.vx = 0; _net.drag.node.vy = 0;
+      _net.drag.moved = true;
+      _netDraw();
+    } else if (_net.pan) {
+      _net.tx = _net.pan.tx0 + (sx - _net.pan.x0);
+      _net.ty = _net.pan.ty0 + (sy - _net.pan.y0);
+      _netDraw();
+    } else if (sx >= 0 && sy >= 0 && sx <= rect.width && sy <= rect.height) {
+      const hit = _netHit(sx, sy);
+      if (hit !== _net.hover) {
+        _net.hover = hit;
+        _net.canvas.style.cursor = hit ? "pointer" : "grab";
+        _netDraw();
+      }
+    }
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (_net.drag && !_net.drag.moved && _net.drag.node) {
+      _netOpenNode(_net.drag.node);
+    }
+    _net.drag = null; _net.pan = null;
+    if (_net.canvas) _net.canvas.style.cursor = "grab";
+  });
+
+  canvas.addEventListener("touchstart", e => {
+    if (e.touches.length !== 1) return;
+    const { x, y } = pos(e);
+    const hit = _netHit(x, y);
+    if (hit) _net.drag = { node: hit, moved: false };
+    else     _net.pan  = { x0: x, y0: y, tx0: _net.tx, ty0: _net.ty };
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener("touchmove", e => {
+    if (e.touches.length !== 1) return;
+    const { x, y } = pos(e);
+    if (_net.drag) {
+      const [wx, wy] = _netS2W(x, y);
+      _net.drag.node.x = wx; _net.drag.node.y = wy;
+      _net.drag.moved = true; _netDraw();
+    } else if (_net.pan) {
+      _net.tx = _net.pan.tx0 + (x - _net.pan.x0);
+      _net.ty = _net.pan.ty0 + (y - _net.pan.y0);
+      _netDraw();
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener("touchend", () => {
+    if (_net.drag && !_net.drag.moved && _net.drag.node) _netOpenNode(_net.drag.node);
+    _net.drag = null; _net.pan = null;
+  });
+}
+
+function _netOpenNode(node) {
+  const title  = document.getElementById("info-drawer-title");
+  const body   = document.getElementById("info-drawer-body");
+  const drawer = document.getElementById("info-drawer");
+  if (!body || !drawer) return;
+  if (title) title.textContent = `${node.icon} ${node.name}`;
+  body.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
+  drawer.classList.add("open");
+
+  Promise.all([
+    _authFetch(`/agents/${encodeURIComponent(node.did)}`).then(r => r.ok ? r.json() : null).catch(() => null),
+    _authFetch(`/agents/${encodeURIComponent(node.did)}/trust-score`).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]).then(([ag, ts]) => {
+    const score   = ts?.score ?? "—";
+    const level   = ts?.level ?? "—";
+    const created = ag?.created_at ? new Date(ag.created_at).toLocaleDateString() : "—";
+    const tags    = (ag?.tags || []).map(t =>
+      `<span style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:0.1rem 0.4rem;font-size:0.7rem;">${esc(t)}</span>`
+    ).join(" ");
+    const bk  = ts?.breakdown || {};
+    const bkHtml = Object.entries(bk).map(([k, v]) =>
+      `<div style="display:flex;justify-content:space-between;font-size:0.75rem;padding:0.22rem 0;border-bottom:1px solid var(--border);">
+        <span style="color:var(--muted);">${esc(k.replace(/_/g, " "))}</span>
+        <span style="font-weight:600;">${v?.score ?? v ?? 0} / ${v?.max ?? "?"}</span>
+       </div>`
+    ).join("");
+
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+        <div style="font-size:2rem;">${node.icon}</div>
+        <div style="min-width:0;">
+          <div style="font-weight:700;font-size:1rem;">${esc(node.name)}</div>
+          <div style="font-size:0.63rem;color:var(--muted);word-break:break-all;">${esc(node.did)}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:1rem;">
+        ${tags || `<span style="color:var(--muted);font-size:0.75rem;">no tags</span>`}
+      </div>
+      <div style="display:flex;gap:0.75rem;margin-bottom:1rem;">
+        <div style="background:var(--surface2);border-radius:8px;padding:0.6rem 1rem;flex:1;text-align:center;">
+          <div style="font-size:1.5rem;font-weight:700;">${score}</div>
+          <div style="font-size:0.63rem;color:var(--muted);">Trust score</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:0.6rem 1rem;flex:1;text-align:center;">
+          <div style="font-size:1rem;font-weight:700;text-transform:capitalize;">${esc(String(level))}</div>
+          <div style="font-size:0.63rem;color:var(--muted);">Level</div>
+        </div>
+      </div>
+      ${bkHtml ? `<div style="font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:0.4rem;">Breakdown</div>${bkHtml}` : ""}
+      <div style="margin-top:0.75rem;font-size:0.72rem;color:var(--muted);">Created ${created}</div>`;
+  });
+}
+
+// Role → {color, icon} for well-known agent names
+const _ROLE_META = {
+  orchestrator: { color: "#f59e0b", icon: "🎯" },
+  researcher:   { color: "#10b981", icon: "🔍" },
+  coder:        { color: "#8b5cf6", icon: "💻" },
+  reviewer:     { color: "#ef4444", icon: "🔎" },
+  monitor:      { color: "#64748b", icon: "📡" },
+};
+
+function _roleMeta(name) {
+  return _ROLE_META[(name || "").toLowerCase()] || { color: "#3b82f6", icon: "🤖" };
+}
 
 function _opColor(op) {
   if (!op) return "#64748b";
-  const key = Object.keys(_OP_COLORS).find(k => op.startsWith(k) || op === k);
-  if (key) return _OP_COLORS[key];
+  if (_OP_COLORS[op]) return _OP_COLORS[op];
   if (op.startsWith("verify")) return "#3b82f6";
   return "#64748b";
 }
@@ -3478,198 +3842,159 @@ function _opColor(op) {
 let _networkRefreshTimer = null;
 
 async function loadNetworkGraph() {
-  const canvas = document.getElementById("network-canvas");
-  const pill   = document.getElementById("network-live-pill");
-  const edgeList = document.getElementById("network-edge-list");
-  const emptyEl  = document.getElementById("network-empty");
+  const canvas      = document.getElementById("network-canvas");
+  const pill        = document.getElementById("network-live-pill");
+  const agentListEl = document.getElementById("network-agent-list");
+  const evListEl    = document.getElementById("network-event-list");
+  const evCountEl   = document.getElementById("network-event-count");
+  const emptyEl     = document.getElementById("network-empty");
   if (!canvas) return;
 
   const days = parseInt(document.getElementById("network-range")?.value || "7", 10);
-
   if (pill) { pill.className = "status-pill status-pill-muted"; pill.textContent = "loading…"; }
 
-  // ── Fetch agents + audit log in parallel ────────────────────────────────
+  // Cancel running simulation
+  if (_net.animId) { cancelAnimationFrame(_net.animId); _net.animId = null; }
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────
   let agents = [], logs = [];
   try {
-    const [agRes, logRes] = await Promise.all([
+    const [ar, lr] = await Promise.all([
       _authFetch("/agents?limit=200"),
-      _authFetch(`/pro/audit-log/json?limit=500`),
+      _authFetch("/pro/audit-log/json?limit=500"),
     ]);
-    if (agRes.ok)  agents = (await agRes.json()) || [];
-    if (logRes.ok) logs   = ((await logRes.json()).logs) || [];
-  } catch (e) {
+    if (ar.ok) agents = (await ar.json()) || [];
+    if (lr.ok) logs   = ((await lr.json()).logs) || [];
+  } catch (_) {
     if (pill) { pill.className = "status-pill status-pill-red"; pill.textContent = "error"; }
     return;
   }
 
-  // Build DID→name map
-  const didToName = {};
-  agents.forEach(a => { didToName[a.did] = a.name || a.did.slice(-8); });
-
-  // Determine time cutoff
-  const cutoff = Date.now() - days * 86400000;
-
-  // Build edge map: "srcDID|dstDID" → { count, ops: {op: count}, latestTs }
-  const edgeMap = {};
-  for (const ev of logs) {
+  const didToAgent = Object.fromEntries(agents.map(a => [a.did, a]));
+  const cutoff     = Date.now() - days * 86400000;
+  const windowLogs = logs.filter(ev => {
     const ts = ev.timestamp ? new Date(ev.timestamp).getTime() : 0;
-    if (ts && ts < cutoff) continue;
-    const src = ev.did;
-    const dst = ev.counterparty;
-    if (!src || !dst) continue;
-    const key = src + "|" + dst;
-    if (!edgeMap[key]) edgeMap[key] = { src, dst, count: 0, ops: {}, latestTs: 0 };
+    return !ts || ts >= cutoff;
+  });
+
+  // Build edges
+  const edgeMap = {};
+  for (const ev of windowLogs) {
+    if (!ev.did || !ev.counterparty) continue;
+    const key = ev.did + "|" + ev.counterparty;
+    if (!edgeMap[key]) edgeMap[key] = { src: ev.did, dst: ev.counterparty, count: 0, ops: {} };
     edgeMap[key].count++;
     const op = ev.operation || ev.action || "?";
     edgeMap[key].ops[op] = (edgeMap[key].ops[op] || 0) + 1;
-    if (ts > edgeMap[key].latestTs) edgeMap[key].latestTs = ts;
   }
+  const rawEdges  = Object.values(edgeMap).sort((a, b) => b.count - a.count);
+  const maxCount  = rawEdges[0]?.count || 1;
 
-  const edges = Object.values(edgeMap).sort((a, b) => b.count - a.count);
+  // All nodes = registered agents + external counterparties
+  const allDids = new Set(agents.map(a => a.did));
+  rawEdges.forEach(e => { allDids.add(e.src); allDids.add(e.dst); });
+  const nodeDids = Array.from(allDids);
 
-  // Collect nodes that actually appear in edges (union of all agents seen)
-  const activeDids = new Set();
-  edges.forEach(e => { activeDids.add(e.src); activeDids.add(e.dst); });
-
-  // If no edges, try to show all registered agents as orphan nodes
-  if (activeDids.size === 0) agents.forEach(a => activeDids.add(a.did));
-
-  const nodeDids = Array.from(activeDids);
-  const nodeCount = nodeDids.length;
-
-  if (emptyEl) emptyEl.style.display = nodeCount === 0 ? "" : "none";
-
-  // ── Canvas sizing (HiDPI) ────────────────────────────────────────────────
+  // ── HiDPI canvas setup ────────────────────────────────────────────────────
   const dpr = window.devicePixelRatio || 1;
-  const W   = canvas.offsetWidth  || canvas.parentElement?.offsetWidth || 600;
-  const H   = 340;
+  const W   = canvas.parentElement?.offsetWidth || canvas.offsetWidth || 700;
+  const H   = 560;
   canvas.width  = W * dpr;
   canvas.height = H * dpr;
   canvas.style.width  = W + "px";
   canvas.style.height = H + "px";
-  const ctx = canvas.getContext("2d");
-  ctx.scale(dpr, dpr);
 
-  // ── Node positions — arrange in a circle ────────────────────────────────
-  const cx = W / 2, cy = H / 2;
-  const r  = Math.min(cx, cy) * 0.65;
-  const nodePos = {};
-  nodeDids.forEach((did, i) => {
-    const angle = (2 * Math.PI * i / nodeCount) - Math.PI / 2;
-    nodePos[did] = {
-      x: cx + r * Math.cos(angle),
-      y: cy + r * Math.sin(angle),
-      name: didToName[did] || did.slice(-8),
+  _net.canvas = canvas;
+  _net.ctx    = canvas.getContext("2d");
+  _net.ctx.scale(dpr, dpr);
+
+  if (nodeDids.length === 0) {
+    if (emptyEl) emptyEl.style.display = "flex";
+    if (pill) { pill.className = "status-pill status-pill-muted"; pill.textContent = "no agents"; }
+    _netDraw();
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = "none";
+
+  // ── Build node objects (jittered circle start) ────────────────────────────
+  const r0 = Math.min(W, H) * 0.28;
+  _net.nodes = nodeDids.map((did, i) => {
+    const ag = didToAgent[did];
+    const { color, icon } = _roleMeta(ag?.name);
+    const angle = (2 * Math.PI * i / nodeDids.length) - Math.PI / 2;
+    const jit = (Math.random() - 0.5) * 50;
+    return {
+      did, name: ag?.name || did.slice(-10), icon, color,
+      x: r0 * Math.cos(angle) + jit,
+      y: r0 * Math.sin(angle) + jit,
+      vx: 0, vy: 0, r: 36,
     };
   });
 
-  // ── Draw ────────────────────────────────────────────────────────────────
-  ctx.clearRect(0, 0, W, H);
+  // ── Build edge objects ────────────────────────────────────────────────────
+  _net.edges = rawEdges.map(e => {
+    const topOp = Object.entries(e.ops).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+    return {
+      src: e.src, dst: e.dst, count: e.count,
+      lw:    1 + (e.count / maxCount) * 3.5,
+      color: _opColor(topOp),
+      label: topOp.replace(/_/g, " "),
+    };
+  });
 
-  // Draw edges
-  const maxCount = edges[0]?.count || 1;
-  for (const edge of edges.slice(0, 60)) {
-    const a = nodePos[edge.src], b = nodePos[edge.dst];
-    if (!a || !b) continue;
-    // dominant op color
-    const topOp = Object.entries(edge.ops).sort((x, y) => y[1] - x[1])[0]?.[0] || "";
-    const color = _opColor(topOp);
-    const weight = 0.8 + (edge.count / maxCount) * 2.5;
+  // Reset transform to center
+  _net.tx = W / 2; _net.ty = H / 2; _net.zoom = 1;
+  _net.hover = null; _net.drag = null; _net.pan = null;
+  _net.step  = 0;
+  _net.MAX_STEPS = Math.min(250, 60 + nodeDids.length * 3);
 
-    // slight curve offset
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const len = Math.sqrt(dx*dx + dy*dy) || 1;
-    const nx = -dy/len * 12, ny = dx/len * 12;
+  _netSetupEvents(canvas);
 
-    ctx.beginPath();
-    ctx.moveTo(a.x + nx, a.y + ny);
-    ctx.quadraticCurveTo(
-      (a.x + b.x)/2 + nx*0.5, (a.y + b.y)/2 + ny*0.5,
-      b.x + nx*0.1, b.y + ny*0.1
-    );
-    ctx.strokeStyle = color;
-    ctx.lineWidth   = weight;
-    ctx.globalAlpha = 0.55;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // Arrowhead
-    const angle = Math.atan2(b.y - a.y, b.x - a.x);
-    const ex = b.x - (dx/len)*20, ey = b.y - (dy/len)*20;
-    ctx.beginPath();
-    ctx.moveTo(ex, ey);
-    ctx.lineTo(ex - 8*Math.cos(angle-0.45), ey - 8*Math.sin(angle-0.45));
-    ctx.lineTo(ex - 8*Math.cos(angle+0.45), ey - 8*Math.sin(angle+0.45));
-    ctx.closePath();
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.7;
-    ctx.fill();
-    ctx.globalAlpha = 1;
+  // ── Sidebar: agents ───────────────────────────────────────────────────────
+  if (agentListEl) {
+    agentListEl.innerHTML = nodeDids.map(did => {
+      const ag = didToAgent[did];
+      const { color } = _roleMeta(ag?.name);
+      const name = ag?.name || did.slice(-10);
+      const shortDid = did.length > 34 ? did.slice(0, 33) + "…" : did;
+      return `<div class="network-agent-row">
+        <div style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+        <span style="font-weight:700;">${esc(name)}</span>
+        <span class="network-agent-did" title="${esc(did)}">${esc(shortDid)}</span>
+      </div>`;
+    }).join("");
   }
 
-  // Draw nodes on top
-  for (const did of nodeDids) {
-    const { x, y, name } = nodePos[did];
-    const agentObj = agents.find(a => a.did === did);
-    const nodeColor = agentObj ? "#3b82f6" : "#64748b";
-
-    // Glow
-    const g = ctx.createRadialGradient(x, y, 6, x, y, 32);
-    g.addColorStop(0, nodeColor + "44");
-    g.addColorStop(1, "transparent");
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(x, y, 32, 0, Math.PI*2); ctx.fill();
-
-    // Circle
-    ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI*2);
-    ctx.fillStyle   = "var(--surface, #1e293b)";
-    ctx.fill();
-    ctx.strokeStyle = nodeColor;
-    ctx.lineWidth   = 2;
-    ctx.stroke();
-
-    // Name label
-    ctx.font = `bold 10px ui-monospace,monospace`;
-    ctx.fillStyle   = "#e2e8f0";
-    ctx.textAlign   = "center";
-    ctx.textBaseline = "top";
-    const label = name.length > 14 ? name.slice(0, 13) + "…" : name;
-    ctx.fillText(label, x, y + 26);
-    ctx.textBaseline = "alphabetic";
+  // ── Sidebar: event log ────────────────────────────────────────────────────
+  if (evListEl) {
+    if (evCountEl) evCountEl.textContent = `(${windowLogs.length})`;
+    evListEl.innerHTML = windowLogs.slice(0, 120).map(ev => {
+      const op    = ev.operation || ev.action || "?";
+      const color = _opColor(op);
+      const src   = didToAgent[ev.did]?.name || (ev.did || "?").slice(-10);
+      const dst   = ev.counterparty ? (didToAgent[ev.counterparty]?.name || ev.counterparty.slice(-10)) : null;
+      const ts    = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+      return `<div class="network-ev-row">
+        <span class="network-ev-op" style="background:${color}22;color:${color};border:1px solid ${color}44;">${esc(op)}</span>
+        <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;max-width:65px;white-space:nowrap;">${esc(src)}</span>
+        ${dst ? `<span style="color:var(--muted);flex-shrink:0;">→</span><span style="overflow:hidden;text-overflow:ellipsis;max-width:55px;white-space:nowrap;">${esc(dst)}</span>` : ""}
+        <span class="network-ev-ts">${ts}</span>
+      </div>`;
+    }).join("");
   }
 
-  // ── Edge list sidebar ────────────────────────────────────────────────────
-  if (edgeList) {
-    if (edges.length === 0) {
-      edgeList.innerHTML = `<div style="color:var(--muted);font-size:0.75rem;">No inter-agent events yet</div>`;
-    } else {
-      edgeList.innerHTML = edges.slice(0, 8).map(e => {
-        const src = didToName[e.src] || e.src.slice(-8);
-        const dst = didToName[e.dst] || e.dst.slice(-8);
-        const topOp = Object.entries(e.ops).sort((x, y) => y[1] - x[1])[0]?.[0] || "?";
-        const color = _opColor(topOp);
-        return `<div style="display:flex;align-items:center;gap:0.4rem;padding:0.25rem 0;border-bottom:1px solid var(--border);">
-          <div style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0;"></div>
-          <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68px;" title="${esc(src)}">${esc(src)}</span>
-          <span style="color:var(--muted);">→</span>
-          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68px;" title="${esc(dst)}">${esc(dst)}</span>
-          <span style="margin-left:auto;color:var(--muted);">${e.count}</span>
-        </div>`;
-      }).join("");
-    }
-  }
-
-  // ── Pill ─────────────────────────────────────────────────────────────────
+  // ── Pill ──────────────────────────────────────────────────────────────────
   if (pill) {
-    pill.className = "status-pill status-pill-green";
-    pill.textContent = `${edges.length} edges · ${nodeDids.length} agents`;
+    pill.className   = "status-pill status-pill-green";
+    pill.textContent = `${windowLogs.length} events · ${nodeDids.length} agents`;
   }
 
-  // ── Auto-refresh ─────────────────────────────────────────────────────────
+  // ── Run force simulation → animate ───────────────────────────────────────
+  _net.animId = requestAnimationFrame(_netAnimate);
+
+  // ── Auto-refresh every 60 s ───────────────────────────────────────────────
   clearTimeout(_networkRefreshTimer);
-  _networkRefreshTimer = setTimeout(() => {
-    loadNetworkGraph().catch(() => {});
-  }, 60000);
+  _networkRefreshTimer = setTimeout(() => loadNetworkGraph().catch(() => {}), 60000);
 }
 
 // ── NOTIFICATION CENTER ──────────────────────────────────────────────────────
