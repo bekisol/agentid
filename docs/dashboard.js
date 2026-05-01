@@ -253,6 +253,13 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
+// Raw fetch mirroring apiFetch auth — returns raw Response (for blob/stream callers).
+async function _authFetch(path) {
+  const key = apiKey || sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key");
+  const headers = key ? { "x-api-key": key } : {};
+  return fetch(`${BASE}${path}`, { credentials: "include", headers });
+}
+
 let _sessionDropFired = false;
 let _loginGraceUntil  = 0;     // wall-clock ms after which we *will* fire a 401 banner
 
@@ -677,16 +684,20 @@ async function loadDashboard() {
 
   // Pro-only loaders — free tier sees locked overlays instead
   if (isPro()) {
-    try { renderCharts(data); } catch (e) {
-      console.warn("Charts:", e);
-      ["trend-chart", "cap-chart"].forEach(id => {
-        const c = document.getElementById(id);
-        if (c) {
-          const wrap = c.closest(".chart-wrap");
-          if (wrap) wrap.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:0.8rem;">Chart unavailable</div>`;
-        }
-      });
-    }
+    // Wait for fonts before rendering so Inter metrics are ready and text isn't blurry
+    const _doRenderCharts = () => {
+      try { renderCharts(data); } catch (e) {
+        console.warn("Charts:", e);
+        ["trend-chart", "cap-chart"].forEach(id => {
+          const c = document.getElementById(id);
+          if (c) {
+            const wrap = c.closest(".chart-wrap");
+            if (wrap) wrap.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:0.8rem;">Chart unavailable</div>`;
+          }
+        });
+      }
+    };
+    (document.fonts?.ready || Promise.resolve()).then(_doRenderCharts);
     try { renderActivity(data.activity_last_7d || []); } catch (e) {
       console.error("renderActivity:", e);
       const actEl = document.getElementById("activity-list");
@@ -933,6 +944,7 @@ function renderCharts(data) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      devicePixelRatio: window.devicePixelRatio || 1,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -983,6 +995,7 @@ function renderCharts(data) {
     },
     options: {
       indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      devicePixelRatio: window.devicePixelRatio || 1,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -1096,28 +1109,32 @@ function renderActivity(activity) {
     return;
   }
 
-  // Fallback: server only sent totals — render a tidy list.
+  // Fallback: server only sent totals — render a tidy list with clickable rows.
   const opSums = {};
   for (const r of activity) {
     const op = (r.operation || "other").toLowerCase();
     opSums[op] = (opSums[op] || 0) + Number(r.count || 0);
   }
   const max = Math.max(...Object.values(opSums), 1);
-  actEl.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:0.5rem;">
-      ${Object.entries(opSums).sort((a,b) => b[1]-a[1]).map(([op, n]) => {
-        const pct = (n / max) * 100;
-        const pal = _opPalette(op);
-        return `
-          <div style="display:flex;align-items:center;gap:0.6rem;">
-            <span class="op-pill ${pal.cls}" style="min-width:64px;justify-content:center;">${esc(op)}</span>
-            <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">
-              <div style="width:${pct}%;height:100%;background:${pal.bg};"></div>
-            </div>
-            <span style="font-variant-numeric:tabular-nums;font-weight:600;font-size:0.82rem;min-width:60px;text-align:right;">${esc(n.toLocaleString())}</span>
-          </div>`;
-      }).join("")}
-    </div>`;
+  const rows = Object.entries(opSums).sort((a, b) => b[1] - a[1]).map(([op, n]) => {
+    const pct = (n / max) * 100;
+    const pal = _opPalette(op);
+    return `
+      <div class="activity-op-row" data-op="${esc(op)}" data-count="${n}"
+           style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;padding:0.15rem 0.25rem;
+                  border-radius:6px;transition:background 0.1s;" title="View ${esc(op)} events">
+        <button class="op-pill ${pal.cls}" style="min-width:64px;justify-content:center;cursor:pointer;border:none;background:inherit;">${esc(op)}</button>
+        <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${pal.bg};"></div>
+        </div>
+        <span style="font-variant-numeric:tabular-nums;font-weight:600;font-size:0.82rem;min-width:60px;text-align:right;">${esc(n.toLocaleString())}</span>
+        <span style="font-size:0.6rem;color:var(--muted);">›</span>
+      </div>`;
+  }).join("");
+  actEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:0.25rem;">${rows}</div>`;
+  actEl.querySelectorAll(".activity-op-row").forEach(row => {
+    row.addEventListener("click", () => _openActivityDrawer(row.dataset.op, Number(row.dataset.count)));
+  });
 }
 
 // ── BADGE ─────────────────────────────────────────────────────────────────────
@@ -3347,14 +3364,18 @@ async function _openReportCompromised(did) {
 
 // Drawer close handlers (one-time wiring)
 document.addEventListener("click", (e) => {
-  if (e.target.matches("#ad-close")) { _closeDrawer(); return; }
-  if (e.target.matches("#ts-drawer-close")) { _closeTsDrawer(); return; }
+  if (e.target.matches("#ad-close"))         { _closeDrawer();     return; }
+  if (e.target.matches("#ts-drawer-close"))  { _closeTsDrawer();   return; }
+  if (e.target.matches("#info-drawer-close")){ _closeInfoDrawer(); return; }
   if (e.target.matches(".agent-drawer-backdrop")) {
-    e.target.closest("#ts-drawer") ? _closeTsDrawer() : _closeDrawer();
+    const id = e.target.closest("[id]")?.id;
+    if (id === "ts-drawer")   _closeTsDrawer();
+    else if (id === "info-drawer") _closeInfoDrawer();
+    else _closeDrawer();
   }
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { _closeDrawer(); _closeTsDrawer(); }
+  if (e.key === "Escape") { _closeDrawer(); _closeTsDrawer(); _closeInfoDrawer(); }
 });
 
 // ── PEER BENCHMARKS (FOMO seed) ──────────────────────────────────────────────
@@ -4192,6 +4213,7 @@ function _switchSettingsTab(tab) {
 // ── Trust Score Fleet Widget ─────────────────────────────────────────────────
 
 const _tsBreakdownCache = {};   // did → full breakdown data (survives re-renders)
+let   _tsAllAgents      = [];   // full agent list from last /pro/trust-scores call
 
 async function _loadTrustScoreWidget() {
   const card    = document.getElementById("trust-score-card");
@@ -4207,8 +4229,9 @@ async function _loadTrustScoreWidget() {
     }
 
     card.style.display = "";
+    _tsAllAgents = data.agents;   // cache for level-filter sidebar
 
-    // Distribution summary pills
+    // Distribution summary — buttons that open a filtered agent list
     const dist = data.distribution || {};
     const levels = [
       { key: "excellent", label: "Excellent", cls: "trust-level-excellent" },
@@ -4218,8 +4241,14 @@ async function _loadTrustScoreWidget() {
     ];
     distRow.innerHTML = levels.map(l => {
       const count = dist[l.key] || 0;
-      return `<span class="trust-dist-pill ${l.cls}">${l.label} <strong>${count}</strong></span>`;
+      return `<button class="trust-dist-pill ${l.cls}" data-level="${l.key}"
+                style="cursor:pointer;border:none;background:inherit;"
+                title="View ${l.label.toLowerCase()} agents">${l.label} <strong>${count}</strong></button>`;
     }).join("") + `<span style="margin-left:auto;font-size:0.78rem;color:var(--muted);">Fleet avg: <strong>${(data.average_score || 0).toFixed(1)}</strong></span>`;
+
+    distRow.querySelectorAll(".trust-dist-pill[data-level]").forEach(btn => {
+      btn.addEventListener("click", () => _openTrustLevelDrawer(btn.dataset.level));
+    });
 
     // Per-agent rows — click opens the trust-score detail panel
     const COLOR = { excellent: "#22c55e", good: "#3b82f6", moderate: "#f59e0b", low: "#ef4444" };
@@ -4332,6 +4361,106 @@ function _trustValColor(key, val) {
     return val === "True" ? "#22c55e" : "#ef4444";
   }
   return "var(--fg)";
+}
+
+// ── Generic Info Drawer ───────────────────────────────────────────────────────
+
+function _closeInfoDrawer() {
+  document.getElementById("info-drawer")?.classList.remove("open");
+}
+
+function _openInfoDrawer(title, bodyHtml) {
+  const drawer = document.getElementById("info-drawer");
+  if (!drawer) return;
+  document.getElementById("info-drawer-title").textContent = title;
+  document.getElementById("info-drawer-body").innerHTML = bodyHtml;
+  drawer.classList.add("open");
+}
+
+function _openTrustLevelDrawer(level) {
+  const COLOR = { excellent: "#22c55e", good: "#3b82f6", moderate: "#f59e0b", low: "#ef4444" };
+  const agents = _tsAllAgents.filter(a => a.level === level).sort((a, b) => b.score - a.score);
+  const label  = level.charAt(0).toUpperCase() + level.slice(1);
+  const color  = COLOR[level] || "#94a3b8";
+
+  if (!agents.length) {
+    _openInfoDrawer(`${label} agents (0)`,
+      `<div class="empty"><div class="empty-icon">✅</div><p>No agents in this category.</p></div>`);
+    return;
+  }
+
+  const rows = agents.map(a => {
+    const pct  = Math.round(a.score);
+    const name = esc(a.name || a.did.slice(0, 28) + "…");
+    return `
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.45rem 0;
+                  border-bottom:1px solid var(--border);cursor:pointer;"
+           class="info-ts-row"
+           data-did="${esc(a.did)}" data-name="${name}" data-score="${pct}" data-level="${esc(a.level)}">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+               title="${esc(a.did)}">${name}</div>
+          <div style="font-size:0.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.did)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;flex-shrink:0;">
+          <div style="width:80px;height:5px;background:var(--surface2);border-radius:999px;overflow:hidden;">
+            <div style="width:${pct}%;height:100%;background:${color};"></div>
+          </div>
+          <span style="font-size:0.78rem;font-weight:700;color:${color};min-width:24px;text-align:right;">${pct}</span>
+        </div>
+        <span style="font-size:0.6rem;color:var(--muted);">›</span>
+      </div>`;
+  }).join("");
+
+  _openInfoDrawer(`${label} agents (${agents.length})`,
+    `<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem;">Click an agent to see its full score breakdown.</div>${rows}`);
+
+  document.getElementById("info-drawer-body").querySelectorAll(".info-ts-row").forEach(row => {
+    row.addEventListener("click", () => {
+      _closeInfoDrawer();
+      _openTrustScorePanel(row.dataset.did, row.dataset.name, Number(row.dataset.score), row.dataset.level);
+    });
+  });
+}
+
+async function _openActivityDrawer(op, count) {
+  const pal = _opPalette(op);
+  _openInfoDrawer(`${op} events (${count.toLocaleString()})`,
+    `<div class="loading"><div class="spinner"></div> Loading recent events…</div>`);
+
+  try {
+    const res  = await _authFetch(`/pro/audit-log/json?operation=${encodeURIComponent(op)}&limit=100`);
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const logs = data.logs || [];
+
+    if (!logs.length) {
+      document.getElementById("info-drawer-body").innerHTML =
+        `<div class="empty"><div class="empty-icon">📭</div><p>No recent ${esc(op)} events.</p></div>`;
+      return;
+    }
+
+    const rows = logs.map(e => {
+      const ts  = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+      const did = e.did || "—";
+      return `
+        <div style="padding:0.4rem 0;border-bottom:1px solid var(--border);font-size:0.78rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.15rem;">
+            <span class="op-pill ${pal.cls}" style="font-size:0.7rem;">${esc(e.operation || op)}</span>
+            ${_statusPill(e.status)}
+            <span style="margin-left:auto;color:var(--muted);font-size:0.7rem;">${esc(ts)}</span>
+          </div>
+          <div style="color:var(--muted);font-size:0.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+               title="${esc(did)}">${esc(did)}</div>
+        </div>`;
+    }).join("");
+
+    document.getElementById("info-drawer-body").innerHTML =
+      `<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem;">Showing ${logs.length} most recent events.</div>${rows}`;
+  } catch (e) {
+    document.getElementById("info-drawer-body").innerHTML =
+      `<div style="color:var(--red);font-size:0.85rem;">Could not load events: ${esc(e.message)}</div>`;
+  }
 }
 
 // ── Trust Score Panel ────────────────────────────────────────────────────────
@@ -4618,15 +4747,6 @@ document.addEventListener("DOMContentLoaded", () => {
     this.textContent = "Copied!";
     setTimeout(() => { this.textContent = "Copy secret"; }, 1800);
   });
-
-  // Raw fetch that mirrors apiFetch auth (session cookie + optional api key).
-  // Returns the Response so callers can get a blob directly.
-  async function _authFetch(path) {
-    const key = apiKey || sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key");
-    const headers = key ? { "x-api-key": key } : {};
-    const res = await fetch(`${BASE}${path}`, { credentials: "include", headers });
-    return res;
-  }
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
   document.getElementById("csv-btn").addEventListener("click", async function () {
