@@ -668,7 +668,14 @@ async function loadNetwork() {
 
   // Build nodes with jittered circle start
   const ownedDids=new Set(agents.map(a=>a.did));
-  const maxI=Math.max(1,...Object.values(_agentStats).map(s=>s.interactions||0));
+  const minDim=Math.min(W,H);
+  // All sizes as % of canvas so the map scales correctly at any resolution.
+  // Absolute (not normalised to max): 17 audits is always bigger than 1,
+  // 100 audits is always bigger than 17 — nothing shifts when the max changes.
+  const baseR = minDim*0.032;  // 3.2% — zero-interaction owned node
+  const stepR = minDim*0.011;  // 1.1% added per log2 doubling
+  const capR  = minDim*0.15;   // 15%  — hard cap so giant hubs don't dominate
+  const extR  = minDim*0.025;  // 2.5% — external / counterparty nodes
   const r0=Math.min(W,H)*.28;
   _net.nodes=nodeDids.map((did,i)=>{
     const ag=agents.find(a=>a.did===did);
@@ -676,9 +683,9 @@ async function loadNetwork() {
     const{color,icon}=roleMeta(ag?.name);
     const angle=(2*Math.PI*i/nodeDids.length)-Math.PI/2;
     const interacts=_agentStats[did]?.interactions||0;
-    // Sqrt scale so agents with a few interactions are visibly bigger than
-    // zero-interaction agents even when one outlier dominates the range.
-    const r=isExternal?22:Math.round(28+Math.sqrt(interacts/maxI)*30);
+    const r=isExternal
+      ? Math.round(extR)
+      : Math.round(Math.min(capR, baseR + Math.log2(interacts+1)*stepR));
     return{
       did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
       color:isExternal?"#475569":color,
