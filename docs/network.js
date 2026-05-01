@@ -238,7 +238,13 @@ function draw() {
 function simTick() {
   const nodes=_net.nodes,edges=_net.edges;
   const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
-  const K_REP=52000,K_SPR=0.025,REST=380,DAMP=0.86;
+  const N=nodes.length;
+  // Scale forces so the graph stays stable at any size.
+  // Small graph (≤10 nodes): wide spacing.  Large graph (100+ nodes): tight packing.
+  const K_REP=Math.max(2500, 52000/(1+N*0.08));
+  const REST =Math.max(55,   380  /(1+N*0.045));
+  const DAMP =N>40?0.78:N>15?0.82:0.86;
+  const K_SPR=0.028;
   for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
     const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
     const d2=dx*dx+dy*dy+1,d=Math.sqrt(d2),f=K_REP/d2;
