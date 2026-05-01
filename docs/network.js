@@ -259,11 +259,12 @@ function simTick() {
 }
 
 function animate() {
-  if (_net.step<_net.MAX_STEPS) {
-    simTick();draw();_net.step++;
+  simTick();draw();_net.step++;
+  // Stop when settled (all velocities near zero) or hard cap reached
+  const maxV=_net.nodes.reduce((m,n)=>Math.max(m,Math.abs(n.vx)+Math.abs(n.vy)),0);
+  if(maxV>0.08&&_net.step<_net.MAX_STEPS){
     _net.animId=requestAnimationFrame(animate);
   } else {
-    // Only auto-fit on initial load; after user has dragged, keep their viewport
     if(!_net.userMoved) fitView();
     draw();_net.animId=null;
   }

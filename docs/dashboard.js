@@ -3659,15 +3659,12 @@ function _netSimTick() {
 }
 
 function _netAnimate() {
-  if (_net.step < _net.MAX_STEPS) {
-    _netSimTick();
-    _netDraw();
-    _net.step++;
+  _netSimTick(); _netDraw(); _net.step++;
+  const maxV = _net.nodes.reduce((m, n) => Math.max(m, Math.abs(n.vx) + Math.abs(n.vy)), 0);
+  if (maxV > 0.08 && _net.step < _net.MAX_STEPS) {
     _net.animId = requestAnimationFrame(_netAnimate);
   } else {
-    _netFitView();
-    _netDraw();
-    _net.animId = null;
+    _netFitView(); _netDraw(); _net.animId = null;
   }
 }
 
