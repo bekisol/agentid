@@ -586,6 +586,7 @@ async function loadDashboard() {
     ? { owner: meRaw.email, tier: meRaw.tier }
     : meRaw;
   CURRENT_TIER = String(me.tier || "free");
+  console.log("[dash] authMode:", authMode, "tier:", CURRENT_TIER, "isPro:", isPro());
 
   // Pro/Enterprise users get the full analytics payload. Free tier skips it.
   let data;
@@ -1033,6 +1034,7 @@ function _opPalette(op) {
 function renderActivity(activity) {
   const actEl = document.getElementById("activity-list");
   const totalEl = document.getElementById("activity-total");
+  console.log("[dash] renderActivity actEl:", !!actEl, "rows:", activity.length);
   if (!actEl) return;
   if (!activity.length) {
     actEl.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>No activity in the last 7 days</p></div>';
@@ -1158,6 +1160,8 @@ function _statusPill(status) {
 async function loadAuditLog() {
   const el = document.getElementById("audit-list");
   const countEl = document.getElementById("audit-count");
+  if (el) el.innerHTML = '<div class="loading"><div class="spinner"></div> Requesting…</div>';
+  console.log("[dash] loadAuditLog starting");
   try {
     const data = await apiFetch("/pro/audit-log/json?limit=15");
     const logs = (data.logs || []).slice(0, 15);
@@ -1997,6 +2001,7 @@ function _initSigningSearch() {
 async function loadSigningActivity() {
   const el    = document.getElementById("signing-table");
   const label = document.getElementById("signing-count-label");
+  console.log("[dash] loadSigningActivity starting");
   try {
     const params = new URLSearchParams({
       page:     _signing.page,
@@ -2150,6 +2155,8 @@ async function loadAnomalies() {
   const pill = document.getElementById("anomaly-status-pill");
   const stamp = document.getElementById("anomaly-last-updated");
   if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> Requesting…</div>';
+  console.log("[dash] loadAnomalies starting");
   try {
     const data = await apiFetch("/pro/anomalies");
     const anomalies = data.anomalies || [];
@@ -3366,6 +3373,8 @@ async function loadPeerBenchmarks() {
   const list = document.getElementById("benchmarks-list");
   const src  = document.getElementById("benchmarks-source");
   if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> Requesting…</div>';
+  console.log("[dash] loadPeerBenchmarks starting");
   try {
     const data = await apiFetch("/pro/benchmarks");
     const metrics = data.metrics || [];
