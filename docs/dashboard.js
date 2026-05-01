@@ -586,7 +586,6 @@ async function loadDashboard() {
     ? { owner: meRaw.email, tier: meRaw.tier }
     : meRaw;
   CURRENT_TIER = String(me.tier || "free");
-  console.log("[dash] authMode:", authMode, "tier:", CURRENT_TIER, "isPro:", isPro());
 
   // Pro/Enterprise users get the full analytics payload. Free tier skips it.
   let data;
@@ -1034,7 +1033,6 @@ function _opPalette(op) {
 function renderActivity(activity) {
   const actEl = document.getElementById("activity-list");
   const totalEl = document.getElementById("activity-total");
-  console.log("[dash] renderActivity actEl:", !!actEl, "rows:", activity.length);
   if (!actEl) return;
   if (!activity.length) {
     actEl.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>No activity in the last 7 days</p></div>';
@@ -1160,8 +1158,6 @@ function _statusPill(status) {
 async function loadAuditLog() {
   const el = document.getElementById("audit-list");
   const countEl = document.getElementById("audit-count");
-  if (el) el.innerHTML = '<div class="loading"><div class="spinner"></div> Requesting…</div>';
-  console.log("[dash] loadAuditLog starting");
   try {
     const data = await apiFetch("/pro/audit-log/json?limit=15");
     const logs = (data.logs || []).slice(0, 15);
@@ -2001,7 +1997,6 @@ function _initSigningSearch() {
 async function loadSigningActivity() {
   const el    = document.getElementById("signing-table");
   const label = document.getElementById("signing-count-label");
-  console.log("[dash] loadSigningActivity starting");
   try {
     const params = new URLSearchParams({
       page:     _signing.page,
@@ -2155,8 +2150,6 @@ async function loadAnomalies() {
   const pill = document.getElementById("anomaly-status-pill");
   const stamp = document.getElementById("anomaly-last-updated");
   if (!el) return;
-  el.innerHTML = '<div class="loading"><div class="spinner"></div> Requesting…</div>';
-  console.log("[dash] loadAnomalies starting");
   try {
     const data = await apiFetch("/pro/anomalies");
     const anomalies = data.anomalies || [];
@@ -3373,8 +3366,6 @@ async function loadPeerBenchmarks() {
   const list = document.getElementById("benchmarks-list");
   const src  = document.getElementById("benchmarks-source");
   if (!list) return;
-  list.innerHTML = '<div class="loading"><div class="spinner"></div> Requesting…</div>';
-  console.log("[dash] loadPeerBenchmarks starting");
   try {
     const data = await apiFetch("/pro/benchmarks");
     const metrics = data.metrics || [];
@@ -4196,9 +4187,11 @@ function _switchSettingsTab(tab) {
 
 // ── Trust Score Fleet Widget ─────────────────────────────────────────────────
 
+const _tsBreakdownCache = {};   // did → full breakdown data (survives re-renders)
+
 async function _loadTrustScoreWidget() {
-  const card = document.getElementById("trust-score-card");
-  const list = document.getElementById("trust-score-list");
+  const card    = document.getElementById("trust-score-card");
+  const list    = document.getElementById("trust-score-list");
   const distRow = document.getElementById("trust-dist-row");
   if (!card || !list) return;
 
@@ -4211,7 +4204,7 @@ async function _loadTrustScoreWidget() {
 
     card.style.display = "";
 
-    // Distribution badges
+    // Distribution summary pills
     const dist = data.distribution || {};
     const levels = [
       { key: "excellent", label: "Excellent", cls: "trust-level-excellent" },
@@ -4224,28 +4217,141 @@ async function _loadTrustScoreWidget() {
       return `<span class="trust-dist-pill ${l.cls}">${l.label} <strong>${count}</strong></span>`;
     }).join("") + `<span style="margin-left:auto;font-size:0.78rem;color:var(--muted);">Fleet avg: <strong>${(data.average_score || 0).toFixed(1)}</strong></span>`;
 
-    // Per-agent rows
+    // Per-agent rows — each row is clickable to expand the score breakdown
     const COLOR = { excellent: "#22c55e", good: "#3b82f6", moderate: "#f59e0b", low: "#ef4444" };
     list.innerHTML = data.agents.map(a => {
-      const pct = Math.round(a.score);
+      const pct   = Math.round(a.score);
       const color = COLOR[a.level] || "#94a3b8";
-      return `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:0.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${a.did}">${a.name || a.did.slice(0, 28) + "…"}</div>
-          <div style="font-size:0.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.did}</div>
-        </div>
-        <div class="trust-score-bar-wrap" style="width:140px;flex-shrink:0;">
-          <div style="height:6px;border-radius:999px;background:var(--surface2);flex:1;overflow:hidden;">
-            <div class="trust-score-bar" style="width:${pct}%;background:${color};height:100%;"></div>
+      const name  = esc(a.name || a.did.slice(0, 28) + "…");
+      return `
+        <div class="ts-agent-row" data-did="${esc(a.did)}">
+          <div class="ts-agent-summary" style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;">
+            <span class="ts-chevron" style="font-size:0.6rem;color:var(--muted);width:10px;flex-shrink:0;transition:transform 0.15s;">▶</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(a.did)}">${name}</div>
+              <div style="font-size:0.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.did)}</div>
+            </div>
+            <div class="trust-score-bar-wrap" style="width:140px;flex-shrink:0;">
+              <div style="height:6px;border-radius:999px;background:var(--surface2);overflow:hidden;">
+                <div class="trust-score-bar" style="width:${pct}%;background:${color};height:100%;"></div>
+              </div>
+              <span style="font-size:0.78rem;font-weight:700;color:${color};min-width:28px;text-align:right;">${pct}</span>
+            </div>
+            <span class="trust-level-badge trust-level-${a.level}" style="flex-shrink:0;">${esc(a.level)}</span>
           </div>
-          <span style="font-size:0.78rem;font-weight:700;color:${color};min-width:28px;text-align:right;">${pct}</span>
-        </div>
-        <span class="trust-level-badge trust-level-${a.level}" style="flex-shrink:0;">${a.level}</span>
-      </div>`;
+          <div class="ts-breakdown" style="display:none;"></div>
+        </div>`;
     }).join("");
+
+    // Wire up expand/collapse on each row
+    list.querySelectorAll(".ts-agent-row").forEach(row => {
+      row.querySelector(".ts-agent-summary").addEventListener("click", async () => {
+        const did      = row.dataset.did;
+        const panel    = row.querySelector(".ts-breakdown");
+        const chevron  = row.querySelector(".ts-chevron");
+        const isOpen   = panel.style.display !== "none";
+
+        if (isOpen) {
+          panel.style.display = "none";
+          chevron.style.transform = "";
+          return;
+        }
+
+        panel.style.display = "block";
+        chevron.style.transform = "rotate(90deg)";
+
+        // Use cached data if available, otherwise fetch
+        if (_tsBreakdownCache[did]) {
+          _renderTrustBreakdown(panel, _tsBreakdownCache[did]);
+          return;
+        }
+
+        panel.innerHTML = `<div style="padding:0.75rem 1rem;font-size:0.78rem;color:var(--muted);">Loading breakdown…</div>`;
+        try {
+          const bd = await apiFetch(`/pro/agents/${encodeURIComponent(did)}/trust-score`);
+          _tsBreakdownCache[did] = bd;
+          _renderTrustBreakdown(panel, bd);
+        } catch (e) {
+          panel.innerHTML = `<div style="padding:0.75rem 1rem;font-size:0.78rem;color:var(--red);">Could not load breakdown: ${esc(e.message)}</div>`;
+        }
+      });
+    });
+
   } catch (e) {
     // Silently skip if endpoint unavailable (feature gate)
   }
+}
+
+const _TS_FACTORS = [
+  { key: "age",                 label: "Agent Age",            hint: "Older agents are more established (full 20 pts at 1 year)" },
+  { key: "verification_rate",   label: "Verification Rate",    hint: "Success rate of verifications in the last 30 days (max 25 pts)" },
+  { key: "verification_volume", label: "Verification Volume",  hint: "Number of verifications in the last 30 days; 100+ = full 15 pts" },
+  { key: "liveness",            label: "Liveness",             hint: "Agent recently sent a heartbeat ping (max 20 pts)" },
+  { key: "verified_badge",      label: "Verified Badge",       hint: "Admin-granted verification badge (10 pts)" },
+  { key: "not_deprecated",      label: "Not Deprecated",       hint: "Agent is still active, not marked as deprecated (5 pts)" },
+  { key: "not_revoked",         label: "Not Revoked",          hint: "Agent is not on the revocation list (5 pts)" },
+];
+
+function _renderTrustBreakdown(el, data) {
+  const bd = data.breakdown || {};
+  const totalScore = data.score || 0;
+  const level      = data.level || "low";
+
+  const rows = _TS_FACTORS.map(f => {
+    const b     = bd[f.key] || { score: 0, max: 0, value: "—" };
+    const pct   = b.max > 0 ? Math.round((b.score / b.max) * 100) : 0;
+    const color = pct >= 80 ? "#22c55e" : pct >= 40 ? "#f59e0b" : "#ef4444";
+    const val   = _fmtTrustVal(f.key, String(b.value || "—"));
+    const valColor = _trustValColor(f.key, String(b.value || ""));
+    return `
+      <div style="display:grid;grid-template-columns:1fr 110px 90px;gap:0.5rem 0.75rem;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:0.78rem;font-weight:600;color:var(--fg);">${esc(f.label)}</div>
+          <div style="font-size:0.68rem;color:var(--muted);margin-top:1px;">${esc(f.hint)}</div>
+        </div>
+        <div>
+          <div style="height:4px;background:var(--surface3,#2a2a2a);border-radius:999px;overflow:hidden;margin-bottom:3px;">
+            <div style="width:${pct}%;height:100%;background:${color};border-radius:999px;"></div>
+          </div>
+          <div style="font-size:0.68rem;color:var(--muted);">${b.score} / ${b.max} pts</div>
+        </div>
+        <div style="font-size:0.72rem;font-weight:600;text-align:right;color:${valColor};">${esc(val)}</div>
+      </div>`;
+  }).join("");
+
+  const levelColor = { excellent: "#22c55e", good: "#3b82f6", moderate: "#f59e0b", low: "#ef4444" }[level] || "#94a3b8";
+
+  el.innerHTML = `
+    <div style="padding:0.75rem 1rem 0.25rem;background:var(--surface2,#1c1c1c);border-radius:0 0 0.5rem 0.5rem;margin-bottom:0.25rem;">
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">
+        <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Score breakdown</span>
+        <span style="margin-left:auto;font-size:0.72rem;font-weight:700;color:${levelColor};">${totalScore} pts — ${level}</span>
+      </div>
+      ${rows}
+    </div>`;
+}
+
+function _fmtTrustVal(key, val) {
+  if (key === "verified_badge")  return val === "True" ? "✓ yes" : "✗ no";
+  if (key === "not_deprecated")  return val === "True" ? "✓ active" : "⚠ deprecated";
+  if (key === "not_revoked")     return val === "True" ? "✓ active" : "⚠ revoked";
+  if (key === "liveness") {
+    return { online: "● online", stale: "◑ stale", offline: "○ offline", never_pinged: "— never pinged" }[val] || val;
+  }
+  if (key === "verification_rate" && val === "no_data") return "— no data";
+  return val || "—";
+}
+
+function _trustValColor(key, val) {
+  if (key === "liveness") {
+    if (val === "online")  return "#22c55e";
+    if (val === "stale")   return "#f59e0b";
+    return "#ef4444";
+  }
+  if (key === "verified_badge" || key === "not_deprecated" || key === "not_revoked") {
+    return val === "True" ? "#22c55e" : "#ef4444";
+  }
+  return "var(--fg)";
 }
 
 // ── EVENT LISTENERS ───────────────────────────────────────────────────────────
