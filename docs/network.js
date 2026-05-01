@@ -779,7 +779,6 @@ async function loadNetwork() {
   _net.canvas=canvas; _net.ctx=canvas.getContext("2d"); _net.ctx.scale(dpr,dpr);
 
   // Build nodes with jittered circle start
-  const ownedDids=new Set(agents.map(a=>a.did));
   const minDim=Math.min(W,H);
   // All sizes as % of canvas so the map scales correctly at any resolution.
   // Absolute (not normalised to max): 17 audits is always bigger than 1,
