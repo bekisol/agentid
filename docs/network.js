@@ -249,9 +249,10 @@ function draw() {
     const a=nmap[edge.src], b=nmap[edge.dst]; if(!a||!b) continue;
     if (!inViewport(a) && !inViewport(b)) continue; // cull off-screen edges
 
-    let alpha = sel ? 0 : 0.4;
+    let alpha = sel ? 0 : (edge.flagged ? 0.7 : 0.4);
     if (sel && selNeighbors.has(edge.src) && selNeighbors.has(edge.dst)) alpha=0.85;
     else if (!sel && searchSet) alpha=(searchSet.has(edge.src)||searchSet.has(edge.dst))?0.75:0.05;
+    if (edge.flagged && !sel) alpha=Math.max(alpha, 0.7); // keep flagged edges visible
     if (a===_net.hover||b===_net.hover) alpha=0.95;
     if (alpha < 0.01) continue;
 
@@ -603,8 +604,11 @@ function buildEdgesForDids(didSet) {
     .filter(e => didSet.has(e.src) && didSet.has(e.dst))
     .map(e => {
       const topOp = Object.entries(e.ops).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
+      const flagged = _compromised.has(e.src) || _compromised.has(e.dst);
       return { src:e.src, dst:e.dst, count:e.count,
-               lw:1+(e.count/maxCount)*3.5, color:opColor(topOp), label:topOp.replace(/_/g," ") };
+               lw:flagged ? Math.max(2, 1+(e.count/maxCount)*3.5) : 1+(e.count/maxCount)*3.5,
+               color: flagged ? "#ef4444" : opColor(topOp),
+               label:topOp.replace(/_/g," "), flagged };
     });
 }
 
@@ -986,8 +990,11 @@ async function loadNetwork() {
     .filter(e=>shownSet.has(e.src)&&shownSet.has(e.dst))
     .map(e=>{
       const topOp=Object.entries(e.ops).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
-      return {src:e.src,dst:e.dst,count:e.count,lw:1+(e.count/maxCount)*3.5,
-              color:opColor(topOp),label:topOp.replace(/_/g," ")};
+      const flagged = _compromised.has(e.src) || _compromised.has(e.dst);
+      return {src:e.src,dst:e.dst,count:e.count,
+              lw: flagged ? Math.max(2, 1+(e.count/maxCount)*3.5) : 1+(e.count/maxCount)*3.5,
+              color: flagged ? "#ef4444" : opColor(topOp),
+              label:topOp.replace(/_/g," "), flagged};
     });
 
   _net.allNodes = nodeList;
