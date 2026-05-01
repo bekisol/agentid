@@ -142,6 +142,28 @@ function expireSession() {
 // Tier agent limits
 const TIER_LIMITS = { free: 100, pro: 10000, enterprise: Infinity };
 
+function _showToast(msg, isError = false) {
+  let el = document.getElementById("_toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "_toast";
+    Object.assign(el.style, {
+      position:"fixed", bottom:"1.5rem", left:"50%", transform:"translateX(-50%)",
+      padding:"0.55rem 1.1rem", borderRadius:"8px", fontSize:"0.8rem",
+      fontWeight:"600", zIndex:"9999", pointerEvents:"none",
+      transition:"opacity 0.3s", opacity:"0",
+      boxShadow:"0 4px 16px rgba(0,0,0,0.4)",
+    });
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.background = isError ? "#ef4444" : "#22c55e";
+  el.style.color = "#fff";
+  el.style.opacity = "1";
+  clearTimeout(el._tid);
+  el._tid = setTimeout(() => { el.style.opacity = "0"; }, 2800);
+}
+
 // SEC: HTML escape — all API strings pass through before innerHTML
 function esc(str) {
   return String(str ?? "")
