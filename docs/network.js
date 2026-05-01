@@ -726,9 +726,10 @@ document.addEventListener("DOMContentLoaded",async()=>{
 
   document.querySelectorAll(".sort-btn").forEach(btn=>{
     btn.addEventListener("click",()=>{
+      const alreadyActive=btn.classList.contains("active");
       document.querySelectorAll(".sort-btn").forEach(b=>b.classList.remove("active"));
-      btn.classList.add("active");
-      _sortBy=btn.dataset.sort;
+      if(!alreadyActive){btn.classList.add("active");_sortBy=btn.dataset.sort;}
+      else _sortBy=null;
       renderSidebar();
     });
   });
