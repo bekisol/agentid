@@ -239,7 +239,7 @@ function simTick() {
   const nodes=_net.nodes,edges=_net.edges;
   const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
   // Adaptive constants stored on _net by buildNetwork so they scale with N
-  const K_REP=_net.K_REP||52000,K_SPR=0.025,REST=_net.REST||380,DAMP=0.86;
+  const K_REP=_net.K_REP||52000,K_SPR=_net.K_SPR||0.025,REST=_net.REST||380,DAMP=0.86;
   // Gravity scales with REST² so large graphs aren't crushed to center
   const GRAV=0.004*(REST/380)**2;
   for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
@@ -802,9 +802,12 @@ async function loadNetwork() {
   const N=nodeDids.length;
   const r0=Math.min(W,H)*.28;
   // Adaptive REST: sqrt(canvas area / N) * 1.5 — nodes fill canvas at any N
-  // K_REP scales with REST² to keep the repulsion/spring ratio constant
+  // K_REP scaled 2× — must overpower spring attraction when nodes start closer than REST
+  // K_SPR weakened for large N: super-hubs (connected to 100+ nodes) collapse the layout
+  //   if springs are too strong. K_SPR=0.008 keeps topology visible without clustering.
   _net.REST=Math.max(55,Math.min(380,Math.sqrt(W*H/Math.max(N,1))*1.5));
-  _net.K_REP=Math.round(52000*(_net.REST/380)**2);
+  _net.K_REP=Math.round(52000*(_net.REST/380)**2*2.0);
+  _net.K_SPR=N>30?0.008:0.025;
   // Grid start for N>30: avoids born-stacked-on-circle problem
   // (150 nodes on r=168px circle = 7px between adjacent nodes — physics never recovers)
   const useGrid=N>30;
@@ -843,7 +846,7 @@ async function loadNetwork() {
 
   _net.tx=W/2;_net.ty=H/2;_net.zoom=1;
   _net.hover=null;_net.selected=null;_net.step=0;_net.userMoved=false;
-  _net.MAX_STEPS=Math.min(420,80+nodeDids.length*4);
+  _net.MAX_STEPS=Math.min(600,100+nodeDids.length*5);
 
   setupEvents(canvas);
   renderSidebar();
