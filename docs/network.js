@@ -256,8 +256,8 @@ function simTick() {
     const f=K_REP/d2;
     nodes[i].vx-=f*dx/d; nodes[i].vy-=f*dy/d;
     nodes[j].vx+=f*dx/d; nodes[j].vy+=f*dy/d;
-    // Direct position push — prevents nodes stacking on top of each other
-    const minD=nodes[i].r+nodes[j].r+8;
+    // Direct position push — use visual radius (r*1.7) not physical r
+    const minD=(nodes[i].r+nodes[j].r)*1.9+6;
     if(d<minD){
       const push=(minD-d)/d*0.5;
       nodes[i].x-=dx*push; nodes[i].y-=dy*push;
@@ -813,13 +813,17 @@ async function loadNetwork() {
   const extR  = minDim*0.018*nodeSc;
 
   // ── Initial placement ────────────────────────────────────────────────────
-  // For large graphs a single circle is too small — nodes start overlapping
-  // before physics even runs.  Use a grid instead so every node has space.
+  // For large graphs a single circle packs nodes too tightly.
+  // Use a grid in a VIRTUAL space larger than the canvas — gives nodes
+  // room to spread during physics.  fitView() auto-zooms to fit on settle.
   const useGrid = N > 25;
-  const cols = useGrid ? Math.ceil(Math.sqrt(N*(W/H)*1.1)) : 0;
+  const vScale  = N > 100 ? 2.0 : N > 50 ? 1.5 : 1.0;
+  const VW      = W * vScale;
+  const VH      = H * vScale;
+  const cols = useGrid ? Math.ceil(Math.sqrt(N*(VW/VH)*1.1)) : 0;
   const rows = useGrid ? Math.ceil(N/cols) : 0;
-  const gx   = useGrid ? W/(cols+1) : 0;
-  const gy   = useGrid ? H/(rows+1) : 0;
+  const gx   = useGrid ? VW/(cols+1) : 0;
+  const gy   = useGrid ? VH/(rows+1) : 0;
   const r0   = useGrid ? 0 : Math.min(W,H)*0.28;
 
   _net.nodes=nodeDids.map((did,i)=>{
@@ -831,11 +835,12 @@ async function loadNetwork() {
       ? Math.round(extR)
       : Math.round(Math.min(capR, baseR + Math.log2(interacts+1)*stepR));
     // Grid start: evenly fill the canvas with a small random jitter
+    // ±15% jitter — was ±50%, which let adjacent nodes start at 0px apart
     const x = useGrid
-      ? (i%cols+1)*gx - W/2 + (Math.random()-.5)*gx*0.5
+      ? (i%cols+1)*gx - VW/2 + (Math.random()-.5)*gx*0.3
       : r0*Math.cos((2*Math.PI*i/N)-Math.PI/2)+(Math.random()-.5)*40;
     const y = useGrid
-      ? (Math.floor(i/cols)+1)*gy - H/2 + (Math.random()-.5)*gy*0.5
+      ? (Math.floor(i/cols)+1)*gy - VH/2 + (Math.random()-.5)*gy*0.3
       : r0*Math.sin((2*Math.PI*i/N)-Math.PI/2)+(Math.random()-.5)*40;
     return{
       did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
