@@ -442,55 +442,157 @@ function renderDetailPanel(node) {
 
   const stats=_agentStats[node.did]||{};
   const isComp=_compromised.has(node.did);
+  const ag=_allAgents.find(a=>a.did===node.did);
 
-  // Build connections
-  const connections=[];
-  for(const[,edge] of Object.entries(_edgeMap)) {
+  // ── Connections: split inbound / outbound ───────────────────────────
+  const inbound=[],outbound=[];
+  for(const edge of Object.values(_edgeMap)){
     if(edge.src!==node.did&&edge.dst!==node.did) continue;
     const otherDid=edge.src===node.did?edge.dst:edge.src;
-    const dir=edge.src===node.did?"out":"in";
     const oNode=_net.nodes.find(n=>n.did===otherDid);
-    if(oNode) connections.push({node:oNode,dir,count:edge.count,ops:edge.ops});
+    if(!oNode) continue;
+    const topOp=Object.entries(edge.ops).sort((a,b)=>b[1]-a[1])[0]?.[0]||"?";
+    const entry={node:oNode,count:edge.count,topOp,ops:edge.ops};
+    if(edge.src===node.did) outbound.push(entry); else inbound.push(entry);
   }
-  connections.sort((a,b)=>b.count-a.count);
+  inbound.sort((a,b)=>b.count-a.count);
+  outbound.sort((a,b)=>b.count-a.count);
 
-  const topConnsHtml=connections.map(c=>{
-    const topOp=Object.entries(c.ops).sort((a,b)=>b[1]-a[1])[0]?.[0]||"?";
-    const color=opColor(topOp);
-    const dirSymbol=c.dir==="out"?"→":"←";
-    return `<div class="conn-row" data-did="${esc(c.node.did)}">
-      <div class="conn-dot" style="background:${c.node.color}"></div>
-      <div style="min-width:0;flex:1;">
-        <div class="conn-name">${esc(c.node.icon)} ${esc(c.node.name)}</div>
-        <div style="font-size:0.6rem;color:var(--muted);">${dirSymbol} <span style="color:${color};">${esc(topOp.replace(/_/g," "))}</span></div>
-      </div>
-      <div class="conn-count">${c.count}</div>
-    </div>`;
+  // ── Anomaly flags ───────────────────────────────────────────────────
+  const flags=[];
+  if(isComp) flags.push({level:"critical",msg:"Marked as compromised"});
+  const allOps=Object.entries(stats.ops||{});
+  const totalOps=allOps.reduce((s,[,c])=>s+c,0);
+  if(allOps.length===1&&totalOps>2)
+    flags.push({level:"warn",msg:`100% ${allOps[0][0]} — single operation type`});
+  if(inbound.length>0&&outbound.length===0)
+    flags.push({level:"info",msg:`All ${inbound.length} connections are inbound — never initiates`});
+  if(outbound.length>0&&inbound.length===0)
+    flags.push({level:"warn",msg:`All ${outbound.length} connections are outbound — never receives`});
+  const uniqueVerifiers=inbound.filter(c=>c.count===1&&c.topOp.startsWith("verify"));
+  if(uniqueVerifiers.length>=5&&uniqueVerifiers.length===inbound.length)
+    flags.push({level:"warn",msg:`${uniqueVerifiers.length} unique agents each verified once — possible sybil pattern`});
+
+  const flagColors={critical:"#ef4444",warn:"#f59e0b",info:"#64748b"};
+  const flagIcons={critical:"🔴",warn:"⚠",info:"ℹ"};
+  const flagsHtml=flags.length?`
+    <div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);display:flex;flex-direction:column;gap:0.35rem;">
+      ${flags.map(f=>`<div style="display:flex;align-items:flex-start;gap:0.4rem;font-size:0.7rem;color:${flagColors[f.level]};">
+        <span style="flex-shrink:0;">${flagIcons[f.level]}</span><span>${esc(f.msg)}</span>
+      </div>`).join("")}
+    </div>`:"";
+
+  // ── Activity sparkline (SVG bars, one per day) ──────────────────────
+  const cutoff=Date.now()-_days*86400000;
+  const agentLogs=_allLogs.filter(ev=>{
+    const ts=ev.timestamp?new Date(ev.timestamp).getTime():0;
+    return (ev.did===node.did||ev.counterparty===node.did)&&ts>=cutoff;
+  });
+  const buckets=new Array(_days).fill(0);
+  agentLogs.forEach(ev=>{
+    const ts=ev.timestamp?new Date(ev.timestamp).getTime():0;
+    const age=Date.now()-ts;
+    const b=Math.min(_days-1,Math.floor(age/86400000));
+    buckets[_days-1-b]++;
+  });
+  const maxB=Math.max(1,...buckets);
+  const svgW=270,svgH=44;
+  const bW=Math.max(2,Math.floor(svgW/_days)-1);
+  const barsHtml=buckets.map((cnt,i)=>{
+    const h=cnt===0?2:Math.max(3,Math.round((cnt/maxB)*(svgH-6)));
+    const x=i*(bW+1),y=svgH-h;
+    const fill=cnt===0?"rgba(255,255,255,0.08)":"var(--accent)";
+    const op=cnt===0?1:0.6+0.4*(cnt/maxB);
+    return `<rect x="${x}" y="${y}" width="${bW}" height="${h}" rx="1" fill="${fill}" opacity="${op}"/>`;
   }).join("");
+  const timelineHtml=`
+    <div style="padding:0 1rem 0.75rem;border-bottom:1px solid var(--border2);">
+      <div class="detail-section-title" style="padding:0.7rem 0 0.4rem;">Activity — last ${_days}d</div>
+      <svg width="${svgW}" height="${svgH}" style="display:block;">${barsHtml}</svg>
+      <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:var(--muted);margin-top:3px;">
+        <span>${_days}d ago</span><span>today</span>
+      </div>
+    </div>`;
 
-  const ag=_allAgents.find(a=>a.did===node.did);
+  // ── Top operations ──────────────────────────────────────────────────
+  const topOps=Object.entries(stats.ops||{}).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const maxOp=topOps[0]?.[1]||1;
+  const opsHtml=topOps.length?`
+    <div style="border-bottom:1px solid var(--border2);">
+      <div class="detail-section-title">Top operations</div>
+      <div style="padding:0 1rem 0.75rem;">
+        ${topOps.map(([op,cnt])=>`
+          <div style="margin-bottom:0.45rem;">
+            <div style="display:flex;justify-content:space-between;font-size:0.68rem;margin-bottom:3px;">
+              <span style="color:${opColor(op)};">${esc(op.replace(/_/g," "))}</span>
+              <span style="color:var(--muted);">${cnt}</span>
+            </div>
+            <div style="height:3px;background:rgba(255,255,255,0.07);border-radius:2px;">
+              <div style="height:3px;background:${opColor(op)};border-radius:2px;width:${Math.round(cnt/maxOp*100)}%;"></div>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>`:"";
+
+  // ── Recent events ───────────────────────────────────────────────────
+  const recentEvts=agentLogs
+    .slice().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))
+    .slice(0,8);
+  const recentHtml=recentEvts.length?`
+    <div style="border-bottom:1px solid var(--border2);">
+      <div class="detail-section-title">Recent events</div>
+      ${recentEvts.map(ev=>{
+        const isActor=ev.did===node.did;
+        const other=isActor?ev.counterparty:ev.did;
+        const oNode=_net.nodes.find(n=>n.did===other);
+        const otherName=oNode?.name||(other?other.slice(-8):"—");
+        const dir=isActor?"→":"←";
+        const op=ev.operation||"?";
+        const ts=ev.timestamp?relTime(new Date(ev.timestamp).getTime()):"";
+        const dot=ev.status==="ok"?"#10b981":ev.status==="error"?"#ef4444":"#64748b";
+        return `<div style="display:flex;align-items:center;gap:0.45rem;padding:0.35rem 1rem;border-bottom:1px solid rgba(255,255,255,0.03);">
+          <div style="width:5px;height:5px;border-radius:50%;background:${dot};flex-shrink:0;"></div>
+          <span style="font-size:0.62rem;color:var(--muted);flex-shrink:0;">${dir}</span>
+          <span style="font-size:0.68rem;color:${opColor(op)};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(op.replace(/_/g," "))}</span>
+          <span style="font-size:0.62rem;color:var(--muted);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;">${esc(otherName)}</span>
+          <span style="font-size:0.58rem;color:var(--muted);flex-shrink:0;">${ts}</span>
+        </div>`;
+      }).join("")}
+    </div>`:"";
+
+  // ── Connections grouped by direction ────────────────────────────────
+  function connGroupHtml(list,label,arrow){
+    if(!list.length) return "";
+    return `<div class="detail-section-title" style="padding-bottom:0.2rem;">${label} (${list.length})</div>
+      ${list.map(c=>`<div class="conn-row" data-did="${esc(c.node.did)}">
+        <div class="conn-dot" style="background:${c.node.color}"></div>
+        <div style="min-width:0;flex:1;">
+          <div class="conn-name">${esc(c.node.icon)} ${esc(c.node.name)}</div>
+          <div style="font-size:0.6rem;color:var(--muted);">${arrow} <span style="color:${opColor(c.topOp)};">${esc(c.topOp.replace(/_/g," "))}</span></div>
+        </div>
+        <div class="conn-count">${c.count}</div>
+      </div>`).join("")}`;
+  }
+  const connsHtml=(inbound.length||outbound.length)?`
+    <div style="border-bottom:1px solid var(--border2);">
+      ${connGroupHtml(inbound,"↓ Inbound","←")}
+      ${connGroupHtml(outbound,"↑ Outbound","→")}
+    </div>`
+    :`<div style="padding:0.75rem 1rem;font-size:0.75rem;color:var(--muted);">No interactions in this period</div>`;
+
+  // ── Quick actions ───────────────────────────────────────────────────
+  const actionsHtml=`
+    <div style="padding:0.75rem 1rem;display:flex;gap:0.5rem;border-top:1px solid var(--border2);position:sticky;bottom:0;background:var(--surface);">
+      <button id="dp-copy" style="flex:1;padding:0.4rem;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:0.68rem;cursor:pointer;">📋 Copy DID</button>
+      <a href="dashboard.html" style="flex:1;padding:0.4rem;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:0.68rem;cursor:pointer;text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center;">📊 Audit log</a>
+    </div>`;
+
+  // ── Metadata ────────────────────────────────────────────────────────
   const tags=(ag?.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
   const desc=ag?.description?`<div class="detail-desc">${esc(ag.description)}</div>`:"";
   const created=ag?.created_at?new Date(ag.created_at).toLocaleDateString():"—";
   const lastActive=stats.latestTs?relTime(stats.latestTs):"—";
-
-  // Top 3 ops breakdown
-  const topOps=Object.entries(stats.ops||{}).sort((a,b)=>b[1]-a[1]).slice(0,4);
-  const maxOp=topOps[0]?.[1]||1;
-  const opsHtml=topOps.length?`
-    <div class="detail-section-title">Top operations</div>
-    <div style="padding:0 1rem 0.75rem;">
-      ${topOps.map(([op,cnt])=>`
-        <div style="margin-bottom:0.45rem;">
-          <div style="display:flex;justify-content:space-between;font-size:0.68rem;margin-bottom:3px;">
-            <span style="color:${opColor(op)};">${esc(op.replace(/_/g," "))}</span>
-            <span style="color:var(--muted);">${cnt}</span>
-          </div>
-          <div style="height:3px;background:rgba(255,255,255,0.07);border-radius:2px;">
-            <div style="height:3px;background:${opColor(op)};border-radius:2px;width:${Math.round(cnt/maxOp*100)}%;"></div>
-          </div>
-        </div>`).join("")}
-    </div>`:"";
+  const totalConns=inbound.length+outbound.length;
 
   panel.innerHTML=`
     <div class="detail-header">
@@ -503,6 +605,7 @@ function renderDetailPanel(node) {
     </div>
     ${desc}
     ${tags?`<div class="tag-row">${tags}</div>`:""}
+    ${flagsHtml}
     <div class="stat-grid" id="dp-stats">
       <div class="stat-box">
         <div class="stat-val" style="font-size:1.1rem;">…</div>
@@ -517,7 +620,7 @@ function renderDetailPanel(node) {
         <div class="stat-lbl">Verifies</div>
       </div>
       <div class="stat-box">
-        <div class="stat-val">${connections.length}</div>
+        <div class="stat-val">${totalConns}</div>
         <div class="stat-lbl">Connections</div>
       </div>
       <div class="stat-box" style="grid-column:span 2;">
@@ -525,20 +628,20 @@ function renderDetailPanel(node) {
         <div class="stat-lbl">Last active</div>
       </div>
     </div>
+    ${timelineHtml}
     ${opsHtml}
-    ${connections.length?`
-      <div class="detail-section-title">Connections (${connections.length})</div>
-      ${topConnsHtml}
-    `:"<div style='padding:0.75rem 1rem;font-size:0.75rem;color:var(--muted);'>No interactions in this period</div>"}
-    <div class="detail-footer">Registered ${created}</div>
+    ${recentHtml}
+    ${connsHtml}
+    <div style="padding:0.5rem 1rem;font-size:0.65rem;color:var(--muted);border-top:1px solid var(--border2);">Registered ${created}</div>
+    ${actionsHtml}
   `;
 
-  // Load trust score async
+  // Async trust score
   _authFetch(`/agents/${encodeURIComponent(node.did)}/trust-score`)
     .then(r=>r.ok?r.json():null)
     .then(ts=>{
       const box=document.querySelector("#dp-stats .stat-box .stat-val");
-      if(box&&ts) {
+      if(box&&ts){
         box.textContent=ts.score??"—";
         box.style.color=ts.level==="excellent"?"#10b981":ts.level==="good"?"#22c55e":ts.level==="moderate"?"#f59e0b":"#ef4444";
       }
@@ -548,7 +651,12 @@ function renderDetailPanel(node) {
     _net.selected=null;renderDetailPanel(null);renderSidebar();draw();
   });
 
-  // Clicking a connection focuses it
+  document.getElementById("dp-copy")?.addEventListener("click",()=>{
+    navigator.clipboard.writeText(node.did).catch(()=>{});
+    const btn=document.getElementById("dp-copy");
+    if(btn){btn.textContent="✓ Copied";setTimeout(()=>{if(btn)btn.textContent="📋 Copy DID";},1500);}
+  });
+
   panel.querySelectorAll(".conn-row[data-did]").forEach(row=>{
     row.addEventListener("click",()=>{
       const n=_net.nodes.find(x=>x.did===row.dataset.did);
