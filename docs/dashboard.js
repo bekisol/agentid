@@ -6147,6 +6147,7 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
     }
 
     // No raw key — try the cookie path silently.
+    let sessionOk = false;
     try {
       const r = await fetch(BASE + "/auth/me", { credentials: "include" });
       if (r.ok) {
@@ -6155,12 +6156,23 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
         sessionStorage.setItem("agentid_login_ts",
           sessionStorage.getItem("agentid_login_ts") || String(Date.now()));
         _markFreshLogin();
+        sessionOk = true;
+      } else if (previouslyLoggedIn) {
+        _showSessionExpiredBanner("Your session has expired");
+      }
+    } catch (_) { /* network failure */ }
+
+    if (sessionOk) {
+      // loadDashboard errors (e.g. a pro endpoint 401) must NOT show the login
+      // screen — the user IS authenticated; the dashboard already revealed itself.
+      try {
         await loadDashboard();
         scheduleSessionExpiry();
-        return;
+      } catch (e) {
+        console.warn("loadDashboard error (session auth):", e);
       }
-      if (previouslyLoggedIn) _showSessionExpiredBanner("Your session has expired");
-    } catch (_) { /* network failure — fall through to show login */ }
+      return;
+    }
 
     // No valid session found — show login screen
     document.getElementById("login-screen").style.display = "flex";
