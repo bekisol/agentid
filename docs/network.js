@@ -41,6 +41,7 @@ const _net = {
   nodes:[], edges:[],
   tx:0, ty:0, zoom:1,
   drag:null, pan:null, hover:null, selected:null,
+  _panMoved:false,
   animId:null, step:0, MAX_STEPS:200,
 };
 
@@ -59,7 +60,8 @@ function s2w(sx, sy) { return [(sx-_net.tx)/_net.zoom, (sy-_net.ty)/_net.zoom]; 
 
 function hitNode(sx, sy) {
   const [wx,wy] = s2w(sx,sy);
-  return _net.nodes.find(n => (n.x-wx)**2+(n.y-wy)**2 < n.r**2) || null;
+  // Add generous hit margin so small zoomed-out nodes are still clickable
+  return _net.nodes.find(n => (n.x-wx)**2+(n.y-wy)**2 < (n.r+8)**2) || null;
 }
 
 function fitView(nodes) {
@@ -214,15 +216,24 @@ function draw() {
 
     ctx.globalAlpha=alpha;
     ctx.beginPath();ctx.arc(node.x,node.y,r,0,Math.PI*2);
-    ctx.fillStyle="#1e293b";ctx.fill();
-    ctx.strokeStyle=isComp?"#ef4444":node.color;ctx.lineWidth=isSel?3.5:isHov?3:2.5;ctx.stroke();
+    ctx.fillStyle=node.external?"#111827":"#1e293b";ctx.fill();
+
+    // External agents get a dashed border to indicate they're from another account
+    if(node.external&&!isComp){
+      ctx.save();ctx.setLineDash([4,3]);
+      ctx.strokeStyle="#475569";ctx.lineWidth=isSel?3:2;ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.strokeStyle=isComp?"#ef4444":node.color;ctx.lineWidth=isSel?3.5:isHov?3:2.5;ctx.stroke();
+    }
 
     ctx.font=`${Math.round(r*.56)}px serif`;
-    ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle="#fff";
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillStyle=node.external?"#94a3b8":"#fff";
     ctx.fillText(node.icon,node.x,node.y-2);
 
     ctx.font=`bold ${Math.max(9,Math.round(r*.31))}px ui-monospace,monospace`;
-    ctx.fillStyle=isSel?"#f8fafc":"#e2e8f0";ctx.textBaseline="top";
+    ctx.fillStyle=isSel?"#f8fafc":node.external?"#64748b":"#e2e8f0";ctx.textBaseline="top";
     ctx.fillText(node.name.length>16?node.name.slice(0,15)+"…":node.name,node.x,node.y+r+6);
     ctx.textBaseline="alphabetic";ctx.globalAlpha=1;
   }
@@ -298,8 +309,10 @@ function setupEvents(canvas) {
       _net.drag.node.vx=0;_net.drag.node.vy=0;
       _net.drag.moved=true;draw();
     } else if(_net.pan){
-      _net.tx=_net.pan.tx0+(sx-_net.pan.x0);
-      _net.ty=_net.pan.ty0+(sy-_net.pan.y0);draw();
+      const dx=sx-_net.pan.x0,dy=sy-_net.pan.y0;
+      if(Math.abs(dx)>4||Math.abs(dy)>4) _net._panMoved=true;
+      _net.tx=_net.pan.tx0+dx;
+      _net.ty=_net.pan.ty0+dy;draw();
     } else if(sx>=0&&sy>=0&&sx<=rect.width&&sy<=rect.height){
       const hit=hitNode(sx,sy);
       if(hit!==_net.hover){
@@ -311,12 +324,18 @@ function setupEvents(canvas) {
 
   window.addEventListener("mouseup",()=>{
     if(_net.drag&&!_net.drag.moved&&_net.drag.node) selectNode(_net.drag.node);
+    if(_net.drag?.moved){
+      // Restart physics so other nodes react to the repositioned node
+      _net.step=0;
+      if(!_net.animId) _net.animId=requestAnimationFrame(animate);
+    }
     _net.drag=null;_net.pan=null;
     if(_net.canvas) _net.canvas.style.cursor="grab";
   });
 
-  // Deselect on empty click
+  // Deselect on empty click — but NOT when the user just panned
   canvas.addEventListener("click",e=>{
+    if(_net._panMoved){_net._panMoved=false;return;}
     const{x,y}=pos(e);
     if(!hitNode(x,y)){_net.selected=null;renderDetailPanel(null);renderSidebar();draw();}
   });
@@ -393,10 +412,11 @@ function renderSidebar() {
     const shortDid=a.did.length>30?a.did.slice(0,29)+"…":a.did;
     const isSel=_net.selected===a.did;
     const isComp=_compromised.has(a.did);
+    const isExt=!new Set(_allAgents.map(x=>x.did)).has(a.did);
     return `<div class="sidebar-agent-row${isSel?" selected":""}" data-did="${esc(a.did)}">
-      <div class="agent-dot" style="background:${isComp?"#ef4444":color};${isComp?"box-shadow:0 0 0 2px #ef444466":""}"></div>
+      <div class="agent-dot" style="background:${isComp?"#ef4444":isExt?"#475569":color};${isComp?"box-shadow:0 0 0 2px #ef444466":""}"></div>
       <div class="agent-info">
-        <div class="agent-name">${esc(icon)} ${esc(name)}${isComp?` <span style="color:#ef4444;font-size:0.6rem;">⚠ flagged</span>`:""}</div>
+        <div class="agent-name">${esc(icon)} ${esc(name)}${isComp?` <span style="color:#ef4444;font-size:0.6rem;">⚠ flagged</span>`:""}${isExt?` <span style="color:#475569;font-size:0.6rem;">external</span>`:""}</div>
         <div class="agent-did">${esc(shortDid)}</div>
         ${stats.interactions?`<div class="agent-stats">${stats.interactions} interactions · ${stats.verifyCount||0} verifies</div>`:""}
       </div>
@@ -618,17 +638,21 @@ async function loadNetwork() {
   _net.canvas=canvas; _net.ctx=canvas.getContext("2d"); _net.ctx.scale(dpr,dpr);
 
   // Build nodes with jittered circle start
+  const ownedDids=new Set(agents.map(a=>a.did));
   const r0=Math.min(W,H)*.28;
   _net.nodes=nodeDids.map((did,i)=>{
     const ag=agents.find(a=>a.did===did);
+    const isExternal=!ownedDids.has(did);
     const{color,icon}=roleMeta(ag?.name);
     const angle=(2*Math.PI*i/nodeDids.length)-Math.PI/2;
     return{
-      did,name:ag?.name||did.slice(-10),icon,color,
+      did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
+      color:isExternal?"#475569":color,
       tags:ag?.tags||[],
+      external:isExternal,
       x:r0*Math.cos(angle)+(Math.random()-.5)*50,
       y:r0*Math.sin(angle)+(Math.random()-.5)*50,
-      vx:0,vy:0,r:36,
+      vx:0,vy:0,r:isExternal?28:36,
     };
   });
 
