@@ -2275,11 +2275,20 @@ function _setSseDot(connected) {
   dot.style.background = connected ? "var(--green)" : "var(--muted)";
 }
 
-function startSse() {
+async function startSse() {
   if (!apiKey) return;
   stopSse();
 
-  const url = `${BASE}/pro/stream?api_key=${encodeURIComponent(apiKey)}`;
+  // Exchange the real API key for a short-lived SSE token so the API key
+  // never appears in the EventSource URL (browser history, access logs).
+  let url = `${BASE}/pro/stream?api_key=${encodeURIComponent(apiKey)}`;
+  try {
+    const tok = await apiFetch("/pro/sse-token", { method: "POST" });
+    if (tok && tok.sse_token) {
+      url = `${BASE}/pro/stream?sse_token=${encodeURIComponent(tok.sse_token)}`;
+    }
+  } catch { /* fall back to api_key param */ }
+
   _sseSource = new EventSource(url);
 
   _sseSource.addEventListener("connected", () => {
