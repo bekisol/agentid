@@ -239,28 +239,45 @@ function simTick() {
   const nodes=_net.nodes,edges=_net.edges;
   const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
   const N=nodes.length;
-  // Scale forces so the graph stays stable at any size.
-  // Small graph (≤10 nodes): wide spacing.  Large graph (100+ nodes): tight packing.
-  const K_REP=Math.max(2500, 52000/(1+N*0.08));
-  const REST =Math.max(55,   380  /(1+N*0.045));
-  const DAMP =N>40?0.78:N>15?0.82:0.86;
-  const K_SPR=0.028;
-  for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+
+  // All constants scale with node count so the graph is stable at any size.
+  // K_REP: repulsion between every pair — drops steeply as N grows
+  const K_REP = Math.max(1200, 52000/(1+N*0.15));
+  // REST: preferred edge length — gets tighter as graph densifies
+  const REST  = Math.max(45, 200/(1+N*0.025));
+  // DAMP: velocity bleed per step — higher N needs more damping to stop crashing
+  const DAMP  = N>80?0.72:N>40?0.78:N>15?0.83:0.87;
+  // GRAV: pull toward origin — must be strong enough to reel in isolated nodes
+  const GRAV  = N>80?0.022:N>40?0.013:N>15?0.007:0.004;
+  // Spring stiffness
+  const K_SPR = 0.032;
+  // Hard velocity cap — prevents nodes flying off on frame 1
+  const MAX_V = 8;
+
+  // Repulsion between all pairs
+  for(let i=0;i<N;i++) for(let j=i+1;j<N;j++){
     const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
     const d2=dx*dx+dy*dy+1,d=Math.sqrt(d2),f=K_REP/d2;
     nodes[i].vx-=f*dx/d;nodes[i].vy-=f*dy/d;
     nodes[j].vx+=f*dx/d;nodes[j].vy+=f*dy/d;
   }
-  for (const e of edges) {
+
+  // Spring attraction along edges
+  for(const e of edges){
     const a=nmap[e.src],b=nmap[e.dst];if(!a||!b) continue;
     const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=K_SPR*(d-REST);
     a.vx+=f*dx/d;a.vy+=f*dy/d;b.vx-=f*dx/d;b.vy-=f*dy/d;
   }
-  // Weak gravity toward origin keeps the graph centered without crushing it
-  nodes.forEach(n=>{ n.vx-=n.x*.004;n.vy-=n.y*.004; });
+
+  // Gravity + damping + velocity cap + integrate
   nodes.forEach(n=>{
     if(_net.drag?.node===n) return;
-    n.vx*=DAMP;n.vy*=DAMP;n.x+=n.vx;n.y+=n.vy;
+    n.vx-=n.x*GRAV; n.vy-=n.y*GRAV;
+    n.vx*=DAMP;     n.vy*=DAMP;
+    // Clamp so no node teleports on the first few chaotic frames
+    n.vx=Math.max(-MAX_V,Math.min(MAX_V,n.vx));
+    n.vy=Math.max(-MAX_V,Math.min(MAX_V,n.vy));
+    n.x+=n.vx; n.y+=n.vy;
   });
 }
 
@@ -788,11 +805,14 @@ async function loadNetwork() {
   // All sizes as % of canvas so the map scales correctly at any resolution.
   // Absolute (not normalised to max): 17 audits is always bigger than 1,
   // 100 audits is always bigger than 17 — nothing shifts when the max changes.
-  const baseR = minDim*0.032;  // 3.2% — zero-interaction owned node
-  const stepR = minDim*0.011;  // 1.1% added per log2 doubling
-  const capR  = minDim*0.15;   // 15%  — hard cap so giant hubs don't dominate
-  const extR  = minDim*0.025;  // 2.5% — external / counterparty nodes
-  const r0=Math.min(W,H)*.28;
+  // Node sizes shrink as the graph gets denser so nodes don't overlap
+  const nodeSc = Math.max(0.30, 1-(nodeDids.length-10)*0.005);
+  const baseR = minDim*0.032*nodeSc;
+  const stepR = minDim*0.011*nodeSc;
+  const capR  = minDim*0.10*nodeSc;
+  const extR  = minDim*0.020*nodeSc;
+  // Spread nodes further apart initially — fewer collisions on frame 1
+  const r0=Math.min(W,H)*Math.min(0.44, 0.15+nodeDids.length*0.002);
   _net.nodes=nodeDids.map((did,i)=>{
     const ag=agents.find(a=>a.did===did);
     const isExternal=!ownedDids.has(did);
