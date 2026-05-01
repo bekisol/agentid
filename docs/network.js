@@ -802,36 +802,47 @@ async function loadNetwork() {
   canvas.style.width=W+"px"; canvas.style.height=H+"px";
   _net.canvas=canvas; _net.ctx=canvas.getContext("2d"); _net.ctx.scale(dpr,dpr);
 
-  // Build nodes with jittered circle start
+  // ── Node sizing — shrinks with density so nodes never overlap at rest ──────
+  const N=nodeDids.length;
   const minDim=Math.min(W,H);
-  // All sizes as % of canvas so the map scales correctly at any resolution.
-  // Absolute (not normalised to max): 17 audits is always bigger than 1,
-  // 100 audits is always bigger than 17 — nothing shifts when the max changes.
-  // Node sizes shrink as the graph gets denser so nodes don't overlap
-  const nodeSc = Math.max(0.30, 1-(nodeDids.length-10)*0.005);
+  // Hard per-bucket sizes: tested to be non-overlapping at each tier
+  const nodeSc = N>100?0.22 : N>60?0.30 : N>30?0.50 : N>15?0.72 : 1.0;
   const baseR = minDim*0.032*nodeSc;
   const stepR = minDim*0.011*nodeSc;
-  const capR  = minDim*0.10*nodeSc;
-  const extR  = minDim*0.020*nodeSc;
-  // Spread nodes further apart initially — fewer collisions on frame 1
-  const r0=Math.min(W,H)*Math.min(0.44, 0.15+nodeDids.length*0.002);
+  const capR  = minDim*0.09 *nodeSc;
+  const extR  = minDim*0.018*nodeSc;
+
+  // ── Initial placement ────────────────────────────────────────────────────
+  // For large graphs a single circle is too small — nodes start overlapping
+  // before physics even runs.  Use a grid instead so every node has space.
+  const useGrid = N > 25;
+  const cols = useGrid ? Math.ceil(Math.sqrt(N*(W/H)*1.1)) : 0;
+  const rows = useGrid ? Math.ceil(N/cols) : 0;
+  const gx   = useGrid ? W/(cols+1) : 0;
+  const gy   = useGrid ? H/(rows+1) : 0;
+  const r0   = useGrid ? 0 : Math.min(W,H)*0.28;
+
   _net.nodes=nodeDids.map((did,i)=>{
     const ag=agents.find(a=>a.did===did);
     const isExternal=!ownedDids.has(did);
     const{color,icon}=roleMeta(ag?.name);
-    const angle=(2*Math.PI*i/nodeDids.length)-Math.PI/2;
     const interacts=_agentStats[did]?.interactions||0;
     const r=isExternal
       ? Math.round(extR)
       : Math.round(Math.min(capR, baseR + Math.log2(interacts+1)*stepR));
+    // Grid start: evenly fill the canvas with a small random jitter
+    const x = useGrid
+      ? (i%cols+1)*gx - W/2 + (Math.random()-.5)*gx*0.5
+      : r0*Math.cos((2*Math.PI*i/N)-Math.PI/2)+(Math.random()-.5)*40;
+    const y = useGrid
+      ? (Math.floor(i/cols)+1)*gy - H/2 + (Math.random()-.5)*gy*0.5
+      : r0*Math.sin((2*Math.PI*i/N)-Math.PI/2)+(Math.random()-.5)*40;
     return{
       did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
       color:isExternal?"#f59e0b":color,
       tags:ag?.tags||[],
       external:isExternal,
-      x:r0*Math.cos(angle)+(Math.random()-.5)*60,
-      y:r0*Math.sin(angle)+(Math.random()-.5)*60,
-      vx:0,vy:0,r,
+      x,y,vx:0,vy:0,r,
     };
   });
 
