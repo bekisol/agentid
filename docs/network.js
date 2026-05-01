@@ -761,9 +761,11 @@ async function loadNetwork() {
   const rawEdges=Object.values(_edgeMap).sort((a,b)=>b.count-a.count);
   const maxCount=rawEdges[0]?.count||1;
 
-  const allDids=new Set(agents.map(a=>a.did));
-  rawEdges.forEach(e=>{allDids.add(e.src);allDids.add(e.dst);});
-  const nodeDids=Array.from(allDids);
+  const ownedDids=new Set(agents.map(a=>a.did));
+  const edgeDids=new Set();
+  rawEdges.forEach(e=>{edgeDids.add(e.src);edgeDids.add(e.dst);});
+  // Only show agents that appear in at least one edge; if no edges, fall back to owned agents
+  const nodeDids=edgeDids.size>0?Array.from(edgeDids):Array.from(ownedDids);
 
   // HiDPI canvas
   const wrap=document.getElementById("canvas-wrap");
