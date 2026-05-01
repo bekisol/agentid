@@ -2169,6 +2169,9 @@
     .op-pill-other      { background: var(--op-other-bg);      color: var(--op-other-fg); }
 
     /* ── Expandable anomaly cards ── */
+    .network-legend-row { display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;padding:0.18rem 0;color:var(--text-secondary); }
+    .network-legend-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+    #network-canvas { cursor:default; }
     .anomaly-card { transition: background 0.15s; }
     .anomaly-card:hover { filter: brightness(0.97); }
     .anomaly-detail {
@@ -3132,6 +3135,42 @@ curl https://api.agentid-protocol.com/agents \
     </div>
   </div>
 
+  <!-- Agent Network Graph -->
+  <div class="card" style="margin-bottom:1.25rem;" id="network-graph-card" data-min-tier="pro" data-lock-feature="Agent network">
+    <div class="card-header" style="display:flex;align-items:center;gap:0.75rem;">
+      <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+        Agent Interaction Network
+        <span id="network-live-pill" class="status-pill status-pill-muted">loading…</span>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;color:var(--muted);">
+        <span id="network-range-label">Last 7 days</span>
+        <select id="network-range" style="font-size:0.75rem;padding:0.2rem 0.5rem;border:1px solid var(--border-dark);border-radius:6px;background:var(--surface);color:var(--text);outline:none;">
+          <option value="1">24 h</option>
+          <option value="7" selected>7 days</option>
+          <option value="30">30 days</option>
+        </select>
+        <button id="network-refresh" class="btn-icon" title="Refresh">↻</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 260px;gap:0;min-height:340px;">
+      <div style="position:relative;border-right:1px solid var(--border);">
+        <canvas id="network-canvas" style="display:block;width:100%;height:340px;"></canvas>
+        <div id="network-empty" style="display:none;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.82rem;color:var(--muted);pointer-events:none;">No interactions in this period</div>
+      </div>
+      <div style="padding:1rem;overflow-y:auto;max-height:340px;">
+        <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.6rem;">Legend</div>
+        <div class="network-legend-row"><div class="network-legend-dot" style="background:#3b82f6"></div>Verify DID</div>
+        <div class="network-legend-row"><div class="network-legend-dot" style="background:#f59e0b"></div>Delegate / Task</div>
+        <div class="network-legend-row"><div class="network-legend-dot" style="background:#10b981"></div>Research / Findings</div>
+        <div class="network-legend-row"><div class="network-legend-dot" style="background:#8b5cf6"></div>Code</div>
+        <div class="network-legend-row"><div class="network-legend-dot" style="background:#ef4444"></div>Review</div>
+        <div class="network-legend-row"><div class="network-legend-dot" style="background:#64748b"></div>Monitor / Report</div>
+        <div style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:0.85rem 0 0.5rem;">Top interactions</div>
+        <div id="network-edge-list" style="font-size:0.72rem;color:var(--text);"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Activity + Audit -->
   <div class="two-col" data-min-tier="pro" data-lock-feature="Activity & audit log">
     <div class="card">
@@ -3719,7 +3758,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260501-11"></script>
+<script src="dashboard.js?v=20260501-12"></script>
 
 </body>
 </html>

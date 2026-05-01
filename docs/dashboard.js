@@ -709,6 +709,7 @@ async function loadDashboard() {
     loadAnomalies().catch(e => console.error("loadAnomalies:", e));
     _loadGroups().catch?.(e => console.error("loadGroups:", e));
     loadPeerBenchmarks();
+    loadNetworkGraph().catch(e => console.error("loadNetworkGraph:", e));
 
     // Start real-time SSE feed (or restart if already running)
     startSse();
@@ -2265,6 +2266,21 @@ async function loadAnomalies() {
   }
 }
 
+// Network graph range selector + refresh
+document.getElementById("network-range")?.addEventListener("change", () => {
+  clearTimeout(_networkRefreshTimer);
+  const label = document.getElementById("network-range-label");
+  const val   = document.getElementById("network-range")?.value;
+  if (label) label.textContent = val === "1" ? "Last 24 h" : val === "30" ? "Last 30 days" : "Last 7 days";
+  loadNetworkGraph().catch(() => {});
+});
+document.addEventListener("click", (e) => {
+  if (e.target.closest("#network-refresh")) {
+    clearTimeout(_networkRefreshTimer);
+    loadNetworkGraph().catch(() => {});
+  }
+});
+
 // Wire the manual refresh button (delegated, attaches once on first load)
 document.addEventListener("click", (e) => {
   if (e.target.closest("#anomaly-refresh")) {
@@ -3428,6 +3444,232 @@ async function loadPeerBenchmarks() {
   } catch (e) {
     list.innerHTML = `<div style="color:var(--muted);font-size:0.8rem;padding:0.5rem 0;">Could not load benchmarks: ${esc(String(e.message || ""))}</div>`;
   }
+}
+
+// ── AGENT INTERACTION NETWORK GRAPH ──────────────────────────────────────────
+
+const _OP_COLORS = {
+  verify:               "#3b82f6",
+  verify_counterparty:  "#3b82f6",
+  verify_orchestrator:  "#3b82f6",
+  verify_researcher:    "#3b82f6",
+  verify_coder:         "#3b82f6",
+  verify_reviewer:      "#3b82f6",
+  verify_monitor:       "#3b82f6",
+  delegate_research:    "#f59e0b",
+  task_received:        "#10b981",
+  research_complete:    "#10b981",
+  research_received:    "#10b981",
+  code_complete:        "#8b5cf6",
+  code_received:        "#8b5cf6",
+  review_complete:      "#ef4444",
+  review_result_received:"#ef4444",
+  integrity_report_issued:"#64748b",
+};
+
+function _opColor(op) {
+  if (!op) return "#64748b";
+  const key = Object.keys(_OP_COLORS).find(k => op.startsWith(k) || op === k);
+  if (key) return _OP_COLORS[key];
+  if (op.startsWith("verify")) return "#3b82f6";
+  return "#64748b";
+}
+
+let _networkRefreshTimer = null;
+
+async function loadNetworkGraph() {
+  const canvas = document.getElementById("network-canvas");
+  const pill   = document.getElementById("network-live-pill");
+  const edgeList = document.getElementById("network-edge-list");
+  const emptyEl  = document.getElementById("network-empty");
+  if (!canvas) return;
+
+  const days = parseInt(document.getElementById("network-range")?.value || "7", 10);
+
+  if (pill) { pill.className = "status-pill status-pill-muted"; pill.textContent = "loading…"; }
+
+  // ── Fetch agents + audit log in parallel ────────────────────────────────
+  let agents = [], logs = [];
+  try {
+    const [agRes, logRes] = await Promise.all([
+      _authFetch("/agents?limit=200"),
+      _authFetch(`/pro/audit-log/json?limit=500`),
+    ]);
+    if (agRes.ok)  agents = (await agRes.json()) || [];
+    if (logRes.ok) logs   = ((await logRes.json()).logs) || [];
+  } catch (e) {
+    if (pill) { pill.className = "status-pill status-pill-red"; pill.textContent = "error"; }
+    return;
+  }
+
+  // Build DID→name map
+  const didToName = {};
+  agents.forEach(a => { didToName[a.did] = a.name || a.did.slice(-8); });
+
+  // Determine time cutoff
+  const cutoff = Date.now() - days * 86400000;
+
+  // Build edge map: "srcDID|dstDID" → { count, ops: {op: count}, latestTs }
+  const edgeMap = {};
+  for (const ev of logs) {
+    const ts = ev.timestamp ? new Date(ev.timestamp).getTime() : 0;
+    if (ts && ts < cutoff) continue;
+    const src = ev.did;
+    const dst = ev.counterparty;
+    if (!src || !dst) continue;
+    const key = src + "|" + dst;
+    if (!edgeMap[key]) edgeMap[key] = { src, dst, count: 0, ops: {}, latestTs: 0 };
+    edgeMap[key].count++;
+    const op = ev.operation || ev.action || "?";
+    edgeMap[key].ops[op] = (edgeMap[key].ops[op] || 0) + 1;
+    if (ts > edgeMap[key].latestTs) edgeMap[key].latestTs = ts;
+  }
+
+  const edges = Object.values(edgeMap).sort((a, b) => b.count - a.count);
+
+  // Collect nodes that actually appear in edges (union of all agents seen)
+  const activeDids = new Set();
+  edges.forEach(e => { activeDids.add(e.src); activeDids.add(e.dst); });
+
+  // If no edges, try to show all registered agents as orphan nodes
+  if (activeDids.size === 0) agents.forEach(a => activeDids.add(a.did));
+
+  const nodeDids = Array.from(activeDids);
+  const nodeCount = nodeDids.length;
+
+  if (emptyEl) emptyEl.style.display = nodeCount === 0 ? "" : "none";
+
+  // ── Canvas sizing (HiDPI) ────────────────────────────────────────────────
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.offsetWidth  || canvas.parentElement?.offsetWidth || 600;
+  const H   = 340;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + "px";
+  canvas.style.height = H + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  // ── Node positions — arrange in a circle ────────────────────────────────
+  const cx = W / 2, cy = H / 2;
+  const r  = Math.min(cx, cy) * 0.65;
+  const nodePos = {};
+  nodeDids.forEach((did, i) => {
+    const angle = (2 * Math.PI * i / nodeCount) - Math.PI / 2;
+    nodePos[did] = {
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle),
+      name: didToName[did] || did.slice(-8),
+    };
+  });
+
+  // ── Draw ────────────────────────────────────────────────────────────────
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw edges
+  const maxCount = edges[0]?.count || 1;
+  for (const edge of edges.slice(0, 60)) {
+    const a = nodePos[edge.src], b = nodePos[edge.dst];
+    if (!a || !b) continue;
+    // dominant op color
+    const topOp = Object.entries(edge.ops).sort((x, y) => y[1] - x[1])[0]?.[0] || "";
+    const color = _opColor(topOp);
+    const weight = 0.8 + (edge.count / maxCount) * 2.5;
+
+    // slight curve offset
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    const nx = -dy/len * 12, ny = dx/len * 12;
+
+    ctx.beginPath();
+    ctx.moveTo(a.x + nx, a.y + ny);
+    ctx.quadraticCurveTo(
+      (a.x + b.x)/2 + nx*0.5, (a.y + b.y)/2 + ny*0.5,
+      b.x + nx*0.1, b.y + ny*0.1
+    );
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = weight;
+    ctx.globalAlpha = 0.55;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Arrowhead
+    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+    const ex = b.x - (dx/len)*20, ey = b.y - (dy/len)*20;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - 8*Math.cos(angle-0.45), ey - 8*Math.sin(angle-0.45));
+    ctx.lineTo(ex - 8*Math.cos(angle+0.45), ey - 8*Math.sin(angle+0.45));
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Draw nodes on top
+  for (const did of nodeDids) {
+    const { x, y, name } = nodePos[did];
+    const agentObj = agents.find(a => a.did === did);
+    const nodeColor = agentObj ? "#3b82f6" : "#64748b";
+
+    // Glow
+    const g = ctx.createRadialGradient(x, y, 6, x, y, 32);
+    g.addColorStop(0, nodeColor + "44");
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, 32, 0, Math.PI*2); ctx.fill();
+
+    // Circle
+    ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI*2);
+    ctx.fillStyle   = "var(--surface, #1e293b)";
+    ctx.fill();
+    ctx.strokeStyle = nodeColor;
+    ctx.lineWidth   = 2;
+    ctx.stroke();
+
+    // Name label
+    ctx.font = `bold 10px ui-monospace,monospace`;
+    ctx.fillStyle   = "#e2e8f0";
+    ctx.textAlign   = "center";
+    ctx.textBaseline = "top";
+    const label = name.length > 14 ? name.slice(0, 13) + "…" : name;
+    ctx.fillText(label, x, y + 26);
+    ctx.textBaseline = "alphabetic";
+  }
+
+  // ── Edge list sidebar ────────────────────────────────────────────────────
+  if (edgeList) {
+    if (edges.length === 0) {
+      edgeList.innerHTML = `<div style="color:var(--muted);font-size:0.75rem;">No inter-agent events yet</div>`;
+    } else {
+      edgeList.innerHTML = edges.slice(0, 8).map(e => {
+        const src = didToName[e.src] || e.src.slice(-8);
+        const dst = didToName[e.dst] || e.dst.slice(-8);
+        const topOp = Object.entries(e.ops).sort((x, y) => y[1] - x[1])[0]?.[0] || "?";
+        const color = _opColor(topOp);
+        return `<div style="display:flex;align-items:center;gap:0.4rem;padding:0.25rem 0;border-bottom:1px solid var(--border);">
+          <div style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+          <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68px;" title="${esc(src)}">${esc(src)}</span>
+          <span style="color:var(--muted);">→</span>
+          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68px;" title="${esc(dst)}">${esc(dst)}</span>
+          <span style="margin-left:auto;color:var(--muted);">${e.count}</span>
+        </div>`;
+      }).join("");
+    }
+  }
+
+  // ── Pill ─────────────────────────────────────────────────────────────────
+  if (pill) {
+    pill.className = "status-pill status-pill-green";
+    pill.textContent = `${edges.length} edges · ${nodeDids.length} agents`;
+  }
+
+  // ── Auto-refresh ─────────────────────────────────────────────────────────
+  clearTimeout(_networkRefreshTimer);
+  _networkRefreshTimer = setTimeout(() => {
+    loadNetworkGraph().catch(() => {});
+  }, 60000);
 }
 
 // ── NOTIFICATION CENTER ──────────────────────────────────────────────────────
