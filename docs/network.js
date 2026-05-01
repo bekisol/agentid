@@ -25,7 +25,7 @@ const BASE = "https://api.agentid-protocol.com";
 //     Full detail, easy to read, no clutter.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NODE_CAP = 200;          // max agents shown in overview
+const NODE_CAP = 500;          // max agents shown in overview
 const CLUSTER_ZOOM = 0.18;     // below this zoom → show role clusters
 const LABEL_ZOOM   = 0.40;     // below this zoom → hide text labels
 
