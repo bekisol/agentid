@@ -676,8 +676,9 @@ async function loadNetwork() {
     const{color,icon}=roleMeta(ag?.name);
     const angle=(2*Math.PI*i/nodeDids.length)-Math.PI/2;
     const interacts=_agentStats[did]?.interactions||0;
-    // Scale radius: external=22, owned scales 30→56 by interaction count
-    const r=isExternal?22:Math.round(30+(interacts/maxI)*26);
+    // Sqrt scale so agents with a few interactions are visibly bigger than
+    // zero-interaction agents even when one outlier dominates the range.
+    const r=isExternal?22:Math.round(28+Math.sqrt(interacts/maxI)*30);
     return{
       did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
       color:isExternal?"#475569":color,
