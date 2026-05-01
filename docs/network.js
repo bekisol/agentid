@@ -472,38 +472,43 @@ function egoSimTick() {
   const DAMP  = 0.84;
   const nmap  = Object.fromEntries(nodes.map(n=>[n.did,n]));
 
+  const drag = _net.drag?.node; // currently dragged node — excluded from all forces
+
   // Repulsion between every pair
   for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
     const ni=nodes[i], nj=nodes[j];
     const dx=nj.x-ni.x, dy=nj.y-ni.y;
     const d2=dx*dx+dy*dy+1, d=Math.sqrt(d2), f=K_REP/d2;
-    if (ni!==center) { ni.vx-=f*dx/d; ni.vy-=f*dy/d; }
-    if (nj!==center) { nj.vx+=f*dx/d; nj.vy+=f*dy/d; }
+    if (ni!==center && ni!==drag) { ni.vx-=f*dx/d; ni.vy-=f*dy/d; }
+    if (nj!==center && nj!==drag) { nj.vx+=f*dx/d; nj.vy+=f*dy/d; }
   }
 
   // Springs along edges
   for (const e of _net.edges) {
     const a=nmap[e.src], b=nmap[e.dst]; if(!a||!b) continue;
     const dx=b.x-a.x, dy=b.y-a.y, d=Math.sqrt(dx*dx+dy*dy)||1, f=K_SPR*(d-REST);
-    if (a!==center) { a.vx+=f*dx/d; a.vy+=f*dy/d; }
-    if (b!==center) { b.vx-=f*dx/d; b.vy-=f*dy/d; }
+    if (a!==center && a!==drag) { a.vx+=f*dx/d; a.vy+=f*dy/d; }
+    if (b!==center && b!==drag) { b.vx-=f*dx/d; b.vy-=f*dy/d; }
   }
 
   // Damping + integrate (skip pinned center and dragged node)
   nodes.forEach(n => {
-    if (n===center || _net.drag?.node===n) return;
+    if (n===center || n===drag) return;
     n.vx*=DAMP; n.vy*=DAMP; n.x+=n.vx; n.y+=n.vy;
   });
 
-  // Collision correction
+  // Collision correction — skip pinned center AND currently-dragged node
+  const dragged = _net.drag?.node;
   for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
     const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
     const d=Math.sqrt(dx*dx+dy*dy)||1;
     const minD=(nodes[i].r+nodes[j].r)*1.9+4;
     if (d<minD) {
       const push=(minD-d)/2/d;
-      if (nodes[i]!==center) { nodes[i].x-=dx*push; nodes[i].y-=dy*push; }
-      if (nodes[j]!==center) { nodes[j].x+=dx*push; nodes[j].y+=dy*push; }
+      const lockI = nodes[i]===center || nodes[i]===dragged;
+      const lockJ = nodes[j]===center || nodes[j]===dragged;
+      if (!lockI) { nodes[i].x-=dx*push; nodes[i].y-=dy*push; }
+      if (!lockJ) { nodes[j].x+=dx*push; nodes[j].y+=dy*push; }
     }
   }
 }
@@ -568,10 +573,13 @@ function enterEgoMode(centerNode) {
   renderSidebar();
   updatePill();
 
-  // Start physics — neighbors animate into natural positions
+  // Center view on the ego graph without forcing a specific zoom level.
+  // fitView() picks the right zoom for the initial layout; physics then
+  // refines positions and a second fitView() runs when it settles.
   if (_egoAnimId) cancelAnimationFrame(_egoAnimId);
   _egoStep = 0;
-  _net.tx=W/2; _net.ty=H/2; _net.zoom=1;
+  _net.tx=W/2; _net.ty=H/2; // world origin → canvas centre
+  fitView();                  // zoom to fit initial circle, not forced 1×
   _egoAnimId = requestAnimationFrame(egoAnimate);
 }
 
