@@ -454,7 +454,7 @@ function renderDetailPanel(node) {
   }
   connections.sort((a,b)=>b.count-a.count);
 
-  const topConnsHtml=connections.slice(0,6).map(c=>{
+  const topConnsHtml=connections.map(c=>{
     const topOp=Object.entries(c.ops).sort((a,b)=>b[1]-a[1])[0]?.[0]||"?";
     const color=opColor(topOp);
     const dirSymbol=c.dir==="out"?"→":"←";
@@ -529,7 +529,6 @@ function renderDetailPanel(node) {
     ${connections.length?`
       <div class="detail-section-title">Connections (${connections.length})</div>
       ${topConnsHtml}
-      ${connections.length>6?`<div style="padding:0.4rem 1rem;font-size:0.68rem;color:var(--muted);">+${connections.length-6} more</div>`:""}
     `:"<div style='padding:0.75rem 1rem;font-size:0.75rem;color:var(--muted);'>No interactions in this period</div>"}
     <div class="detail-footer">Registered ${created}</div>
   `;
@@ -569,16 +568,21 @@ function relTime(ts) {
 
 function buildStats(logs) {
   _agentStats={};
-  for(const ev of logs) {
-    const did=ev.did; if(!did) continue;
+  function _inc(did, op, ts) {
+    if(!did) return;
     if(!_agentStats[did]) _agentStats[did]={interactions:0,verifyCount:0,latestTs:0,ops:{}};
     const s=_agentStats[did];
     s.interactions++;
-    const op=ev.operation||ev.action||"";
     if(op.startsWith("verify")) s.verifyCount++;
     s.ops[op]=(s.ops[op]||0)+1;
-    const ts=ev.timestamp?new Date(ev.timestamp).getTime():0;
     if(ts>s.latestTs) s.latestTs=ts;
+  }
+  for(const ev of logs) {
+    const op=ev.operation||ev.action||"";
+    const ts=ev.timestamp?new Date(ev.timestamp).getTime():0;
+    _inc(ev.did, op, ts);
+    // Also credit the counterparty — they participated in this interaction
+    _inc(ev.counterparty, op, ts);
   }
 }
 
