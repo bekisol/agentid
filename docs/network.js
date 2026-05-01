@@ -82,6 +82,8 @@ let _compromised = new Set();
 let _sortBy      = "interactions";
 let _searchQ     = "";
 let _days        = 7;
+let _egoAnimId   = null;
+let _egoStep     = 0;
 
 // ── Canvas helpers ────────────────────────────────────────────────────────
 function s2w(sx, sy) { return [(sx-_net.tx)/_net.zoom, (sy-_net.ty)/_net.zoom]; }
@@ -454,6 +456,68 @@ function setupEvents(canvas) {
   });
 }
 
+// ── Ego physics ───────────────────────────────────────────────────────────
+// Runs only in ego mode. Center node is pinned at (0,0); neighbours get
+// full spring + repulsion physics so they settle into a natural layout.
+function egoSimTick() {
+  const nodes = _net.nodes;
+  const center = nodes.find(n => n.did === _net.selected);
+  if (!center) return;
+
+  const N = nodes.length;
+  // Scale constants to graph size: fewer neighbours → tighter layout
+  const REST  = Math.max(100, Math.min(260, 60 + N*12));
+  const K_REP = REST * REST * 0.22;
+  const K_SPR = 0.045;
+  const DAMP  = 0.84;
+  const nmap  = Object.fromEntries(nodes.map(n=>[n.did,n]));
+
+  // Repulsion between every pair
+  for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+    const ni=nodes[i], nj=nodes[j];
+    const dx=nj.x-ni.x, dy=nj.y-ni.y;
+    const d2=dx*dx+dy*dy+1, d=Math.sqrt(d2), f=K_REP/d2;
+    if (ni!==center) { ni.vx-=f*dx/d; ni.vy-=f*dy/d; }
+    if (nj!==center) { nj.vx+=f*dx/d; nj.vy+=f*dy/d; }
+  }
+
+  // Springs along edges
+  for (const e of _net.edges) {
+    const a=nmap[e.src], b=nmap[e.dst]; if(!a||!b) continue;
+    const dx=b.x-a.x, dy=b.y-a.y, d=Math.sqrt(dx*dx+dy*dy)||1, f=K_SPR*(d-REST);
+    if (a!==center) { a.vx+=f*dx/d; a.vy+=f*dy/d; }
+    if (b!==center) { b.vx-=f*dx/d; b.vy-=f*dy/d; }
+  }
+
+  // Damping + integrate (skip pinned center and dragged node)
+  nodes.forEach(n => {
+    if (n===center || _net.drag?.node===n) return;
+    n.vx*=DAMP; n.vy*=DAMP; n.x+=n.vx; n.y+=n.vy;
+  });
+
+  // Collision correction
+  for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+    const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
+    const d=Math.sqrt(dx*dx+dy*dy)||1;
+    const minD=(nodes[i].r+nodes[j].r)*1.9+4;
+    if (d<minD) {
+      const push=(minD-d)/2/d;
+      if (nodes[i]!==center) { nodes[i].x-=dx*push; nodes[i].y-=dy*push; }
+      if (nodes[j]!==center) { nodes[j].x+=dx*push; nodes[j].y+=dy*push; }
+    }
+  }
+}
+
+function egoAnimate() {
+  egoSimTick(); draw(); _egoStep++;
+  const maxV = _net.nodes.reduce((m,n)=>Math.max(m,Math.abs(n.vx)+Math.abs(n.vy)),0);
+  if (maxV > 0.1 && _egoStep < 300) {
+    _egoAnimId = requestAnimationFrame(egoAnimate);
+  } else {
+    fitView(); draw(); _egoAnimId = null;
+  }
+}
+
 // ── Selection & ego mode ──────────────────────────────────────────────────
 function selectNode(node) {
   _net.selected = node.did;
@@ -494,15 +558,25 @@ function enterEgoMode(centerNode) {
   _net.nodes   = [centerNode, ...neighbours];
   _net.edges   = buildEdgesForDids(new Set(_net.nodes.map(n=>n.did)));
 
+  // Reset velocities so physics starts clean each time
+  _net.nodes.forEach(n=>{ n.vx=0; n.vy=0; });
+  centerNode.x=0; centerNode.y=0;
+
   computeEgoLayout(centerNode, neighbours, W, H);
-  fitView();
+
   renderDetailPanel(centerNode);
   renderSidebar();
   updatePill();
-  draw();
+
+  // Start physics — neighbors animate into natural positions
+  if (_egoAnimId) cancelAnimationFrame(_egoAnimId);
+  _egoStep = 0;
+  _net.tx=W/2; _net.ty=H/2; _net.zoom=1;
+  _egoAnimId = requestAnimationFrame(egoAnimate);
 }
 
 function exitEgoMode() {
+  if (_egoAnimId) { cancelAnimationFrame(_egoAnimId); _egoAnimId=null; }
   _net.egoMode   = false;
   _net.selected  = null;
   _net.nodes     = _net.allNodes;
