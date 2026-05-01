@@ -193,7 +193,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .detail-footer { padding: 0.75rem 1rem; font-size: 0.7rem; color: var(--muted); border-top: 1px solid var(--border2); margin-top: auto; }
 </style>
 </head>
-<body>
+<body style="visibility:hidden;">
+<script>
+  // Reveal body only after auth is confirmed — prevents login flash
+  const _k = sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key");
+  const _m = sessionStorage.getItem("agentid_auth_mode");
+  if (_k || _m === "session") document.body.style.visibility = "";
+</script>
 
 <div id="header">
   <a href="dashboard.html" class="back-link">← Dashboard</a>

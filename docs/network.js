@@ -216,24 +216,17 @@ function draw() {
 
     ctx.globalAlpha=alpha;
     ctx.beginPath();ctx.arc(node.x,node.y,r,0,Math.PI*2);
-    ctx.fillStyle=node.external?"#111827":"#1e293b";ctx.fill();
+    ctx.fillStyle=node.external?"#1c1408":"#1e293b";ctx.fill();
 
-    // External agents get a dashed border to indicate they're from another account
-    if(node.external&&!isComp){
-      ctx.save();ctx.setLineDash([4,3]);
-      ctx.strokeStyle="#475569";ctx.lineWidth=isSel?3:2;ctx.stroke();
-      ctx.restore();
-    } else {
-      ctx.strokeStyle=isComp?"#ef4444":node.color;ctx.lineWidth=isSel?3.5:isHov?3:2.5;ctx.stroke();
-    }
+    ctx.strokeStyle=isComp?"#ef4444":node.color;ctx.lineWidth=isSel?3.5:isHov?3:2.5;ctx.stroke();
 
     ctx.font=`${Math.round(r*.56)}px serif`;
     ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.fillStyle=node.external?"#94a3b8":"#fff";
+    ctx.fillStyle="#fff";
     ctx.fillText(node.icon,node.x,node.y-2);
 
     ctx.font=`bold ${Math.max(9,Math.round(r*.31))}px ui-monospace,monospace`;
-    ctx.fillStyle=isSel?"#f8fafc":node.external?"#64748b":"#e2e8f0";ctx.textBaseline="top";
+    ctx.fillStyle=isSel?"#f8fafc":node.external?"#fcd34d":"#e2e8f0";ctx.textBaseline="top";
     ctx.fillText(node.name.length>16?node.name.slice(0,15)+"…":node.name,node.x,node.y+r+6);
     ctx.textBaseline="alphabetic";ctx.globalAlpha=1;
   }
@@ -269,7 +262,11 @@ function animate() {
   if (_net.step<_net.MAX_STEPS) {
     simTick();draw();_net.step++;
     _net.animId=requestAnimationFrame(animate);
-  } else { fitView();draw();_net.animId=null; }
+  } else {
+    // Only auto-fit on initial load; after user has dragged, keep their viewport
+    if(!_net.userMoved) fitView();
+    draw();_net.animId=null;
+  }
 }
 
 // ── Interaction events ────────────────────────────────────────────────────
@@ -326,6 +323,7 @@ function setupEvents(canvas) {
   window.addEventListener("mouseup",()=>{
     if(_net.drag&&!_net.drag.moved&&_net.drag.node) selectNode(_net.drag.node);
     if(_net.drag?.moved){
+      _net.userMoved=true;
       // Restart physics so other nodes react to the repositioned node
       _net.step=0;
       if(!_net.animId) _net.animId=requestAnimationFrame(animate);
@@ -799,7 +797,7 @@ async function loadNetwork() {
       : Math.round(Math.min(capR, baseR + Math.log2(interacts+1)*stepR));
     return{
       did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
-      color:isExternal?"#475569":color,
+      color:isExternal?"#f59e0b":color,
       tags:ag?.tags||[],
       external:isExternal,
       x:r0*Math.cos(angle)+(Math.random()-.5)*60,
@@ -815,7 +813,7 @@ async function loadNetwork() {
   });
 
   _net.tx=W/2;_net.ty=H/2;_net.zoom=1;
-  _net.hover=null;_net.selected=null;_net.step=0;
+  _net.hover=null;_net.selected=null;_net.step=0;_net.userMoved=false;
   _net.MAX_STEPS=Math.min(420,80+nodeDids.length*4);
 
   setupEvents(canvas);
@@ -833,6 +831,7 @@ document.addEventListener("DOMContentLoaded",async()=>{
     const r=await _authFetch("/auth/me");
     if(!r.ok){window.location.href="dashboard.html";return;}
   } catch(_){window.location.href="dashboard.html";return;}
+  document.body.style.visibility="";
 
   // Wire controls
   document.getElementById("range-select")?.addEventListener("change",loadNetwork);

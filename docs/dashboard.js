@@ -3860,7 +3860,7 @@ async function loadNetworkGraph() {
   let agents = [], logs = [];
   try {
     const [ar, lr] = await Promise.all([
-      _authFetch("/agents?limit=200"),
+      _authFetch("/agents?mine=true&limit=500"),
       _authFetch("/pro/audit-log/json?limit=500"),
     ]);
     if (ar.ok) agents = (await ar.json()) || [];
@@ -3890,10 +3890,12 @@ async function loadNetworkGraph() {
   const rawEdges  = Object.values(edgeMap).sort((a, b) => b.count - a.count);
   const maxCount  = rawEdges[0]?.count || 1;
 
-  // All nodes = registered agents + external counterparties
-  const allDids = new Set(agents.map(a => a.did));
-  rawEdges.forEach(e => { allDids.add(e.src); allDids.add(e.dst); });
-  const nodeDids = Array.from(allDids);
+  // Only owned agents + counterparties that interacted with owned agents
+  const ownedDids = new Set(agents.map(a => a.did));
+  const filteredEdges = rawEdges.filter(e => ownedDids.has(e.src) || ownedDids.has(e.dst));
+  const edgeDids = new Set();
+  filteredEdges.forEach(e => { edgeDids.add(e.src); edgeDids.add(e.dst); });
+  const nodeDids = edgeDids.size > 0 ? Array.from(edgeDids) : Array.from(ownedDids);
 
   // ── HiDPI canvas setup ────────────────────────────────────────────────────
   const dpr = window.devicePixelRatio || 1;
@@ -3932,7 +3934,7 @@ async function loadNetworkGraph() {
   });
 
   // ── Build edge objects ────────────────────────────────────────────────────
-  _net.edges = rawEdges.map(e => {
+  _net.edges = filteredEdges.map(e => {
     const topOp = Object.entries(e.ops).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
     return {
       src: e.src, dst: e.dst, count: e.count,
@@ -6161,7 +6163,10 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
         return;
       }
       if (previouslyLoggedIn) _showSessionExpiredBanner("Your session has expired");
-    } catch (_) { /* network failure — leave login screen */ }
+    } catch (_) { /* network failure — fall through to show login */ }
+
+    // No valid session found — show login screen
+    document.getElementById("login-screen").style.display = "flex";
   })();
 });
 
