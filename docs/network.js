@@ -512,18 +512,23 @@ function egoSimTick() {
       if (!lockJ) { nodes[j].x+=dx*push; nodes[j].y+=dy*push; }
     }
   }
+
+  // Gentle perpetual drift — keeps nodes softly floating after physics settles.
+  // Each node gets a unique phase so they move independently rather than in sync.
+  // Terminal drift velocity ≈ 0.022 / (1 - 0.84) ≈ 0.14 px/frame (~8 px/s).
+  const T = _egoStep * 0.022;
+  nodes.forEach((n, i) => {
+    if (n===center || n===drag) return;
+    n.vx += 0.022 * Math.sin(T + i * 2.39);
+    n.vy += 0.022 * Math.cos(T + i * 1.57);
+  });
 }
 
 function egoAnimate() {
   egoSimTick(); draw(); _egoStep++;
-  const maxV = _net.nodes.reduce((m,n)=>Math.max(m,Math.abs(n.vx)+Math.abs(n.vy)),0);
-  if (maxV > 0.1 && _egoStep < 300) {
-    _egoAnimId = requestAnimationFrame(egoAnimate);
-  } else {
-    // Do NOT call fitView() here — it would snap the viewport while the user
-    // may be panning/dragging, causing the "zoom jump after a few seconds" bug.
-    draw(); _egoAnimId = null;
-  }
+  // Keep running as long as we're in ego mode — never go static
+  if (_net.egoMode) _egoAnimId = requestAnimationFrame(egoAnimate);
+  else _egoAnimId = null;
 }
 
 // ── Selection & ego mode ──────────────────────────────────────────────────
