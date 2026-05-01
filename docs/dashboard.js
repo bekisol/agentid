@@ -664,8 +664,21 @@ async function loadDashboard() {
 
   // Pro-only loaders — free tier sees locked overlays instead
   if (isPro()) {
-    try { renderCharts(data); } catch (e) { console.warn("Charts:", e); }
-    try { renderActivity(data.activity_last_7d || []); } catch (e) { console.error("renderActivity:", e); }
+    try { renderCharts(data); } catch (e) {
+      console.warn("Charts:", e);
+      ["trend-chart", "cap-chart"].forEach(id => {
+        const c = document.getElementById(id);
+        if (c) {
+          const wrap = c.closest(".chart-wrap");
+          if (wrap) wrap.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:0.8rem;">Chart unavailable</div>`;
+        }
+      });
+    }
+    try { renderActivity(data.activity_last_7d || []); } catch (e) {
+      console.error("renderActivity:", e);
+      const actEl = document.getElementById("activity-list");
+      if (actEl) actEl.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><p style="font-size:0.78rem;color:var(--muted);">Could not render activity: ${esc(String(e?.message || e))}</p></div>`;
+    }
     loadAuditLog().catch(e => console.error("loadAuditLog:", e));
     loadSigningActivity().catch(e => console.error("loadSigningActivity:", e));
     loadDiscoveryStats().catch(e => console.error("loadDiscoveryStats:", e));
@@ -893,7 +906,9 @@ function renderCharts(data) {
         borderColor: "rgba(194,65,12,0.9)",
         borderWidth: 2,
         backgroundColor: (ctx) => {
-          const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+          const h = ctx.chart.height;
+          if (!h) return "rgba(194,65,12,0.12)";
+          const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, h);
           gradient.addColorStop(0, "rgba(194,65,12,0.18)");
           gradient.addColorStop(1, "rgba(194,65,12,0.01)");
           return gradient;
