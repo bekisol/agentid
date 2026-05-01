@@ -240,29 +240,32 @@ function simTick() {
   const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
   const N=nodes.length;
 
-  // All constants scale with node count so the graph is stable at any size.
-  // K_REP: repulsion between every pair — drops steeply as N grows
-  const K_REP = Math.max(1200, 52000/(1+N*0.15));
-  // REST: preferred edge length — gets tighter as graph densifies
-  const REST  = Math.max(45, 200/(1+N*0.025));
-  // DAMP: velocity bleed per step — higher N needs more damping to stop crashing
-  const DAMP  = N>80?0.72:N>40?0.78:N>15?0.83:0.87;
-  // GRAV: pull toward origin — must be strong enough to reel in isolated nodes
-  const GRAV  = N>80?0.022:N>40?0.013:N>15?0.007:0.004;
-  // Spring stiffness
-  const K_SPR = 0.032;
-  // Hard velocity cap — prevents nodes flying off on frame 1
-  const MAX_V = 8;
+  // Constants tuned per graph size
+  const K_REP = N>80?4500 : N>40?9000  : N>15?22000 : 52000;
+  const REST  = N>80?68   : N>40?95    : N>15?150   : 220;
+  const K_SPR = N>80?0.055: N>40?0.045 : 0.035;
+  const DAMP  = N>80?0.74 : N>40?0.80  : N>15?0.84  : 0.87;
+  const GRAV  = N>80?0.018: N>40?0.010 : N>15?0.006 : 0.003;
+  const MAX_V = 6;
 
-  // Repulsion between all pairs
+  // Repulsion + inline collision resolution (single O(N²) pass)
   for(let i=0;i<N;i++) for(let j=i+1;j<N;j++){
-    const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
-    const d2=dx*dx+dy*dy+1,d=Math.sqrt(d2),f=K_REP/d2;
-    nodes[i].vx-=f*dx/d;nodes[i].vy-=f*dy/d;
-    nodes[j].vx+=f*dx/d;nodes[j].vy+=f*dy/d;
+    const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
+    const d2=dx*dx+dy*dy+1, d=Math.sqrt(d2);
+    // Velocity-based repulsion
+    const f=K_REP/d2;
+    nodes[i].vx-=f*dx/d; nodes[i].vy-=f*dy/d;
+    nodes[j].vx+=f*dx/d; nodes[j].vy+=f*dy/d;
+    // Direct position push — prevents nodes stacking on top of each other
+    const minD=nodes[i].r+nodes[j].r+8;
+    if(d<minD){
+      const push=(minD-d)/d*0.5;
+      nodes[i].x-=dx*push; nodes[i].y-=dy*push;
+      nodes[j].x+=dx*push; nodes[j].y+=dy*push;
+    }
   }
 
-  // Spring attraction along edges
+  // Spring attraction along edges — stronger K_SPR pulls outliers back in
   for(const e of edges){
     const a=nmap[e.src],b=nmap[e.dst];if(!a||!b) continue;
     const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=K_SPR*(d-REST);
@@ -274,7 +277,6 @@ function simTick() {
     if(_net.drag?.node===n) return;
     n.vx-=n.x*GRAV; n.vy-=n.y*GRAV;
     n.vx*=DAMP;     n.vy*=DAMP;
-    // Clamp so no node teleports on the first few chaotic frames
     n.vx=Math.max(-MAX_V,Math.min(MAX_V,n.vx));
     n.vy=Math.max(-MAX_V,Math.min(MAX_V,n.vy));
     n.x+=n.vx; n.y+=n.vy;
