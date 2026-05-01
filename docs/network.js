@@ -820,7 +820,9 @@ async function loadNetwork() {
   //   if springs are too strong. K_SPR=0.008 keeps topology visible without clustering.
   _net.REST=Math.max(55,Math.min(380,Math.sqrt(W*H/Math.max(N,1))*1.5));
   _net.K_REP=Math.round(52000*(_net.REST/380)**2*2.0);
-  _net.K_SPR=N>30?0.008:0.025;
+  // For large graphs every node connects to many others → spring forces all cancel
+  // and pull everything to center. Edges become visual-only; pure repulsion spreads nodes.
+  _net.K_SPR=N>30?0:0.025;
   // Grid start for N>30: avoids born-stacked-on-circle problem
   // (150 nodes on r=168px circle = 7px between adjacent nodes — physics never recovers)
   const useGrid=N>30;
