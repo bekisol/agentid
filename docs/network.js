@@ -720,7 +720,7 @@ async function loadNetwork() {
 
   _days=parseInt(document.getElementById("range-select")?.value||"7",10);
 
-  let agents=[],logs=[],compromised=[];
+  let agents=[],logs=[],compromised=[],_allRegistered=new Set();
   try {
     const[ar,allAr,lr,cr]=await Promise.all([
       _authFetch("/agents?mine=true&limit=500"),
@@ -732,7 +732,7 @@ async function loadNetwork() {
     if(ar.ok)  agents=(await ar.json())||[];
     if(lr.ok)  logs=((await lr.json()).logs)||[];
     if(cr?.ok) compromised=((await cr.json()).feed)||[];
-    const _allRegistered=new Set(allAr.ok?(await allAr.json()).map(a=>a.did):[]);
+    if(allAr.ok) _allRegistered=new Set((await allAr.json()).map(a=>a.did));
   } catch(_) {
     if(pill){pill.textContent="Connection error";pill.style.color="#ef4444";}
     if(loading) loading.style.display="none";
