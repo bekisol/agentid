@@ -3661,6 +3661,32 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 </div>
 
 <!-- ── AGENT DETAIL DRAWER ────────────────────────────────────────────────── -->
+<!-- Trust-score detail panel -->
+<div id="ts-drawer" class="agent-drawer">
+  <div class="agent-drawer-backdrop"></div>
+  <aside class="agent-drawer-panel">
+    <div class="agent-drawer-head">
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <span id="ts-drawer-name" style="font-size:1.05rem;font-weight:700;"></span>
+          <span id="ts-drawer-level" class="trust-level-badge" style="flex-shrink:0;"></span>
+        </div>
+        <div id="ts-drawer-did" style="font-size:0.7rem;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:0.3rem;word-break:break-all;"></div>
+        <div id="ts-drawer-score-bar" style="margin-top:0.6rem;display:flex;align-items:center;gap:0.6rem;">
+          <div style="flex:1;height:6px;background:var(--surface2);border-radius:999px;overflow:hidden;">
+            <div id="ts-drawer-score-fill" style="height:100%;border-radius:999px;transition:width 0.3s;"></div>
+          </div>
+          <span id="ts-drawer-score-num" style="font-size:0.9rem;font-weight:700;min-width:32px;text-align:right;"></span>
+        </div>
+      </div>
+      <button class="btn-icon" id="ts-drawer-close" title="Close" style="margin-left:0.5rem;">✕</button>
+    </div>
+    <div id="ts-drawer-body" class="agent-drawer-body" style="padding:1.25rem;">
+      <div class="loading"><div class="spinner"></div> Loading…</div>
+    </div>
+  </aside>
+</div>
+
 <div id="agent-drawer" class="agent-drawer">
   <div class="agent-drawer-backdrop"></div>
   <aside class="agent-drawer-panel">
@@ -3679,7 +3705,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260501-8"></script>
+<script src="dashboard.js?v=20260501-10"></script>
 
 </body>
 </html>
