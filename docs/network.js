@@ -722,8 +722,9 @@ async function loadNetwork() {
 
   let agents=[],logs=[],compromised=[];
   try {
-    const[ar,lr,cr]=await Promise.all([
+    const[ar,allAr,lr,cr]=await Promise.all([
       _authFetch("/agents?mine=true&limit=500"),
+      _authFetch("/agents?limit=1000"),
       _authFetch("/pro/audit-log/json?limit=1000"),
       _authFetch("/trust/compromised?limit=200").catch(()=>null),
     ]);
@@ -731,6 +732,7 @@ async function loadNetwork() {
     if(ar.ok)  agents=(await ar.json())||[];
     if(lr.ok)  logs=((await lr.json()).logs)||[];
     if(cr?.ok) compromised=((await cr.json()).feed)||[];
+    const _allRegistered=new Set(allAr.ok?(await allAr.json()).map(a=>a.did):[]);
   } catch(_) {
     if(pill){pill.textContent="Connection error";pill.style.color="#ef4444";}
     if(loading) loading.style.display="none";
@@ -758,12 +760,19 @@ async function loadNetwork() {
     const op=ev.operation||ev.action||"?";
     _edgeMap[key].ops[op]=(_edgeMap[key].ops[op]||0)+1;
   }
-  const rawEdges=Object.values(_edgeMap).sort((a,b)=>b.count-a.count);
-  const maxCount=rawEdges[0]?.count||1;
-
   const ownedDids=new Set(agents.map(a=>a.did));
+  // Drop edges where either endpoint is not a registered agent
+  const rawEdges=Object.values(_edgeMap)
+    .filter(e=>(ownedDids.has(e.src)||_allRegistered.has(e.src))&&
+                (ownedDids.has(e.dst)||_allRegistered.has(e.dst)))
+    .sort((a,b)=>b.count-a.count);
+  const maxCount=rawEdges[0]?.count||1;
   const edgeDids=new Set();
-  rawEdges.forEach(e=>{edgeDids.add(e.src);edgeDids.add(e.dst);});
+  rawEdges.forEach(e=>{
+    // Only include DIDs that are registered agents — filters out ghost/sybil counterparty DIDs
+    if(ownedDids.has(e.src)||_allRegistered.has(e.src)) edgeDids.add(e.src);
+    if(ownedDids.has(e.dst)||_allRegistered.has(e.dst)) edgeDids.add(e.dst);
+  });
   // Only show agents that appear in at least one edge; if no edges, fall back to owned agents
   const nodeDids=edgeDids.size>0?Array.from(edgeDids):Array.from(ownedDids);
 
