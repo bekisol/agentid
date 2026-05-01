@@ -43,13 +43,14 @@ const _net = {
   drag:null, pan:null, hover:null, selected:null,
   _panMoved:false,
   animId:null, step:0, MAX_STEPS:200,
+  largeGraph:false,
 };
 
 // ── App state ─────────────────────────────────────────────────────────────
 let _allAgents   = [];
 let _allLogs     = [];
 let _edgeMap     = {};
-let _agentStats  = {};   // did → { interactions, verifyCount, latestTs, inbound, outbound }
+let _agentStats  = {};
 let _compromised = new Set();
 let _sortBy      = "interactions";
 let _searchQ     = "";
@@ -60,7 +61,6 @@ function s2w(sx, sy) { return [(sx-_net.tx)/_net.zoom, (sy-_net.ty)/_net.zoom]; 
 
 function hitNode(sx, sy) {
   const [wx,wy] = s2w(sx,sy);
-  // Add generous hit margin so small zoomed-out nodes are still clickable
   return _net.nodes.find(n => (n.x-wx)**2+(n.y-wy)**2 < (n.r+8)**2) || null;
 }
 
@@ -69,7 +69,7 @@ function fitView(nodes) {
   const list = nodes || _net.nodes;
   if (!list.length) return;
   const dpr = window.devicePixelRatio||1;
-  const W = c.width/dpr, H = c.height/dpr, pad = 100;
+  const W = c.width/dpr, H = c.height/dpr, pad = 80;
   const xs = list.map(n=>n.x), ys = list.map(n=>n.y);
   const bx1=Math.min(...xs)-pad, bx2=Math.max(...xs)+pad;
   const by1=Math.min(...ys)-pad, by2=Math.max(...ys)+pad;
@@ -112,14 +112,13 @@ function draw() {
   const ctx=_net.ctx;
   ctx.clearRect(0,0,W,H);
 
-  // Dot grid
+  // Dot grid background
   const gs=Math.max(8,32*_net.zoom);
   const gox=((_net.tx%gs)+gs)%gs, goy=((_net.ty%gs)+gs)%gs;
   ctx.fillStyle="rgba(100,116,139,0.12)";
   for (let gx=gox;gx<W;gx+=gs)
     for (let gy=goy;gy<H;gy+=gs) { ctx.beginPath();ctx.arc(gx,gy,1,0,Math.PI*2);ctx.fill(); }
 
-  // Build active sets
   const sel=_net.selected;
   const selNeighbors=new Set();
   if (sel) {
@@ -144,23 +143,22 @@ function draw() {
   ctx.scale(_net.zoom,_net.zoom);
   const nmap=Object.fromEntries(_net.nodes.map(n=>[n.did,n]));
 
-  // Pair-offset bookkeeping
   const pairCnt={},pairIdx={};
   _net.edges.forEach(e=>{ const k=[e.src,e.dst].sort().join("|"); pairCnt[k]=(pairCnt[k]||0)+1; });
 
   // Edges
   for (const edge of _net.edges) {
     const a=nmap[edge.src],b=nmap[edge.dst]; if(!a||!b) continue;
-    let alpha=0.55;
-    if (sel)        alpha=(selNeighbors.has(edge.src)&&selNeighbors.has(edge.dst))?0.88:0.05;
-    else if (searchSet) alpha=(searchSet.has(edge.src)||searchSet.has(edge.dst))?0.8:0.07;
+    let alpha=0.45;
+    if (sel)        alpha=(selNeighbors.has(edge.src)&&selNeighbors.has(edge.dst))?0.88:0.04;
+    else if (searchSet) alpha=(searchSet.has(edge.src)||searchSet.has(edge.dst))?0.8:0.06;
     if (a===_net.hover||b===_net.hover) alpha=0.95;
 
     const dx=b.x-a.x,dy=b.y-a.y,len=Math.sqrt(dx*dx+dy*dy)||1;
     const ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
     const pk=[edge.src,edge.dst].sort().join("|");
     pairIdx[pk]=pairIdx[pk]??0;
-    const off=(pairIdx[pk]-(pairCnt[pk]-1)/2)*30; pairIdx[pk]++;
+    const off=(pairIdx[pk]-(pairCnt[pk]-1)/2)*28; pairIdx[pk]++;
     const ox=nx*off,oy=ny*off;
     const sx=a.x+ux*a.r+ox,sy=a.y+uy*a.r+oy;
     const ex=b.x-ux*b.r+ox,ey=b.y-uy*b.r+oy;
@@ -172,8 +170,8 @@ function draw() {
     const ang=Math.atan2(ey-sy,ex-sx);
     ctx.beginPath();
     ctx.moveTo(ex,ey);
-    ctx.lineTo(ex-11*Math.cos(ang-.38),ey-11*Math.sin(ang-.38));
-    ctx.lineTo(ex-11*Math.cos(ang+.38),ey-11*Math.sin(ang+.38));
+    ctx.lineTo(ex-10*Math.cos(ang-.38),ey-10*Math.sin(ang-.38));
+    ctx.lineTo(ex-10*Math.cos(ang+.38),ey-10*Math.sin(ang+.38));
     ctx.closePath();ctx.fillStyle=edge.color;ctx.fill();
     ctx.globalAlpha=1;
 
@@ -187,7 +185,6 @@ function draw() {
   // Nodes
   for (const node of _net.nodes) {
     const isHov=node===_net.hover,isSel=node.did===sel;
-    const isNeighbor=sel&&selNeighbors.has(node.did);
     let alpha=1;
     if (sel&&!selNeighbors.has(node.did)) alpha=0.1;
     else if (searchSet&&!searchSet.has(node.did)) alpha=0.12;
@@ -196,19 +193,16 @@ function draw() {
 
     ctx.globalAlpha=alpha;
 
-    // Glow
+    // Glow halo
     const g=ctx.createRadialGradient(node.x,node.y,r*.2,node.x,node.y,r*1.7);
     g.addColorStop(0,node.color+(isHov||isSel?"99":"44"));
     g.addColorStop(1,"transparent");
     ctx.fillStyle=g;ctx.beginPath();ctx.arc(node.x,node.y,r*1.7,0,Math.PI*2);ctx.fill();
 
-    // Compromised warning ring
     if (isComp) {
       ctx.beginPath();ctx.arc(node.x,node.y,r+5,0,Math.PI*2);
       ctx.strokeStyle="#ef4444";ctx.lineWidth=2;ctx.stroke();
     }
-
-    // Selected pulse
     if (isSel) {
       ctx.beginPath();ctx.arc(node.x,node.y,r+8,0,Math.PI*2);
       ctx.strokeStyle=node.color;ctx.lineWidth=2;ctx.globalAlpha=alpha*0.6;ctx.stroke();
@@ -217,7 +211,6 @@ function draw() {
     ctx.globalAlpha=alpha;
     ctx.beginPath();ctx.arc(node.x,node.y,r,0,Math.PI*2);
     ctx.fillStyle=node.external?"#1c1408":"#1e293b";ctx.fill();
-
     ctx.strokeStyle=isComp?"#ef4444":node.color;ctx.lineWidth=isSel?3.5:isHov?3:2.5;ctx.stroke();
 
     ctx.font=`${Math.round(r*.56)}px serif`;
@@ -225,74 +218,105 @@ function draw() {
     ctx.fillStyle="#fff";
     ctx.fillText(node.icon,node.x,node.y-2);
 
-    ctx.font=`bold ${Math.max(9,Math.round(r*.31))}px ui-monospace,monospace`;
-    ctx.fillStyle=isSel?"#f8fafc":node.external?"#fcd34d":"#e2e8f0";ctx.textBaseline="top";
-    ctx.fillText(node.name.length>16?node.name.slice(0,15)+"…":node.name,node.x,node.y+r+6);
-    ctx.textBaseline="alphabetic";ctx.globalAlpha=1;
+    // Only show labels when zoomed in enough to read them
+    if (_net.zoom > 0.35) {
+      ctx.font=`bold ${Math.max(9,Math.round(r*.31))}px ui-monospace,monospace`;
+      ctx.fillStyle=isSel?"#f8fafc":node.external?"#fcd34d":"#e2e8f0";
+      ctx.textBaseline="top";
+      ctx.fillText(node.name.length>16?node.name.slice(0,15)+"…":node.name,node.x,node.y+r+5);
+      ctx.textBaseline="alphabetic";
+    }
+    ctx.globalAlpha=1;
   }
 
   ctx.restore();
 }
 
-// ── Force simulation ──────────────────────────────────────────────────────
+// ── Physics simulation ────────────────────────────────────────────────────
+//
+// LARGE GRAPHS (N > 30):
+//   Collision-only resolution. No repulsion forces, no springs.
+//   Reason: in a dense highly-connected graph, every node has springs
+//   pulling it in all directions equally — they cancel out and the whole
+//   graph collapses to its centroid regardless of how the constants are tuned.
+//   Solution: skip force physics entirely. Place nodes in an evenly-spaced
+//   grid, then run iterative collision resolution (push overlapping nodes apart)
+//   until nothing overlaps. Result is a stable, evenly-spread cloud.
+//
+// SMALL GRAPHS (N ≤ 30):
+//   Classic repulsion + spring force-directed layout.
+//
 function simTick() {
-  const nodes=_net.nodes,edges=_net.edges;
-  const nmap=Object.fromEntries(nodes.map(n=>[n.did,n]));
-  const K_REP=_net.K_REP||52000,K_SPR=_net.K_SPR||0.025,REST=_net.REST||380,DAMP=0.88;
-  const MAX_V=REST*0.4; // velocity cap — prevents runaway on initial burst
+  const nodes = _net.nodes;
 
-  // Repulsion between every pair
-  for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
-    const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
-    const d2=dx*dx+dy*dy+1,d=Math.sqrt(d2),f=K_REP/d2;
-    nodes[i].vx-=f*dx/d;nodes[i].vy-=f*dy/d;
-    nodes[j].vx+=f*dx/d;nodes[j].vy+=f*dy/d;
-  }
+  if (_net.largeGraph) {
+    // ── Collision-only (large graphs) ──────────────────────────────────
+    // Run 4 passes per tick so the layout converges in ~50 animation frames
+    for (let pass = 0; pass < 4; pass++) {
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i+1; j < nodes.length; j++) {
+          const ni = nodes[i], nj = nodes[j];
+          const dx = nj.x - ni.x, dy = nj.y - ni.y;
+          const d2 = dx*dx + dy*dy;
+          const minD = (ni.r + nj.r) * 2.1 + 8;
+          if (d2 < minD*minD) {
+            const d = Math.sqrt(d2) || 1;
+            const push = (minD - d) * 0.5 / d;
+            const isDragI = _net.drag?.node === ni;
+            const isDragJ = _net.drag?.node === nj;
+            if (!isDragI) { ni.x -= dx*push; ni.y -= dy*push; }
+            if (!isDragJ) { nj.x += dx*push; nj.y += dy*push; }
+          }
+        }
+      }
+    }
+    // Keep the whole cloud centered on canvas origin
+    const cx = nodes.reduce((s,n)=>s+n.x,0) / nodes.length;
+    const cy = nodes.reduce((s,n)=>s+n.y,0) / nodes.length;
+    nodes.forEach(n=>{ n.x -= cx*0.06; n.y -= cy*0.06; });
 
-  // Springs on edges
-  for (const e of edges) {
-    const a=nmap[e.src],b=nmap[e.dst];if(!a||!b) continue;
-    const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=K_SPR*(d-REST);
-    a.vx+=f*dx/d;a.vy+=f*dy/d;b.vx-=f*dx/d;b.vy-=f*dy/d;
-  }
+  } else {
+    // ── Force-directed (small graphs) ──────────────────────────────────
+    const nmap = Object.fromEntries(nodes.map(n=>[n.did,n]));
+    const K_REP=52000, K_SPR=0.025, REST=380, DAMP=0.86, GRAV=0.004;
 
-  // Velocity cap + damping + integrate
-  nodes.forEach(n=>{
-    if(_net.drag?.node===n) return;
-    n.vx=Math.max(-MAX_V,Math.min(MAX_V,n.vx));
-    n.vy=Math.max(-MAX_V,Math.min(MAX_V,n.vy));
-    n.vx*=DAMP;n.vy*=DAMP;n.x+=n.vx;n.y+=n.vy;
-  });
-
-  // Centering: shift ALL nodes by the same offset so centroid stays at origin.
-  // Unlike per-node gravity (which pulls every node toward 0,0 individually and
-  // causes hub-and-spoke graphs to collapse), centering doesn't change relative
-  // positions — it only prevents the whole graph from drifting off-canvas.
-  const cx=nodes.reduce((s,n)=>s+n.x,0)/nodes.length;
-  const cy=nodes.reduce((s,n)=>s+n.y,0)/nodes.length;
-  nodes.forEach(n=>{ n.x-=cx*0.05;n.y-=cy*0.05; });
-
-  // Collision correction — visual glow drawn at r*1.7, use that as minimum gap
-  for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
-    const dx=nodes[j].x-nodes[i].x,dy=nodes[j].y-nodes[i].y;
-    const d=Math.sqrt(dx*dx+dy*dy)||1;
-    const minD=(nodes[i].r+nodes[j].r)*1.9+4;
-    if(d<minD){const push=(minD-d)/2/d;
-      nodes[i].x-=dx*push;nodes[i].y-=dy*push;
-      nodes[j].x+=dx*push;nodes[j].y+=dy*push;
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+      const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
+      const d2=dx*dx+dy*dy+1, d=Math.sqrt(d2), f=K_REP/d2;
+      nodes[i].vx-=f*dx/d; nodes[i].vy-=f*dy/d;
+      nodes[j].vx+=f*dx/d; nodes[j].vy+=f*dy/d;
+    }
+    for (const e of _net.edges) {
+      const a=nmap[e.src],b=nmap[e.dst]; if(!a||!b) continue;
+      const dx=b.x-a.x, dy=b.y-a.y, d=Math.sqrt(dx*dx+dy*dy)||1, f=K_SPR*(d-REST);
+      a.vx+=f*dx/d; a.vy+=f*dy/d; b.vx-=f*dx/d; b.vy-=f*dy/d;
+    }
+    nodes.forEach(n=>{ n.vx-=n.x*GRAV; n.vy-=n.y*GRAV; });
+    nodes.forEach(n=>{
+      if(_net.drag?.node===n) return;
+      n.vx*=DAMP; n.vy*=DAMP; n.x+=n.vx; n.y+=n.vy;
+    });
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+      const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
+      const d=Math.sqrt(dx*dx+dy*dy)||1;
+      const minD=(nodes[i].r+nodes[j].r)*1.9+4;
+      if(d<minD){const push=(minD-d)/2/d;
+        nodes[i].x-=dx*push; nodes[i].y-=dy*push;
+        nodes[j].x+=dx*push; nodes[j].y+=dy*push;
+      }
     }
   }
 }
 
 function animate() {
-  simTick();draw();_net.step++;
-  // Stop when settled (all velocities near zero) or hard cap reached
-  const maxV=_net.nodes.reduce((m,n)=>Math.max(m,Math.abs(n.vx)+Math.abs(n.vy)),0);
-  if(maxV>0.08&&_net.step<_net.MAX_STEPS){
-    _net.animId=requestAnimationFrame(animate);
+  simTick(); draw(); _net.step++;
+  const done = _net.step >= _net.MAX_STEPS ||
+    (!_net.largeGraph && _net.nodes.reduce((m,n)=>Math.max(m,Math.abs(n.vx)+Math.abs(n.vy)),0) < 0.08);
+  if (!done) {
+    _net.animId = requestAnimationFrame(animate);
   } else {
-    if(!_net.userMoved) fitView();
-    draw();_net.animId=null;
+    if (!_net.userMoved) fitView();
+    draw(); _net.animId = null;
   }
 }
 
@@ -314,7 +338,7 @@ function setupEvents(canvas) {
     const nz=Math.min(8,Math.max(0.06,_net.zoom*f));
     _net.tx=x-(x-_net.tx)*(nz/_net.zoom);
     _net.ty=y-(y-_net.ty)*(nz/_net.zoom);
-    _net.zoom=nz;draw();
+    _net.zoom=nz; draw();
   },{passive:false});
 
   canvas.addEventListener("mousedown",e=>{
@@ -327,22 +351,21 @@ function setupEvents(canvas) {
   window.addEventListener("mousemove",e=>{
     if(!_net.canvas) return;
     const rect=_net.canvas.getBoundingClientRect();
-    const sx=e.clientX-rect.left,sy=e.clientY-rect.top;
+    const sx=e.clientX-rect.left, sy=e.clientY-rect.top;
     if(_net.drag){
       const[wx,wy]=s2w(sx,sy);
-      _net.drag.node.x=wx;_net.drag.node.y=wy;
-      _net.drag.node.vx=0;_net.drag.node.vy=0;
-      _net.drag.moved=true;draw();
+      _net.drag.node.x=wx; _net.drag.node.y=wy;
+      _net.drag.node.vx=0; _net.drag.node.vy=0;
+      _net.drag.moved=true; draw();
     } else if(_net.pan){
-      const dx=sx-_net.pan.x0,dy=sy-_net.pan.y0;
+      const dx=sx-_net.pan.x0, dy=sy-_net.pan.y0;
       if(Math.abs(dx)>4||Math.abs(dy)>4) _net._panMoved=true;
-      _net.tx=_net.pan.tx0+dx;
-      _net.ty=_net.pan.ty0+dy;draw();
+      _net.tx=_net.pan.tx0+dx; _net.ty=_net.pan.ty0+dy; draw();
     } else if(sx>=0&&sy>=0&&sx<=rect.width&&sy<=rect.height){
       const hit=hitNode(sx,sy);
       if(hit!==_net.hover){
         _net.hover=hit;
-        _net.canvas.style.cursor=hit?"pointer":"grab";draw();
+        _net.canvas.style.cursor=hit?"pointer":"grab"; draw();
       }
     }
   });
@@ -351,22 +374,19 @@ function setupEvents(canvas) {
     if(_net.drag&&!_net.drag.moved&&_net.drag.node) selectNode(_net.drag.node);
     if(_net.drag?.moved){
       _net.userMoved=true;
-      // Restart physics so other nodes react to the repositioned node
       _net.step=0;
       if(!_net.animId) _net.animId=requestAnimationFrame(animate);
     }
-    _net.drag=null;_net.pan=null;
+    _net.drag=null; _net.pan=null;
     if(_net.canvas) _net.canvas.style.cursor="grab";
   });
 
-  // Deselect on empty click — but NOT when the user just panned
   canvas.addEventListener("click",e=>{
     if(_net._panMoved){_net._panMoved=false;return;}
     const{x,y}=pos(e);
     if(!hitNode(x,y)){_net.selected=null;renderDetailPanel(null);renderSidebar();draw();}
   });
 
-  // Touch
   canvas.addEventListener("touchstart",e=>{
     if(e.touches.length!==1) return;
     const{x,y}=pos(e);
@@ -384,7 +404,7 @@ function setupEvents(canvas) {
   },{passive:false});
   canvas.addEventListener("touchend",()=>{
     if(_net.drag&&!_net.drag.moved&&_net.drag.node) selectNode(_net.drag.node);
-    _net.drag=null;_net.pan=null;
+    _net.drag=null; _net.pan=null;
   });
 }
 
@@ -408,8 +428,6 @@ function renderSidebar() {
   if(!list) return;
 
   const q=(_searchQ||"").toLowerCase().trim();
-
-  // Start from all registered agents + any external nodes
   const registeredDids=new Set(_allAgents.map(a=>a.did));
   const extraNodes=_net.nodes.filter(n=>!registeredDids.has(n.did)).map(n=>({did:n.did,name:n.name,tags:[]}));
   let agents=[..._allAgents,...extraNodes];
@@ -423,8 +441,7 @@ function renderSidebar() {
   }
 
   agents.sort((a,b)=>{
-    const sa=_agentStats[a.did]||{};
-    const sb=_agentStats[b.did]||{};
+    const sa=_agentStats[a.did]||{}, sb=_agentStats[b.did]||{};
     if(_sortBy==="verified") return (sb.verifyCount||0)-(sa.verifyCount||0);
     if(_sortBy==="recent")   return (sb.latestTs||0)-(sa.latestTs||0);
     if(_sortBy==="flagged")  return (_compromised.has(b.did)?1:0)-(_compromised.has(a.did)?1:0);
@@ -438,7 +455,7 @@ function renderSidebar() {
     const shortDid=a.did.length>30?a.did.slice(0,29)+"…":a.did;
     const isSel=_net.selected===a.did;
     const isComp=_compromised.has(a.did);
-    const isExt=!new Set(_allAgents.map(x=>x.did)).has(a.did);
+    const isExt=!registeredDids.has(a.did);
     return `<div class="sidebar-agent-row${isSel?" selected":""}" data-did="${esc(a.did)}">
       <div class="agent-dot" style="background:${isComp?"#ef4444":isExt?"#475569":color};${isComp?"box-shadow:0 0 0 2px #ef444466":""}"></div>
       <div class="agent-info">
@@ -469,7 +486,6 @@ function renderDetailPanel(node) {
   const isComp=_compromised.has(node.did);
   const ag=_allAgents.find(a=>a.did===node.did);
 
-  // ── Connections: split inbound / outbound ───────────────────────────
   const inbound=[],outbound=[];
   for(const edge of Object.values(_edgeMap)){
     if(edge.src!==node.did&&edge.dst!==node.did) continue;
@@ -483,7 +499,6 @@ function renderDetailPanel(node) {
   inbound.sort((a,b)=>b.count-a.count);
   outbound.sort((a,b)=>b.count-a.count);
 
-  // ── Anomaly flags ───────────────────────────────────────────────────
   const flags=[];
   if(isComp) flags.push({level:"critical",msg:"Marked as compromised"});
   const allOps=Object.entries(stats.ops||{});
@@ -507,7 +522,6 @@ function renderDetailPanel(node) {
       </div>`).join("")}
     </div>`:"";
 
-  // ── Activity sparkline (SVG bars, one per day) ──────────────────────
   const cutoff=Date.now()-_days*86400000;
   const agentLogs=_allLogs.filter(ev=>{
     const ts=ev.timestamp?new Date(ev.timestamp).getTime():0;
@@ -539,7 +553,6 @@ function renderDetailPanel(node) {
       </div>
     </div>`;
 
-  // ── Top operations ──────────────────────────────────────────────────
   const topOps=Object.entries(stats.ops||{}).sort((a,b)=>b[1]-a[1]).slice(0,4);
   const maxOp=topOps[0]?.[1]||1;
   const opsHtml=topOps.length?`
@@ -559,10 +572,7 @@ function renderDetailPanel(node) {
       </div>
     </div>`:"";
 
-  // ── Recent events ───────────────────────────────────────────────────
-  const recentEvts=agentLogs
-    .slice().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))
-    .slice(0,8);
+  const recentEvts=agentLogs.slice().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,8);
   const recentHtml=recentEvts.length?`
     <div style="border-bottom:1px solid var(--border2);">
       <div class="detail-section-title">Recent events</div>
@@ -585,7 +595,6 @@ function renderDetailPanel(node) {
       }).join("")}
     </div>`:"";
 
-  // ── Connections grouped by direction ────────────────────────────────
   function connGroupHtml(list,label,arrow){
     if(!list.length) return "";
     return `<div class="detail-section-title" style="padding-bottom:0.2rem;">${label} (${list.length})</div>
@@ -605,14 +614,12 @@ function renderDetailPanel(node) {
     </div>`
     :`<div style="padding:0.75rem 1rem;font-size:0.75rem;color:var(--muted);">No interactions in this period</div>`;
 
-  // ── Quick actions ───────────────────────────────────────────────────
   const actionsHtml=`
     <div style="padding:0.75rem 1rem;display:flex;gap:0.5rem;border-top:1px solid var(--border2);position:sticky;bottom:0;background:var(--surface);">
       <button id="dp-copy" style="flex:1;padding:0.4rem;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:0.68rem;cursor:pointer;">📋 Copy DID</button>
       <a href="dashboard.html" style="flex:1;padding:0.4rem;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:0.68rem;cursor:pointer;text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center;">📊 Audit log</a>
     </div>`;
 
-  // ── Metadata ────────────────────────────────────────────────────────
   const tags=(ag?.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
   const desc=ag?.description?`<div class="detail-desc">${esc(ag.description)}</div>`:"";
   const created=ag?.created_at?new Date(ag.created_at).toLocaleDateString():"—";
@@ -632,26 +639,11 @@ function renderDetailPanel(node) {
     ${tags?`<div class="tag-row">${tags}</div>`:""}
     ${flagsHtml}
     <div class="stat-grid" id="dp-stats">
-      <div class="stat-box">
-        <div class="stat-val" style="font-size:1.1rem;">…</div>
-        <div class="stat-lbl">Trust score</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${stats.interactions||0}</div>
-        <div class="stat-lbl">Events</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${stats.verifyCount||0}</div>
-        <div class="stat-lbl">Verifies</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${totalConns}</div>
-        <div class="stat-lbl">Connections</div>
-      </div>
-      <div class="stat-box" style="grid-column:span 2;">
-        <div class="stat-val" style="font-size:0.85rem;">${esc(lastActive)}</div>
-        <div class="stat-lbl">Last active</div>
-      </div>
+      <div class="stat-box"><div class="stat-val" style="font-size:1.1rem;">…</div><div class="stat-lbl">Trust score</div></div>
+      <div class="stat-box"><div class="stat-val">${stats.interactions||0}</div><div class="stat-lbl">Events</div></div>
+      <div class="stat-box"><div class="stat-val">${stats.verifyCount||0}</div><div class="stat-lbl">Verifies</div></div>
+      <div class="stat-box"><div class="stat-val">${totalConns}</div><div class="stat-lbl">Connections</div></div>
+      <div class="stat-box" style="grid-column:span 2;"><div class="stat-val" style="font-size:0.85rem;">${esc(lastActive)}</div><div class="stat-lbl">Last active</div></div>
     </div>
     ${timelineHtml}
     ${opsHtml}
@@ -661,7 +653,6 @@ function renderDetailPanel(node) {
     ${actionsHtml}
   `;
 
-  // Async trust score
   _authFetch(`/agents/${encodeURIComponent(node.did)}/trust-score`)
     .then(r=>r.ok?r.json():null)
     .then(ts=>{
@@ -675,13 +666,11 @@ function renderDetailPanel(node) {
   document.getElementById("dp-close")?.addEventListener("click",()=>{
     _net.selected=null;renderDetailPanel(null);renderSidebar();draw();
   });
-
   document.getElementById("dp-copy")?.addEventListener("click",()=>{
     navigator.clipboard.writeText(node.did).catch(()=>{});
     const btn=document.getElementById("dp-copy");
     if(btn){btn.textContent="✓ Copied";setTimeout(()=>{if(btn)btn.textContent="📋 Copy DID";},1500);}
   });
-
   panel.querySelectorAll(".conn-row[data-did]").forEach(row=>{
     row.addEventListener("click",()=>{
       const n=_net.nodes.find(x=>x.did===row.dataset.did);
@@ -690,7 +679,7 @@ function renderDetailPanel(node) {
   });
 }
 
-// ── Build stats ───────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────
 function relTime(ts) {
   const d=Date.now()-ts;
   if(d<60000)    return "just now";
@@ -714,12 +703,10 @@ function buildStats(logs) {
     const op=ev.operation||ev.action||"";
     const ts=ev.timestamp?new Date(ev.timestamp).getTime():0;
     _inc(ev.did, op, ts);
-    // Also credit the counterparty — they participated in this interaction
     _inc(ev.counterparty, op, ts);
   }
 }
 
-// ── Canvas resize ─────────────────────────────────────────────────────────
 function resizeCanvas() {
   const canvas=_net.canvas; if(!canvas) return;
   const wrap=document.getElementById("canvas-wrap");
@@ -742,7 +729,6 @@ async function loadNetwork() {
   if(pill) pill.textContent="loading…";
 
   if(_net.animId){cancelAnimationFrame(_net.animId);_net.animId=null;}
-
   _days=parseInt(document.getElementById("range-select")?.value||"7",10);
 
   let agents=[],logs=[],compromised=[];
@@ -784,14 +770,12 @@ async function loadNetwork() {
     _edgeMap[key].ops[op]=(_edgeMap[key].ops[op]||0)+1;
   }
   const ownedDids=new Set(agents.map(a=>a.did));
-  // Only keep edges where at least one endpoint is an owned agent
   const rawEdges=Object.values(_edgeMap)
     .filter(e=>ownedDids.has(e.src)||ownedDids.has(e.dst))
     .sort((a,b)=>b.count-a.count);
   const maxCount=rawEdges[0]?.count||1;
   const edgeDids=new Set();
   rawEdges.forEach(e=>{edgeDids.add(e.src);edgeDids.add(e.dst);});
-  // Show agents in edges; if no edges at all, fall back to owned agents only
   const nodeDids=edgeDids.size>0?Array.from(edgeDids):Array.from(ownedDids);
 
   // HiDPI canvas
@@ -803,92 +787,91 @@ async function loadNetwork() {
   canvas.style.width=W+"px"; canvas.style.height=H+"px";
   _net.canvas=canvas; _net.ctx=canvas.getContext("2d"); _net.ctx.scale(dpr,dpr);
 
-  // Build nodes with jittered circle start
-  const minDim=Math.min(W,H);
-  // All sizes as % of canvas so the map scales correctly at any resolution.
-  // Absolute (not normalised to max): 17 audits is always bigger than 1,
-  // 100 audits is always bigger than 17 — nothing shifts when the max changes.
-  const baseR = minDim*0.032;  // 3.2% — zero-interaction owned node
-  const stepR = minDim*0.011;  // 1.1% added per log2 doubling
-  const capR  = minDim*0.15;   // 15%  — hard cap so giant hubs don't dominate
-  const extR  = minDim*0.025;  // 2.5% — external / counterparty nodes
-  const N=nodeDids.length;
-  const r0=Math.min(W,H)*.28;
-  // Adaptive REST: sqrt(canvas area / N) * 1.5 — nodes fill canvas at any N
-  // K_REP scaled 2× — must overpower spring attraction when nodes start closer than REST
-  // K_SPR weakened for large N: super-hubs (connected to 100+ nodes) collapse the layout
-  //   if springs are too strong. K_SPR=0.008 keeps topology visible without clustering.
-  _net.REST=Math.max(55,Math.min(380,Math.sqrt(W*H/Math.max(N,1))*1.5));
-  _net.K_REP=Math.round(52000*(_net.REST/380)**2*2.0);
-  // For large graphs every node connects to many others → spring forces all cancel
-  // and pull everything to center. Edges become visual-only; pure repulsion spreads nodes.
-  _net.K_SPR=N>30?0:0.025;
-  // Grid start for N>30: avoids born-stacked-on-circle problem
-  // (150 nodes on r=168px circle = 7px between adjacent nodes — physics never recovers)
-  const useGrid=N>30;
-  const cols=useGrid?Math.ceil(Math.sqrt(N*(W/H)*1.1)):0;
-  const gx=useGrid?W/(cols+1):0;
-  const gy=useGrid?H/(Math.ceil(N/Math.max(cols,1))+1):0;
-  _net.nodes=nodeDids.map((did,i)=>{
-    const ag=agents.find(a=>a.did===did);
-    const isExternal=!ownedDids.has(did);
-    const{color,icon}=roleMeta(ag?.name);
-    const angle=(2*Math.PI*i/nodeDids.length)-Math.PI/2;
-    const interacts=_agentStats[did]?.interactions||0;
-    const r=isExternal
+  const N = nodeDids.length;
+  _net.largeGraph = N > 30;
+
+  const minDim = Math.min(W,H);
+  const baseR  = minDim * 0.022;   // owned node, zero interactions
+  const stepR  = minDim * 0.007;   // per log2 doubling of interactions
+  const capR   = minDim * 0.055;   // hard cap — hubs don't dominate
+  const extR   = minDim * 0.018;   // external / counterparty nodes
+
+  // ── Initial positions ──────────────────────────────────────────────────
+  // Large graphs: evenly-spaced grid. Collision resolution settles the jitter.
+  // Small graphs: classic circle layout.
+  let placeNode;
+  if (_net.largeGraph) {
+    const cols = Math.ceil(Math.sqrt(N * (W / H)));
+    const rows = Math.ceil(N / cols);
+    const sx = W / (cols + 1);
+    const sy = H / (rows + 1);
+    placeNode = (i) => ({
+      x: ((i % cols) + 1) * sx - W/2 + (Math.random()-0.5) * sx * 0.5,
+      y: (Math.floor(i / cols) + 1) * sy - H/2 + (Math.random()-0.5) * sy * 0.5,
+    });
+  } else {
+    const r0 = Math.min(W,H) * 0.28;
+    placeNode = (i) => {
+      const angle = (2*Math.PI*i/N) - Math.PI/2;
+      return {
+        x: r0*Math.cos(angle) + (Math.random()-0.5)*60,
+        y: r0*Math.sin(angle) + (Math.random()-0.5)*60,
+      };
+    };
+  }
+
+  _net.nodes = nodeDids.map((did,i) => {
+    const ag = agents.find(a=>a.did===did);
+    const isExternal = !ownedDids.has(did);
+    const {color,icon} = roleMeta(ag?.name);
+    const interacts = _agentStats[did]?.interactions||0;
+    const r = isExternal
       ? Math.round(extR)
       : Math.round(Math.min(capR, baseR + Math.log2(interacts+1)*stepR));
-    // Grid: ±15% jitter (was ±50% — adjacent nodes could start 0px apart)
-    // Circle: unchanged original behaviour for small graphs
-    const ix=useGrid?(i%cols+1)*gx-W/2+(Math.random()-.5)*gx*0.3
-                    :r0*Math.cos(angle)+(Math.random()-.5)*60;
-    const iy=useGrid?(Math.floor(i/cols)+1)*gy-H/2+(Math.random()-.5)*gy*0.3
-                    :r0*Math.sin(angle)+(Math.random()-.5)*60;
-    return{
-      did,name:ag?.name||(did.length>14?did.slice(-12):did),icon,
-      color:isExternal?"#f59e0b":color,
-      tags:ag?.tags||[],
-      external:isExternal,
-      x:ix,y:iy,vx:0,vy:0,r,
+    const {x,y} = placeNode(i);
+    return {
+      did, name:ag?.name||(did.length>14?did.slice(-12):did), icon,
+      color: isExternal ? "#f59e0b" : color,
+      tags: ag?.tags||[],
+      external: isExternal,
+      x, y, vx:0, vy:0, r,
     };
   });
 
-  _net.edges=rawEdges.map(e=>{
-    const topOp=Object.entries(e.ops).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
-    return{src:e.src,dst:e.dst,count:e.count,lw:1+(e.count/maxCount)*3.5,
-           color:opColor(topOp),label:topOp.replace(/_/g," ")};
+  _net.edges = rawEdges.map(e => {
+    const topOp = Object.entries(e.ops).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
+    return { src:e.src, dst:e.dst, count:e.count,
+             lw:1+(e.count/maxCount)*3.5, color:opColor(topOp),
+             label:topOp.replace(/_/g," ") };
   });
 
-  _net.tx=W/2;_net.ty=H/2;_net.zoom=1;
-  _net.hover=null;_net.selected=null;_net.step=0;_net.userMoved=false;
-  _net.MAX_STEPS=Math.min(600,100+nodeDids.length*5);
+  _net.tx=W/2; _net.ty=H/2; _net.zoom=1;
+  _net.hover=null; _net.selected=null; _net.step=0; _net.userMoved=false;
+  // Large graphs: 60 frames of collision resolution is plenty
+  // Small graphs: up to 420 frames of force-directed physics
+  _net.MAX_STEPS = _net.largeGraph ? 60 : Math.min(420, 80+N*4);
 
   setupEvents(canvas);
   renderSidebar();
   if(loading) loading.style.display="none";
-  if(pill) pill.textContent=`${windowLogs.length} events · ${nodeDids.length} agents`;
+  if(pill) pill.textContent=`${windowLogs.length} events · ${N} agents`;
 
-  _net.animId=requestAnimationFrame(animate);
+  _net.animId = requestAnimationFrame(animate);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded",async()=>{
-  // Auth check
+document.addEventListener("DOMContentLoaded", async () => {
   try {
-    const r=await _authFetch("/auth/me");
+    const r = await _authFetch("/auth/me");
     if(!r.ok){window.location.href="dashboard.html";return;}
   } catch(_){window.location.href="dashboard.html";return;}
   document.body.style.visibility="";
 
-  // Wire controls
   document.getElementById("range-select")?.addEventListener("change",loadNetwork);
   document.getElementById("refresh-btn")?.addEventListener("click",loadNetwork);
-
   document.getElementById("search-input")?.addEventListener("input",e=>{
-    _searchQ=e.target.value;
-    renderSidebar();draw();
+    _searchQ=e.target.value; renderSidebar(); draw();
   });
-
   document.querySelectorAll(".sort-btn").forEach(btn=>{
     btn.addEventListener("click",()=>{
       const alreadyActive=btn.classList.contains("active");
@@ -898,11 +881,9 @@ document.addEventListener("DOMContentLoaded",async()=>{
       renderSidebar();
     });
   });
-
   document.getElementById("zoom-in")?.addEventListener("click",()=>{_net.zoom=Math.min(8,_net.zoom*1.3);draw();});
   document.getElementById("zoom-out")?.addEventListener("click",()=>{_net.zoom=Math.max(0.06,_net.zoom/1.3);draw();});
   document.getElementById("zoom-fit")?.addEventListener("click",()=>{fitView();draw();});
-
   window.addEventListener("resize",resizeCanvas);
 
   await loadNetwork();
