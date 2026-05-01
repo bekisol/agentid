@@ -213,13 +213,26 @@ async function apiFetch(path, options = {}) {
     headers["Content-Type"] = "application/json";
   }
 
-  // credentials:"include" lets the browser carry the agentid_session cookie
-  // on cross-origin requests. Harmless when the cookie isn't present.
-  const res = await fetch(BASE + path, {
-    ...options,
-    credentials: "include",
-    headers,
-  });
+  // 30-second hard timeout so slow/cold-starting Railway responses never
+  // leave a section stuck on "Loading..." forever.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  let res;
+  try {
+    res = await fetch(BASE + path, {
+      ...options,
+      credentials: "include",
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") throw new Error("Request timed out");
+    throw err;
+  }
+  clearTimeout(timeoutId);
+
   if (!res.ok) {
     let msg = res.status;
     try {
