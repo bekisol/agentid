@@ -603,6 +603,7 @@ function renderSidebar() {
 
   list.querySelectorAll(".sidebar-item").forEach(el => {
     el.addEventListener("click", () => {
+      _lastRenderKey = "";  // force re-render so deals HTML doesn't linger
       _dealsView = false;
       _selectedDid = el.dataset.did;
       list.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
