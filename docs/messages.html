@@ -917,13 +917,26 @@ async function deleteSelected() {
 let _chatDid = "";
 let _chatName = "";
 
+let _chatContextDid = null;  // DID of the counterparty visible in the feed when chat opens
+
 async function openChat() {
   const agent = _agents.find(a => a.did === _selectedDid);
   if (!agent) return;
   _chatDid  = agent.did;
   _chatName = agent.name || agent.did.slice(-12);
+
+  // Capture whichever conversation is active in the feed as context
+  const msgs = _messages.filter(m => m._agentDid === _selectedDid);
+  const counterparties = [...new Set(
+    msgs.flatMap(m => [m.from_did, m.to_did]).filter(d => d && d !== _selectedDid && !d.startsWith("human:"))
+  )];
+  _chatContextDid = counterparties.length === 1 ? counterparties[0] : null;
+
+  const subtitle = _chatContextDid
+    ? `AI-powered · context: active conversation`
+    : "AI-powered · your agent";
   document.getElementById("chat-panel-title").textContent = `💬 ${_chatName}`;
-  document.getElementById("chat-panel-subtitle").textContent = "AI-powered · your agent";
+  document.getElementById("chat-panel-subtitle").textContent = subtitle;
   document.getElementById("chat-panel").classList.add("open");
   document.getElementById("chat-input").focus();
   await loadChatHistory();
@@ -1005,7 +1018,7 @@ async function sendChatMessage() {
     const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_chatDid)}/chat`, {
       method: "POST",
       headers: apiHeaders(),
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, context_did: _chatContextDid }),
     });
     const data = await r.json();
     typingEl.remove();
