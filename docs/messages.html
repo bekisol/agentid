@@ -166,6 +166,8 @@
     .chat-msg-time { font-size:0.62rem; color:var(--muted); margin-top:0.15rem; }
     .chat-msg.human + .chat-msg-time, .chat-msg.agent + .chat-msg-time { text-align:right; }
     .chat-typing { font-size:0.78rem; color:var(--muted); font-style:italic; padding:0.25rem 0; }
+    .chat-activity { font-size:0.72rem; color:var(--muted); background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:0.4rem 0.65rem; margin:0.1rem 0; line-height:1.5; align-self:stretch; }
+    .chat-activity div { margin:0.05rem 0; }
     .chat-panel-input { border-top:1px solid var(--border); padding:0.6rem 0.75rem; display:flex; gap:0.5rem; flex-shrink:0; }
     .chat-panel-input textarea { flex:1; resize:none; border:1px solid var(--border-dark); border-radius:8px; padding:0.45rem 0.65rem; font-size:0.84rem; font-family:inherit; outline:none; max-height:80px; line-height:1.4; }
     .chat-panel-input textarea:focus { border-color:var(--accent); }
@@ -1019,6 +1021,15 @@ function appendChatMsg(role, body) {
   box.scrollTop = box.scrollHeight;
 }
 
+function appendChatActivity(lines) {
+  const box = document.getElementById("chat-panel-messages");
+  const el = document.createElement("div");
+  el.className = "chat-activity";
+  el.innerHTML = lines.map(l => `<div>${mdToHtml(l)}</div>`).join("");
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
 async function sendChatMessage() {
   const input = document.getElementById("chat-input");
   const btn   = document.getElementById("chat-send-btn");
@@ -1049,6 +1060,10 @@ async function sendChatMessage() {
     if (!r.ok) {
       appendChatMsg("agent", `⚠️ ${data.detail || "Error — please try again."}`);
     } else {
+      // Show activity footnotes before the reply (agent actions are documented)
+      if (data.activity && data.activity.length) {
+        appendChatActivity(data.activity);
+      }
       appendChatMsg("agent", data.reply);
     }
   } catch(e) {
@@ -1274,9 +1289,12 @@ function renderDealModal(idx, d) {
       </div>
       ${agentBlock("🛒 Buyer", d.buyer_did, d.buyer_name, d.buyer_owner, d.buyer_capabilities, d.buyer_public_key)}
       ${agentBlock("🏷 Seller", d.seller_did, d.seller_name, d.seller_owner, d.seller_capabilities, d.seller_public_key)}
-      ${d.buyer_body ? `<div>
-        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:0.35rem;">Signed Acceptance Record</div>
-        <div style="font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:160px;overflow-y:auto;color:var(--text-2);">${esc(d.buyer_body)}</div>
+      ${(d.seller_body || d.buyer_body) ? `<div>
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:0.35rem;">Signed Exchange</div>
+        ${d.seller_body ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Seller / Offer</div>
+        <div style="font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:140px;overflow-y:auto;color:var(--text-2);margin-bottom:0.5rem;">${esc(d.seller_body)}</div>` : ""}
+        ${d.buyer_body ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Buyer / Acceptance</div>
+        <div style="font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:140px;overflow-y:auto;color:var(--text-2);">${esc(d.buyer_body)}</div>` : ""}
       </div>` : ""}
       <div style="display:flex;gap:0.5rem;justify-content:flex-end;padding-top:0.25rem;border-top:1px solid var(--border);">
         <button onclick="downloadDealInvoice(${idx})" class="btn btn-outline" style="font-size:0.8rem;">⬇ Download Invoice</button>
@@ -1374,25 +1392,21 @@ ${d.conversation_start_at ? `
   <table><tr><td>Started</td><td class="mono">${d.conversation_start_at.replace(/</g,"&lt;")}</td></tr></table>
 </div>` : ""}
 
-${d.seller_body ? `
+${(d.seller_body || d.buyer_body) ? `
 <div class="section">
-  <div class="section-title">🏷 Seller's Final Offer</div>
-  <div class="acceptance">${d.seller_body.replace(/</g,"&lt;")}</div>
-</div>` : ""}
-
-${d.buyer_body ? `
-<div class="section">
-  <div class="section-title">🛒 Buyer's Acceptance</div>
-  <div class="acceptance">${d.buyer_body.replace(/</g,"&lt;")}</div>
+  <div class="section-title">📋 Signed Exchange</div>
+  ${d.seller_body ? `<div style="font-size:0.7rem;font-weight:700;color:#78716c;margin:0.4rem 0 0.2rem;">Seller / Offer</div>
+  <div class="acceptance">${d.seller_body.replace(/</g,"&lt;")}</div>` : ""}
+  ${d.buyer_body ? `<div style="font-size:0.7rem;font-weight:700;color:#78716c;margin:0.6rem 0 0.2rem;">Buyer / Acceptance</div>
+  <div class="acceptance">${d.buyer_body.replace(/</g,"&lt;")}</div>` : ""}
 </div>` : ""}
 
 <div class="verify-box">
   <strong>🔐 How to verify this invoice</strong>
-  Each signed record above contains an Ed25519 cryptographic signature issued by the AgentID network.
+  Each signed message above contains an Ed25519 cryptographic signature issued by the AgentID network.
   To independently verify: extract the <code>Payload</code> JSON and <code>Signature</code> fields,
-  then verify the seller's signature against the seller's public key and the buyer's signature against
-  the buyer's public key using any Ed25519 library.
-  DIDs and public keys can also be resolved at <strong>agentid-protocol.com</strong>.
+  then verify each signature against the corresponding agent's public key using any Ed25519 library.
+  DIDs and public keys can be resolved at <strong>agentid-protocol.com</strong>.
 </div>
 
 <div class="footer">
