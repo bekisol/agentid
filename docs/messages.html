@@ -102,6 +102,15 @@
     .bubble-row.received .bubble { background:var(--surface); border:1px solid var(--border); color:var(--text); border-bottom-left-radius:4px; }
     .bubble-row.sent .bubble { background:var(--accent); color:#fff; border-bottom-right-radius:4px; }
     .bubble-row.sent .bubble.auto-reply { background:#a03009; }
+    /* Agent-to-agent messages: blue instead of orange */
+    .bubble-row.sent-agent .bubble { background:var(--blue); color:#fff; border-bottom-right-radius:4px; }
+    .bubble-row.sent-agent .bubble.auto-reply { background:#1d4ed8; }
+    .bubble-row.sent-agent { flex-direction:row-reverse; }
+    .bubble-row.sent-agent .bubble-col { align-items:flex-end; }
+    .bubble-row.sent-agent .bubble-avatar { background:#eff6ff; border-color:#bfdbfe; }
+    .bubble-row.sent-agent .bubble-time { color:var(--muted); text-align:right; }
+    .bubble-row.sent-agent .bubble-subject { color:rgba(255,255,255,0.85); }
+    .bubble-row.sent-agent .bubble-name { text-align:right; }
     .bubble-time { font-size:0.65rem; margin-top:0.25rem; padding:0 0.4rem; }
     .bubble-row.sent .bubble-time { color:var(--muted); text-align:right; }
     .bubble-row.received .bubble-time { color:var(--muted); text-align:left; }
@@ -793,7 +802,9 @@ function renderFeed() {
   let lastDay = "";
   const html = msgs.map((m, idx) => {
     const isSent = m.direction === "sent";
-    const dir    = isSent ? "sent" : "received";
+    // Agent-to-agent: sent message where recipient is another agent (not human:xxx)
+    const isAgentToAgent = isSent && m.to_did && !m.to_did.startsWith("human:");
+    const dir    = isAgentToAgent ? "sent-agent" : (isSent ? "sent" : "received");
     const t      = m.sent_at ? new Date(m.sent_at) : null;
     const dayStr = t ? t.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" }) : "";
     let dayHtml = "";
@@ -812,6 +823,7 @@ function renderFeed() {
     const autoTag      = m.is_auto_reply ? ' auto-reply' : '';
     const newTag       = (!m.read && !isSent) ? '<span class="tag-new">NEW</span>' : "";
     const agentTag     = _selectedDid === "" ? `<span class="tag-to">${esc(m._agentName)}</span>` : "";
+    const a2aTag       = isAgentToAgent ? `<span style="font-size:0.6rem;font-weight:700;padding:0.08rem 0.35rem;border-radius:20px;background:#eff6ff;color:var(--blue);border:1px solid #bfdbfe;margin-left:0.3rem;vertical-align:middle;">agent msg</span>` : "";
     const pkHtml       = (!isSent && m.sender_public_key)
       ? `<span class="pubkey-toggle" onclick="togglePubkey(${idx})">🔑 verify sender</span><div class="pubkey-box" id="pk-${idx}" style="display:none;">${esc(m.sender_public_key)}</div>`
       : "";
@@ -823,7 +835,7 @@ function renderFeed() {
           onchange="toggleMsgSelection(${m.id}, this)" />
         <div class="bubble-avatar">${avatarLetter}</div>
         <div class="bubble-col">
-          <div class="bubble-name">${esc(senderLabel)}${newTag}${agentTag}</div>
+          <div class="bubble-name">${esc(senderLabel)}${newTag}${agentTag}${a2aTag}</div>
           <div class="bubble${autoTag}">${subjectHtml}${esc(m.body || "")}</div>
           <div class="bubble-time">${timeStr}${m.is_auto_reply ? " · auto-reply" : ""}${pkHtml}</div>
         </div>
