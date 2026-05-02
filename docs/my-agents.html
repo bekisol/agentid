@@ -182,12 +182,20 @@
 <!-- Auth wall -->
 <div id="auth-wall" style="display:none;">
   <div class="auth-card">
-    <div style="font-size:2rem;margin-bottom:0.5rem;">🔑</div>
+    <div style="font-size:2rem;margin-bottom:0.5rem;">🤖</div>
     <h2>Sign in to AgentID</h2>
-    <p>Enter your API key to manage your agents.</p>
-    <input id="auth-key-input" class="auth-input" type="password" placeholder="agentid_…" autocomplete="off" spellcheck="false" />
-    <button class="btn btn-primary" id="auth-sign-in-btn" style="width:100%;">Sign In</button>
-    <p id="auth-error" style="color:var(--red);font-size:0.8rem;margin-top:0.6rem;"></p>
+    <p>Manage your AI agents, view trust scores, and read your inbox.</p>
+    <a id="google-signin-btn" href="https://api.agentid-protocol.com/auth/oauth/google/start?next=https://agentid-protocol.com/my-agents.html"
+       style="display:flex;align-items:center;justify-content:center;gap:0.6rem;width:100%;padding:0.65rem 1rem;border:1px solid var(--border-dark);border-radius:8px;background:#fff;color:#3c4043;font-size:0.9rem;font-weight:600;text-decoration:none;cursor:pointer;margin-bottom:0.75rem;transition:box-shadow .15s;">
+      <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+        <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+      </svg>
+      Continue with Google
+    </a>
+    <p id="auth-error" style="color:var(--red);font-size:0.8rem;margin-top:0.4rem;text-align:center;"></p>
   </div>
 </div>
 
@@ -412,58 +420,49 @@ const BASE = "https://api.agentid-protocol.com";
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 let apiKey = sessionStorage.getItem("agentid_key") || "";
 
-// Inherit key from sibling tabs (BroadcastChannel)
-(function () {
-  if (!apiKey && typeof BroadcastChannel !== "undefined") {
-    const bc = new BroadcastChannel("agentid_session");
-    bc.postMessage({ type: "request" });
-    bc.onmessage = (ev) => {
-      const msg = ev.data;
-      if (msg?.type === "response" && msg.key && !apiKey) {
-        apiKey = msg.key;
-        sessionStorage.setItem("agentid_key", apiKey);
-        bc.close();
-        boot();
-      }
-    };
-    // Give sibling tabs 200ms to respond, else show auth wall
-    setTimeout(() => {
-      if (!apiKey) { bc.close(); showAuthWall(); }
-    }, 200);
-  } else if (apiKey) {
-    boot();
-  } else {
-    showAuthWall();
-  }
-})();
-
 function showAuthWall() {
   document.getElementById("auth-wall").style.display = "flex";
   document.getElementById("main-content").style.display = "none";
 }
 
-async function signIn() {
-  const key = (document.getElementById("auth-key-input").value || "").trim();
-  const errEl = document.getElementById("auth-error");
-  errEl.textContent = "";
-  if (!key) { errEl.textContent = "Enter your API key."; return; }
-  const btn = document.getElementById("auth-sign-in-btn");
-  btn.disabled = true; btn.textContent = "Signing in…";
-  try {
-    const res = await fetch(`${BASE}/pro/dashboard`, { headers: { "x-api-key": key } });
-    if (!res.ok) throw new Error("Invalid API key");
-    apiKey = key;
-    sessionStorage.setItem("agentid_key", key);
-    document.getElementById("auth-wall").style.display = "none";
-    boot();
-  } catch(e) {
-    errEl.textContent = e.message || "Could not sign in";
-    btn.disabled = false; btn.textContent = "Sign In";
+async function initAuth() {
+  // If we already have a key stored, verify the session is still alive
+  if (apiKey) {
+    try {
+      const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
+      if (r.ok) { boot(); return; }
+    } catch(_) {}
+    // Session expired — clear stale key and fall through to OAuth
+    sessionStorage.removeItem("agentid_key");
+    apiKey = "";
   }
+
+  // No key in storage — check if a session cookie exists
+  try {
+    const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
+    if (r.ok) {
+      // Session active — mint a fresh API key for this browser session
+      const kr = await fetch(`${BASE}/auth/keys`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: "my-agents-dashboard" }),
+      });
+      if (kr.ok) {
+        const kd = await kr.json();
+        apiKey = kd.key;
+        sessionStorage.setItem("agentid_key", apiKey);
+        boot();
+        return;
+      }
+    }
+  } catch(_) {}
+
+  // No session — show Google sign-in
+  showAuthWall();
 }
 
-document.getElementById("auth-sign-in-btn").addEventListener("click", signIn);
-document.getElementById("auth-key-input").addEventListener("keydown", e => { if (e.key === "Enter") signIn(); });
+initAuth();
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
