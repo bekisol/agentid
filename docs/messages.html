@@ -174,6 +174,19 @@
           <button class="btn btn-outline" id="refresh-btn">↻ Refresh</button>
         </div>
       </div>
+      <!-- Agent identity card — shown when a specific agent is selected -->
+      <div id="agent-info" style="display:none;padding:0.75rem 1.5rem;background:var(--surface2);border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+          <div style="min-width:0;flex:1;">
+            <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:0.3rem;">Agent Identity</div>
+            <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);word-break:break-all;margin-bottom:0.3rem;" id="agent-info-did"></div>
+            <div id="agent-info-key-wrap" style="display:none;">
+              <button onclick="toggleAgentKey()" style="font-size:0.7rem;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:0;">🔑 Show public key</button>
+              <div id="agent-info-key" style="display:none;margin-top:0.3rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.62rem;font-family:'JetBrains Mono',monospace;word-break:break-all;color:var(--muted);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="feed-scroll" id="feed-scroll">
         <div class="state-box"><div class="spinner"></div><div class="state-title">Loading messages…</div></div>
       </div>
@@ -360,10 +373,23 @@ function renderSidebar() {
 }
 
 // ── FEED ──────────────────────────────────────────────────────────────────────
+function toggleAgentKey() {
+  const box = document.getElementById("agent-info-key");
+  const btn = box.previousElementSibling;
+  if (box.style.display === "none") {
+    box.style.display = "block";
+    btn.textContent = "🔑 Hide public key";
+  } else {
+    box.style.display = "none";
+    btn.textContent = "🔑 Show public key";
+  }
+}
+
 function renderFeed() {
-  const titleEl = document.getElementById("feed-title");
-  const metaEl  = document.getElementById("feed-meta");
-  const scroll  = document.getElementById("feed-scroll");
+  const titleEl   = document.getElementById("feed-title");
+  const metaEl    = document.getElementById("feed-meta");
+  const scroll    = document.getElementById("feed-scroll");
+  const infoPanel = document.getElementById("agent-info");
 
   let msgs = _selectedDid
     ? _messages.filter(m => m._agentDid === _selectedDid)
@@ -373,6 +399,25 @@ function renderFeed() {
 
   const agent = _agents.find(a => a.did === _selectedDid);
   titleEl.textContent = agent ? (agent.name || "Agent") : "All Messages";
+
+  // Agent identity panel
+  if (agent) {
+    document.getElementById("agent-info-did").textContent = agent.did || "";
+    const keyWrap = document.getElementById("agent-info-key-wrap");
+    const keyBox  = document.getElementById("agent-info-key");
+    if (agent.public_key) {
+      keyBox.textContent = agent.public_key;
+      keyWrap.style.display = "block";
+      keyBox.style.display = "none";
+      const btn = keyBox.previousElementSibling;
+      if (btn) btn.textContent = "🔑 Show public key";
+    } else {
+      keyWrap.style.display = "none";
+    }
+    infoPanel.style.display = "block";
+  } else {
+    infoPanel.style.display = "none";
+  }
 
   const unread = msgs.filter(m => !m.read).length;
   metaEl.textContent = unread
@@ -401,9 +446,11 @@ function renderFeed() {
         ${bodyLong ? `<button class="msg-expand" onclick="toggleExpand(${idx})">Show more</button>` : ""}
         <div class="msg-meta">
           <div class="msg-sender">
-            ${m.sender_name ? `<strong>${esc(m.sender_name)}</strong> — ` : ""}
-            ${m.from_did ? esc(m.from_did) : '<span style="font-family:inherit;font-style:italic;">anonymous</span>'}
-            ${m.sender_public_key ? `<br><span class="pubkey-toggle" onclick="togglePubkey(${idx})">🔑 verify sender</span><div class="pubkey-box" id="pk-${idx}" style="display:none;">${esc(m.sender_public_key)}</div>` : ""}
+            ${m.from_did ? `
+              ${m.sender_name ? `<strong>${esc(m.sender_name)}</strong><br>` : ""}
+              ${esc(m.from_did)}
+              ${m.sender_public_key ? `<br><span class="pubkey-toggle" onclick="togglePubkey(${idx})">🔑 verify sender</span><div class="pubkey-box" id="pk-${idx}" style="display:none;">${esc(m.sender_public_key)}</div>` : ""}
+            ` : '<span style="font-family:inherit;color:var(--muted);font-size:0.72rem;">No sender DID provided</span>'}
           </div>
           <div class="msg-tags">
             ${!m.read ? '<span class="tag-new">NEW</span>' : ""}
