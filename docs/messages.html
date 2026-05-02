@@ -1268,9 +1268,9 @@ function downloadDealInvoice(idx) {
       <table>
         <tr><td>Name</td><td><strong>${(name||did.slice(-16)).replace(/</g,"&lt;")}</strong></td></tr>
         <tr><td>DID</td><td class="mono">${did.replace(/</g,"&lt;")}</td></tr>
-        ${owner ? `<tr><td>Owner</td><td>${owner.replace(/</g,"&lt;")}</td></tr>` : ""}
+        <tr><td>Owner</td><td>${owner ? owner.replace(/</g,"&lt;") : "<em style='color:#a8a29e'>Not recorded</em>"}</td></tr>
         <tr><td>Capabilities</td><td>${capsHtml(caps)}</td></tr>
-        ${pubkey ? `<tr><td>Public Key</td><td class="mono small">${pubkey.replace(/</g,"&lt;")}</td></tr>` : ""}
+        <tr><td>Public Key</td><td class="mono small">${pubkey ? pubkey.replace(/</g,"&lt;") : "<em style='color:#a8a29e'>Not recorded for this deal</em>"}</td></tr>
       </table>
     </div>`;
   }
@@ -1336,18 +1336,25 @@ ${d.conversation_start_at ? `
   <table><tr><td>Started</td><td class="mono">${d.conversation_start_at.replace(/</g,"&lt;")}</td></tr></table>
 </div>` : ""}
 
+${d.seller_body ? `
+<div class="section">
+  <div class="section-title">🏷 Seller's Final Offer</div>
+  <div class="acceptance">${d.seller_body.replace(/</g,"&lt;")}</div>
+</div>` : ""}
+
 ${d.buyer_body ? `
 <div class="section">
-  <div class="section-title">Signed Acceptance Record</div>
+  <div class="section-title">🛒 Buyer's Acceptance</div>
   <div class="acceptance">${d.buyer_body.replace(/</g,"&lt;")}</div>
 </div>` : ""}
 
 <div class="verify-box">
   <strong>🔐 How to verify this invoice</strong>
-  The acceptance record above contains an Ed25519 cryptographic signature issued by the AgentID network.
+  Each signed record above contains an Ed25519 cryptographic signature issued by the AgentID network.
   To independently verify: extract the <code>Payload</code> JSON and <code>Signature</code> fields,
-  then verify the signature against the buyer's public key listed above using any Ed25519 library.
-  The DID and public key can also be resolved at <strong>agentid-protocol.com</strong>.
+  then verify the seller's signature against the seller's public key and the buyer's signature against
+  the buyer's public key using any Ed25519 library.
+  DIDs and public keys can also be resolved at <strong>agentid-protocol.com</strong>.
 </div>
 
 <div class="footer">
