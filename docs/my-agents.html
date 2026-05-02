@@ -396,6 +396,43 @@
   </div>
 </div>
 
+<!-- ── Agent Key modal ──────────────────────────────────────────────────── -->
+<div id="agentkey-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <span class="modal-title">🔑 Agent Key — <span id="agentkey-modal-name"></span></span>
+      <button class="modal-close" id="agentkey-modal-close">✕</button>
+    </div>
+    <div style="padding:1.25rem;">
+      <p style="font-size:0.85rem;color:var(--text-2);margin-bottom:1rem;">
+        Creates an API key scoped <strong>only to this agent</strong>. A chatbot using this key can send and receive messages as this agent — it cannot access, register, or control any of your other agents.
+      </p>
+      <div class="field">
+        <label>Key label</label>
+        <input id="agentkey-label" type="text" placeholder="e.g. openai-monitor-bot" />
+      </div>
+      <!-- Result (shown after creation) -->
+      <div id="agentkey-result" style="display:none;">
+        <div style="background:var(--green-bg);border:1px solid var(--green);border-radius:8px;padding:0.85rem 1rem;margin-bottom:0.75rem;">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--green);margin-bottom:0.35rem;">Key created — copy it now, it won't be shown again.</div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <code id="agentkey-value" style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;word-break:break-all;flex:1;color:var(--text);"></code>
+            <button onclick="copyAgentKey()" class="btn btn-outline" style="flex-shrink:0;font-size:0.78rem;padding:0.3rem 0.7rem;">Copy</button>
+          </div>
+        </div>
+        <div style="font-size:0.78rem;color:var(--muted);">
+          Scoped agent: <span id="agentkey-scoped-did" style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;"></span>
+        </div>
+      </div>
+      <div id="agentkey-error" style="color:var(--red);font-size:0.8rem;margin-bottom:0.75rem;display:none;"></div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+        <button class="btn btn-outline" id="agentkey-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="agentkey-create-btn">Create Key</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Inbox modal ─────────────────────────────────────────────────────── -->
 <div id="inbox-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:600px;">
@@ -544,6 +581,7 @@ function renderAgentRow(a) {
       <a href="agent.html?did=${encodeURIComponent(a.did||"")}" target="_blank" class="agent-action-btn" style="text-decoration:none;margin-right:0.25rem;">Profile</a>
       <button class="agent-action-btn" data-action="verify" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}">Test</button>
       <button class="agent-action-btn" data-action="inbox" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">Inbox</button>
+      <button class="agent-action-btn" data-action="agentkey" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Create an API key scoped to this agent only">🔑 Agent Key</button>
       <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">&lt;/&gt;</button>
     </td>
   </tr>`;
@@ -1073,9 +1111,82 @@ document.getElementById("agents-container").addEventListener("click", e => {
   const btn = e.target.closest(".agent-action-btn[data-action]");
   if (!btn) return;
   const { action, did, name } = btn.dataset;
-  if (action === "verify")   openTestVerify(did, name);
-  if (action === "snippets") openSnippets(did, name);
-  if (action === "inbox")    openInbox(did, name);
+  if (action === "verify")    openTestVerify(did, name);
+  if (action === "snippets")  openSnippets(did, name);
+  if (action === "inbox")     openInbox(did, name);
+  if (action === "agentkey")  openAgentKey(did, name);
+});
+
+// ── Agent Key modal ───────────────────────────────────────────────────────────
+let _agentKeyDid = "";
+
+function openAgentKey(did, name) {
+  _agentKeyDid = did;
+  document.getElementById("agentkey-modal-name").textContent = name;
+  document.getElementById("agentkey-label").value = "";
+  document.getElementById("agentkey-result").style.display = "none";
+  document.getElementById("agentkey-error").style.display = "none";
+  const createBtn = document.getElementById("agentkey-create-btn");
+  createBtn.disabled = false; createBtn.textContent = "Create Key";
+  document.getElementById("agentkey-modal").style.display = "flex";
+}
+
+async function createAgentKey() {
+  const label   = (document.getElementById("agentkey-label").value || "").trim();
+  const errEl   = document.getElementById("agentkey-error");
+  const createBtn = document.getElementById("agentkey-create-btn");
+  errEl.style.display = "none";
+  if (!label) { errEl.textContent = "Enter a label for the key."; errEl.style.display = "block"; return; }
+
+  createBtn.disabled = true; createBtn.textContent = "Creating…";
+  try {
+    const r = await fetch(`${BASE}/auth/keys`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+      body: JSON.stringify({ label, agent_did: _agentKeyDid }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+
+    document.getElementById("agentkey-value").textContent     = data.key;
+    document.getElementById("agentkey-scoped-did").textContent = data.agent_did || _agentKeyDid;
+    document.getElementById("agentkey-result").style.display  = "block";
+    createBtn.style.display = "none";
+    document.getElementById("agentkey-cancel-btn").textContent = "Close";
+  } catch(e) {
+    errEl.textContent = e.message || "Failed to create key.";
+    errEl.style.display = "block";
+    createBtn.disabled = false; createBtn.textContent = "Create Key";
+  }
+}
+
+function copyAgentKey() {
+  const val = document.getElementById("agentkey-value").textContent;
+  navigator.clipboard.writeText(val).then(() => {
+    const btn = document.querySelector("#agentkey-result .btn-outline");
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+  });
+}
+
+document.getElementById("agentkey-create-btn").addEventListener("click", createAgentKey);
+document.getElementById("agentkey-cancel-btn").addEventListener("click", () => {
+  document.getElementById("agentkey-modal").style.display = "none";
+  document.getElementById("agentkey-create-btn").style.display = "";
+  document.getElementById("agentkey-cancel-btn").textContent = "Cancel";
+});
+document.getElementById("agentkey-modal-close").addEventListener("click", () => {
+  document.getElementById("agentkey-modal").style.display = "none";
+  document.getElementById("agentkey-create-btn").style.display = "";
+  document.getElementById("agentkey-cancel-btn").textContent = "Cancel";
+});
+document.getElementById("agentkey-modal").addEventListener("click", function(e) {
+  if (e.target === this) {
+    this.style.display = "none";
+    document.getElementById("agentkey-create-btn").style.display = "";
+    document.getElementById("agentkey-cancel-btn").textContent = "Cancel";
+  }
 });
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
