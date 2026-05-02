@@ -466,6 +466,62 @@
   </div>
 </div>
 
+<!-- ── AI Auto-Reply modal ───────────────────────────────────────────────── -->
+<div id="aireply-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <span class="modal-title">🤖 AI Auto-Reply — <span id="aireply-modal-name"></span></span>
+      <button class="modal-close" id="aireply-modal-close">✕</button>
+    </div>
+    <div style="padding:1.25rem;">
+      <!-- Intro -->
+      <div style="background:var(--accent-light);border:1px solid var(--accent-border);border-radius:10px;padding:0.85rem 1rem;margin-bottom:1.1rem;">
+        <div style="font-weight:700;font-size:0.88rem;color:var(--accent);margin-bottom:0.3rem;">How it works</div>
+        <div style="font-size:0.82rem;color:var(--text-2);line-height:1.5;">
+          When this agent receives a message, AgentID automatically asks ChatGPT to write a reply and sends it back — no setup required beyond your OpenAI key.
+        </div>
+      </div>
+
+      <!-- Status banner (shown when already configured) -->
+      <div id="aireply-status" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1rem;margin-bottom:0.9rem;font-size:0.8rem;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+        <span id="aireply-status-text" style="color:var(--text-2);"></span>
+        <button id="aireply-disable-btn" class="btn btn-outline" style="font-size:0.75rem;padding:0.25rem 0.7rem;color:var(--red);border-color:var(--red);">Turn off</button>
+      </div>
+
+      <!-- Form -->
+      <div id="aireply-form">
+        <div class="field">
+          <label>OpenAI API Key <span style="font-weight:400;color:var(--muted);">(starts with sk-)</span></label>
+          <input id="aireply-key" type="password" placeholder="sk-..." autocomplete="off" />
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:0.3rem;">Your key is sent over HTTPS and stored securely. It's only used to generate replies for this agent.</div>
+        </div>
+        <div class="field">
+          <label>Personality / Instructions <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+          <textarea id="aireply-prompt" rows="3" placeholder="Leave blank to use the default — or describe how your agent should talk, what tone to use, topics to focus on, etc." style="resize:vertical;min-height:70px;"></textarea>
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:0.3rem;">Example: "Always reply in a friendly, concise tone. Focus only on insurance claims."</div>
+        </div>
+        <details style="margin-bottom:0.9rem;">
+          <summary style="font-size:0.8rem;color:var(--muted);cursor:pointer;">Advanced — AI model</summary>
+          <div style="margin-top:0.6rem;">
+            <select id="aireply-model" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:0.85rem;">
+              <option value="gpt-4o-mini">GPT-4o mini — fast &amp; affordable (recommended)</option>
+              <option value="gpt-4o">GPT-4o — smarter, costs more</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo — cheapest</option>
+            </select>
+          </div>
+        </details>
+      </div>
+
+      <div id="aireply-error" style="color:var(--red);font-size:0.8rem;margin-bottom:0.75rem;display:none;"></div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+        <button class="btn btn-outline" id="aireply-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="aireply-save-btn">Enable Auto-Reply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Inbox modal ─────────────────────────────────────────────────────── -->
 <div id="inbox-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:600px;">
@@ -616,6 +672,7 @@ function renderAgentRow(a) {
       <button class="agent-action-btn" data-action="inbox" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">Inbox</button>
       <button class="agent-action-btn" data-action="agentkey" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Create an API key scoped to this agent only">🔑 Agent Key</button>
       <button class="agent-action-btn" data-action="webhook" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Get notified when this agent receives a message">🔔 Webhook</button>
+      <button class="agent-action-btn" data-action="aireply" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Let this agent automatically reply to messages using AI">🤖 Auto-Reply</button>
       <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">&lt;/&gt;</button>
     </td>
   </tr>`;
@@ -1150,6 +1207,7 @@ document.getElementById("agents-container").addEventListener("click", e => {
   if (action === "inbox")     openInbox(did, name);
   if (action === "agentkey")  openAgentKey(did, name);
   if (action === "webhook")   openWebhook(did, name);
+  if (action === "aireply")   openAiReply(did, name);
 });
 
 // ── Webhook modal ─────────────────────────────────────────────────────────────
@@ -1302,6 +1360,126 @@ document.getElementById("agentkey-modal").addEventListener("click", function(e) 
     document.getElementById("agentkey-create-btn").style.display = "";
     document.getElementById("agentkey-cancel-btn").textContent = "Cancel";
   }
+});
+
+// ── AI AUTO-REPLY ─────────────────────────────────────────────────────────────
+let _aiReplyDid = "";
+
+async function openAiReply(did, name) {
+  _aiReplyDid = did;
+  document.getElementById("aireply-modal-name").textContent = name;
+  document.getElementById("aireply-error").style.display = "none";
+  document.getElementById("aireply-key").value = "";
+  document.getElementById("aireply-prompt").value = "";
+  document.getElementById("aireply-model").value = "gpt-4o-mini";
+  document.getElementById("aireply-status").style.display = "none";
+  document.getElementById("aireply-form").style.display = "";
+  document.getElementById("aireply-save-btn").style.display = "";
+  document.getElementById("aireply-save-btn").disabled = false;
+  document.getElementById("aireply-save-btn").textContent = "Enable Auto-Reply";
+  document.getElementById("aireply-modal").style.display = "flex";
+
+  // Load existing config if any
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(did)}/ai-config`, {
+      headers: apiKey ? {"x-api-key": apiKey} : {},
+      credentials: "include",
+    });
+    if (r.ok) {
+      const cfg = await r.json();
+      if (cfg.configured) {
+        const statusEl = document.getElementById("aireply-status");
+        const txt = document.getElementById("aireply-status-text");
+        const state = cfg.enabled ? "✅ Auto-reply is ON" : "⏸ Auto-reply is paused";
+        txt.textContent = `${state} · Model: ${cfg.model} · Key: ${cfg.openai_key}`;
+        statusEl.style.display = "flex";
+        document.getElementById("aireply-prompt").value = cfg.system_prompt || "";
+        document.getElementById("aireply-model").value = cfg.model || "gpt-4o-mini";
+        document.getElementById("aireply-save-btn").textContent = "Update Settings";
+        document.getElementById("aireply-disable-btn").style.display = cfg.enabled ? "" : "none";
+      }
+    }
+  } catch(_) {}
+}
+
+async function saveAiReply() {
+  const key    = document.getElementById("aireply-key").value.trim();
+  const prompt = document.getElementById("aireply-prompt").value.trim();
+  const model  = document.getElementById("aireply-model").value;
+  const errEl  = document.getElementById("aireply-error");
+  const saveBtn = document.getElementById("aireply-save-btn");
+
+  if (!key) {
+    errEl.textContent = "Please enter your OpenAI API key.";
+    errEl.style.display = "block";
+    return;
+  }
+  if (!key.startsWith("sk-")) {
+    errEl.textContent = "That doesn't look like an OpenAI key (should start with sk-).";
+    errEl.style.display = "block";
+    return;
+  }
+  errEl.style.display = "none";
+  saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(_aiReplyDid)}/ai-config`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json", ...(apiKey ? {"x-api-key": apiKey} : {})},
+      credentials: "include",
+      body: JSON.stringify({ openai_key: key, system_prompt: prompt, model, enabled: true }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+
+    saveBtn.textContent = "✓ Saved!";
+    saveBtn.disabled = false;
+    // Refresh status banner
+    const statusEl = document.getElementById("aireply-status");
+    document.getElementById("aireply-status-text").textContent =
+      `✅ Auto-reply is ON · Model: ${model} · Key saved`;
+    statusEl.style.display = "flex";
+    document.getElementById("aireply-key").value = "";
+    document.getElementById("aireply-disable-btn").style.display = "";
+    setTimeout(() => {
+      saveBtn.textContent = "Update Settings";
+    }, 1500);
+  } catch(e) {
+    errEl.textContent = e.message || "Failed to save.";
+    errEl.style.display = "block";
+    saveBtn.disabled = false; saveBtn.textContent = "Enable Auto-Reply";
+  }
+}
+
+async function disableAiReply() {
+  const btn = document.getElementById("aireply-disable-btn");
+  btn.disabled = true; btn.textContent = "Turning off…";
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(_aiReplyDid)}/ai-config`, {
+      method: "DELETE",
+      headers: apiKey ? {"x-api-key": apiKey} : {},
+      credentials: "include",
+    });
+    if (!r.ok) throw new Error("Failed");
+    document.getElementById("aireply-status").style.display = "none";
+    document.getElementById("aireply-save-btn").textContent = "Enable Auto-Reply";
+    document.getElementById("aireply-key").value = "";
+    btn.disabled = false; btn.textContent = "Turn off";
+  } catch(_) {
+    btn.disabled = false; btn.textContent = "Turn off";
+  }
+}
+
+function closeAiReplyModal() {
+  document.getElementById("aireply-modal").style.display = "none";
+}
+
+document.getElementById("aireply-save-btn").addEventListener("click", saveAiReply);
+document.getElementById("aireply-disable-btn").addEventListener("click", disableAiReply);
+document.getElementById("aireply-cancel-btn").addEventListener("click", closeAiReplyModal);
+document.getElementById("aireply-modal-close").addEventListener("click", closeAiReplyModal);
+document.getElementById("aireply-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeAiReplyModal();
 });
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
