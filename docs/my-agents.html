@@ -387,6 +387,25 @@
   </div>
 </div>
 
+<!-- ── Inbox modal ─────────────────────────────────────────────────────── -->
+<div id="inbox-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <span class="modal-title">📬 Inbox — <span id="inbox-modal-name"></span></span>
+      <button class="modal-close" id="inbox-modal-close">✕</button>
+    </div>
+    <div id="inbox-body" style="padding:1.25rem;min-height:120px;">
+      <div style="text-align:center;color:var(--muted);padding:2rem 0;">Loading…</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1.25rem;border-top:1px solid var(--border);">
+      <label style="font-size:0.8rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:0.4rem;">
+        <input type="checkbox" id="inbox-unread-only" style="cursor:pointer;"> Unread only
+      </label>
+      <button class="btn btn-outline" id="inbox-refresh-btn" style="font-size:0.8rem;padding:0.35rem 0.9rem;">↻ Refresh</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const BASE = "https://api.agentid-protocol.com";
 
@@ -524,6 +543,7 @@ function renderAgentRow(a) {
     <td>
       <a href="agent.html?did=${encodeURIComponent(a.did||"")}" target="_blank" class="agent-action-btn" style="text-decoration:none;margin-right:0.25rem;">Profile</a>
       <button class="agent-action-btn" data-action="verify" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}">Test</button>
+      <button class="agent-action-btn" data-action="inbox" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">Inbox</button>
       <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">&lt;/&gt;</button>
     </td>
   </tr>`;
@@ -992,6 +1012,52 @@ function openSnippets(did, name) {
   document.getElementById("snippets-modal").style.display = "flex";
 }
 
+// ── INBOX ──────────────────────────────────────────────────────────────────────
+let _inboxDid = "";
+
+async function loadInbox() {
+  const unreadOnly = document.getElementById("inbox-unread-only").checked;
+  const body = document.getElementById("inbox-body");
+  body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem 0;">Loading…</div>';
+  try {
+    const params = new URLSearchParams({ limit: 50 });
+    if (unreadOnly) params.set("unread_only", "true");
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(_inboxDid)}/messages?${params}`, {
+      headers: { "x-api-key": apiKey }
+    });
+    if (!r.ok) { body.innerHTML = `<div style="color:var(--red);padding:1rem;">Error ${r.status}: ${esc(await r.text())}</div>`; return; }
+    const data = await r.json();
+    if (!data.messages?.length) {
+      body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem 0;">No messages</div>';
+      return;
+    }
+    body.innerHTML = data.messages.map(m => `
+      <div style="border:1px solid var(--border);border-radius:9px;padding:0.85rem 1rem;margin-bottom:0.7rem;background:${m.read ? "var(--surface)" : "var(--accent-light)"};">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;margin-bottom:0.4rem;">
+          <span style="font-weight:600;font-size:0.85rem;">${m.subject ? esc(m.subject) : '<span style="color:var(--muted);font-style:italic;">(no subject)</span>'}</span>
+          <span style="font-size:0.72rem;color:var(--muted);white-space:nowrap;">${m.sent_at ? new Date(m.sent_at).toLocaleString() : ""}</span>
+        </div>
+        <div style="font-size:0.82rem;color:var(--text-2);white-space:pre-wrap;word-break:break-word;">${esc(m.body)}</div>
+        ${m.from_did ? `<div style="margin-top:0.4rem;font-size:0.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">from: ${esc(m.from_did)}</div>` : ""}
+        ${!m.read ? '<div style="margin-top:0.35rem;"><span style="background:var(--accent);color:#fff;font-size:0.65rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:20px;letter-spacing:0.04em;">NEW</span></div>' : ""}
+      </div>`).join("");
+  } catch(e) {
+    body.innerHTML = `<div style="color:var(--red);padding:1rem;">Failed to load inbox</div>`;
+  }
+}
+
+function openInbox(did, name) {
+  _inboxDid = did;
+  document.getElementById("inbox-modal-name").textContent = name;
+  document.getElementById("inbox-modal").style.display = "flex";
+  loadInbox();
+}
+
+document.getElementById("inbox-modal-close").addEventListener("click", () => { document.getElementById("inbox-modal").style.display = "none"; });
+document.getElementById("inbox-modal").addEventListener("click", function(e) { if (e.target === this) this.style.display = "none"; });
+document.getElementById("inbox-refresh-btn").addEventListener("click", loadInbox);
+document.getElementById("inbox-unread-only").addEventListener("change", loadInbox);
+
 // ── AGENT ROW ACTION DELEGATION ───────────────────────────────────────────────
 document.getElementById("agents-container").addEventListener("click", e => {
   const btn = e.target.closest(".agent-action-btn[data-action]");
@@ -999,6 +1065,7 @@ document.getElementById("agents-container").addEventListener("click", e => {
   const { action, did, name } = btn.dataset;
   if (action === "verify")   openTestVerify(did, name);
   if (action === "snippets") openSnippets(did, name);
+  if (action === "inbox")    openInbox(did, name);
 });
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
