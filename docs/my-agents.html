@@ -825,24 +825,12 @@ async function doPrivacyChange(btn, did, newPrivate) {
 
 function initPrivacyToggles() {
   document.getElementById("agents-container")?.addEventListener("click", (ev) => {
-    // Confirm "yes" clicked — validate API key first
+    // Confirm "yes" clicked
     const confirmYes = ev.target.closest(".privacy-confirm-yes");
     if (confirmYes) {
-      const wrapper  = confirmYes.closest(".privacy-confirm-wrap");
-      const keyInput = wrapper?.querySelector(".privacy-key-input");
-      const errEl    = wrapper?.querySelector(".privacy-key-error");
-      const entered  = (keyInput?.value || "").trim();
-      if (!entered) {
-        if (errEl) { errEl.textContent = "Enter your API key."; errEl.style.display = ""; }
-        keyInput?.focus(); return;
-      }
-      if (entered !== apiKey) {
-        if (errEl) { errEl.textContent = "Incorrect API key."; errEl.style.display = ""; }
-        keyInput?.select(); return;
-      }
-      const did = confirmYes.dataset.did;
+      const wrapper = confirmYes.closest(".privacy-confirm-wrap");
       const btn = wrapper?._origBtn;
-      if (btn) { confirmYes.closest("td").replaceChild(btn, wrapper); doPrivacyChange(btn, did, false); }
+      if (btn) { confirmYes.closest("td").replaceChild(btn, wrapper); doPrivacyChange(btn, btn.dataset.did, false); }
       return;
     }
     // Confirm "cancel" clicked
@@ -859,22 +847,17 @@ function initPrivacyToggles() {
     const did = btn.dataset.did;
     const isPrivate = btn.dataset.private === "true";
     if (isPrivate) {
-      // private → public: require confirmation
+      // private → public: simple confirm (server auth handles security)
       const wrapper = document.createElement("span");
       wrapper.className = "privacy-confirm-wrap";
       wrapper._origBtn  = btn;
       wrapper.innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:0.3rem;min-width:200px;">
-          <span style="font-size:0.72rem;color:var(--text-2);font-weight:600;">Make public? Enter API key to confirm:</span>
-          <div style="display:flex;gap:0.3rem;align-items:center;">
-            <input class="privacy-key-input" type="password" placeholder="agentid_…" autocomplete="off" spellcheck="false"
-              style="font-size:0.72rem;padding:0.2rem 0.45rem;border-radius:4px;border:1px solid var(--border-dark);font-family:inherit;flex:1;outline:none;min-width:0;" />
-            <button class="privacy-confirm-yes" data-did="${esc(did)}"
-              style="font-size:0.72rem;padding:0.2rem 0.5rem;border-radius:4px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);cursor:pointer;font-family:inherit;white-space:nowrap;">Confirm</button>
-            <button class="privacy-confirm-no"
-              style="font-size:0.72rem;padding:0.2rem 0.45rem;border-radius:4px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;">✕</button>
-          </div>
-          <span class="privacy-key-error" style="font-size:0.7rem;color:var(--red);display:none;"></span>
+        <div style="display:flex;align-items:center;gap:0.3rem;">
+          <span style="font-size:0.72rem;color:var(--text-2);font-weight:600;">Make public?</span>
+          <button class="privacy-confirm-yes" data-did="${esc(did)}"
+            style="font-size:0.72rem;padding:0.2rem 0.5rem;border-radius:4px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);cursor:pointer;font-family:inherit;">Yes</button>
+          <button class="privacy-confirm-no"
+            style="font-size:0.72rem;padding:0.2rem 0.45rem;border-radius:4px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;">✕</button>
         </div>`;
       btn.parentNode.replaceChild(wrapper, btn);
     } else {
