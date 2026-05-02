@@ -1183,37 +1183,68 @@ function renderDealsView() {
   }).join("");
 }
 
-function openDealDetail(idx) {
+async function openDealDetail(idx) {
   const d = _deals[idx];
   if (!d) return;
-  const type    = d.deal_type || "sale";
+  document.getElementById("deal-modal-ref").textContent = `📄 ${d.deal_ref}`;
+  document.getElementById("deal-modal-body").innerHTML =
+    '<div style="text-align:center;padding:2rem;"><div class="spinner"></div></div>';
+  document.getElementById("deal-detail-modal").style.display = "flex";
+
+  // Fetch full deal with snapshotted agent profiles
+  let full = d;
+  try {
+    const r = await fetch(`${BASE}/pro/deals/${encodeURIComponent(d.deal_ref)}`, {
+      headers: apiHeaders(), credentials: "include" });
+    if (r.ok) full = await r.json();
+  } catch(_) {}
+
+  _deals[idx] = full; // cache enriched version
+  renderDealModal(idx, full);
+}
+
+function renderDealModal(idx, d) {
+  const type     = d.deal_type || "sale";
   const hasPrice = d.price != null && d.price > 0;
-  const price   = hasPrice ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}` : null;
-  const when    = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "—";
+  const price    = hasPrice ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}` : null;
+  const when     = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "—";
   const typeBadge = `<span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.5rem;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;background:${type==="sale"?"#dcfce7":"#eff6ff"};color:${type==="sale"?"#15803d":"#1d4ed8"};">${esc(type)}</span>`;
 
   document.getElementById("deal-modal-ref").innerHTML = `📄 ${esc(d.deal_ref)} ${typeBadge}`;
+
+  function agentBlock(label, did, name, owner, caps, pubkey) {
+    const capList = Array.isArray(caps) && caps.length
+      ? caps.map(c => `<span style="font-size:0.68rem;padding:0.1rem 0.4rem;border-radius:4px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent-border);font-weight:600;">${esc(c)}</span>`).join(" ")
+      : `<span style="font-size:0.72rem;color:var(--muted);">No capabilities listed</span>`;
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:0.75rem 1rem;display:grid;gap:0.35rem;">
+      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">${label}</div>
+      <div style="font-weight:700;font-size:0.92rem;">${esc(name || did.slice(-16))}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.66rem;color:var(--text-2);word-break:break-all;">${esc(did)}</div>
+      ${owner ? `<div style="font-size:0.74rem;color:var(--muted);">Owner: <strong>${esc(owner)}</strong></div>` : ""}
+      <div style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-top:0.1rem;">${capList}</div>
+      ${pubkey ? `<details style="margin-top:0.25rem;"><summary style="font-size:0.7rem;color:var(--accent);cursor:pointer;user-select:none;">🔑 Public key (verification)</summary><div style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;word-break:break-all;color:var(--muted);margin-top:0.25rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:0.3rem 0.5rem;">${esc(pubkey)}</div></details>` : ""}
+    </div>`;
+  }
+
   document.getElementById("deal-modal-body").innerHTML = `
-    <div style="display:grid;gap:1rem;">
-      <div style="text-align:center;padding:1rem 0;border-bottom:1px solid var(--border);">
+    <div style="display:grid;gap:0.9rem;max-height:70vh;overflow-y:auto;padding-right:0.25rem;">
+      <div style="text-align:center;padding:0.75rem 0;border-bottom:1px solid var(--border);">
         ${price ? `<div style="font-size:2rem;font-weight:800;color:#15803d;letter-spacing:-0.03em;">${esc(price)}</div>` : ""}
-        ${d.description ? `<div style="font-size:${price ? "0.9" : "1.1"}rem;font-weight:${price ? "400" : "700"};color:${price ? "var(--text-2)" : "var(--text)"};margin-top:${price ? "0.3" : "0"}rem;font-style:${price ? "italic" : "normal"};">${esc(d.description)}</div>` : ""}
+        ${d.description ? `<div style="font-size:${price?"0.9":"1.1"}rem;font-weight:${price?"400":"700"};color:${price?"var(--text-2)":"var(--text)"};margin-top:${price?"0.3":"0"}rem;font-style:${price?"italic":"normal"};">${esc(d.description)}</div>` : ""}
         ${!price && !d.description ? `<div style="font-size:1rem;color:var(--muted);">Service Agreement</div>` : ""}
-        <div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem;">${price ? "Agreed price" : "No monetary value"}</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem;">Finalized ${esc(when)} · <span style="background:#dcfce7;color:#15803d;font-weight:700;padding:0.1rem 0.4rem;border-radius:20px;">${esc(d.status||"finalized")}</span></div>
       </div>
-      <div style="display:grid;gap:0.5rem;font-size:0.83rem;">
-        <div><span style="color:var(--muted);font-weight:600;">Buyer</span><br/><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">${esc(d.buyer_did)}</span>${d.buyer_name ? ` <em>(${esc(d.buyer_name)})</em>` : ""}</div>
-        <div><span style="color:var(--muted);font-weight:600;">Seller</span><br/><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">${esc(d.seller_did)}</span>${d.seller_name ? ` <em>(${esc(d.seller_name)})</em>` : ""}</div>
-        <div><span style="color:var(--muted);font-weight:600;">Finalized</span><br/>${esc(when)}</div>
-        <div><span style="color:var(--muted);font-weight:600;">Status</span><br/><span style="background:#dcfce7;color:#15803d;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:20px;">${esc(d.status || "finalized")}</span></div>
-      </div>
-      ${d.buyer_body ? `<div><div style="font-size:0.75rem;font-weight:700;color:var(--muted);margin-bottom:0.3rem;">ACCEPTANCE MESSAGE</div><div style="font-size:0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.7rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:120px;overflow-y:auto;">${esc(d.buyer_body)}</div></div>` : ""}
+      ${agentBlock("🛒 Buyer", d.buyer_did, d.buyer_name, d.buyer_owner, d.buyer_capabilities, d.buyer_public_key)}
+      ${agentBlock("🏷 Seller", d.seller_did, d.seller_name, d.seller_owner, d.seller_capabilities, d.seller_public_key)}
+      ${d.buyer_body ? `<div>
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:0.35rem;">Signed Acceptance Record</div>
+        <div style="font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:160px;overflow-y:auto;color:var(--text-2);">${esc(d.buyer_body)}</div>
+      </div>` : ""}
       <div style="display:flex;gap:0.5rem;justify-content:flex-end;padding-top:0.25rem;border-top:1px solid var(--border);">
         <button onclick="downloadDealInvoice(${idx})" class="btn btn-outline" style="font-size:0.8rem;">⬇ Download Invoice</button>
         <button onclick="closeDealModal()" class="btn btn-primary" style="font-size:0.8rem;">Close</button>
       </div>
     </div>`;
-  document.getElementById("deal-detail-modal").style.display = "flex";
 }
 
 function downloadDealInvoice(idx) {
@@ -1223,44 +1254,107 @@ function downloadDealInvoice(idx) {
   const hasPrice = d.price != null && d.price > 0;
   const price    = hasPrice ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}` : null;
   const when     = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "—";
-  const buyer    = `${d.buyer_name ? d.buyer_name + "\n" : ""}${d.buyer_did}`;
-  const seller   = `${d.seller_name ? d.seller_name + "\n" : ""}${d.seller_did}`;
+  const generated = new Date().toLocaleString();
+
+  function capsHtml(caps) {
+    if (!Array.isArray(caps) || !caps.length) return "<em>None listed</em>";
+    return caps.map(c => `<span style="display:inline-block;font-size:0.75rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:4px;background:#fff7ed;color:#c2410c;border:1px solid #fdba74;margin:0.1rem;">${c.replace(/</g,"&lt;")}</span>`).join(" ");
+  }
+
+  function agentSection(role, did, name, owner, caps, pubkey) {
+    return `
+    <div class="section">
+      <div class="section-title">${role}</div>
+      <table>
+        <tr><td>Name</td><td><strong>${(name||did.slice(-16)).replace(/</g,"&lt;")}</strong></td></tr>
+        <tr><td>DID</td><td class="mono">${did.replace(/</g,"&lt;")}</td></tr>
+        ${owner ? `<tr><td>Owner</td><td>${owner.replace(/</g,"&lt;")}</td></tr>` : ""}
+        <tr><td>Capabilities</td><td>${capsHtml(caps)}</td></tr>
+        ${pubkey ? `<tr><td>Public Key</td><td class="mono small">${pubkey.replace(/</g,"&lt;")}</td></tr>` : ""}
+      </table>
+    </div>`;
+  }
 
   const html = `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"/><title>Invoice ${d.deal_ref}</title>
+<head>
+<meta charset="UTF-8"/>
+<title>AgentID Invoice — ${d.deal_ref}</title>
 <style>
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:640px;margin:60px auto;padding:0 24px;color:#1c1917;line-height:1.6;}
-  .header{border-bottom:3px solid #059669;padding-bottom:1.25rem;margin-bottom:1.5rem;}
-  .badge{display:inline-block;font-size:0.72rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:20px;text-transform:uppercase;background:${type==="sale"?"#dcfce7":"#eff6ff"};color:${type==="sale"?"#15803d":"#1d4ed8"};}
-  h1{font-size:1.5rem;font-weight:800;margin:0 0 0.25rem;letter-spacing:-0.02em;}
-  .ref{font-family:monospace;font-size:0.85rem;color:#78716c;}
-  .amount{font-size:2.5rem;font-weight:800;color:#059669;letter-spacing:-0.04em;margin:1rem 0 0.25rem;}
-  .desc{font-size:1rem;color:#44403c;font-style:italic;margin-bottom:1.25rem;}
-  table{width:100%;border-collapse:collapse;font-size:0.9rem;margin-bottom:1.5rem;}
-  td{padding:0.6rem 0.75rem;border-bottom:1px solid #e5e2db;vertical-align:top;}
-  td:first-child{font-weight:600;color:#78716c;width:130px;white-space:nowrap;}
-  .mono{font-family:monospace;font-size:0.78rem;word-break:break-all;}
-  .acceptance{background:#f9f7f4;border:1px solid #e5e2db;border-radius:8px;padding:0.75rem 1rem;font-family:monospace;font-size:0.75rem;white-space:pre-wrap;word-break:break-all;margin-bottom:1.5rem;}
-  .footer{font-size:0.72rem;color:#a8a29e;border-top:1px solid #e5e2db;padding-top:1rem;text-align:center;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;max-width:720px;margin:48px auto;padding:0 28px;color:#1c1917;line-height:1.6;font-size:14px;}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #059669;padding-bottom:1.25rem;margin-bottom:0.25rem;}
+  .header-left h1{font-size:1.6rem;font-weight:800;letter-spacing:-0.03em;color:#1c1917;}
+  .header-left .sub{font-size:0.8rem;color:#78716c;margin-top:0.2rem;}
+  .header-right{text-align:right;}
+  .badge{display:inline-block;font-size:0.68rem;font-weight:700;padding:0.12rem 0.5rem;border-radius:20px;text-transform:uppercase;letter-spacing:0.05em;background:${type==="sale"?"#dcfce7":"#eff6ff"};color:${type==="sale"?"#15803d":"#1d4ed8"};}
+  .status-chip{display:inline-block;font-size:0.68rem;font-weight:700;padding:0.12rem 0.5rem;border-radius:20px;background:#dcfce7;color:#15803d;margin-top:0.3rem;}
+  .amount-block{padding:1.25rem 0 1rem;border-bottom:1px solid #e5e2db;margin-bottom:0.25rem;}
+  .amount{font-size:2.8rem;font-weight:800;color:#059669;letter-spacing:-0.04em;line-height:1;}
+  .amount-label{font-size:0.78rem;color:#78716c;margin-top:0.3rem;}
+  .desc-line{font-size:1rem;color:#44403c;font-style:italic;margin-top:0.4rem;}
+  .section{margin-top:1.25rem;}
+  .section-title{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#78716c;border-bottom:1px solid #e5e2db;padding-bottom:0.3rem;margin-bottom:0.6rem;}
+  table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+  td{padding:0.45rem 0.5rem;border-bottom:1px solid #f5f3f0;vertical-align:top;}
+  td:first-child{font-weight:600;color:#78716c;width:140px;white-space:nowrap;}
+  .mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:0.75rem;word-break:break-all;}
+  .small{font-size:0.65rem;}
+  .acceptance{margin-top:0.5rem;background:#f9f7f4;border:1px solid #e5e2db;border-radius:8px;padding:0.85rem 1rem;font-family:"SFMono-Regular",Consolas,monospace;font-size:0.72rem;white-space:pre-wrap;word-break:break-all;color:#44403c;line-height:1.5;}
+  .verify-box{margin-top:1.25rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.85rem 1rem;font-size:0.8rem;color:#1e3a5f;}
+  .verify-box strong{display:block;margin-bottom:0.3rem;}
+  .footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #e5e2db;font-size:0.7rem;color:#a8a29e;display:flex;justify-content:space-between;}
+  @media print{body{margin:24px;}.footer{position:fixed;bottom:0;width:100%;}}
 </style>
 </head>
 <body>
-  <div class="header">
+
+<div class="header">
+  <div class="header-left">
     <h1>AgentID Invoice</h1>
-    <div class="ref">${d.deal_ref} &nbsp;<span class="badge">${type}</span></div>
+    <div class="sub">${d.deal_ref} &nbsp;<span class="badge">${type}</span></div>
   </div>
-  ${price ? `<div class="amount">${price}</div>` : ""}
-  ${d.description ? `<div class="desc">${d.description}</div>` : ""}
-  <table>
-    <tr><td>Buyer</td><td class="mono">${buyer}</td></tr>
-    <tr><td>Seller</td><td class="mono">${seller}</td></tr>
-    <tr><td>Finalized</td><td>${when}</td></tr>
-    <tr><td>Status</td><td>${d.status || "finalized"}</td></tr>
-    ${d.conversation_start_at ? `<tr><td>Session</td><td class="mono">${d.conversation_start_at}</td></tr>` : ""}
-  </table>
-  ${d.buyer_body ? `<div style="font-size:0.78rem;font-weight:700;color:#78716c;margin-bottom:0.4rem;">ACCEPTANCE MESSAGE</div><div class="acceptance">${d.buyer_body.replace(/</g,"&lt;")}</div>` : ""}
-  <div class="footer">Generated by AgentID · agentid-protocol.com · ${new Date().toLocaleString()}</div>
+  <div class="header-right">
+    <div style="font-size:0.78rem;color:#78716c;">Finalized</div>
+    <div style="font-weight:700;">${when}</div>
+    <div><span class="status-chip">${d.status || "finalized"}</span></div>
+  </div>
+</div>
+
+${price || d.description ? `
+<div class="amount-block">
+  ${price ? `<div class="amount">${price}</div><div class="amount-label">Agreed price</div>` : ""}
+  ${d.description ? `<div class="desc-line">${d.description.replace(/</g,"&lt;")}</div>` : ""}
+</div>` : ""}
+
+${agentSection("🛒 Buyer", d.buyer_did, d.buyer_name, d.buyer_owner, d.buyer_capabilities, d.buyer_public_key)}
+${agentSection("🏷 Seller", d.seller_did, d.seller_name, d.seller_owner, d.seller_capabilities, d.seller_public_key)}
+
+${d.conversation_start_at ? `
+<div class="section">
+  <div class="section-title">Session</div>
+  <table><tr><td>Started</td><td class="mono">${d.conversation_start_at.replace(/</g,"&lt;")}</td></tr></table>
+</div>` : ""}
+
+${d.buyer_body ? `
+<div class="section">
+  <div class="section-title">Signed Acceptance Record</div>
+  <div class="acceptance">${d.buyer_body.replace(/</g,"&lt;")}</div>
+</div>` : ""}
+
+<div class="verify-box">
+  <strong>🔐 How to verify this invoice</strong>
+  The acceptance record above contains an Ed25519 cryptographic signature issued by the AgentID network.
+  To independently verify: extract the <code>Payload</code> JSON and <code>Signature</code> fields,
+  then verify the signature against the buyer's public key listed above using any Ed25519 library.
+  The DID and public key can also be resolved at <strong>agentid-protocol.com</strong>.
+</div>
+
+<div class="footer">
+  <span>AgentID · agentid-protocol.com</span>
+  <span>Generated ${generated}</span>
+</div>
+
 </body>
 </html>`;
 
