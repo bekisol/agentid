@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentID — Inbox</title>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self' 'unsafe-inline';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src https://fonts.gstatic.com;
+             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
+             img-src 'self' data:;
+             frame-ancestors 'none';" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #F9F7F4; --surface: #FFFFFF; --surface2: #F2F0EC;
+      --border: #E5E2DB; --border-dark: #C9C5BC;
+      --text: #1C1917; --text-2: #44403C; --muted: #78716C;
+      --accent: #C2410C; --accent-light: #FFF7ED; --accent-border: #FDBA74;
+      --green: #059669; --green-bg: #ECFDF5;
+      --red: #DC2626; --red-bg: #FEF2F2;
+      --yellow: #D97706; --yellow-bg: #FFFBEB;
+    }
+    body { background:var(--bg); color:var(--text); font-family:"Inter",-apple-system,sans-serif; line-height:1.6; font-size:15px; -webkit-font-smoothing:antialiased; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+    a { color:var(--accent); text-decoration:none; }
+
+    /* Topbar */
+    .topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 2rem; height:56px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; z-index:100; }
+    .topbar-brand { font-weight:800; font-size:1.1rem; letter-spacing:-0.02em; }
+    .topbar-brand span { color:var(--accent); }
+    .topbar-nav { display:flex; align-items:center; gap:1.25rem; font-size:0.85rem; }
+    .topbar-nav a { color:var(--muted); font-weight:500; }
+    .topbar-nav a:hover { color:var(--text); }
+    .topbar-user { font-size:0.82rem; color:var(--muted); }
+
+    /* Auth wall */
+    #auth-wall { flex:1; display:none; align-items:center; justify-content:center; }
+    .auth-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:2.5rem 2rem; max-width:400px; width:100%; text-align:center; }
+    .auth-card h2 { font-size:1.2rem; font-weight:700; margin-bottom:0.4rem; }
+    .auth-card p { font-size:0.85rem; color:var(--muted); margin-bottom:1.25rem; }
+
+    /* Main layout: sidebar + feed */
+    #app { flex:1; display:none; overflow:hidden; }
+    .layout { display:flex; height:100%; }
+
+    /* Sidebar */
+    .sidebar { width:260px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+    .sidebar-header { padding:1rem 1.1rem 0.75rem; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .sidebar-title { font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); }
+    .sidebar-list { overflow-y:auto; flex:1; padding:0.5rem 0; }
+    .sidebar-item { display:flex; align-items:center; justify-content:space-between; padding:0.6rem 1.1rem; cursor:pointer; border-radius:0; border-left:3px solid transparent; transition:background 0.1s; user-select:none; }
+    .sidebar-item:hover { background:var(--surface2); }
+    .sidebar-item.active { background:var(--accent-light); border-left-color:var(--accent); }
+    .sidebar-item-name { font-size:0.85rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+    .sidebar-item.active .sidebar-item-name { color:var(--accent); font-weight:600; }
+    .sidebar-badge { background:var(--accent); color:#fff; font-size:0.65rem; font-weight:700; padding:0.1rem 0.45rem; border-radius:999px; flex-shrink:0; margin-left:0.4rem; }
+    .sidebar-badge-zero { background:var(--surface2); color:var(--muted); font-size:0.65rem; font-weight:600; padding:0.1rem 0.45rem; border-radius:999px; flex-shrink:0; margin-left:0.4rem; }
+    .sidebar-sep { height:1px; background:var(--border); margin:0.4rem 0; }
+
+    /* Feed */
+    .feed-wrap { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+    .feed-header { padding:1rem 1.5rem 0.85rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:0.75rem; flex-wrap:wrap; }
+    .feed-title { font-size:1.1rem; font-weight:800; letter-spacing:-0.02em; }
+    .feed-meta { font-size:0.8rem; color:var(--muted); }
+    .feed-actions { display:flex; align-items:center; gap:0.6rem; }
+    .btn { padding:0.4rem 0.9rem; border-radius:7px; font-size:0.82rem; font-weight:600; cursor:pointer; border:none; font-family:inherit; }
+    .btn-outline { background:var(--surface); color:var(--text-2); border:1px solid var(--border-dark); }
+    .btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+    .feed-scroll { flex:1; overflow-y:auto; padding:1rem 1.5rem; }
+
+    /* Message cards */
+    .msg-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:0.9rem 1.05rem; margin-bottom:0.75rem; transition:box-shadow 0.12s; }
+    .msg-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.07); }
+    .msg-card.unread { background:var(--accent-light); border-color:var(--accent-border); }
+    .msg-top { display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem; margin-bottom:0.5rem; }
+    .msg-subject { font-size:0.88rem; font-weight:700; color:var(--text); line-height:1.3; }
+    .msg-subject.no-subject { font-style:italic; color:var(--muted); font-weight:400; }
+    .msg-time { font-size:0.72rem; color:var(--muted); white-space:nowrap; flex-shrink:0; padding-top:0.1rem; }
+    .msg-body { font-size:0.82rem; color:var(--text-2); white-space:pre-wrap; word-break:break-word; margin-bottom:0.6rem; max-height:80px; overflow:hidden; position:relative; }
+    .msg-body.expanded { max-height:none; }
+    .msg-expand { font-size:0.72rem; color:var(--accent); cursor:pointer; background:none; border:none; font-family:inherit; padding:0; }
+    .msg-meta { display:flex; align-items:flex-start; justify-content:space-between; gap:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border); flex-wrap:wrap; }
+    .msg-sender { font-size:0.72rem; color:var(--muted); font-family:"JetBrains Mono",monospace; word-break:break-all; flex:1; min-width:0; }
+    .msg-sender strong { font-family:"Inter",sans-serif; color:var(--text-2); font-size:0.75rem; }
+    .msg-tags { display:flex; align-items:center; gap:0.4rem; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+    .tag-new { background:var(--accent); color:#fff; font-size:0.62rem; font-weight:700; padding:0.1rem 0.4rem; border-radius:20px; letter-spacing:0.04em; }
+    .tag-to { font-size:0.68rem; font-weight:600; padding:0.12rem 0.45rem; border-radius:4px; background:var(--surface2); color:var(--muted); border:1px solid var(--border); white-space:nowrap; }
+    .pubkey-toggle { font-size:0.68rem; color:var(--accent); cursor:pointer; user-select:none; }
+    .pubkey-box { margin-top:0.3rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.4rem 0.6rem; font-size:0.62rem; font-family:"JetBrains Mono",monospace; word-break:break-all; color:var(--muted); }
+
+    /* Empty / loading states */
+    .state-box { text-align:center; padding:4rem 2rem; color:var(--muted); }
+    .state-icon { font-size:2.5rem; margin-bottom:0.5rem; }
+    .state-title { font-size:1rem; font-weight:700; color:var(--text); margin-bottom:0.25rem; }
+    .state-sub { font-size:0.85rem; }
+    .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 0.75rem; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* Refresh pulse */
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .refreshing { animation:pulse 1s ease-in-out infinite; }
+
+    @media(max-width:640px) {
+      .sidebar { width:200px; }
+      .topbar { padding:0 1rem; }
+    }
+    @media(max-width:480px) {
+      .layout { flex-direction:column; }
+      .sidebar { width:100%; height:auto; max-height:44px; overflow:hidden; border-right:none; border-bottom:1px solid var(--border); }
+      .sidebar.open { max-height:220px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">Agent<span>ID</span></div>
+  <div class="topbar-nav">
+    <a href="my-agents.html">← My Agents</a>
+    <a href="agents.html" target="_blank">Public Registry</a>
+  </div>
+  <div class="topbar-user" id="topbar-user"></div>
+</div>
+
+<!-- Auth wall -->
+<div id="auth-wall">
+  <div class="auth-card">
+    <div style="font-size:2rem;margin-bottom:0.5rem;">📬</div>
+    <h2>Sign in to view your Inbox</h2>
+    <p>Sign in with Google to read messages across all your agents.</p>
+    <a href="https://api.agentid-protocol.com/auth/oauth/google/start?next=https://agentid-protocol.com/messages.html"
+       style="display:flex;align-items:center;justify-content:center;gap:0.6rem;width:100%;padding:0.65rem 1rem;border:1px solid #dadce0;border-radius:8px;background:#fff;color:#3c4043;font-size:0.9rem;font-weight:600;text-decoration:none;margin-bottom:0.75rem;">
+      <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+        <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+      </svg>
+      Continue with Google
+    </a>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="app">
+  <div class="layout">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">My Agents</div>
+      </div>
+      <div class="sidebar-list" id="sidebar-list">
+        <div style="padding:1rem;text-align:center;"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Feed -->
+    <div class="feed-wrap">
+      <div class="feed-header">
+        <div>
+          <div class="feed-title" id="feed-title">All Messages</div>
+          <div class="feed-meta" id="feed-meta"></div>
+        </div>
+        <div class="feed-actions">
+          <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--muted);cursor:pointer;">
+            <input type="checkbox" id="unread-only"> Unread only
+          </label>
+          <button class="btn btn-outline" id="refresh-btn">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="feed-scroll" id="feed-scroll">
+        <div class="state-box"><div class="spinner"></div><div class="state-title">Loading messages…</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+"use strict";
+const BASE = "https://api.agentid-protocol.com";
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+let apiKey = sessionStorage.getItem("agentid_key") || "";
+
+function showAuthWall() {
+  document.getElementById("auth-wall").style.display = "flex";
+  document.getElementById("app").style.display = "none";
+}
+
+async function initAuth() {
+  if (apiKey) {
+    try {
+      const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
+      if (r.ok) { boot(); return; }
+    } catch(_) {}
+    sessionStorage.removeItem("agentid_key");
+    apiKey = "";
+  }
+  try {
+    const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
+    if (r.ok) {
+      const me = await r.json();
+      document.getElementById("topbar-user").textContent = me.email || "";
+      const kr = await fetch(`${BASE}/auth/keys`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: "inbox-dashboard" }),
+      });
+      if (kr.ok) {
+        const kd = await kr.json();
+        apiKey = kd.key;
+        sessionStorage.setItem("agentid_key", apiKey);
+        boot();
+        return;
+      }
+    }
+  } catch(_) {}
+  showAuthWall();
+}
+
+initAuth();
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let _agents = [];      // [{did, name}]
+let _messages = [];    // [{...msg, _agentDid, _agentName}] all messages merged
+let _selectedDid = ""; // "" = all
+let _unreadOnly = false;
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function relativeTime(iso) {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60)  return "just now";
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  if (s < 604800) return `${Math.floor(s/86400)}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function apiHeaders() {
+  return { "x-api-key": apiKey, "Content-Type": "application/json" };
+}
+
+// ── DATA FETCHING ─────────────────────────────────────────────────────────────
+async function fetchAgents() {
+  const r = await fetch(`${BASE}/agents?mine=true&limit=500`, { headers: apiHeaders() });
+  if (!r.ok) return [];
+  const data = await r.json();
+  return Array.isArray(data) ? data : (data.agents || []);
+}
+
+async function fetchMessages(did) {
+  const params = new URLSearchParams({ limit: 200 });
+  const r = await fetch(`${BASE}/agents/${encodeURIComponent(did)}/messages?${params}`, {
+    headers: apiHeaders(),
+  });
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.messages || [];
+}
+
+async function loadAll(silent = false) {
+  if (!silent) setFeedLoading();
+  const btn = document.getElementById("refresh-btn");
+  btn.classList.add("refreshing");
+
+  try {
+    // 1. Fetch agent list
+    _agents = await fetchAgents();
+    renderSidebar();
+
+    // 2. Fetch messages for all agents in parallel
+    const results = await Promise.allSettled(
+      _agents.map(a => fetchMessages(a.did).then(msgs => msgs.map(m => ({
+        ...m,
+        _agentDid:  a.did,
+        _agentName: a.name || a.did.slice(-10),
+      }))))
+    );
+
+    _messages = results
+      .filter(r => r.status === "fulfilled")
+      .flatMap(r => r.value)
+      .sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
+
+    renderSidebar();
+    renderFeed();
+  } catch(e) {
+    document.getElementById("feed-scroll").innerHTML =
+      `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load messages</div><div class="state-sub">${esc(e.message)}</div></div>`;
+  } finally {
+    btn.classList.remove("refreshing");
+  }
+}
+
+function setFeedLoading() {
+  document.getElementById("feed-scroll").innerHTML =
+    '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading messages…</div></div>';
+}
+
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById("sidebar-list");
+
+  // Count unread per agent
+  const unreadMap = {};
+  _messages.forEach(m => {
+    if (!m.read) unreadMap[m._agentDid] = (unreadMap[m._agentDid] || 0) + 1;
+  });
+  const totalUnread = Object.values(unreadMap).reduce((a, b) => a + b, 0);
+
+  let html = `
+    <div class="sidebar-item${_selectedDid === "" ? " active" : ""}" data-did="">
+      <span class="sidebar-item-name">All agents</span>
+      ${totalUnread > 0
+        ? `<span class="sidebar-badge">${totalUnread}</span>`
+        : `<span class="sidebar-badge-zero">${_messages.length}</span>`}
+    </div>
+    <div class="sidebar-sep"></div>
+  `;
+
+  if (!_agents.length) {
+    html += `<div style="padding:1rem;text-align:center;font-size:0.8rem;color:var(--muted);">No agents yet</div>`;
+  } else {
+    _agents.forEach(a => {
+      const u = unreadMap[a.did] || 0;
+      const total = _messages.filter(m => m._agentDid === a.did).length;
+      const active = _selectedDid === a.did;
+      html += `
+        <div class="sidebar-item${active ? " active" : ""}" data-did="${esc(a.did)}">
+          <span class="sidebar-item-name" title="${esc(a.name || a.did)}">${esc(a.name || a.did.slice(-12))}</span>
+          ${u > 0
+            ? `<span class="sidebar-badge">${u}</span>`
+            : `<span class="sidebar-badge-zero">${total}</span>`}
+        </div>`;
+    });
+  }
+
+  list.innerHTML = html;
+
+  list.querySelectorAll(".sidebar-item").forEach(el => {
+    el.addEventListener("click", () => {
+      _selectedDid = el.dataset.did;
+      list.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
+      el.classList.add("active");
+      renderFeed();
+    });
+  });
+}
+
+// ── FEED ──────────────────────────────────────────────────────────────────────
+function renderFeed() {
+  const titleEl = document.getElementById("feed-title");
+  const metaEl  = document.getElementById("feed-meta");
+  const scroll  = document.getElementById("feed-scroll");
+
+  let msgs = _selectedDid
+    ? _messages.filter(m => m._agentDid === _selectedDid)
+    : _messages;
+
+  if (_unreadOnly) msgs = msgs.filter(m => !m.read);
+
+  const agent = _agents.find(a => a.did === _selectedDid);
+  titleEl.textContent = agent ? (agent.name || "Agent") : "All Messages";
+
+  const unread = msgs.filter(m => !m.read).length;
+  metaEl.textContent = unread
+    ? `${msgs.length} message${msgs.length !== 1 ? "s" : ""} · ${unread} unread`
+    : `${msgs.length} message${msgs.length !== 1 ? "s" : ""}`;
+
+  if (!msgs.length) {
+    scroll.innerHTML = `
+      <div class="state-box">
+        <div class="state-icon">📭</div>
+        <div class="state-title">${_unreadOnly ? "No unread messages" : "No messages yet"}</div>
+        <div class="state-sub">${_unreadOnly ? "All caught up!" : "Messages sent to your agents will appear here."}</div>
+      </div>`;
+    return;
+  }
+
+  scroll.innerHTML = msgs.map((m, idx) => {
+    const bodyLong = (m.body || "").length > 180;
+    return `
+      <div class="msg-card${m.read ? "" : " unread"}" id="mc-${idx}">
+        <div class="msg-top">
+          <div class="msg-subject${m.subject ? "" : " no-subject"}">${m.subject ? esc(m.subject) : "(no subject)"}</div>
+          <div class="msg-time">${relativeTime(m.sent_at)}</div>
+        </div>
+        <div class="msg-body" id="mb-${idx}">${esc(m.body || "")}</div>
+        ${bodyLong ? `<button class="msg-expand" onclick="toggleExpand(${idx})">Show more</button>` : ""}
+        <div class="msg-meta">
+          <div class="msg-sender">
+            ${m.sender_name ? `<strong>${esc(m.sender_name)}</strong> — ` : ""}
+            ${m.from_did ? esc(m.from_did) : '<span style="font-family:inherit;font-style:italic;">anonymous</span>'}
+            ${m.sender_public_key ? `<br><span class="pubkey-toggle" onclick="togglePubkey(${idx})">🔑 verify sender</span><div class="pubkey-box" id="pk-${idx}" style="display:none;">${esc(m.sender_public_key)}</div>` : ""}
+          </div>
+          <div class="msg-tags">
+            ${!m.read ? '<span class="tag-new">NEW</span>' : ""}
+            ${_selectedDid === "" ? `<span class="tag-to">${esc(m._agentName)}</span>` : ""}
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function toggleExpand(idx) {
+  const el = document.getElementById(`mb-${idx}`);
+  const btn = el.nextElementSibling;
+  if (el.classList.contains("expanded")) {
+    el.classList.remove("expanded");
+    btn.textContent = "Show more";
+  } else {
+    el.classList.add("expanded");
+    btn.textContent = "Show less";
+  }
+}
+
+function togglePubkey(idx) {
+  const el = document.getElementById(`pk-${idx}`);
+  if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+function boot() {
+  document.getElementById("auth-wall").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  // Set user label
+  fetch(`${BASE}/auth/me`, { credentials: "include" })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d) document.getElementById("topbar-user").textContent = d.email || ""; })
+    .catch(() => {});
+
+  loadAll();
+
+  document.getElementById("refresh-btn").addEventListener("click", () => loadAll(true));
+  document.getElementById("unread-only").addEventListener("change", e => {
+    _unreadOnly = e.target.checked;
+    renderFeed();
+  });
+
+  // Auto-refresh every 30s
+  setInterval(() => loadAll(true), 30_000);
+}
+</script>
+</body>
+</html>
