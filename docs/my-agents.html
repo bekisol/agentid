@@ -596,7 +596,12 @@ async function initAuth() {
   if (apiKey) {
     try {
       const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
-      if (r.ok) { boot(); return; }
+      if (r.ok) {
+        const me = await r.json();
+        _owner = me.owner || _owner;
+        sessionStorage.setItem("agentid_owner", _owner);
+        boot(); return;
+      }
     } catch(_) {}
     // Session expired — clear stale key and fall through to OAuth
     sessionStorage.removeItem("agentid_key");
