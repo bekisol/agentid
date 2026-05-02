@@ -22,6 +22,8 @@
       --border: #E5E2DB; --border-dark: #C9C5BC;
       --text: #1C1917; --text-2: #44403C; --muted: #78716C;
       --accent: #C2410C; --accent-light: #FFF7ED; --accent-border: #FDBA74;
+      --blue: #2563EB; --blue-dark: #1E40AF; --blue-light: #EFF6FF;
+      --sent-bg: #3D5A80; --sent-bg-dark: #2D4566;
       --green: #059669; --green-bg: #ECFDF5;
       --red: #DC2626; --red-bg: #FEF2F2;
       --yellow: #D97706; --yellow-bg: #FFFBEB;
@@ -100,14 +102,14 @@
     .bubble-name { font-size:0.68rem; color:var(--muted); margin-bottom:0.2rem; padding:0 0.5rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
     .bubble { padding:0.6rem 0.9rem; border-radius:18px; font-size:0.84rem; line-height:1.5; word-break:break-word; white-space:pre-wrap; position:relative; }
     .bubble-row.received .bubble { background:var(--surface); border:1px solid var(--border); color:var(--text); border-bottom-left-radius:4px; }
-    .bubble-row.sent .bubble { background:var(--accent); color:#fff; border-bottom-right-radius:4px; }
-    .bubble-row.sent .bubble.auto-reply { background:#a03009; }
-    /* Agent-to-agent messages: blue instead of orange */
+    .bubble-row.sent .bubble { background:var(--sent-bg); color:#fff; border-bottom-right-radius:4px; }
+    .bubble-row.sent .bubble.auto-reply { background:var(--sent-bg-dark); }
+    /* Agent-to-agent messages: blue instead of slate */
     .bubble-row.sent-agent .bubble { background:var(--blue); color:#fff; border-bottom-right-radius:4px; }
-    .bubble-row.sent-agent .bubble.auto-reply { background:#1d4ed8; }
+    .bubble-row.sent-agent .bubble.auto-reply { background:var(--blue-dark); }
     .bubble-row.sent-agent { flex-direction:row-reverse; }
     .bubble-row.sent-agent .bubble-col { align-items:flex-end; }
-    .bubble-row.sent-agent .bubble-avatar { background:#eff6ff; border-color:#bfdbfe; }
+    .bubble-row.sent-agent .bubble-avatar { background:var(--blue-light); border-color:#bfdbfe; }
     .bubble-row.sent-agent .bubble-time { color:var(--muted); text-align:right; }
     .bubble-row.sent-agent .bubble-subject { color:rgba(255,255,255,0.85); }
     .bubble-row.sent-agent .bubble-name { text-align:right; }
