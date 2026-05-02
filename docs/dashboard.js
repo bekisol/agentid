@@ -4713,12 +4713,17 @@ async function _loadAccountKeys() {
         <tbody>
           ${keys.map(k => `
             <tr>
-              <td style="padding:0.45rem 0.5rem;font-weight:600;">${esc(k.label || "(unlabelled)")}</td>
+              <td style="padding:0.45rem 0.5rem;font-weight:600;">
+                ${esc(k.label || "(unlabelled)")}
+                ${k.permanent ? '<span title="Permanent owner key — cannot be revoked" style="margin-left:0.35rem;font-size:0.72rem;opacity:0.7;">🔒</span>' : ""}
+              </td>
               <td style="padding:0.45rem 0.5rem;color:var(--text-2);">${esc(k.scopes || "(full)")}</td>
               <td style="padding:0.45rem 0.5rem;color:var(--muted);font-size:0.74rem;">${esc(_relativeTime(k.created_at) || "—")}</td>
               <td style="padding:0.45rem 0.5rem;color:var(--muted);font-size:0.74rem;">${esc(_relativeTime(k.last_used) || "never")}</td>
               <td style="padding:0.45rem 0.5rem;text-align:right;">
-                <button class="btn btn-outline ak-revoke-btn" data-label="${esc(k.label)}" style="font-size:0.72rem;padding:0.25rem 0.6rem;color:var(--red);border-color:var(--red);">Revoke</button>
+                ${k.permanent
+                  ? '<span style="font-size:0.72rem;color:var(--muted);">permanent</span>'
+                  : `<button class="btn btn-outline ak-revoke-btn" data-label="${esc(k.label)}" style="font-size:0.72rem;padding:0.25rem 0.6rem;color:var(--red);border-color:var(--red);">Revoke</button>`}
               </td>
             </tr>`).join("")}
         </tbody>
