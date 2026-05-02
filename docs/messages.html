@@ -71,6 +71,8 @@
     .btn { padding:0.4rem 0.9rem; border-radius:7px; font-size:0.82rem; font-weight:600; cursor:pointer; border:none; font-family:inherit; }
     .btn-outline { background:var(--surface); color:var(--text-2); border:1px solid var(--border-dark); }
     .btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+    .btn-primary { background:var(--accent); color:#fff; border:1px solid var(--accent); }
+    .btn-primary:hover { background:#b43709; }
     .feed-scroll { flex:1; overflow-y:auto; padding:1rem 1.5rem; }
 
     /* Chat bubble layout */
@@ -111,6 +113,29 @@
     /* Refresh pulse */
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
     .refreshing { animation:pulse 1s ease-in-out infinite; }
+
+    /* Force-stop / danger button */
+    .btn-danger { background:var(--red-bg); color:var(--red); border:1px solid #fca5a5; }
+    .btn-danger:hover { background:#fee2e2; border-color:var(--red); }
+    .btn-success { background:var(--green-bg); color:var(--green); border:1px solid #6ee7b7; }
+    .btn-success:hover { background:#d1fae5; }
+
+    /* Deal badge in feed */
+    .deal-badge { display:inline-flex; align-items:center; gap:0.4rem; background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:0.35rem 0.7rem; font-size:0.78rem; font-weight:600; color:#15803d; cursor:pointer; margin-top:0.4rem; }
+    .deal-badge:hover { background:#dcfce7; }
+
+    /* Sidebar deals item */
+    .sidebar-section { padding:0.45rem 1.1rem; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-top:0.25rem; }
+    .sidebar-item-deal { padding:0.5rem 1.1rem; cursor:pointer; font-size:0.84rem; font-weight:500; color:var(--text-2); display:flex; align-items:center; gap:0.5rem; }
+    .sidebar-item-deal:hover { background:var(--surface2); }
+    .sidebar-item-deal.active { background:var(--green-bg); color:#15803d; font-weight:600; }
+
+    /* Deal list in feed */
+    .deal-card { background:var(--surface); border:1px solid #86efac; border-radius:12px; padding:1rem 1.25rem; margin-bottom:0.75rem; display:grid; gap:0.3rem; }
+    .deal-card-ref { font-family:"JetBrains Mono",monospace; font-size:0.8rem; color:var(--muted); }
+    .deal-card-price { font-size:1.35rem; font-weight:800; color:#15803d; letter-spacing:-0.03em; }
+    .deal-card-parties { font-size:0.78rem; color:var(--text-2); }
+    .deal-card-time { font-size:0.72rem; color:var(--muted); }
 
     @media(max-width:640px) {
       .sidebar { width:200px; }
@@ -208,6 +233,11 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="sidebar-list" id="sidebar-list">
         <div style="padding:1rem;text-align:center;"><div class="spinner"></div></div>
       </div>
+      <div class="sidebar-sep"></div>
+      <div class="sidebar-section">Deals</div>
+      <div class="sidebar-item-deal" id="sidebar-deals-btn" onclick="showDealsView()">
+        🤝 Signed Deals <span id="sidebar-deals-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
+      </div>
     </div>
 
     <!-- Feed -->
@@ -221,6 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--muted);cursor:pointer;">
             <input type="checkbox" id="unread-only"> Unread only
           </label>
+          <button class="btn btn-danger" id="stop-btn" style="display:none;" onclick="openStopModal()">⏹ Force Stop</button>
           <button class="btn btn-outline" id="refresh-btn">↻ Refresh</button>
         </div>
       </div>
@@ -283,6 +314,48 @@ document.addEventListener("DOMContentLoaded", () => {
         <button onclick="sendMessage()" id="compose-send-btn" class="btn btn-primary">Send</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Force-Stop modal -->
+<div id="stop-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;z-index:9000;padding:1rem;">
+  <div style="background:var(--surface);border-radius:16px;border:1px solid var(--border);max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.18);overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-weight:700;font-size:0.95rem;">⏹ Force Stop Auto-Reply</span>
+      <button onclick="closeStopModal()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;">✕</button>
+    </div>
+    <div style="padding:1.25rem;display:grid;gap:0.85rem;">
+      <p style="font-size:0.83rem;color:var(--text-2);">Stop all auto-reply traffic between two agents. This is reversible — you can re-enable it anytime.</p>
+      <div>
+        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">Agent A (your agent)</label>
+        <input id="stop-did-a" type="text" readonly style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--muted);background:var(--surface2);outline:none;" />
+      </div>
+      <div>
+        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">Agent B (counterparty DID)</label>
+        <input id="stop-did-b" type="text" placeholder="did:agentid:…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.82rem;font-family:'JetBrains Mono',monospace;color:var(--text);background:var(--surface);outline:none;" />
+      </div>
+      <div id="stop-active-list" style="display:none;">
+        <div style="font-size:0.75rem;font-weight:600;color:var(--muted);margin-bottom:0.4rem;">Active stops for this agent:</div>
+        <div id="stop-active-items"></div>
+      </div>
+      <div id="stop-error" style="display:none;color:var(--red);font-size:0.8rem;"></div>
+      <div id="stop-success" style="display:none;color:var(--green);font-size:0.82rem;font-weight:600;"></div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+        <button onclick="closeStopModal()" class="btn btn-outline">Cancel</button>
+        <button onclick="submitStop()" id="stop-submit-btn" class="btn btn-danger">⏹ Stop Communication</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Deals modal -->
+<div id="deal-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;z-index:9000;padding:1rem;">
+  <div style="background:var(--surface);border-radius:16px;border:1px solid var(--border);max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.18);overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-weight:700;font-size:0.95rem;" id="deal-modal-ref">Deal Invoice</span>
+      <button onclick="closeDealModal()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;">✕</button>
+    </div>
+    <div style="padding:1.25rem;" id="deal-modal-body"></div>
   </div>
 </div>
 
@@ -398,6 +471,15 @@ async function loadAll(silent = false) {
 
     renderSidebar();
     renderFeed();
+
+    // Update deals count badge in sidebar (fire-and-forget)
+    fetch(`${BASE}/pro/deals?limit=1`, { headers: apiHeaders(), credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const el = document.getElementById("sidebar-deals-count");
+        if (el && d && d.total != null) el.textContent = d.total > 0 ? d.total : "";
+      }).catch(() => {});
+
   } catch(e) {
     document.getElementById("feed-scroll").innerHTML =
       `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load messages</div><div class="state-sub">${esc(e.message)}</div></div>`;
@@ -453,9 +535,11 @@ function renderSidebar() {
 
   list.querySelectorAll(".sidebar-item").forEach(el => {
     el.addEventListener("click", () => {
+      _dealsView = false;
       _selectedDid = el.dataset.did;
       list.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
       el.classList.add("active");
+      document.getElementById("sidebar-deals-btn").classList.remove("active");
       renderFeed();
     });
   });
@@ -544,7 +628,17 @@ function renderFeed() {
   const scroll    = document.getElementById("feed-scroll");
   const infoPanel = document.getElementById("agent-info");
 
-  let msgs = _selectedDid
+  // Show Force Stop button only when a specific agent is selected
+  const stopBtn = document.getElementById("stop-btn");
+  if (_selectedDid && _selectedDid !== "__deals__") {
+    stopBtn.style.display = "";
+  } else {
+    stopBtn.style.display = "none";
+  }
+
+  if (_dealsView) return;
+
+  let msgs = _selectedDid && _selectedDid !== "__deals__"
     ? _messages.filter(m => m._agentDid === _selectedDid)
     : _messages;
 
@@ -655,6 +749,187 @@ function togglePubkey(idx) {
   const el = document.getElementById(`pk-${idx}`);
   if (el) el.style.display = el.style.display === "none" ? "block" : "none";
 }
+
+// ── FORCE STOP ────────────────────────────────────────────────────────────────
+let _activeStops = [];
+
+async function openStopModal() {
+  const modal   = document.getElementById("stop-modal");
+  const errEl   = document.getElementById("stop-error");
+  const succEl  = document.getElementById("stop-success");
+  const didAEl  = document.getElementById("stop-did-a");
+  const didBEl  = document.getElementById("stop-did-b");
+  errEl.style.display = "none";
+  succEl.style.display = "none";
+  didAEl.value = _selectedDid || "";
+  didBEl.value = "";
+  modal.style.display = "flex";
+  // Load existing stops for this agent
+  try {
+    const r = await fetch(`${BASE}/pro/agents/comm-stops`, { headers: apiHeaders(), credentials: "include" });
+    if (r.ok) {
+      const data = await r.json();
+      _activeStops = (data.stops || []).filter(s => s.did_a === _selectedDid || s.did_b === _selectedDid);
+      renderActiveStops();
+    }
+  } catch(_) {}
+}
+
+function renderActiveStops() {
+  const wrap  = document.getElementById("stop-active-list");
+  const items = document.getElementById("stop-active-items");
+  if (!_activeStops.length) { wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  items.innerHTML = _activeStops.map(s => {
+    const other = s.did_a === _selectedDid ? (s.name_b || s.did_b) : (s.name_a || s.did_a);
+    const otherDid = s.did_a === _selectedDid ? s.did_b : s.did_a;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0.5rem;background:var(--red-bg);border:1px solid #fca5a5;border-radius:6px;margin-bottom:0.3rem;font-size:0.78rem;">
+      <span style="font-family:'JetBrains Mono',monospace;color:var(--red);">⏹ ${esc(other)}</span>
+      <button onclick="removeStop('${esc(otherDid)}')" style="background:none;border:none;font-size:0.72rem;color:var(--red);cursor:pointer;font-family:inherit;font-weight:600;">Remove</button>
+    </div>`;
+  }).join("");
+}
+
+function closeStopModal() {
+  document.getElementById("stop-modal").style.display = "none";
+}
+
+async function submitStop() {
+  const didA  = document.getElementById("stop-did-a").value.trim();
+  const didB  = document.getElementById("stop-did-b").value.trim();
+  const errEl = document.getElementById("stop-error");
+  const succEl= document.getElementById("stop-success");
+  const btn   = document.getElementById("stop-submit-btn");
+  errEl.style.display = "none"; succEl.style.display = "none";
+  if (!didA || !didB) { errEl.textContent = "Both agent DIDs are required."; errEl.style.display = "block"; return; }
+  if (didA === didB)  { errEl.textContent = "Agent A and Agent B cannot be the same."; errEl.style.display = "block"; return; }
+  btn.disabled = true; btn.textContent = "Stopping…";
+  try {
+    const r = await fetch(`${BASE}/pro/agents/comm-stop`, {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ did_a: didA, did_b: didB }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || `Error ${r.status}`);
+    succEl.textContent = "✓ Auto-reply traffic stopped. The chain will not restart.";
+    succEl.style.display = "block";
+    document.getElementById("stop-did-b").value = "";
+    // Refresh stops list
+    _activeStops.push({ did_a: data.did_a, did_b: data.did_b, name_a: null, name_b: null });
+    renderActiveStops();
+  } catch(e) {
+    errEl.textContent = e.message || "Failed to create stop.";
+    errEl.style.display = "block";
+  }
+  btn.disabled = false; btn.textContent = "⏹ Stop Communication";
+}
+
+async function removeStop(otherDid) {
+  const didA = _selectedDid;
+  try {
+    const params = new URLSearchParams({ did_a: didA, did_b: otherDid });
+    const r = await fetch(`${BASE}/pro/agents/comm-stop?${params}`, {
+      method: "DELETE",
+      headers: apiHeaders(),
+      credentials: "include",
+    });
+    if (r.ok) {
+      _activeStops = _activeStops.filter(s => !(
+        (s.did_a === didA && s.did_b === otherDid) ||
+        (s.did_b === didA && s.did_a === otherDid)
+      ));
+      renderActiveStops();
+      const succEl = document.getElementById("stop-success");
+      succEl.textContent = "✓ Stop removed — auto-reply re-enabled.";
+      succEl.style.display = "block";
+    }
+  } catch(_) {}
+}
+
+document.getElementById("stop-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeStopModal();
+});
+
+// ── SIGNED DEALS ──────────────────────────────────────────────────────────────
+let _dealsView = false;
+let _deals = [];
+
+async function showDealsView() {
+  _dealsView = true;
+  _selectedDid = "__deals__";
+  document.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
+  document.getElementById("sidebar-deals-btn").classList.add("active");
+  document.getElementById("stop-btn").style.display = "none";
+  document.getElementById("feed-title").textContent = "Signed Deals";
+  document.getElementById("feed-meta").textContent = "";
+  document.getElementById("agent-info").style.display = "none";
+  const scroll = document.getElementById("feed-scroll");
+  scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading deals…</div></div>';
+  try {
+    const r = await fetch(`${BASE}/pro/deals?limit=100`, { headers: apiHeaders(), credentials: "include" });
+    if (!r.ok) throw new Error(`Error ${r.status}`);
+    const data = await r.json();
+    _deals = data.deals || [];
+    document.getElementById("feed-meta").textContent = `${_deals.length} deal${_deals.length !== 1 ? "s" : ""} finalized`;
+    renderDealsView();
+  } catch(e) {
+    scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load deals</div><div class="state-sub">${esc(e.message)}</div></div>`;
+  }
+}
+
+function renderDealsView() {
+  const scroll = document.getElementById("feed-scroll");
+  if (!_deals.length) {
+    scroll.innerHTML = `<div class="state-box"><div class="state-icon">🤝</div><div class="state-title">No deals yet</div><div class="state-sub">Finalized agent negotiations will appear here as signed invoices.</div></div>`;
+    return;
+  }
+  scroll.innerHTML = _deals.map((d, i) => {
+    const buyer  = d.buyer_name  || d.buyer_did.slice(-12);
+    const seller = d.seller_name || d.seller_did.slice(-12);
+    const price  = d.price != null ? `$${Number(d.price).toLocaleString()} ${d.currency}` : "Price not recorded";
+    const when   = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "";
+    return `<div class="deal-card" onclick="openDealDetail(${i})" style="cursor:pointer;">
+      <div class="deal-card-ref">📄 ${esc(d.deal_ref)}</div>
+      <div class="deal-card-price">${esc(price)}</div>
+      <div class="deal-card-parties">🛒 Buyer: <strong>${esc(buyer)}</strong> &nbsp;·&nbsp; 🏷 Seller: <strong>${esc(seller)}</strong></div>
+      <div class="deal-card-time">Finalized ${esc(when)}</div>
+    </div>`;
+  }).join("");
+}
+
+function openDealDetail(idx) {
+  const d = _deals[idx];
+  if (!d) return;
+  const buyer  = d.buyer_name  || d.buyer_did;
+  const seller = d.seller_name || d.seller_did;
+  const price  = d.price != null ? `$${Number(d.price).toLocaleString()} ${d.currency}` : "—";
+  const when   = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "—";
+  document.getElementById("deal-modal-ref").textContent = `📄 ${d.deal_ref}`;
+  document.getElementById("deal-modal-body").innerHTML = `
+    <div style="display:grid;gap:1rem;">
+      <div style="text-align:center;padding:1rem 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:2rem;font-weight:800;color:#15803d;letter-spacing:-0.03em;">${esc(price)}</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.25rem;">Agreed price</div>
+      </div>
+      <div style="display:grid;gap:0.5rem;font-size:0.83rem;">
+        <div><span style="color:var(--muted);font-weight:600;">Buyer</span><br/><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">${esc(d.buyer_did)}</span>${d.buyer_name ? ` <em>(${esc(d.buyer_name)})</em>` : ''}</div>
+        <div><span style="color:var(--muted);font-weight:600;">Seller</span><br/><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">${esc(d.seller_did)}</span>${d.seller_name ? ` <em>(${esc(d.seller_name)})</em>` : ''}</div>
+        <div><span style="color:var(--muted);font-weight:600;">Finalized</span><br/>${esc(when)}</div>
+        <div><span style="color:var(--muted);font-weight:600;">Status</span><br/><span style="background:#dcfce7;color:#15803d;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:20px;">${esc(d.status || "finalized")}</span></div>
+      </div>
+      ${d.buyer_body ? `<div><div style="font-size:0.75rem;font-weight:700;color:var(--muted);margin-bottom:0.3rem;">BUYER ACCEPTANCE</div><div style="font-size:0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.7rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:120px;overflow-y:auto;">${esc(d.buyer_body)}</div></div>` : ''}
+    </div>`;
+  document.getElementById("deal-detail-modal").style.display = "flex";
+}
+
+function closeDealModal() {
+  document.getElementById("deal-detail-modal").style.display = "none";
+}
+
+document.getElementById("deal-detail-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeDealModal();
+});
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 function boot() {
