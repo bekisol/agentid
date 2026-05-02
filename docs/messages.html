@@ -73,25 +73,32 @@
     .btn-outline:hover { border-color:var(--accent); color:var(--accent); }
     .feed-scroll { flex:1; overflow-y:auto; padding:1rem 1.5rem; }
 
-    /* Message cards */
-    .msg-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:0.9rem 1.05rem; margin-bottom:0.75rem; transition:box-shadow 0.12s; }
-    .msg-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.07); }
-    .msg-card.unread { background:var(--accent-light); border-color:var(--accent-border); }
-    .msg-top { display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem; margin-bottom:0.5rem; }
-    .msg-subject { font-size:0.88rem; font-weight:700; color:var(--text); line-height:1.3; }
-    .msg-subject.no-subject { font-style:italic; color:var(--muted); font-weight:400; }
-    .msg-time { font-size:0.72rem; color:var(--muted); white-space:nowrap; flex-shrink:0; padding-top:0.1rem; }
-    .msg-body { font-size:0.82rem; color:var(--text-2); white-space:pre-wrap; word-break:break-word; margin-bottom:0.6rem; max-height:80px; overflow:hidden; position:relative; }
-    .msg-body.expanded { max-height:none; }
-    .msg-expand { font-size:0.72rem; color:var(--accent); cursor:pointer; background:none; border:none; font-family:inherit; padding:0; }
-    .msg-meta { display:flex; align-items:flex-start; justify-content:space-between; gap:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border); flex-wrap:wrap; }
-    .msg-sender { font-size:0.72rem; color:var(--muted); font-family:"JetBrains Mono",monospace; word-break:break-all; flex:1; min-width:0; }
-    .msg-sender strong { font-family:"Inter",sans-serif; color:var(--text-2); font-size:0.75rem; }
-    .msg-tags { display:flex; align-items:center; gap:0.4rem; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
-    .tag-new { background:var(--accent); color:#fff; font-size:0.62rem; font-weight:700; padding:0.1rem 0.4rem; border-radius:20px; letter-spacing:0.04em; }
-    .tag-to { font-size:0.68rem; font-weight:600; padding:0.12rem 0.45rem; border-radius:4px; background:var(--surface2); color:var(--muted); border:1px solid var(--border); white-space:nowrap; }
-    .pubkey-toggle { font-size:0.68rem; color:var(--accent); cursor:pointer; user-select:none; }
-    .pubkey-box { margin-top:0.3rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.4rem 0.6rem; font-size:0.62rem; font-family:"JetBrains Mono",monospace; word-break:break-all; color:var(--muted); }
+    /* Chat bubble layout */
+    .chat-day { text-align:center; margin:1rem 0 0.5rem; }
+    .chat-day-label { display:inline-block; font-size:0.7rem; color:var(--muted); background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:0.15rem 0.75rem; }
+    .bubble-row { display:flex; margin-bottom:0.65rem; align-items:flex-end; gap:0.5rem; }
+    .bubble-row.sent  { flex-direction:row-reverse; }
+    .bubble-row.received { flex-direction:row; }
+    .bubble-avatar { width:28px; height:28px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:0.75rem; flex-shrink:0; }
+    .bubble-row.sent .bubble-avatar { background:var(--accent-light); }
+    .bubble-col { display:flex; flex-direction:column; max-width:68%; min-width:0; }
+    .bubble-row.sent .bubble-col { align-items:flex-end; }
+    .bubble-row.received .bubble-col { align-items:flex-start; }
+    .bubble-name { font-size:0.68rem; color:var(--muted); margin-bottom:0.2rem; padding:0 0.5rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+    .bubble { padding:0.6rem 0.9rem; border-radius:18px; font-size:0.84rem; line-height:1.5; word-break:break-word; white-space:pre-wrap; position:relative; }
+    .bubble-row.received .bubble { background:var(--surface); border:1px solid var(--border); color:var(--text); border-bottom-left-radius:4px; }
+    .bubble-row.sent .bubble { background:var(--accent); color:#fff; border-bottom-right-radius:4px; }
+    .bubble-row.sent .bubble.auto-reply { background:#a03009; }
+    .bubble-time { font-size:0.65rem; margin-top:0.25rem; padding:0 0.4rem; }
+    .bubble-row.sent .bubble-time { color:var(--muted); text-align:right; }
+    .bubble-row.received .bubble-time { color:var(--muted); text-align:left; }
+    .bubble-subject { font-size:0.7rem; font-weight:700; margin-bottom:0.3rem; opacity:0.75; }
+    .bubble-row.sent .bubble-subject { color:rgba(255,255,255,0.85); }
+    .bubble-row.received .bubble-subject { color:var(--text-2); }
+    .tag-new { display:inline-block; background:var(--accent); color:#fff; font-size:0.6rem; font-weight:700; padding:0.08rem 0.35rem; border-radius:20px; margin-left:0.35rem; vertical-align:middle; letter-spacing:0.04em; }
+    .tag-to  { font-size:0.65rem; font-weight:600; padding:0.1rem 0.4rem; border-radius:4px; background:var(--surface2); color:var(--muted); border:1px solid var(--border); margin-left:0.3rem; }
+    .pubkey-toggle { font-size:0.65rem; color:var(--accent); cursor:pointer; user-select:none; margin-top:0.2rem; display:inline-block; }
+    .pubkey-box { margin-top:0.25rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.35rem 0.5rem; font-size:0.6rem; font-family:"JetBrains Mono",monospace; word-break:break-all; color:var(--muted); max-width:340px; }
 
     /* Empty / loading states */
     .state-box { text-align:center; padding:4rem 2rem; color:var(--muted); }
@@ -315,9 +322,10 @@ async function fetchAgents() {
 }
 
 async function fetchMessages(did) {
-  const params = new URLSearchParams({ limit: 200 });
+  const params = new URLSearchParams({ limit: 200, include_sent: "true" });
   const r = await fetch(`${BASE}/agents/${encodeURIComponent(did)}/messages?${params}`, {
     headers: apiHeaders(),
+    credentials: "include",
   });
   if (!r.ok) return [];
   const data = await r.json();
@@ -487,6 +495,9 @@ function trustColor(score) {
   return "var(--red)";
 }
 
+// Track last render to avoid unnecessary DOM rebuilds (fixes flickering)
+let _lastRenderKey = "";
+
 function renderFeed() {
   const titleEl   = document.getElementById("feed-title");
   const metaEl    = document.getElementById("feed-meta");
@@ -499,55 +510,51 @@ function renderFeed() {
 
   if (_unreadOnly) msgs = msgs.filter(m => !m.read);
 
+  // Sort oldest→newest for chat view (newest at bottom)
+  msgs = [...msgs].sort((a, b) => new Date(a.sent_at) - new Date(b.sent_at));
+
   const agent = _agents.find(a => a.did === _selectedDid);
   titleEl.textContent = agent ? (agent.name || "Agent") : "All Messages";
 
   // Agent identity panel
   if (agent) {
     document.getElementById("agent-info-did").textContent = agent.did || "";
-
-    // Capabilities
     const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
     const capsEl = document.getElementById("agent-info-caps");
     capsEl.innerHTML = caps.length
       ? caps.map(c => `<span style="font-size:0.68rem;font-weight:600;padding:0.12rem 0.4rem;border-radius:4px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent-border);">${esc(c)}</span>`).join("")
       : `<span style="font-size:0.72rem;color:var(--muted);">No capabilities listed</span>`;
-
-    // Trust score — fetch async
     const trustEl = document.getElementById("agent-info-trust");
     trustEl.innerHTML = "Trust score: <span style='font-style:italic;color:var(--muted);'>loading…</span>";
-    fetch(`${BASE}/agents/${encodeURIComponent(agent.did)}/trust-score`, { headers: apiHeaders() })
+    fetch(`${BASE}/agents/${encodeURIComponent(agent.did)}/trust-score`, { headers: apiHeaders(), credentials:"include" })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (!d || d.error) { trustEl.innerHTML = "Trust score: <span style='color:var(--muted);'>unavailable</span>"; return; }
         const score = d.score ?? "—";
-        const level = d.level || "";
-        const col   = typeof score === "number" ? trustColor(score) : "var(--muted)";
-        trustEl.innerHTML = `Trust score: <strong style="color:${col};">${score}/100</strong>${level ? ` <span style="font-size:0.72rem;color:var(--muted);">(${level})</span>` : ""}`;
-      })
-      .catch(() => { trustEl.innerHTML = "Trust score: <span style='color:var(--muted);'>unavailable</span>"; });
-
-    // Public key toggle
+        const col = typeof score === "number" ? trustColor(score) : "var(--muted)";
+        trustEl.innerHTML = `Trust score: <strong style="color:${col};">${score}/100</strong>`;
+      }).catch(() => {});
     const keyWrap = document.getElementById("agent-info-key-wrap");
     const keyBox  = document.getElementById("agent-info-key");
     if (agent.public_key) {
       keyBox.textContent = agent.public_key;
       keyWrap.style.display = "block";
       keyBox.style.display = "none";
-      const btn = keyBox.previousElementSibling;
-      if (btn) btn.textContent = "🔑 Show public key";
-    } else {
-      keyWrap.style.display = "none";
-    }
+    } else { keyWrap.style.display = "none"; }
     infoPanel.style.display = "block";
   } else {
     infoPanel.style.display = "none";
   }
 
-  const unread = msgs.filter(m => !m.read).length;
+  const unread = msgs.filter(m => !m.read && m.direction !== "sent").length;
   metaEl.textContent = unread
     ? `${msgs.length} message${msgs.length !== 1 ? "s" : ""} · ${unread} unread`
     : `${msgs.length} message${msgs.length !== 1 ? "s" : ""}`;
+
+  // Flicker fix: skip full re-render if nothing changed
+  const renderKey = msgs.map(m => m.id + ":" + m.direction).join(",");
+  if (renderKey === _lastRenderKey) return;
+  _lastRenderKey = renderKey;
 
   if (!msgs.length) {
     scroll.innerHTML = `
@@ -559,43 +566,49 @@ function renderFeed() {
     return;
   }
 
-  scroll.innerHTML = msgs.map((m, idx) => {
-    const bodyLong = (m.body || "").length > 180;
-    return `
-      <div class="msg-card${m.read ? "" : " unread"}" id="mc-${idx}">
-        <div class="msg-top">
-          <div class="msg-subject${m.subject ? "" : " no-subject"}">${m.subject ? esc(m.subject) : "(no subject)"}</div>
-          <div class="msg-time">${relativeTime(m.sent_at)}</div>
-        </div>
-        <div class="msg-body" id="mb-${idx}">${esc(m.body || "")}</div>
-        ${bodyLong ? `<button class="msg-expand" onclick="toggleExpand(${idx})">Show more</button>` : ""}
-        <div class="msg-meta">
-          <div class="msg-sender">
-            ${m.from_did ? `
-              ${m.sender_name ? `<strong>${esc(m.sender_name)}</strong><br>` : ""}
-              ${esc(m.from_did)}
-              ${m.sender_public_key ? `<br><span class="pubkey-toggle" onclick="togglePubkey(${idx})">🔑 verify sender</span><div class="pubkey-box" id="pk-${idx}" style="display:none;">${esc(m.sender_public_key)}</div>` : ""}
-            ` : '<span style="font-family:inherit;color:var(--muted);font-size:0.72rem;">No sender DID provided</span>'}
-          </div>
-          <div class="msg-tags">
-            ${!m.read ? '<span class="tag-new">NEW</span>' : ""}
-            ${_selectedDid === "" ? `<span class="tag-to">${esc(m._agentName)}</span>` : ""}
-          </div>
+  // Save scroll position — restore after re-render only if not at bottom
+  const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 60;
+
+  // Group by calendar day for date separators
+  let lastDay = "";
+  const html = msgs.map((m, idx) => {
+    const isSent = m.direction === "sent";
+    const dir    = isSent ? "sent" : "received";
+    const t      = m.sent_at ? new Date(m.sent_at) : null;
+    const dayStr = t ? t.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" }) : "";
+    let dayHtml = "";
+    if (dayStr && dayStr !== lastDay) {
+      lastDay = dayStr;
+      const isToday = new Date().toDateString() === t.toDateString();
+      dayHtml = `<div class="chat-day"><span class="chat-day-label">${isToday ? "Today" : dayStr}</span></div>`;
+    }
+
+    const timeStr = t ? t.toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit" }) : "";
+    const senderLabel = isSent
+      ? (m._agentName || "You")
+      : (m.sender_name || (m.from_did ? m.from_did.slice(-10) : "Unknown"));
+    const avatarLetter = senderLabel.charAt(0).toUpperCase();
+    const subjectHtml  = m.subject ? `<div class="bubble-subject">${esc(m.subject)}</div>` : "";
+    const autoTag      = m.is_auto_reply ? ' auto-reply' : '';
+    const newTag       = (!m.read && !isSent) ? '<span class="tag-new">NEW</span>' : "";
+    const agentTag     = _selectedDid === "" ? `<span class="tag-to">${esc(m._agentName)}</span>` : "";
+    const pkHtml       = (!isSent && m.sender_public_key)
+      ? `<span class="pubkey-toggle" onclick="togglePubkey(${idx})">🔑 verify sender</span><div class="pubkey-box" id="pk-${idx}" style="display:none;">${esc(m.sender_public_key)}</div>`
+      : "";
+
+    return `${dayHtml}
+      <div class="bubble-row ${dir}" id="br-${idx}">
+        <div class="bubble-avatar">${avatarLetter}</div>
+        <div class="bubble-col">
+          <div class="bubble-name">${esc(senderLabel)}${newTag}${agentTag}</div>
+          <div class="bubble${autoTag}">${subjectHtml}${esc(m.body || "")}</div>
+          <div class="bubble-time">${timeStr}${m.is_auto_reply ? " · auto-reply" : ""}${pkHtml}</div>
         </div>
       </div>`;
   }).join("");
-}
 
-function toggleExpand(idx) {
-  const el = document.getElementById(`mb-${idx}`);
-  const btn = el.nextElementSibling;
-  if (el.classList.contains("expanded")) {
-    el.classList.remove("expanded");
-    btn.textContent = "Show more";
-  } else {
-    el.classList.add("expanded");
-    btn.textContent = "Show less";
-  }
+  scroll.innerHTML = html;
+  if (atBottom) scroll.scrollTop = scroll.scrollHeight;
 }
 
 function togglePubkey(idx) {
