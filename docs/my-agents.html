@@ -583,8 +583,8 @@
 const BASE = "https://api.agentid-protocol.com";
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
-let apiKey = sessionStorage.getItem("agentid_key") || "";
-let _owner  = sessionStorage.getItem("agentid_owner") || "";
+let apiKey = localStorage.getItem("agentid_key") || "";
+let _owner  = localStorage.getItem("agentid_owner") || "";
 
 function showAuthWall() {
   document.getElementById("auth-wall").style.display = "flex";
@@ -599,12 +599,12 @@ async function initAuth() {
       if (r.ok) {
         const me = await r.json();
         _owner = me.owner || _owner;
-        sessionStorage.setItem("agentid_owner", _owner);
+        localStorage.setItem("agentid_owner", _owner);
         boot(); return;
       }
     } catch(_) {}
     // Session expired — clear stale key and fall through to OAuth
-    sessionStorage.removeItem("agentid_key");
+    localStorage.removeItem("agentid_key");
     apiKey = "";
   }
 
@@ -614,7 +614,7 @@ async function initAuth() {
     if (r.ok) {
       const me = await r.json();
       _owner = me.owner || "";
-      sessionStorage.setItem("agentid_owner", _owner);
+      localStorage.setItem("agentid_owner", _owner);
       // Session active — mint a fresh API key for this browser session
       const kr = await fetch(`${BASE}/auth/keys`, {
         method: "POST",
@@ -625,7 +625,7 @@ async function initAuth() {
       if (kr.ok) {
         const kd = await kr.json();
         apiKey = kd.key;
-        sessionStorage.setItem("agentid_key", apiKey);
+        localStorage.setItem("agentid_key", apiKey);
         boot();
         return;
       }

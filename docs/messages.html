@@ -248,7 +248,7 @@
 const BASE = "https://api.agentid-protocol.com";
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
-let apiKey = sessionStorage.getItem("agentid_key") || "";
+let apiKey = localStorage.getItem("agentid_key") || "";
 
 function showAuthWall() {
   document.getElementById("auth-wall").style.display = "flex";
@@ -261,7 +261,7 @@ async function initAuth() {
       const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
       if (r.ok) { boot(); return; }
     } catch(_) {}
-    sessionStorage.removeItem("agentid_key");
+    localStorage.removeItem("agentid_key");
     apiKey = "";
   }
   try {
@@ -278,7 +278,7 @@ async function initAuth() {
       if (kr.ok) {
         const kd = await kr.json();
         apiKey = kd.key;
-        sessionStorage.setItem("agentid_key", apiKey);
+        localStorage.setItem("agentid_key", apiKey);
         boot();
         return;
       }
