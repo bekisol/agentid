@@ -132,10 +132,33 @@
 
     /* Deal list in feed */
     .deal-card { background:var(--surface); border:1px solid #86efac; border-radius:12px; padding:1rem 1.25rem; margin-bottom:0.75rem; display:grid; gap:0.3rem; }
-    .deal-card-ref { font-family:"JetBrains Mono",monospace; font-size:0.8rem; color:var(--muted); }
-    .deal-card-price { font-size:1.35rem; font-weight:800; color:#15803d; letter-spacing:-0.03em; }
+    .deal-card-ref { font-family:"JetBrains Mono",monospace; font-size:0.8rem; color:var(--muted); display:flex; align-items:center; gap:0.5rem; }
+    .deal-card-type { font-size:0.65rem; font-weight:700; padding:0.1rem 0.45rem; border-radius:20px; text-transform:uppercase; letter-spacing:0.04em; }
+    .deal-card-type.sale { background:#dcfce7; color:#15803d; }
+    .deal-card-type.service { background:#eff6ff; color:#1d4ed8; }
+    .deal-card-headline { font-size:1.35rem; font-weight:800; color:#15803d; letter-spacing:-0.03em; }
+    .deal-card-desc { font-size:0.84rem; color:var(--text-2); font-style:italic; }
     .deal-card-parties { font-size:0.78rem; color:var(--text-2); }
     .deal-card-time { font-size:0.72rem; color:var(--muted); }
+
+    /* Chat panel */
+    .chat-panel { display:none; position:fixed; bottom:0; right:0; width:380px; height:520px; background:var(--surface); border:1px solid var(--border); border-radius:16px 16px 0 0; box-shadow:0 -8px 40px rgba(0,0,0,0.12); z-index:8000; flex-direction:column; overflow:hidden; }
+    .chat-panel.open { display:flex; }
+    .chat-panel-header { padding:0.75rem 1rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; background:var(--surface2); }
+    .chat-panel-title { font-weight:700; font-size:0.9rem; }
+    .chat-panel-subtitle { font-size:0.72rem; color:var(--muted); }
+    .chat-panel-messages { flex:1; overflow-y:auto; padding:0.75rem 1rem; display:flex; flex-direction:column; gap:0.5rem; }
+    .chat-msg { max-width:85%; padding:0.5rem 0.8rem; border-radius:14px; font-size:0.84rem; line-height:1.5; word-break:break-word; white-space:pre-wrap; }
+    .chat-msg.human { background:var(--accent); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+    .chat-msg.agent { background:var(--surface2); border:1px solid var(--border); color:var(--text); align-self:flex-start; border-bottom-left-radius:4px; }
+    .chat-msg-time { font-size:0.62rem; color:var(--muted); margin-top:0.15rem; }
+    .chat-msg.human + .chat-msg-time, .chat-msg.agent + .chat-msg-time { text-align:right; }
+    .chat-typing { font-size:0.78rem; color:var(--muted); font-style:italic; padding:0.25rem 0; }
+    .chat-panel-input { border-top:1px solid var(--border); padding:0.6rem 0.75rem; display:flex; gap:0.5rem; flex-shrink:0; }
+    .chat-panel-input textarea { flex:1; resize:none; border:1px solid var(--border-dark); border-radius:8px; padding:0.45rem 0.65rem; font-size:0.84rem; font-family:inherit; outline:none; max-height:80px; line-height:1.4; }
+    .chat-panel-input textarea:focus { border-color:var(--accent); }
+    .chat-send-btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:0.45rem 0.75rem; font-size:0.82rem; font-weight:600; cursor:pointer; font-family:inherit; flex-shrink:0; }
+    .chat-send-btn:disabled { opacity:0.5; cursor:not-allowed; }
 
     @media(max-width:640px) {
       .sidebar { width:200px; }
@@ -272,8 +295,11 @@ document.addEventListener("DOMContentLoaded", () => {
               <div id="agent-info-key" style="display:none;margin-top:0.3rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.62rem;font-family:'JetBrains Mono',monospace;word-break:break-all;color:var(--muted);"></div>
             </div>
           </div>
-          <!-- Compose button -->
-          <button id="compose-btn" onclick="openCompose()" class="btn btn-outline" style="flex-shrink:0;align-self:flex-start;">✉ Send Message</button>
+          <!-- Action buttons -->
+          <div style="display:flex;flex-direction:column;gap:0.4rem;flex-shrink:0;align-self:flex-start;">
+            <button id="compose-btn" onclick="openCompose()" class="btn btn-outline">✉ Send Message</button>
+            <button id="chat-open-btn" onclick="openChat()" class="btn btn-primary" style="display:none;">💬 Chat with Agent</button>
+          </div>
         </div>
       </div>
       <div class="feed-scroll" id="feed-scroll">
@@ -314,6 +340,26 @@ document.addEventListener("DOMContentLoaded", () => {
         <button onclick="sendMessage()" id="compose-send-btn" class="btn btn-primary">Send</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Chat panel (slides up from bottom-right) -->
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-panel-header">
+    <div>
+      <div class="chat-panel-title" id="chat-panel-title">Chat</div>
+      <div class="chat-panel-subtitle" id="chat-panel-subtitle"></div>
+    </div>
+    <button onclick="closeChat()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;">✕</button>
+  </div>
+  <div class="chat-panel-messages" id="chat-panel-messages">
+    <div style="text-align:center;padding:2rem 1rem;color:var(--muted);font-size:0.82rem;">
+      Send a message to start chatting with your agent.
+    </div>
+  </div>
+  <div class="chat-panel-input">
+    <textarea id="chat-input" rows="1" placeholder="Message your agent…" oninput="autoResizeChatInput(this)" onkeydown="chatKeydown(event)"></textarea>
+    <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()">Send</button>
   </div>
 </div>
 
@@ -628,12 +674,15 @@ function renderFeed() {
   const scroll    = document.getElementById("feed-scroll");
   const infoPanel = document.getElementById("agent-info");
 
-  // Show Force Stop button only when a specific agent is selected
+  // Show Force Stop + Chat buttons only when a specific agent is selected
   const stopBtn = document.getElementById("stop-btn");
+  const chatBtn = document.getElementById("chat-open-btn");
   if (_selectedDid && _selectedDid !== "__deals__") {
     stopBtn.style.display = "";
+    if (chatBtn) chatBtn.style.display = "";
   } else {
     stopBtn.style.display = "none";
+    if (chatBtn) chatBtn.style.display = "none";
   }
 
   if (_dealsView) return;
@@ -748,6 +797,124 @@ function renderFeed() {
 function togglePubkey(idx) {
   const el = document.getElementById(`pk-${idx}`);
   if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+// ── CHAT ──────────────────────────────────────────────────────────────────────
+let _chatDid = "";
+let _chatName = "";
+
+async function openChat() {
+  const agent = _agents.find(a => a.did === _selectedDid);
+  if (!agent) return;
+  _chatDid  = agent.did;
+  _chatName = agent.name || agent.did.slice(-12);
+  document.getElementById("chat-panel-title").textContent = `💬 ${_chatName}`;
+  document.getElementById("chat-panel-subtitle").textContent = "AI-powered · your agent";
+  document.getElementById("chat-panel").classList.add("open");
+  document.getElementById("chat-input").focus();
+  await loadChatHistory();
+}
+
+function closeChat() {
+  document.getElementById("chat-panel").classList.remove("open");
+}
+
+async function loadChatHistory() {
+  const box = document.getElementById("chat-panel-messages");
+  box.innerHTML = '<div class="chat-typing">Loading history…</div>';
+  try {
+    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_chatDid)}/chat/history?limit=60`, {
+      headers: apiHeaders(), credentials: "include",
+    });
+    if (!r.ok) throw new Error(`${r.status}`);
+    const data = await r.json();
+    const msgs = data.messages || [];
+    if (!msgs.length) {
+      box.innerHTML = '<div style="text-align:center;padding:2rem 1rem;color:var(--muted);font-size:0.82rem;">No messages yet — say hello!</div>';
+      return;
+    }
+    renderChatMessages(msgs);
+  } catch(e) {
+    box.innerHTML = `<div style="color:var(--red);font-size:0.8rem;padding:1rem;">Could not load history: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderChatMessages(msgs) {
+  const box = document.getElementById("chat-panel-messages");
+  box.innerHTML = msgs.map(m => {
+    const cls  = m.role === "human" ? "human" : "agent";
+    const time = m.sent_at ? new Date(m.sent_at).toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit" }) : "";
+    return `<div class="chat-msg ${cls}">${esc(m.body || "")}</div><div class="chat-msg-time" style="align-self:${cls === "human" ? "flex-end" : "flex-start"}">${time}</div>`;
+  }).join("");
+  box.scrollTop = box.scrollHeight;
+}
+
+function appendChatMsg(role, body) {
+  const box  = document.getElementById("chat-panel-messages");
+  const time = new Date().toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit" });
+  const cls  = role === "human" ? "human" : "agent";
+  // Remove placeholder if present
+  const ph = box.querySelector("div:not(.chat-msg):not(.chat-msg-time)");
+  if (ph) ph.remove();
+  const msgEl  = document.createElement("div");
+  msgEl.className = `chat-msg ${cls}`;
+  msgEl.textContent = body;
+  const timeEl = document.createElement("div");
+  timeEl.className = "chat-msg-time";
+  timeEl.style.alignSelf = cls === "human" ? "flex-end" : "flex-start";
+  timeEl.textContent = time;
+  box.appendChild(msgEl);
+  box.appendChild(timeEl);
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById("chat-input");
+  const btn   = document.getElementById("chat-send-btn");
+  const text  = input.value.trim();
+  if (!text || !_chatDid) return;
+  input.value = "";
+  input.style.height = "";
+  appendChatMsg("human", text);
+
+  // Typing indicator
+  const box = document.getElementById("chat-panel-messages");
+  const typingEl = document.createElement("div");
+  typingEl.className = "chat-typing";
+  typingEl.id = "chat-typing";
+  typingEl.textContent = `${_chatName} is thinking…`;
+  box.appendChild(typingEl);
+  box.scrollTop = box.scrollHeight;
+
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_chatDid)}/chat`, {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ message: text }),
+    });
+    const data = await r.json();
+    typingEl.remove();
+    if (!r.ok) {
+      appendChatMsg("agent", `⚠️ ${data.detail || "Error — please try again."}`);
+    } else {
+      appendChatMsg("agent", data.reply);
+    }
+  } catch(e) {
+    typingEl.remove();
+    appendChatMsg("agent", "⚠️ Network error — please try again.");
+  }
+  btn.disabled = false;
+  input.focus();
+}
+
+function chatKeydown(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+}
+
+function autoResizeChatInput(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 80) + "px";
 }
 
 // ── FORCE STOP ────────────────────────────────────────────────────────────────
@@ -885,13 +1052,18 @@ function renderDealsView() {
     return;
   }
   scroll.innerHTML = _deals.map((d, i) => {
-    const buyer  = d.buyer_name  || d.buyer_did.slice(-12);
-    const seller = d.seller_name || d.seller_did.slice(-12);
-    const price  = d.price != null ? `$${Number(d.price).toLocaleString()} ${d.currency}` : "Price not recorded";
-    const when   = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "";
+    const buyer   = d.buyer_name  || d.buyer_did.slice(-12);
+    const seller  = d.seller_name || d.seller_did.slice(-12);
+    const type    = d.deal_type || "sale";
+    const hasPrice = d.price != null && d.price > 0;
+    const headline = hasPrice
+      ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}`
+      : (d.description ? d.description.slice(0, 60) + (d.description.length > 60 ? "…" : "") : "Service Agreement");
+    const when = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "";
     return `<div class="deal-card" onclick="openDealDetail(${i})" style="cursor:pointer;">
-      <div class="deal-card-ref">📄 ${esc(d.deal_ref)}</div>
-      <div class="deal-card-price">${esc(price)}</div>
+      <div class="deal-card-ref">📄 ${esc(d.deal_ref)} <span class="deal-card-type ${esc(type)}">${esc(type)}</span></div>
+      <div class="deal-card-headline">${esc(headline)}</div>
+      ${hasPrice && d.description ? `<div class="deal-card-desc">${esc(d.description)}</div>` : ""}
       <div class="deal-card-parties">🛒 Buyer: <strong>${esc(buyer)}</strong> &nbsp;·&nbsp; 🏷 Seller: <strong>${esc(seller)}</strong></div>
       <div class="deal-card-time">Finalized ${esc(when)}</div>
     </div>`;
@@ -901,26 +1073,90 @@ function renderDealsView() {
 function openDealDetail(idx) {
   const d = _deals[idx];
   if (!d) return;
-  const buyer  = d.buyer_name  || d.buyer_did;
-  const seller = d.seller_name || d.seller_did;
-  const price  = d.price != null ? `$${Number(d.price).toLocaleString()} ${d.currency}` : "—";
-  const when   = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "—";
-  document.getElementById("deal-modal-ref").textContent = `📄 ${d.deal_ref}`;
+  const type    = d.deal_type || "sale";
+  const hasPrice = d.price != null && d.price > 0;
+  const price   = hasPrice ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}` : null;
+  const when    = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "—";
+  const typeBadge = `<span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.5rem;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;background:${type==="sale"?"#dcfce7":"#eff6ff"};color:${type==="sale"?"#15803d":"#1d4ed8"};">${esc(type)}</span>`;
+
+  document.getElementById("deal-modal-ref").innerHTML = `📄 ${esc(d.deal_ref)} ${typeBadge}`;
   document.getElementById("deal-modal-body").innerHTML = `
     <div style="display:grid;gap:1rem;">
       <div style="text-align:center;padding:1rem 0;border-bottom:1px solid var(--border);">
-        <div style="font-size:2rem;font-weight:800;color:#15803d;letter-spacing:-0.03em;">${esc(price)}</div>
-        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.25rem;">Agreed price</div>
+        ${price ? `<div style="font-size:2rem;font-weight:800;color:#15803d;letter-spacing:-0.03em;">${esc(price)}</div>` : ""}
+        ${d.description ? `<div style="font-size:${price ? "0.9" : "1.1"}rem;font-weight:${price ? "400" : "700"};color:${price ? "var(--text-2)" : "var(--text)"};margin-top:${price ? "0.3" : "0"}rem;font-style:${price ? "italic" : "normal"};">${esc(d.description)}</div>` : ""}
+        ${!price && !d.description ? `<div style="font-size:1rem;color:var(--muted);">Service Agreement</div>` : ""}
+        <div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem;">${price ? "Agreed price" : "No monetary value"}</div>
       </div>
       <div style="display:grid;gap:0.5rem;font-size:0.83rem;">
-        <div><span style="color:var(--muted);font-weight:600;">Buyer</span><br/><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">${esc(d.buyer_did)}</span>${d.buyer_name ? ` <em>(${esc(d.buyer_name)})</em>` : ''}</div>
-        <div><span style="color:var(--muted);font-weight:600;">Seller</span><br/><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">${esc(d.seller_did)}</span>${d.seller_name ? ` <em>(${esc(d.seller_name)})</em>` : ''}</div>
+        <div><span style="color:var(--muted);font-weight:600;">Buyer</span><br/><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">${esc(d.buyer_did)}</span>${d.buyer_name ? ` <em>(${esc(d.buyer_name)})</em>` : ""}</div>
+        <div><span style="color:var(--muted);font-weight:600;">Seller</span><br/><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;">${esc(d.seller_did)}</span>${d.seller_name ? ` <em>(${esc(d.seller_name)})</em>` : ""}</div>
         <div><span style="color:var(--muted);font-weight:600;">Finalized</span><br/>${esc(when)}</div>
         <div><span style="color:var(--muted);font-weight:600;">Status</span><br/><span style="background:#dcfce7;color:#15803d;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:20px;">${esc(d.status || "finalized")}</span></div>
       </div>
-      ${d.buyer_body ? `<div><div style="font-size:0.75rem;font-weight:700;color:var(--muted);margin-bottom:0.3rem;">BUYER ACCEPTANCE</div><div style="font-size:0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.7rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:120px;overflow-y:auto;">${esc(d.buyer_body)}</div></div>` : ''}
+      ${d.buyer_body ? `<div><div style="font-size:0.75rem;font-weight:700;color:var(--muted);margin-bottom:0.3rem;">ACCEPTANCE MESSAGE</div><div style="font-size:0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.7rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:120px;overflow-y:auto;">${esc(d.buyer_body)}</div></div>` : ""}
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;padding-top:0.25rem;border-top:1px solid var(--border);">
+        <button onclick="downloadDealInvoice(${idx})" class="btn btn-outline" style="font-size:0.8rem;">⬇ Download Invoice</button>
+        <button onclick="closeDealModal()" class="btn btn-primary" style="font-size:0.8rem;">Close</button>
+      </div>
     </div>`;
   document.getElementById("deal-detail-modal").style.display = "flex";
+}
+
+function downloadDealInvoice(idx) {
+  const d = _deals[idx];
+  if (!d) return;
+  const type     = d.deal_type || "sale";
+  const hasPrice = d.price != null && d.price > 0;
+  const price    = hasPrice ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}` : null;
+  const when     = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "—";
+  const buyer    = `${d.buyer_name ? d.buyer_name + "\n" : ""}${d.buyer_did}`;
+  const seller   = `${d.seller_name ? d.seller_name + "\n" : ""}${d.seller_did}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><title>Invoice ${d.deal_ref}</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:640px;margin:60px auto;padding:0 24px;color:#1c1917;line-height:1.6;}
+  .header{border-bottom:3px solid #059669;padding-bottom:1.25rem;margin-bottom:1.5rem;}
+  .badge{display:inline-block;font-size:0.72rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:20px;text-transform:uppercase;background:${type==="sale"?"#dcfce7":"#eff6ff"};color:${type==="sale"?"#15803d":"#1d4ed8"};}
+  h1{font-size:1.5rem;font-weight:800;margin:0 0 0.25rem;letter-spacing:-0.02em;}
+  .ref{font-family:monospace;font-size:0.85rem;color:#78716c;}
+  .amount{font-size:2.5rem;font-weight:800;color:#059669;letter-spacing:-0.04em;margin:1rem 0 0.25rem;}
+  .desc{font-size:1rem;color:#44403c;font-style:italic;margin-bottom:1.25rem;}
+  table{width:100%;border-collapse:collapse;font-size:0.9rem;margin-bottom:1.5rem;}
+  td{padding:0.6rem 0.75rem;border-bottom:1px solid #e5e2db;vertical-align:top;}
+  td:first-child{font-weight:600;color:#78716c;width:130px;white-space:nowrap;}
+  .mono{font-family:monospace;font-size:0.78rem;word-break:break-all;}
+  .acceptance{background:#f9f7f4;border:1px solid #e5e2db;border-radius:8px;padding:0.75rem 1rem;font-family:monospace;font-size:0.75rem;white-space:pre-wrap;word-break:break-all;margin-bottom:1.5rem;}
+  .footer{font-size:0.72rem;color:#a8a29e;border-top:1px solid #e5e2db;padding-top:1rem;text-align:center;}
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>AgentID Invoice</h1>
+    <div class="ref">${d.deal_ref} &nbsp;<span class="badge">${type}</span></div>
+  </div>
+  ${price ? `<div class="amount">${price}</div>` : ""}
+  ${d.description ? `<div class="desc">${d.description}</div>` : ""}
+  <table>
+    <tr><td>Buyer</td><td class="mono">${buyer}</td></tr>
+    <tr><td>Seller</td><td class="mono">${seller}</td></tr>
+    <tr><td>Finalized</td><td>${when}</td></tr>
+    <tr><td>Status</td><td>${d.status || "finalized"}</td></tr>
+    ${d.conversation_start_at ? `<tr><td>Session</td><td class="mono">${d.conversation_start_at}</td></tr>` : ""}
+  </table>
+  ${d.buyer_body ? `<div style="font-size:0.78rem;font-weight:700;color:#78716c;margin-bottom:0.4rem;">ACCEPTANCE MESSAGE</div><div class="acceptance">${d.buyer_body.replace(/</g,"&lt;")}</div>` : ""}
+  <div class="footer">Generated by AgentID · agentid-protocol.com · ${new Date().toLocaleString()}</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${d.deal_ref}.html`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function closeDealModal() {
