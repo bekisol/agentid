@@ -5593,7 +5593,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const proof = await _signPayload(_reg.kp, payload);
       const res = await fetch(`${BASE}/agents`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...(apiKey ? { "x-api-key": apiKey } : {}) },
         body: JSON.stringify({ ...payload, proof }),
       });
       const data = await res.json();
