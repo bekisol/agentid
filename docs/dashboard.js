@@ -1728,9 +1728,10 @@ function _signingDetailPanel(e, i, payloadObj, payloadJson, sigFull, summary) {
           false) +
         detailRow('Verifier',
           e.verifier_did
-            ? (e.verifier_name ? '<strong>' + esc(e.verifier_name) + '</strong> · ' : '') +
-              '<code style="font-size:0.74rem;">' + esc(e.verifier_did) + '</code>'
-            : '<span style="color:var(--muted);font-style:italic;">external (not in your registry)</span>',
+            ? (e.verifier_name
+                ? '<strong>' + esc(e.verifier_name) + '</strong> · <code style="font-size:0.74rem;">' + esc(e.verifier_did) + '</code>'
+                : '<span style="color:var(--muted);font-style:italic;">external</span> · <code style="font-size:0.74rem;">' + esc(e.verifier_did) + '</code>')
+            : '<span style="color:var(--muted);font-style:italic;">unknown</span>',
           false) +
       '</div>' +
 
