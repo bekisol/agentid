@@ -150,8 +150,51 @@
       </svg>
       Continue with Google
     </a>
+    <div style="display:flex;align-items:center;gap:0.5rem;margin:0.25rem 0;">
+      <div style="flex:1;height:1px;background:#dadce0;"></div>
+      <span style="font-size:0.75rem;color:#888;">or</span>
+      <div style="flex:1;height:1px;background:#dadce0;"></div>
+    </div>
+    <input id="apikey-input" type="password" placeholder="Paste your API key (agentid_…)"
+      style="width:100%;padding:0.55rem 0.75rem;border-radius:8px;border:1px solid #dadce0;font-size:0.85rem;font-family:inherit;box-sizing:border-box;margin-top:0.25rem;" autocomplete="off" spellcheck="false" />
+    <button id="apikey-submit"
+      style="width:100%;margin-top:0.5rem;padding:0.6rem;border-radius:8px;border:none;background:#f97316;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:inherit;">
+      Sign in with API key
+    </button>
+    <p id="auth-error" style="color:#dc2626;font-size:0.8rem;margin-top:0.4rem;text-align:center;"></p>
   </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const submitBtn = document.getElementById("apikey-submit");
+  const keyInput  = document.getElementById("apikey-input");
+  const errEl     = document.getElementById("auth-error");
+  if (!submitBtn) return;
+  async function tryApiKey() {
+    const entered = (keyInput.value || "").trim();
+    if (!entered) return;
+    errEl.textContent = "";
+    submitBtn.textContent = "Checking…"; submitBtn.disabled = true;
+    try {
+      const r = await _origFetch(`${BASE}/auth/me`, { headers: { "x-api-key": entered } });
+      if (r.ok) {
+        apiKey = entered;
+        localStorage.setItem("agentid_key", apiKey);
+        document.getElementById("auth-wall").style.display = "none";
+        document.getElementById("app").style.display = "";
+        boot();
+      } else {
+        errEl.textContent = "Invalid API key — check Settings → API Keys.";
+        keyInput.select();
+      }
+    } catch(_) { errEl.textContent = "Network error, please retry."; }
+    submitBtn.textContent = "Sign in with API key"; submitBtn.disabled = false;
+  }
+  submitBtn.addEventListener("click", tryApiKey);
+  keyInput.addEventListener("keydown", e => { if (e.key === "Enter") tryApiKey(); });
+});
+</script>
 
 <!-- Main app -->
 <div id="app">
@@ -250,40 +293,37 @@ const BASE = "https://api.agentid-protocol.com";
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 let apiKey = localStorage.getItem("agentid_key") || "";
 
+// Patch global fetch: any request to BASE automatically gets credentials +
+// the API key header so inline fetch() calls don't need to repeat it.
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(url, opts = {}) {
+  if (typeof url === "string" && url.startsWith(BASE)) {
+    const h = { ...(opts.headers || {}) };
+    if (apiKey && !h["x-api-key"]) h["x-api-key"] = apiKey;
+    opts = { ...opts, credentials: "include", headers: h };
+  }
+  return _origFetch(url, opts);
+};
+
 function showAuthWall() {
   document.getElementById("auth-wall").style.display = "flex";
   document.getElementById("app").style.display = "none";
 }
 
 async function initAuth() {
-  if (apiKey) {
-    try {
-      const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
-      if (r.ok) { boot(); return; }
-    } catch(_) {}
-    localStorage.removeItem("agentid_key");
-    apiKey = "";
-  }
+  // Try stored API key OR session cookie — whichever works
   try {
-    const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
+    const headers = apiKey ? { "x-api-key": apiKey } : {};
+    const r = await _origFetch(`${BASE}/auth/me`, { credentials: "include", headers });
     if (r.ok) {
       const me = await r.json();
-      document.getElementById("topbar-user").textContent = me.email || "";
-      const kr = await fetch(`${BASE}/auth/keys`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: "inbox-dashboard" }),
-      });
-      if (kr.ok) {
-        const kd = await kr.json();
-        apiKey = kd.key;
-        localStorage.setItem("agentid_key", apiKey);
-        boot();
-        return;
-      }
+      const emailEl = document.getElementById("topbar-user");
+      if (emailEl) emailEl.textContent = me.email || "";
+      boot(); return;
     }
   } catch(_) {}
+  // Nothing worked — clear stale key and show auth wall
+  if (apiKey) { localStorage.removeItem("agentid_key"); apiKey = ""; }
   showAuthWall();
 }
 

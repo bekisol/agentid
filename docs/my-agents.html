@@ -196,6 +196,17 @@
       </svg>
       Continue with Google
     </a>
+    <div style="display:flex;align-items:center;gap:0.5rem;margin:0.25rem 0;">
+      <div style="flex:1;height:1px;background:var(--border-dark);"></div>
+      <span style="font-size:0.75rem;color:var(--muted);">or</span>
+      <div style="flex:1;height:1px;background:var(--border-dark);"></div>
+    </div>
+    <input id="apikey-input" type="password" placeholder="Paste your API key (agentid_…)"
+      style="width:100%;padding:0.55rem 0.75rem;border-radius:8px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--text);font-size:0.85rem;font-family:inherit;box-sizing:border-box;margin-top:0.25rem;" autocomplete="off" spellcheck="false" />
+    <button id="apikey-submit"
+      style="width:100%;margin-top:0.5rem;padding:0.6rem;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:inherit;">
+      Sign in with API key
+    </button>
     <p id="auth-error" style="color:var(--red);font-size:0.8rem;margin-top:0.4rem;text-align:center;"></p>
   </div>
 </div>
@@ -586,57 +597,75 @@ const BASE = "https://api.agentid-protocol.com";
 let apiKey = localStorage.getItem("agentid_key") || "";
 let _owner  = localStorage.getItem("agentid_owner") || "";
 
+// Patch global fetch: any request to BASE automatically gets credentials +
+// the API key header so inline fetch() calls don't need to repeat it.
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(url, opts = {}) {
+  if (typeof url === "string" && url.startsWith(BASE)) {
+    const h = { ...(opts.headers || {}) };
+    if (apiKey && !h["x-api-key"]) h["x-api-key"] = apiKey;
+    opts = { ...opts, credentials: "include", headers: h };
+  }
+  return _origFetch(url, opts);
+};
+
 function showAuthWall() {
   document.getElementById("auth-wall").style.display = "flex";
   document.getElementById("main-content").style.display = "none";
 }
 
 async function initAuth() {
-  // If we already have a key stored, verify the session is still alive
-  if (apiKey) {
-    try {
-      const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
-      if (r.ok) {
-        const me = await r.json();
-        _owner = me.owner || _owner;
-        localStorage.setItem("agentid_owner", _owner);
-        boot(); return;
-      }
-    } catch(_) {}
-    // Session expired — clear stale key and fall through to OAuth
-    localStorage.removeItem("agentid_key");
-    apiKey = "";
-  }
-
-  // No key in storage — check if a session cookie exists
+  // Try stored API key OR session cookie — whichever works
   try {
-    const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
+    const headers = apiKey ? { "x-api-key": apiKey } : {};
+    const r = await fetch(`${BASE}/auth/me`, { credentials: "include", headers });
     if (r.ok) {
       const me = await r.json();
-      _owner = me.owner || "";
+      _owner = me.owner || _owner;
       localStorage.setItem("agentid_owner", _owner);
-      // Session active — mint a fresh API key for this browser session
-      const kr = await fetch(`${BASE}/auth/keys`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: "my-agents-dashboard" }),
-      });
-      if (kr.ok) {
-        const kd = await kr.json();
-        apiKey = kd.key;
-        localStorage.setItem("agentid_key", apiKey);
-        boot();
-        return;
-      }
+      boot(); return;
     }
   } catch(_) {}
 
-  // No session — show Google sign-in
+  // Nothing worked — clear stale key and show auth wall
+  if (apiKey) { localStorage.removeItem("agentid_key"); apiKey = ""; }
   showAuthWall();
 }
 
 initAuth();
+
+// ── API KEY SIGN-IN ────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  const submitBtn = document.getElementById("apikey-submit");
+  const keyInput  = document.getElementById("apikey-input");
+  const errEl     = document.getElementById("auth-error");
+  if (!submitBtn) return;
+  async function tryApiKey() {
+    const entered = (keyInput.value || "").trim();
+    if (!entered) return;
+    errEl.textContent = "";
+    submitBtn.textContent = "Checking…"; submitBtn.disabled = true;
+    try {
+      const r = await fetch(`${BASE}/auth/me`, { headers: { "x-api-key": entered } });
+      if (r.ok) {
+        const me = await r.json();
+        apiKey = entered;
+        _owner = me.owner || "";
+        localStorage.setItem("agentid_key", apiKey);
+        localStorage.setItem("agentid_owner", _owner);
+        document.getElementById("auth-wall").style.display = "none";
+        document.getElementById("main-content").style.display = "";
+        boot();
+      } else {
+        errEl.textContent = "Invalid API key — check Settings → API Keys.";
+        keyInput.select();
+      }
+    } catch(_) { errEl.textContent = "Network error, please retry."; }
+    submitBtn.textContent = "Sign in with API key"; submitBtn.disabled = false;
+  }
+  submitBtn.addEventListener("click", tryApiKey);
+  keyInput.addEventListener("keydown", e => { if (e.key === "Enter") tryApiKey(); });
+});
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -656,10 +685,9 @@ function timeAgo(iso) {
 }
 
 async function apiFetch(path, opts = {}) {
-  const res = await fetch(BASE + path, {
-    ...opts,
-    headers: { "x-api-key": apiKey, "Content-Type": "application/json", ...(opts.headers || {}) },
-  });
+  const h = { "Content-Type": "application/json", ...(opts.headers || {}) };
+  if (apiKey) h["x-api-key"] = apiKey;
+  const res = await fetch(BASE + path, { ...opts, credentials: "include", headers: h });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
   return data;
