@@ -584,6 +584,7 @@ const BASE = "https://api.agentid-protocol.com";
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 let apiKey = sessionStorage.getItem("agentid_key") || "";
+let _owner  = sessionStorage.getItem("agentid_owner") || "";
 
 function showAuthWall() {
   document.getElementById("auth-wall").style.display = "flex";
@@ -606,6 +607,9 @@ async function initAuth() {
   try {
     const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
     if (r.ok) {
+      const me = await r.json();
+      _owner = me.owner || "";
+      sessionStorage.setItem("agentid_owner", _owner);
       // Session active — mint a fresh API key for this browser session
       const kr = await fetch(`${BASE}/auth/keys`, {
         method: "POST",
@@ -1054,7 +1058,7 @@ document.getElementById("reg-register-btn").addEventListener("click", async func
   msgEl.textContent = ""; this.textContent = "Registering…"; this.disabled = true;
   try {
     const createdAt = new Date().toISOString();
-    const payload = { did:_reg.did, name, capabilities:[..._reg.capsArr], public_key:_reg.pubB64, created_at:createdAt, metadata:{}, private:isPrivate };
+    const payload = { did:_reg.did, name, owner:_owner, capabilities:[..._reg.capsArr], public_key:_reg.pubB64, created_at:createdAt, metadata:{}, private:isPrivate };
     const proof = await signPayload(_reg.kp, payload);
     const res = await fetch(`${BASE}/agents`, {
       method:"POST", headers:{"Content-Type":"application/json","x-api-key":apiKey},
