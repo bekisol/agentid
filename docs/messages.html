@@ -535,9 +535,20 @@ async function loadAll(silent = false) {
       }))))
     );
 
-    _messages = results
+    // De-duplicate: same message ID can appear in both sender's "sent" list and
+    // recipient's "received" list when both agents are owned by the same account.
+    // Keep the "received" version (better perspective for inbox); fall back to "sent".
+    const _msgMap = new Map();
+    results
       .filter(r => r.status === "fulfilled")
       .flatMap(r => r.value)
+      .forEach(m => {
+        const existing = _msgMap.get(m.id);
+        if (!existing || (existing.direction === "sent" && m.direction === "received")) {
+          _msgMap.set(m.id, m);
+        }
+      });
+    _messages = [..._msgMap.values()]
       .sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
 
     renderSidebar();
