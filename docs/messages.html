@@ -175,16 +175,24 @@
         </div>
       </div>
       <!-- Agent identity card — shown when a specific agent is selected -->
-      <div id="agent-info" style="display:none;padding:0.75rem 1.5rem;background:var(--surface2);border-bottom:1px solid var(--border);">
+      <div id="agent-info" style="display:none;padding:0.8rem 1.5rem;background:var(--surface2);border-bottom:1px solid var(--border);">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-          <div style="min-width:0;flex:1;">
-            <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:0.3rem;">Agent Identity</div>
-            <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);word-break:break-all;margin-bottom:0.3rem;" id="agent-info-did"></div>
+          <div style="min-width:0;flex:1;display:grid;gap:0.45rem;">
+            <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Agent Identity</div>
+            <!-- DID -->
+            <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);word-break:break-all;" id="agent-info-did"></div>
+            <!-- Capabilities -->
+            <div id="agent-info-caps" style="display:flex;flex-wrap:wrap;gap:0.3rem;"></div>
+            <!-- Trust score -->
+            <div id="agent-info-trust" style="font-size:0.78rem;color:var(--muted);">Trust score: <span style="font-style:italic;">loading…</span></div>
+            <!-- Public key toggle -->
             <div id="agent-info-key-wrap" style="display:none;">
               <button onclick="toggleAgentKey()" style="font-size:0.7rem;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:0;">🔑 Show public key</button>
               <div id="agent-info-key" style="display:none;margin-top:0.3rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.62rem;font-family:'JetBrains Mono',monospace;word-break:break-all;color:var(--muted);"></div>
             </div>
           </div>
+          <!-- Compose button -->
+          <button id="compose-btn" onclick="openCompose()" class="btn btn-outline" style="flex-shrink:0;align-self:flex-start;">✉ Send Message</button>
         </div>
       </div>
       <div class="feed-scroll" id="feed-scroll">
@@ -192,6 +200,39 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Compose modal -->
+<div id="compose-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:9000;padding:1rem;">
+  <div style="background:var(--surface);border-radius:16px;border:1px solid var(--border);max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.18);overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+      <span style="font-weight:700;font-size:0.95rem;">Send Message</span>
+      <button onclick="closeCompose()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;">✕</button>
+    </div>
+    <div style="padding:1.25rem;display:grid;gap:0.85rem;">
+      <div>
+        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">From (your agent DID)</label>
+        <input id="compose-from" type="text" readonly style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;font-size:0.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);background:var(--surface2);outline:none;" />
+      </div>
+      <div>
+        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">To (recipient DID)</label>
+        <input id="compose-to" type="text" placeholder="did:key:z6Mk… or did:agentid:…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.82rem;font-family:'JetBrains Mono',monospace;color:var(--text);background:var(--surface);outline:none;" />
+      </div>
+      <div>
+        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">Subject <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input id="compose-subject" type="text" placeholder="e.g. Trust verification request" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.875rem;font-family:inherit;color:var(--text);background:var(--surface);outline:none;" />
+      </div>
+      <div>
+        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">Message</label>
+        <textarea id="compose-body" rows="4" placeholder="Write your message…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.875rem;font-family:inherit;color:var(--text);background:var(--surface);outline:none;resize:vertical;"></textarea>
+      </div>
+      <div id="compose-error" style="display:none;color:var(--red);font-size:0.8rem;"></div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+        <button onclick="closeCompose()" class="btn btn-outline">Cancel</button>
+        <button onclick="sendMessage()" id="compose-send-btn" class="btn btn-primary">Send</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -372,6 +413,60 @@ function renderSidebar() {
   });
 }
 
+// ── COMPOSE ───────────────────────────────────────────────────────────────────
+function openCompose() {
+  const agent = _agents.find(a => a.did === _selectedDid);
+  if (!agent) return;
+  document.getElementById("compose-from").value    = agent.did;
+  document.getElementById("compose-to").value      = "";
+  document.getElementById("compose-subject").value = "";
+  document.getElementById("compose-body").value    = "";
+  document.getElementById("compose-error").style.display = "none";
+  const btn = document.getElementById("compose-send-btn");
+  btn.disabled = false; btn.textContent = "Send";
+  document.getElementById("compose-modal").style.display = "flex";
+}
+
+function closeCompose() {
+  document.getElementById("compose-modal").style.display = "none";
+}
+
+async function sendMessage() {
+  const fromDid  = document.getElementById("compose-from").value.trim();
+  const toDid    = document.getElementById("compose-to").value.trim();
+  const subject  = document.getElementById("compose-subject").value.trim();
+  const body     = document.getElementById("compose-body").value.trim();
+  const errEl    = document.getElementById("compose-error");
+  const btn      = document.getElementById("compose-send-btn");
+
+  errEl.style.display = "none";
+  if (!toDid)  { errEl.textContent = "Recipient DID is required."; errEl.style.display = "block"; return; }
+  if (!body)   { errEl.textContent = "Message body cannot be empty."; errEl.style.display = "block"; return; }
+
+  btn.disabled = true; btn.textContent = "Sending…";
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(toDid)}/messages`, {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ from_did: fromDid, subject, body }),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(t || `Error ${r.status}`);
+    }
+    closeCompose();
+    loadAll(true);
+  } catch(e) {
+    errEl.textContent = e.message || "Failed to send.";
+    errEl.style.display = "block";
+    btn.disabled = false; btn.textContent = "Send";
+  }
+}
+
+document.getElementById("compose-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeCompose();
+});
+
 // ── FEED ──────────────────────────────────────────────────────────────────────
 function toggleAgentKey() {
   const box = document.getElementById("agent-info-key");
@@ -383,6 +478,13 @@ function toggleAgentKey() {
     box.style.display = "none";
     btn.textContent = "🔑 Show public key";
   }
+}
+
+function trustColor(score) {
+  if (score >= 80) return "var(--green)";
+  if (score >= 60) return "#2563eb";
+  if (score >= 30) return "var(--yellow)";
+  return "var(--red)";
 }
 
 function renderFeed() {
@@ -403,6 +505,29 @@ function renderFeed() {
   // Agent identity panel
   if (agent) {
     document.getElementById("agent-info-did").textContent = agent.did || "";
+
+    // Capabilities
+    const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
+    const capsEl = document.getElementById("agent-info-caps");
+    capsEl.innerHTML = caps.length
+      ? caps.map(c => `<span style="font-size:0.68rem;font-weight:600;padding:0.12rem 0.4rem;border-radius:4px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent-border);">${esc(c)}</span>`).join("")
+      : `<span style="font-size:0.72rem;color:var(--muted);">No capabilities listed</span>`;
+
+    // Trust score — fetch async
+    const trustEl = document.getElementById("agent-info-trust");
+    trustEl.innerHTML = "Trust score: <span style='font-style:italic;color:var(--muted);'>loading…</span>";
+    fetch(`${BASE}/agents/${encodeURIComponent(agent.did)}/trust-score`, { headers: apiHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d || d.error) { trustEl.innerHTML = "Trust score: <span style='color:var(--muted);'>unavailable</span>"; return; }
+        const score = d.score ?? "—";
+        const level = d.level || "";
+        const col   = typeof score === "number" ? trustColor(score) : "var(--muted)";
+        trustEl.innerHTML = `Trust score: <strong style="color:${col};">${score}/100</strong>${level ? ` <span style="font-size:0.72rem;color:var(--muted);">(${level})</span>` : ""}`;
+      })
+      .catch(() => { trustEl.innerHTML = "Trust score: <span style='color:var(--muted);'>unavailable</span>"; });
+
+    // Public key toggle
     const keyWrap = document.getElementById("agent-info-key-wrap");
     const keyBox  = document.getElementById("agent-info-key");
     if (agent.public_key) {
