@@ -75,6 +75,17 @@
     .btn-primary:hover { background:#b43709; }
     .feed-scroll { flex:1; overflow-y:auto; padding:1rem 1.5rem; }
 
+    /* Selection mode */
+    .select-bar { display:none; padding:0.55rem 1.5rem; background:#fef2f2; border-bottom:1px solid #fca5a5; flex-shrink:0; flex-direction:row; align-items:center; justify-content:space-between; gap:0.75rem; }
+    .select-bar.visible { display:flex; }
+    .select-bar-count { font-size:0.83rem; font-weight:600; color:var(--red); }
+    .bubble-row { display:flex; margin-bottom:0.65rem; align-items:flex-end; gap:0.5rem; position:relative; }
+    .bubble-check { display:none; width:18px; height:18px; accent-color:var(--red); flex-shrink:0; cursor:pointer; align-self:center; }
+    body.select-mode .bubble-check { display:block; }
+    body.select-mode .bubble-row:hover { background:var(--surface2); border-radius:10px; }
+    body.select-mode .bubble-row.selected { background:#fef2f2; border-radius:10px; }
+    body.select-mode .bubble-row.selected .bubble-check { accent-color:var(--red); }
+
     /* Chat bubble layout */
     .chat-day { text-align:center; margin:1rem 0 0.5rem; }
     .chat-day-label { display:inline-block; font-size:0.7rem; color:var(--muted); background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:0.15rem 0.75rem; }
@@ -274,10 +285,21 @@ document.addEventListener("DOMContentLoaded", () => {
           <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--muted);cursor:pointer;">
             <input type="checkbox" id="unread-only"> Unread only
           </label>
+          <button class="btn btn-outline" id="select-toggle-btn" onclick="toggleSelectMode()">☑ Select</button>
           <button class="btn btn-danger" id="stop-btn" style="display:none;" onclick="openStopModal()">⏹ Force Stop</button>
           <button class="btn btn-outline" id="refresh-btn">↻ Refresh</button>
         </div>
       </div>
+      <!-- Selection action bar -->
+      <div class="select-bar" id="select-bar">
+        <span class="select-bar-count" id="select-bar-count">0 selected</span>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-outline" onclick="selectAllVisible()" style="font-size:0.78rem;">Select All</button>
+          <button class="btn btn-danger" id="delete-selected-btn" onclick="deleteSelected()" style="font-size:0.78rem;" disabled>🗑 Delete</button>
+          <button class="btn btn-outline" onclick="toggleSelectMode()" style="font-size:0.78rem;">Cancel</button>
+        </div>
+      </div>
+
       <!-- Agent identity card — shown when a specific agent is selected -->
       <div id="agent-info" style="display:none;padding:0.8rem 1.5rem;background:var(--surface2);border-bottom:1px solid var(--border);">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
@@ -779,8 +801,11 @@ function renderFeed() {
       ? `<span class="pubkey-toggle" onclick="togglePubkey(${idx})">🔑 verify sender</span><div class="pubkey-box" id="pk-${idx}" style="display:none;">${esc(m.sender_public_key)}</div>`
       : "";
 
+    const isSelected = _selectedIds.has(m.id);
     return `${dayHtml}
-      <div class="bubble-row ${dir}" id="br-${idx}">
+      <div class="bubble-row ${dir}${isSelected ? " selected" : ""}" id="br-${idx}" data-id="${m.id}">
+        <input type="checkbox" class="bubble-check" ${isSelected ? "checked" : ""}
+          onchange="toggleMsgSelection(${m.id}, this)" />
         <div class="bubble-avatar">${avatarLetter}</div>
         <div class="bubble-col">
           <div class="bubble-name">${esc(senderLabel)}${newTag}${agentTag}</div>
@@ -797,6 +822,94 @@ function renderFeed() {
 function togglePubkey(idx) {
   const el = document.getElementById(`pk-${idx}`);
   if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+// ── SELECT & DELETE ───────────────────────────────────────────────────────────
+let _selectMode = false;
+let _selectedIds = new Set();
+
+function toggleSelectMode() {
+  _selectMode = !_selectMode;
+  _selectedIds.clear();
+  document.body.classList.toggle("select-mode", _selectMode);
+  document.getElementById("select-bar").classList.toggle("visible", _selectMode);
+  document.getElementById("select-toggle-btn").textContent = _selectMode ? "✕ Cancel" : "☑ Select";
+  document.getElementById("select-toggle-btn").className = _selectMode ? "btn btn-outline" : "btn btn-outline";
+  updateSelectBar();
+  if (!_selectMode) renderFeed(); // re-render without checkboxes
+}
+
+function updateSelectBar() {
+  const n   = _selectedIds.size;
+  const btn = document.getElementById("delete-selected-btn");
+  document.getElementById("select-bar-count").textContent = `${n} selected`;
+  btn.disabled = n === 0;
+}
+
+function toggleMsgSelection(id, el) {
+  const row = el.closest(".bubble-row");
+  if (_selectedIds.has(id)) {
+    _selectedIds.delete(id);
+    row.classList.remove("selected");
+    el.checked = false;
+  } else {
+    _selectedIds.add(id);
+    row.classList.add("selected");
+    el.checked = true;
+  }
+  updateSelectBar();
+}
+
+function selectAllVisible() {
+  document.querySelectorAll(".bubble-row[data-id]").forEach(row => {
+    const id  = parseInt(row.dataset.id, 10);
+    const chk = row.querySelector(".bubble-check");
+    _selectedIds.add(id);
+    row.classList.add("selected");
+    if (chk) chk.checked = true;
+  });
+  updateSelectBar();
+}
+
+async function deleteSelected() {
+  if (!_selectedIds.size) return;
+  const ids     = [..._selectedIds];
+  const agentDid = _selectedDid;
+  const btn     = document.getElementById("delete-selected-btn");
+  btn.disabled  = true;
+  btn.textContent = "Deleting…";
+
+  // Messages may belong to different agents; group by the agent that owns each
+  // In practice _agentDid is stored on each message — use it to route correctly
+  const byAgent = {};
+  _messages.forEach(m => {
+    if (_selectedIds.has(m.id)) {
+      const a = m._agentDid;
+      if (!byAgent[a]) byAgent[a] = [];
+      byAgent[a].push(m.id);
+    }
+  });
+
+  try {
+    await Promise.all(
+      Object.entries(byAgent).map(([did, msgIds]) =>
+        fetch(`${BASE}/agents/${encodeURIComponent(did)}/messages`, {
+          method: "DELETE",
+          headers: apiHeaders(),
+          body: JSON.stringify({ ids: msgIds }),
+        })
+      )
+    );
+  } catch(e) { /* silently proceed */ }
+
+  // Remove deleted from local state and re-render
+  const deletedSet = new Set(ids);
+  _messages = _messages.filter(m => !deletedSet.has(m.id));
+  _selectedIds.clear();
+  _lastRenderKey = "";
+  updateSelectBar();
+  renderFeed();
+  btn.textContent = "🗑 Delete";
 }
 
 // ── CHAT ──────────────────────────────────────────────────────────────────────
