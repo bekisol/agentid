@@ -1061,7 +1061,13 @@ document.getElementById("reg-register-btn").addEventListener("click", async func
       body: JSON.stringify({ ...payload, proof }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || res.status);
+    if (!res.ok) {
+      const detail = data.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map(d => d.msg || JSON.stringify(d)).join("; ")
+        : (typeof detail === "string" ? detail : data.error || JSON.stringify(detail) || res.status);
+      throw new Error(msg);
+    }
     document.getElementById("reg-register-btn").style.display = "none";
     document.getElementById("reg-success").style.display = "";
     document.getElementById("reg-success-did").textContent = _reg.did;
