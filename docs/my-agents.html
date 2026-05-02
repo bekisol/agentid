@@ -396,6 +396,39 @@
   </div>
 </div>
 
+<!-- ── Webhook modal ─────────────────────────────────────────────────────── -->
+<div id="webhook-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <span class="modal-title">🔔 Webhook — <span id="webhook-modal-name"></span></span>
+      <button class="modal-close" id="webhook-modal-close">✕</button>
+    </div>
+    <div style="padding:1.25rem;">
+      <p style="font-size:0.85rem;color:var(--text-2);margin-bottom:1rem;">
+        When this agent receives a message, AgentID will POST the message to your URL so your chatbot can respond automatically without waiting to be asked.
+      </p>
+      <div class="field">
+        <label>Webhook URL <span style="font-weight:400;color:var(--muted);">(must be https://)</span></label>
+        <input id="webhook-url-input" type="url" placeholder="https://your-endpoint.com/hook" />
+      </div>
+      <div class="field">
+        <label>Secret <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input id="webhook-secret-input" type="text" placeholder="any secret — sent as X-AgentID-Secret header" autocomplete="off" />
+      </div>
+      <div id="webhook-current" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.75rem;font-size:0.8rem;">
+        <span style="color:var(--muted);font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Current webhook</span>
+        <div id="webhook-current-url" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;word-break:break-all;margin-top:0.25rem;color:var(--text-2);"></div>
+      </div>
+      <div id="webhook-error" style="color:var(--red);font-size:0.8rem;margin-bottom:0.75rem;display:none;"></div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+        <button class="btn btn-outline" id="webhook-delete-btn" style="display:none;color:var(--red);border-color:var(--red);">Remove</button>
+        <button class="btn btn-outline" id="webhook-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="webhook-save-btn">Save Webhook</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Agent Key modal ──────────────────────────────────────────────────── -->
 <div id="agentkey-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:500px;">
@@ -582,6 +615,7 @@ function renderAgentRow(a) {
       <button class="agent-action-btn" data-action="verify" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}">Test</button>
       <button class="agent-action-btn" data-action="inbox" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">Inbox</button>
       <button class="agent-action-btn" data-action="agentkey" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Create an API key scoped to this agent only">🔑 Agent Key</button>
+      <button class="agent-action-btn" data-action="webhook" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Get notified when this agent receives a message">🔔 Webhook</button>
       <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">&lt;/&gt;</button>
     </td>
   </tr>`;
@@ -1115,7 +1149,88 @@ document.getElementById("agents-container").addEventListener("click", e => {
   if (action === "snippets")  openSnippets(did, name);
   if (action === "inbox")     openInbox(did, name);
   if (action === "agentkey")  openAgentKey(did, name);
+  if (action === "webhook")   openWebhook(did, name);
 });
+
+// ── Webhook modal ─────────────────────────────────────────────────────────────
+let _webhookDid = "";
+
+async function openWebhook(did, name) {
+  _webhookDid = did;
+  document.getElementById("webhook-modal-name").textContent = name;
+  document.getElementById("webhook-url-input").value = "";
+  document.getElementById("webhook-secret-input").value = "";
+  document.getElementById("webhook-error").style.display = "none";
+  document.getElementById("webhook-current").style.display = "none";
+  document.getElementById("webhook-delete-btn").style.display = "none";
+  document.getElementById("webhook-modal").style.display = "flex";
+
+  // Load existing webhook if any
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(did)}/webhook`, { headers: { "x-api-key": apiKey } });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.url) {
+        document.getElementById("webhook-current-url").textContent = d.url;
+        document.getElementById("webhook-current").style.display = "block";
+        document.getElementById("webhook-url-input").value = d.url;
+        document.getElementById("webhook-delete-btn").style.display = "";
+      }
+    }
+  } catch(_) {}
+}
+
+async function saveWebhook() {
+  const url    = (document.getElementById("webhook-url-input").value || "").trim();
+  const secret = (document.getElementById("webhook-secret-input").value || "").trim();
+  const errEl  = document.getElementById("webhook-save-btn");
+  const saveBtn = document.getElementById("webhook-save-btn");
+  const errDiv  = document.getElementById("webhook-error");
+  errDiv.style.display = "none";
+  if (!url) { errDiv.textContent = "Enter a webhook URL."; errDiv.style.display = "block"; return; }
+
+  saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(_webhookDid)}/webhook`, {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ url, secret }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d?.detail || d?.error || `Error ${r.status}`);
+    document.getElementById("webhook-modal").style.display = "none";
+  } catch(e) {
+    errDiv.textContent = e.message || "Failed to save webhook.";
+    errDiv.style.display = "block";
+  } finally {
+    saveBtn.disabled = false; saveBtn.textContent = "Save Webhook";
+  }
+}
+
+async function deleteWebhook() {
+  const deleteBtn = document.getElementById("webhook-delete-btn");
+  const errDiv    = document.getElementById("webhook-error");
+  errDiv.style.display = "none";
+  deleteBtn.disabled = true; deleteBtn.textContent = "Removing…";
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(_webhookDid)}/webhook`, {
+      method: "DELETE",
+      headers: { "x-api-key": apiKey },
+    });
+    if (!r.ok) throw new Error(`Error ${r.status}`);
+    document.getElementById("webhook-modal").style.display = "none";
+  } catch(e) {
+    errDiv.textContent = e.message || "Failed to remove webhook.";
+    errDiv.style.display = "block";
+    deleteBtn.disabled = false; deleteBtn.textContent = "Remove";
+  }
+}
+
+document.getElementById("webhook-save-btn").addEventListener("click", saveWebhook);
+document.getElementById("webhook-delete-btn").addEventListener("click", deleteWebhook);
+document.getElementById("webhook-cancel-btn").addEventListener("click", () => { document.getElementById("webhook-modal").style.display = "none"; });
+document.getElementById("webhook-modal-close").addEventListener("click", () => { document.getElementById("webhook-modal").style.display = "none"; });
+document.getElementById("webhook-modal").addEventListener("click", function(e) { if (e.target === this) this.style.display = "none"; });
 
 // ── Agent Key modal ───────────────────────────────────────────────────────────
 let _agentKeyDid = "";
