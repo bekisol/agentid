@@ -211,6 +211,7 @@
       </div>
       <div style="display:flex;gap:0.6rem;">
         <button class="btn btn-outline" id="refresh-btn" title="Refresh">↺ Refresh</button>
+        <button class="btn btn-outline" id="delete-all-btn" style="color:var(--red);border-color:var(--red);" title="Delete all your agents">🗑 Delete All</button>
         <button class="btn btn-primary" id="register-agent-btn">+ Register Agent</button>
       </div>
     </div>
@@ -1398,6 +1399,47 @@ document.getElementById("agentkey-modal").addEventListener("click", function(e) 
     this.style.display = "none";
     document.getElementById("agentkey-create-btn").style.display = "";
     document.getElementById("agentkey-cancel-btn").textContent = "Cancel";
+  }
+});
+
+// ── DELETE ALL AGENTS ─────────────────────────────────────────────────────────
+document.getElementById("delete-all-btn").addEventListener("click", async () => {
+  if (!confirm("Delete ALL your agents? This cannot be undone.")) return;
+
+  const btn = document.getElementById("delete-all-btn");
+  btn.disabled = true; btn.textContent = "Deleting…";
+
+  try {
+    // Fetch all owned DIDs
+    const r = await fetch(`${BASE}/agents?mine=true&limit=500`, {
+      headers: apiKey ? {"x-api-key": apiKey} : {},
+      credentials: "include",
+    });
+    const agents = await r.json();
+    if (!Array.isArray(agents) || agents.length === 0) {
+      btn.textContent = "Nothing to delete";
+      setTimeout(() => { btn.disabled = false; btn.textContent = "🗑 Delete All"; }, 2000);
+      return;
+    }
+
+    // Delete in batches of 50
+    const dids = agents.map(a => a.did);
+    for (let i = 0; i < dids.length; i += 50) {
+      const batch = dids.slice(i, i + 50);
+      await fetch(`${BASE}/pro/agents/bulk`, {
+        method: "DELETE",
+        headers: {"Content-Type":"application/json", ...(apiKey ? {"x-api-key": apiKey} : {})},
+        credentials: "include",
+        body: JSON.stringify({ dids: batch }),
+      });
+    }
+
+    btn.textContent = `✓ Deleted ${dids.length} agent${dids.length !== 1 ? "s" : ""}`;
+    setTimeout(() => { btn.disabled = false; btn.textContent = "🗑 Delete All"; }, 2500);
+    loadAgents();
+  } catch(e) {
+    btn.textContent = "Error — try again";
+    btn.disabled = false;
   }
 });
 
