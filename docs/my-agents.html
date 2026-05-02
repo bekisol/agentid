@@ -466,6 +466,43 @@
   </div>
 </div>
 
+<!-- ── Store Key (Signing) modal ─────────────────────────────────────────── -->
+<div id="storekey-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <span class="modal-title">✍ Message Signing — <span id="storekey-modal-name"></span></span>
+      <button class="modal-close" id="storekey-modal-close">✕</button>
+    </div>
+    <div style="padding:1.25rem;">
+      <div style="background:var(--accent-light);border:1px solid var(--accent-border);border-radius:10px;padding:0.85rem 1rem;margin-bottom:1.1rem;">
+        <div style="font-weight:700;font-size:0.88rem;color:var(--accent);margin-bottom:0.3rem;">What this does</div>
+        <div style="font-size:0.82rem;color:var(--text-2);line-height:1.5;">
+          Every message this agent sends will be cryptographically signed. Other agents can verify the signature to confirm the message really came from this agent — not an impersonator.
+        </div>
+      </div>
+
+      <div id="storekey-active-banner" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1rem;margin-bottom:0.9rem;font-size:0.82rem;color:var(--text-2);display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+        <span>✅ Signing is active for this agent</span>
+        <button id="storekey-remove-btn" class="btn btn-outline" style="font-size:0.75rem;padding:0.25rem 0.7rem;color:var(--red);border-color:var(--red);">Remove key</button>
+      </div>
+
+      <div id="storekey-form">
+        <div class="field">
+          <label>Private key <span style="font-weight:400;color:var(--muted);">(from when you registered this agent)</span></label>
+          <textarea id="storekey-key-input" rows="3" placeholder="Paste the base64 private key here — it starts with a long string of letters and numbers" style="resize:vertical;min-height:70px;font-family:'JetBrains Mono',monospace;font-size:0.75rem;" autocomplete="off"></textarea>
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:0.3rem;">The key is encrypted before storage and is never returned in any API response.</div>
+        </div>
+      </div>
+
+      <div id="storekey-error" style="color:var(--red);font-size:0.8rem;margin-bottom:0.75rem;display:none;"></div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+        <button class="btn btn-outline" id="storekey-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="storekey-save-btn">Enable Signing</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── AI Auto-Reply modal ───────────────────────────────────────────────── -->
 <div id="aireply-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:520px;">
@@ -672,6 +709,7 @@ function renderAgentRow(a) {
       <button class="agent-action-btn" data-action="inbox" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">Inbox</button>
       <button class="agent-action-btn" data-action="agentkey" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Create an API key scoped to this agent only">🔑 Agent Key</button>
       <button class="agent-action-btn" data-action="webhook" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Get notified when this agent receives a message">🔔 Webhook</button>
+      <button class="agent-action-btn" data-action="storekey" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Store this agent's private key so it can sign messages">✍ Signing</button>
       <button class="agent-action-btn" data-action="aireply" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Let this agent automatically reply to messages using AI">🤖 Auto-Reply</button>
       <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">&lt;/&gt;</button>
     </td>
@@ -1208,6 +1246,7 @@ document.getElementById("agents-container").addEventListener("click", e => {
   if (action === "agentkey")  openAgentKey(did, name);
   if (action === "webhook")   openWebhook(did, name);
   if (action === "aireply")   openAiReply(did, name);
+  if (action === "storekey")  openStoreKey(did, name);
 });
 
 // ── Webhook modal ─────────────────────────────────────────────────────────────
@@ -1360,6 +1399,99 @@ document.getElementById("agentkey-modal").addEventListener("click", function(e) 
     document.getElementById("agentkey-create-btn").style.display = "";
     document.getElementById("agentkey-cancel-btn").textContent = "Cancel";
   }
+});
+
+// ── STORE KEY (SIGNING) ───────────────────────────────────────────────────────
+let _storeKeyDid = "";
+
+async function openStoreKey(did, name) {
+  _storeKeyDid = did;
+  document.getElementById("storekey-modal-name").textContent = name;
+  document.getElementById("storekey-error").style.display = "none";
+  document.getElementById("storekey-key-input").value = "";
+  document.getElementById("storekey-active-banner").style.display = "none";
+  document.getElementById("storekey-form").style.display = "";
+  document.getElementById("storekey-save-btn").style.display = "";
+  document.getElementById("storekey-save-btn").disabled = false;
+  document.getElementById("storekey-save-btn").textContent = "Enable Signing";
+  document.getElementById("storekey-modal").style.display = "flex";
+
+  // Check if key already stored by trying to sign a test payload
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(did)}/sign`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json", ...(apiKey ? {"x-api-key": apiKey} : {})},
+      credentials: "include",
+      body: JSON.stringify({ payload: "ping" }),
+    });
+    if (r.ok) {
+      document.getElementById("storekey-active-banner").style.display = "flex";
+      document.getElementById("storekey-save-btn").textContent = "Update Key";
+    }
+  } catch(_) {}
+}
+
+async function saveStoreKey() {
+  const raw    = document.getElementById("storekey-key-input").value.trim();
+  const errEl  = document.getElementById("storekey-error");
+  const saveBtn = document.getElementById("storekey-save-btn");
+
+  if (!raw) {
+    errEl.textContent = "Please paste your private key.";
+    errEl.style.display = "block";
+    return;
+  }
+  errEl.style.display = "none";
+  saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(_storeKeyDid)}/store-key`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json", ...(apiKey ? {"x-api-key": apiKey} : {})},
+      credentials: "include",
+      body: JSON.stringify({ private_key_b64: raw }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+
+    document.getElementById("storekey-active-banner").style.display = "flex";
+    document.getElementById("storekey-key-input").value = "";
+    saveBtn.textContent = "✓ Signing enabled!";
+    saveBtn.disabled = false;
+    setTimeout(() => { saveBtn.textContent = "Update Key"; }, 1800);
+  } catch(e) {
+    errEl.textContent = e.message || "Failed to store key.";
+    errEl.style.display = "block";
+    saveBtn.disabled = false; saveBtn.textContent = "Enable Signing";
+  }
+}
+
+async function removeStoreKey() {
+  const btn = document.getElementById("storekey-remove-btn");
+  btn.disabled = true; btn.textContent = "Removing…";
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeURIComponent(_storeKeyDid)}/store-key`, {
+      method: "DELETE",
+      headers: apiKey ? {"x-api-key": apiKey} : {},
+      credentials: "include",
+    });
+    if (!r.ok) throw new Error("Failed");
+    document.getElementById("storekey-active-banner").style.display = "none";
+    document.getElementById("storekey-save-btn").textContent = "Enable Signing";
+  } catch(_) {}
+  btn.disabled = false; btn.textContent = "Remove key";
+}
+
+function closeStoreKeyModal() {
+  document.getElementById("storekey-modal").style.display = "none";
+}
+
+document.getElementById("storekey-save-btn").addEventListener("click", saveStoreKey);
+document.getElementById("storekey-remove-btn").addEventListener("click", removeStoreKey);
+document.getElementById("storekey-cancel-btn").addEventListener("click", closeStoreKeyModal);
+document.getElementById("storekey-modal-close").addEventListener("click", closeStoreKeyModal);
+document.getElementById("storekey-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeStoreKeyModal();
 });
 
 // ── AI AUTO-REPLY ─────────────────────────────────────────────────────────────
