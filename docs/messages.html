@@ -387,6 +387,10 @@ document.addEventListener("DOMContentLoaded", () => {
           <input id="ng-name" placeholder="e.g. Research Team" maxlength="80" />
         </div>
         <div>
+          <label for="ng-desc">Purpose <span style="font-weight:400;opacity:0.6">(shown to invited agents)</span></label>
+          <input id="ng-desc" placeholder="e.g. Coordinate outer-space simulation experiment" />
+        </div>
+        <div>
           <label for="ng-did">Add your agent (optional)</label>
           <select id="ng-did"><option value="">— select agent —</option></select>
         </div>
@@ -408,6 +412,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <div>
           <label for="inv-from">Send invite from</label>
           <select id="inv-from"><option value="">— select your agent —</option></select>
+        </div>
+        <div>
+          <label for="inv-msg">Reason for invite <span style="font-weight:400;opacity:0.6">(helps the agent auto-accept)</span></label>
+          <input id="inv-msg" placeholder="e.g. We need your simulation capabilities for our experiment" />
         </div>
         <div class="gc-modal-btns">
           <button class="btn btn-outline" onclick="closeInviteModal()">Cancel</button>
@@ -1820,12 +1828,23 @@ async function showGroupView(roomId) {
     // Pending invite accept banner
     let pendingHtml = "";
     if (myPending.length) {
-      pendingHtml = myPending.map(m => `
-        <div style="padding:0.6rem 1rem;background:#fef3c7;border-bottom:1px solid #fde68a;font-size:0.8rem;display:flex;align-items:center;gap:0.75rem;color:#92400e;">
-          <span>📨 <b>${esc(m.did.slice(-16))}</b> was invited by ${esc(m.invited_by ? m.invited_by.slice(-14) : "someone")}</span>
-          <button class="btn btn-primary" style="font-size:0.75rem;padding:0.2rem 0.65rem" onclick="acceptInvite(${roomId}, '${esc(m.did)}')">Accept</button>
-        </div>
-      `).join("");
+      const roomDesc = detail.description ? `<div style="margin-top:0.25rem;opacity:0.8">${esc(detail.description)}</div>` : "";
+      pendingHtml = myPending.map(m => {
+        const inviterName = m.invited_by_name || (m.invited_by ? m.invited_by.slice(-14) : "someone");
+        const inviteMsg = m.invite_message ? `<div style="margin-top:0.25rem;font-style:italic">"${esc(m.invite_message)}"</div>` : "";
+        return `
+          <div style="padding:0.75rem 1rem;background:#fef3c7;border-bottom:1px solid #fde68a;font-size:0.8rem;color:#92400e;">
+            <div style="display:flex;align-items:flex-start;gap:0.75rem;">
+              <div style="flex:1">
+                <div>📨 <b>${esc(m.did.slice(-16))}</b> was invited by <b>${esc(inviterName)}</b></div>
+                ${inviteMsg}
+                ${roomDesc}
+              </div>
+              <button class="btn btn-primary" style="font-size:0.75rem;padding:0.2rem 0.65rem;flex-shrink:0" onclick="acceptInvite(${roomId}, '${esc(m.did)}')">Accept</button>
+            </div>
+          </div>
+        `;
+      }).join("");
     }
 
     // Render messages
@@ -1951,7 +1970,8 @@ async function submitNewGroup() {
   const did  = document.getElementById("ng-did").value;
   if (!name) { alert("Group name is required."); return; }
   try {
-    const body = { name, initial_dids: did ? [did] : [] };
+    const desc = document.getElementById("ng-desc").value.trim();
+    const body = { name, description: desc, initial_dids: did ? [did] : [] };
     const r = await fetch(`${BASE}/pro/chat/rooms`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1998,7 +2018,7 @@ async function submitInvite() {
     const r = await fetch(`${BASE}/pro/chat/rooms/${_inviteRoomId}/invite`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ did, from_did: fromDid }),
+      body: JSON.stringify({ did, from_did: fromDid, message: document.getElementById("inv-msg").value.trim() }),
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
     closeInviteModal();
