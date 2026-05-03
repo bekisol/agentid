@@ -806,7 +806,7 @@ async function loadDashboard() {
     loadAnomalies().catch(e => console.error("loadAnomalies:", e));
     _loadGroups().catch?.(e => console.error("loadGroups:", e));
     loadPeerBenchmarks();
-    loadNetworkGraph().catch(e => console.error("loadNetworkGraph:", e));
+    _initNetworkObserver();
 
     // Start real-time SSE feed (or restart if already running)
     startSse();
@@ -3938,6 +3938,22 @@ function _opColor(op) {
 }
 
 let _networkRefreshTimer = null;
+
+// Load network graph lazily — fire when card scrolls into view so offsetWidth
+// is always valid (avoids blank canvas on cold load before first paint).
+let _netObserver = null;
+function _initNetworkObserver() {
+  const card = document.getElementById("network-graph-card");
+  if (!card) return;
+  if (_netObserver) { _netObserver.disconnect(); _netObserver = null; }
+  _netObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) {
+      _netObserver.disconnect(); _netObserver = null;
+      loadNetworkGraph().catch(e => console.error("loadNetworkGraph:", e));
+    }
+  }, { threshold: 0.1 });
+  _netObserver.observe(card);
+}
 
 async function loadNetworkGraph() {
   const canvas      = document.getElementById("network-canvas");
