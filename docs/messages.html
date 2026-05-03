@@ -193,15 +193,17 @@
     .sidebar-item-deal.active { background:var(--green-bg); color:#15803d; font-weight:600; }
 
     /* Deal list in feed */
-    .deal-card { background:var(--surface); border:1px solid #86efac; border-radius:12px; padding:1rem 1.25rem; margin-bottom:0.75rem; display:grid; gap:0.3rem; }
-    .deal-card-ref { font-family:"JetBrains Mono",monospace; font-size:0.8rem; color:var(--muted); display:flex; align-items:center; gap:0.5rem; }
-    .deal-card-type { font-size:0.65rem; font-weight:700; padding:0.1rem 0.45rem; border-radius:20px; text-transform:uppercase; letter-spacing:0.04em; }
-    .deal-card-type.sale { background:#dcfce7; color:#15803d; }
-    .deal-card-type.service { background:#eff6ff; color:#1d4ed8; }
-    .deal-card-headline { font-size:1.35rem; font-weight:800; color:#15803d; letter-spacing:-0.03em; }
-    .deal-card-desc { font-size:0.84rem; color:var(--text-2); font-style:italic; }
-    .deal-card-parties { font-size:0.78rem; color:var(--text-2); }
-    .deal-card-time { font-size:0.72rem; color:var(--muted); }
+    .deals-wrap { max-width:480px; margin:1.25rem auto; padding:0 1rem; }
+    .deal-card { background:var(--surface); border:1px solid var(--border); border-left:3px solid #4ade80; border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.6rem; display:grid; gap:0.25rem; transition:box-shadow 0.12s; }
+    .deal-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.08); }
+    .deal-card-ref { font-family:"JetBrains Mono",monospace; font-size:0.72rem; color:var(--muted); display:flex; align-items:center; gap:0.4rem; }
+    .deal-card-type { font-size:0.6rem; font-weight:700; padding:0.08rem 0.4rem; border-radius:20px; text-transform:uppercase; letter-spacing:0.04em; }
+    .deal-card-type.sale { background:var(--green-bg); color:var(--green); }
+    .deal-card-type.service { background:var(--blue-bg,#eff6ff); color:var(--blue); }
+    .deal-card-headline { font-size:1rem; font-weight:800; color:var(--green); letter-spacing:-0.02em; }
+    .deal-card-desc { font-size:0.78rem; color:var(--text-2); font-style:italic; }
+    .deal-card-parties { font-size:0.74rem; color:var(--text-2); }
+    .deal-card-time { font-size:0.68rem; color:var(--muted); }
 
     /* Chat panel */
     .chat-panel { display:none; position:fixed; top:0; right:0; width:400px; height:100vh; background:var(--surface); border-left:1px solid var(--border); box-shadow:-4px 0 24px rgba(0,0,0,0.08); z-index:8000; flex-direction:column; overflow:hidden; }
@@ -1352,7 +1354,7 @@ function renderDealsView() {
     scroll.innerHTML = `<div class="state-box"><div class="state-icon">🤝</div><div class="state-title">No deals yet</div><div class="state-sub">Finalized agent negotiations will appear here as signed invoices.</div></div>`;
     return;
   }
-  scroll.innerHTML = _deals.map((d, i) => {
+  scroll.innerHTML = `<div class="deals-wrap">` + _deals.map((d, i) => {
     const buyer   = d.buyer_name  || d.buyer_did.slice(-12);
     const seller  = d.seller_name || d.seller_did.slice(-12);
     const type    = d.deal_type || "sale";
@@ -1368,7 +1370,7 @@ function renderDealsView() {
       <div class="deal-card-parties">🛒 Buyer: <strong>${esc(buyer)}</strong> &nbsp;·&nbsp; 🏷 Seller: <strong>${esc(seller)}</strong></div>
       <div class="deal-card-time">Finalized ${esc(when)}</div>
     </div>`;
-  }).join("");
+  }).join("") + `</div>`;
 }
 
 async function openDealDetail(idx) {
