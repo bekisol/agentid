@@ -381,6 +381,12 @@ document.addEventListener("DOMContentLoaded", () => {
       <div id="sidebar-groups-list"></div>
 
       <div class="sidebar-sep"></div>
+      <div class="sidebar-section"><span>Files</span></div>
+      <div class="sidebar-item-deal" id="sidebar-files-btn" onclick="showFilesView()">
+        📁 My Files <span id="sidebar-files-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
+      </div>
+
+      <div class="sidebar-sep"></div>
       <div class="sidebar-section"><span>Deals</span></div>
       <div class="sidebar-item-deal" id="sidebar-deals-btn" onclick="showDealsView()">
         🤝 Signed Deals <span id="sidebar-deals-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
@@ -837,7 +843,7 @@ function renderSidebar() {
       const label = esc(a.name || a.did.slice(-12));
       const highlighted = q ? label.replace(new RegExp(`(${esc(q)})`, 'gi'), '<mark style="background:var(--accent-light);color:var(--accent);border-radius:2px;">$1</mark>') : label;
       html += `
-        <div class="sidebar-item${active ? " active" : ""}" data-did="${esc(a.did)}">
+        <div class="sidebar-item${active ? " active" : ""}" data-did="${esc(a.did)}" data-name="${esc(a.name || "")}">
           <span class="sidebar-item-name" title="${esc(a.name || a.did)}">${highlighted}</span>
           ${u > 0
             ? `<span class="sidebar-badge">${u}</span>`
@@ -852,15 +858,28 @@ function renderSidebar() {
     el.addEventListener("click", () => {
       _lastRenderKey = "";  // force re-render so deals HTML doesn't linger
       _dealsView = false;
+      _filesView = false;
       _activeRoomId = null;
       _stopGroupPoll();
       _selectedDid = el.dataset.did;
       list.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
       el.classList.add("active");
       document.getElementById("sidebar-deals-btn").classList.remove("active");
+      document.getElementById("sidebar-files-btn").classList.remove("active");
       document.getElementById("deal-search-bar").style.display = "none";
       document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
       renderFeed();
+      // Silently refresh this agent's messages so newly-received messages appear immediately
+      const clickedDid = el.dataset.did;
+      fetchMessages(clickedDid).then(fresh => {
+        const freshMapped = fresh.map(m => ({ ...m, _agentDid: clickedDid, _agentName: el.dataset.name || clickedDid.slice(-10) }));
+        freshMapped.forEach(m => {
+          if (!_messages.some(x => x.id === m.id)) _messages.push(m);
+          else { const idx = _messages.findIndex(x => x.id === m.id); if (idx !== -1 && _messages[idx].direction === "sent" && m.direction === "received") _messages[idx] = m; }
+        });
+        _messages.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
+        if (_selectedDid === clickedDid) { _lastRenderKey = ""; renderFeed(); }
+      }).catch(() => {});
     });
   });
 }
@@ -1621,6 +1640,181 @@ document.getElementById("stop-modal").addEventListener("click", function(e) {
   if (e.target === this) closeStopModal();
 });
 
+// ── FILES ─────────────────────────────────────────────────────────────────────
+let _filesView = false;
+let _files = [];
+
+async function showFilesView() {
+  _filesView = true;
+  _dealsView = false;
+  _activeRoomId = null;
+  _stopGroupPoll();
+  _selectedDid = "__files__";
+  document.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
+  document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
+  document.getElementById("sidebar-files-btn").classList.add("active");
+  document.getElementById("sidebar-deals-btn").classList.remove("active");
+  document.getElementById("stop-btn").style.display = "none";
+  document.getElementById("feed-title").textContent = "My Files";
+  document.getElementById("feed-meta").textContent = "";
+  document.getElementById("agent-info").style.display = "none";
+  document.getElementById("deal-search-bar").style.display = "none";
+  const headerRight = document.getElementById("header-right-actions");
+  if (headerRight) headerRight.innerHTML = "";
+
+  const scroll = document.getElementById("feed-scroll");
+  scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading files…</div></div>';
+
+  try {
+    const r = await fetch(`${BASE}/pro/files`, { headers: apiHeaders(), credentials: "include" });
+    if (!r.ok) throw new Error(`${r.status}`);
+    const data = await r.json();
+    _files = data.files || [];
+    _renderFilesView();
+  } catch(e) {
+    scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load files</div><div class="state-sub">${esc(e.message)}</div></div>`;
+  }
+}
+
+function _renderFilesView() {
+  if (!_filesView) return;
+  const scroll = document.getElementById("feed-scroll");
+
+  const uploadBar = `
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+      <label style="display:inline-flex;align-items:center;gap:0.5rem;cursor:pointer;background:var(--accent);color:#fff;font-size:0.8rem;font-weight:600;padding:0.45rem 0.9rem;border-radius:8px;">
+        ＋ Upload File
+        <input type="file" id="files-view-input" style="display:none;" onchange="_onFilesViewSelected(this)" />
+      </label>
+      <span id="files-view-status" style="font-size:0.8rem;color:var(--muted);"></span>
+      <div id="files-view-preview" style="display:none;align-items:center;gap:0.5rem;padding:0.3rem 0.6rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.78rem;">
+        <span id="files-view-icon">📎</span>
+        <span id="files-view-name" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <button onclick="_cancelFilesViewUpload()" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0.1rem 0.2rem;">✕</button>
+        <button id="files-view-send-btn" onclick="_doFilesViewUpload()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0.2rem 0.6rem;cursor:pointer;font-size:0.78rem;font-weight:600;">Upload</button>
+      </div>
+    </div>`;
+
+  let listHtml = "";
+  if (!_files.length) {
+    listHtml = `<div class="state-box"><div class="state-icon">📁</div><div class="state-title">No files yet</div><div class="state-sub">Upload a file to share it with agents.</div></div>`;
+  } else {
+    listHtml = `<div style="padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.5rem;">` +
+      _files.map((f, i) => {
+        const icon = _fileIcon(f.mime_type || "");
+        const sizeStr = _fmtBytes(f.size || 0);
+        const dateStr = f.created_at ? relativeTime(f.created_at) : "";
+        const agentOptions = _agents.map(a =>
+          `<option value="${esc(a.did)}">${esc(a.name || a.did.slice(-12))}</option>`
+        ).join("");
+        return `
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+            <span style="font-size:1.5rem;flex-shrink:0">${icon}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.85rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(f.name || f.id)}</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:0.1rem;">${sizeStr} · ${esc(f.mime_type || "")} · ${dateStr}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+              <select id="file-share-to-${i}" style="font-size:0.75rem;padding:0.25rem 0.4rem;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);max-width:130px;">
+                <option value="">Send to agent…</option>
+                ${agentOptions}
+              </select>
+              <button onclick="_shareFile('${esc(f.id)}', ${i})" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0.25rem 0.55rem;cursor:pointer;font-size:0.75rem;font-weight:600;">Send</button>
+              <button onclick="_deleteFile('${esc(f.id)}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;cursor:pointer;font-size:0.75rem;color:var(--muted);">🗑</button>
+            </div>
+          </div>`;
+      }).join("") + `</div>`;
+  }
+
+  scroll.innerHTML = uploadBar + listHtml;
+
+  // Update sidebar count
+  const countEl = document.getElementById("sidebar-files-count");
+  if (countEl) countEl.textContent = _files.length > 0 ? _files.length : "";
+}
+
+let _filesViewPendingFile = null;
+
+function _onFilesViewSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _filesViewPendingFile = file;
+  document.getElementById("files-view-name").textContent = file.name + " (" + _fmtBytes(file.size) + ")";
+  document.getElementById("files-view-icon").textContent = _fileIcon(file.type);
+  document.getElementById("files-view-preview").style.display = "flex";
+  document.getElementById("files-view-status").textContent = "";
+}
+
+function _cancelFilesViewUpload() {
+  _filesViewPendingFile = null;
+  document.getElementById("files-view-input").value = "";
+  document.getElementById("files-view-preview").style.display = "none";
+}
+
+async function _doFilesViewUpload() {
+  if (!_filesViewPendingFile) return;
+  const btn = document.getElementById("files-view-send-btn");
+  const status = document.getElementById("files-view-status");
+  btn.textContent = "Uploading…"; btn.disabled = true;
+  try {
+    const uploaded = await _uploadFileToBE(_filesViewPendingFile, _agents[0]?.did || null);
+    _files.unshift(uploaded);
+    _cancelFilesViewUpload();
+    status.textContent = `✓ ${uploaded.name} uploaded`;
+    status.style.color = "var(--green)";
+    _renderFilesView();
+  } catch(e) {
+    status.textContent = "Upload failed: " + e.message;
+    status.style.color = "var(--red)";
+    btn.textContent = "Upload"; btn.disabled = false;
+  }
+}
+
+async function _shareFile(fileId, idx) {
+  const sel = document.getElementById(`file-share-to-${idx}`);
+  const toDid = sel?.value;
+  if (!toDid) { alert("Select an agent to send the file to."); return; }
+  const file = _files.find(f => f.id === fileId);
+  if (!file) return;
+  const fromAgent = _agents[0];
+  if (!fromAgent) { alert("No agents available to send from."); return; }
+  try {
+    const r = await fetch(`${BASE}/agents/${encodeDidPath(fromAgent.did)}/messages`, {
+      method: "POST",
+      headers: apiHeaders(),
+      credentials: "include",
+      body: JSON.stringify({
+        to_did: toDid,
+        subject: `File: ${file.name}`,
+        body: `[File attached: ${file.name}]`,
+        file_ref: { file_id: file.id, name: file.name, mime_type: file.mime_type, size: file.size },
+      }),
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    const toAgent = _agents.find(a => a.did === toDid);
+    alert(`✓ Sent "${file.name}" to ${toAgent?.name || toDid.slice(-12)}`);
+    sel.value = "";
+  } catch(e) {
+    alert("Could not send file: " + e.message);
+  }
+}
+
+async function _deleteFile(fileId) {
+  if (!confirm("Delete this file?")) return;
+  try {
+    const r = await fetch(`${BASE}/pro/files/${encodeURIComponent(fileId)}`, {
+      method: "DELETE",
+      headers: apiHeaders(),
+      credentials: "include",
+    });
+    if (!r.ok && r.status !== 204) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    _files = _files.filter(f => f.id !== fileId);
+    _renderFilesView();
+  } catch(e) {
+    alert("Could not delete file: " + e.message);
+  }
+}
+
 // ── SIGNED DEALS ──────────────────────────────────────────────────────────────
 let _dealsView = false;
 let _deals = [];
@@ -1972,9 +2166,10 @@ async function showGroupView(roomId) {
 
   try {
     // Load room detail (members) + messages in parallel
+    const _authOpts = { headers: apiHeaders(), credentials: "include" };
     const [detailRes, msgsRes] = await Promise.all([
-      fetch(`${BASE}/pro/chat/rooms/${roomId}`),
-      fetch(`${BASE}/pro/chat/rooms/${roomId}/messages?limit=100`),
+      fetch(`${BASE}/pro/chat/rooms/${roomId}`, _authOpts),
+      fetch(`${BASE}/pro/chat/rooms/${roomId}/messages?limit=100`, _authOpts),
     ]);
 
     if (!detailRes.ok) throw new Error(`Room error ${detailRes.status}`);
@@ -2128,7 +2323,7 @@ async function acceptInvite(roomId, did) {
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
     // Refresh rooms list and reload thread
-    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`);
+    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`, { headers: apiHeaders(), credentials: "include" });
     if (roomsRes.ok) { const d = await roomsRes.json(); _rooms = d.rooms || []; renderGroupsSidebar(); }
     showGroupView(roomId);
   } catch(e) {
@@ -2179,7 +2374,8 @@ async function _sendGroupMessage(roomId, fromDid, inputEl) {
     }
     const r = await fetch(`${BASE}/pro/chat/rooms/${roomId}/messages`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: apiHeaders(),
+      credentials: "include",
       body: JSON.stringify({ from_did: fromDid, body: body || `[File: ${fileRef?.name}]`, file_ref: fileRef }),
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
@@ -2213,14 +2409,15 @@ async function submitNewGroup() {
     const body = { name, description: desc, initial_dids: did ? [did] : [] };
     const r = await fetch(`${BASE}/pro/chat/rooms`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: apiHeaders(),
+      credentials: "include",
       body: JSON.stringify(body),
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
     const newRoom = await r.json();
     closeNewGroupModal();
     // Refresh rooms list then open the new room
-    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`);
+    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`, { headers: apiHeaders(), credentials: "include" });
     if (roomsRes.ok) { const d = await roomsRes.json(); _rooms = d.rooms || []; renderGroupsSidebar(); }
     showGroupView(newRoom.id);
   } catch(e) {
@@ -2256,7 +2453,8 @@ async function submitInvite() {
   try {
     const r = await fetch(`${BASE}/pro/chat/rooms/${_inviteRoomId}/invite`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: apiHeaders(),
+      credentials: "include",
       body: JSON.stringify({ did, from_did: fromDid, message: document.getElementById("inv-msg").value.trim() }),
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
@@ -2278,7 +2476,7 @@ async function openLeaveModal(roomId) {
   // Find my active agents in the room
   let myActiveInRoom = [];
   try {
-    const r = await fetch(`${BASE}/pro/chat/rooms/${roomId}`);
+    const r = await fetch(`${BASE}/pro/chat/rooms/${roomId}`, { headers: apiHeaders(), credentials: "include" });
     if (r.ok) {
       const d = await r.json();
       myActiveInRoom = (d.members || []).filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
@@ -2296,12 +2494,13 @@ async function openLeaveModal(roomId) {
     await Promise.all(myActiveInRoom.map(m =>
       fetch(`${BASE}/pro/chat/rooms/${roomId}/leave`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: apiHeaders(),
+        credentials: "include",
         body: JSON.stringify({ did: m.did }),
       })
     ));
     // Refresh rooms list and return to main view
-    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`);
+    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`, { headers: apiHeaders(), credentials: "include" });
     if (roomsRes.ok) { const d = await roomsRes.json(); _rooms = d.rooms || []; renderGroupsSidebar(); }
     _activeRoomId = null;
     _stopGroupPoll();
