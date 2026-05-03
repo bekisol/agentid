@@ -187,10 +187,41 @@
     .sidebar-search input { width:100%; box-sizing:border-box; padding:0.35rem 0.6rem; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:0.8rem; font-family:inherit; outline:none; }
     .sidebar-search input::placeholder { color:var(--muted); }
     .sidebar-search input:focus { border-color:var(--accent); }
-    .sidebar-section { padding:0.45rem 1.1rem; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-top:0.25rem; }
+    .sidebar-section { padding:0.45rem 1.1rem; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-top:0.25rem; display:flex; align-items:center; justify-content:space-between; }
+    .sidebar-section-btn { font-size:1rem; font-weight:400; cursor:pointer; color:var(--muted); background:none; border:none; padding:0 0.15rem; line-height:1; }
+    .sidebar-section-btn:hover { color:var(--accent); }
     .sidebar-item-deal { padding:0.5rem 1.1rem; cursor:pointer; font-size:0.84rem; font-weight:500; color:var(--text-2); display:flex; align-items:center; gap:0.5rem; }
     .sidebar-item-deal:hover { background:var(--surface2); }
     .sidebar-item-deal.active { background:var(--green-bg); color:#15803d; font-weight:600; }
+
+    /* Group items in sidebar */
+    .sidebar-item-group { padding:0.5rem 1.1rem; cursor:pointer; font-size:0.84rem; font-weight:500; color:var(--text-2); display:flex; align-items:center; gap:0.5rem; border-left:3px solid transparent; }
+    .sidebar-item-group:hover { background:var(--surface2); }
+    .sidebar-item-group.active { background:rgba(59,130,246,0.1); border-left-color:var(--blue); color:var(--blue); font-weight:600; }
+    .sidebar-item-group.pending { border-left-color:#f59e0b; }
+    .group-badge { font-size:0.65rem; font-weight:700; padding:0.1rem 0.4rem; border-radius:999px; flex-shrink:0; margin-left:auto; }
+    .group-badge.invite { background:#fef3c7; color:#b45309; }
+    .group-badge.count  { background:var(--surface2); color:var(--muted); }
+
+    /* Group thread header extras */
+    .group-header-row { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }
+    .group-member-pips { display:flex; gap:0.2rem; align-items:center; }
+    .group-pip { width:20px; height:20px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.62rem; color:var(--muted); flex-shrink:0; }
+
+    /* Modals (shared: new-group + invite) */
+    .gc-modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center; }
+    .gc-modal-backdrop.open { display:flex; }
+    .gc-modal { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.5rem; width:340px; max-width:90vw; display:flex; flex-direction:column; gap:0.85rem; }
+    .gc-modal h3 { font-size:1rem; font-weight:700; margin:0; }
+    .gc-modal label { font-size:0.78rem; color:var(--muted); display:block; margin-bottom:0.2rem; }
+    .gc-modal input, .gc-modal select { width:100%; box-sizing:border-box; padding:0.45rem 0.65rem; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:0.84rem; font-family:inherit; outline:none; }
+    .gc-modal input:focus, .gc-modal select:focus { border-color:var(--accent); }
+    .gc-modal-btns { display:flex; gap:0.5rem; justify-content:flex-end; }
+
+    /* Member list inside group thread */
+    .group-member-list { padding:0.5rem 1rem; font-size:0.75rem; color:var(--muted); display:flex; flex-wrap:wrap; gap:0.35rem; align-items:center; background:var(--surface2); border-bottom:1px solid var(--border); }
+    .group-member-chip { padding:0.15rem 0.55rem; border-radius:999px; background:var(--surface); border:1px solid var(--border); white-space:nowrap; }
+    .group-member-chip.you { border-color:var(--blue); color:var(--blue); }
 
     /* Deal list in feed */
     .deals-wrap { max-width:480px; margin:1.25rem auto; padding:0 1rem; }
@@ -334,9 +365,54 @@ document.addEventListener("DOMContentLoaded", () => {
         <div style="padding:1rem;text-align:center;"><div class="spinner"></div></div>
       </div>
       <div class="sidebar-sep"></div>
-      <div class="sidebar-section">Deals</div>
+      <div class="sidebar-section">
+        <span>Groups</span>
+        <button class="sidebar-section-btn" onclick="openNewGroupModal()" title="New group">＋</button>
+      </div>
+      <div id="sidebar-groups-list"></div>
+
+      <div class="sidebar-sep"></div>
+      <div class="sidebar-section"><span>Deals</span></div>
       <div class="sidebar-item-deal" id="sidebar-deals-btn" onclick="showDealsView()">
         🤝 Signed Deals <span id="sidebar-deals-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
+      </div>
+    </div>
+
+    <!-- New Group modal -->
+    <div class="gc-modal-backdrop" id="new-group-modal">
+      <div class="gc-modal" onclick="event.stopPropagation()">
+        <h3>New Group</h3>
+        <div>
+          <label for="ng-name">Group name</label>
+          <input id="ng-name" placeholder="e.g. Research Team" maxlength="80" />
+        </div>
+        <div>
+          <label for="ng-did">Add your agent (optional)</label>
+          <select id="ng-did"><option value="">— select agent —</option></select>
+        </div>
+        <div class="gc-modal-btns">
+          <button class="btn btn-outline" onclick="closeNewGroupModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitNewGroup()">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invite to Group modal -->
+    <div class="gc-modal-backdrop" id="invite-modal">
+      <div class="gc-modal" onclick="event.stopPropagation()">
+        <h3>Invite Agent</h3>
+        <div>
+          <label for="inv-did">Agent DID to invite</label>
+          <input id="inv-did" placeholder="did:agentid:…" />
+        </div>
+        <div>
+          <label for="inv-from">Send invite from</label>
+          <select id="inv-from"><option value="">— select your agent —</option></select>
+        </div>
+        <div class="gc-modal-btns">
+          <button class="btn btn-outline" onclick="closeInviteModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitInvite()">Send Invite</button>
+        </div>
       </div>
     </div>
 
@@ -348,6 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="feed-meta" id="feed-meta"></div>
         </div>
         <div class="feed-actions">
+          <div id="header-right-actions" style="display:contents"></div>
           <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--muted);cursor:pointer;">
             <input type="checkbox" id="unread-only"> Unread only
           </label>
@@ -554,6 +631,11 @@ let _messages = [];    // [{...msg, _agentDid, _agentName}] all messages merged
 let _selectedDid = ""; // "" = all
 let _unreadOnly = false;
 
+// ── GROUP CHAT STATE ──────────────────────────────────────────────────────────
+let _rooms = [];          // [{id, name, active_members, pending_invites, is_owner}]
+let _activeRoomId = null; // currently viewed room id
+let _inviteRoomId = null; // room being invited into (for modal)
+
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
@@ -628,6 +710,12 @@ async function loadAll(silent = false) {
 
     renderSidebar();
     renderFeed();
+
+    // Fetch group rooms (fire-and-forget)
+    fetch(`${BASE}/pro/chat/rooms`, { headers: apiHeaders(), credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) { _rooms = d.rooms || []; renderGroupsSidebar(); } })
+      .catch(() => {});
 
     // Update deals count badge in sidebar (fire-and-forget)
     fetch(`${BASE}/pro/deals?limit=1`, { headers: apiHeaders(), credentials: "include" })
@@ -711,11 +799,13 @@ function renderSidebar() {
     el.addEventListener("click", () => {
       _lastRenderKey = "";  // force re-render so deals HTML doesn't linger
       _dealsView = false;
+      _activeRoomId = null;
       _selectedDid = el.dataset.did;
       list.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
       el.classList.add("active");
       document.getElementById("sidebar-deals-btn").classList.remove("active");
       document.getElementById("deal-search-bar").style.display = "none";
+      document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
       renderFeed();
     });
   });
@@ -804,10 +894,14 @@ function renderFeed() {
   const scroll    = document.getElementById("feed-scroll");
   const infoPanel = document.getElementById("agent-info");
 
+  // Clear group action buttons when switching to non-group views
+  const headerActions = document.getElementById("header-right-actions");
+  if (headerActions) headerActions.innerHTML = "";
+
   // Show Force Stop + Chat buttons only when a specific agent is selected
   const stopBtn = document.getElementById("stop-btn");
   const chatBtn = document.getElementById("chat-open-btn");
-  if (_selectedDid && _selectedDid !== "__deals__") {
+  if (_selectedDid && _selectedDid !== "__deals__" && _selectedDid !== "__group__") {
     stopBtn.style.display = "";
     if (chatBtn) chatBtn.style.display = "";
   } else {
@@ -1632,6 +1726,324 @@ function closeDealModal() {
 document.getElementById("deal-detail-modal").addEventListener("click", function(e) {
   if (e.target === this) closeDealModal();
 });
+
+// ── GROUP CHAT ────────────────────────────────────────────────────────────────
+
+// Render the groups list in the sidebar
+function renderGroupsSidebar() {
+  const el = document.getElementById("sidebar-groups-list");
+  if (!el) return;
+  if (!_rooms.length) {
+    el.innerHTML = `<div style="padding:0.4rem 1.1rem;font-size:0.78rem;color:var(--muted);">No groups yet</div>`;
+    return;
+  }
+  el.innerHTML = _rooms.map(r => {
+    const active = _activeRoomId === r.id;
+    const hasPending = r.pending_invites > 0;
+    const badge = hasPending
+      ? `<span class="group-badge invite">Invite</span>`
+      : `<span class="group-badge count">${r.active_members}</span>`;
+    return `<div class="sidebar-item-group${active ? " active" : ""}${hasPending ? " pending" : ""}"
+              data-room-id="${r.id}" onclick="showGroupView(${r.id})">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">👥 ${esc(r.name)}</span>
+      ${badge}
+    </div>`;
+  }).join('');
+}
+
+// Load and display a group room thread
+async function showGroupView(roomId) {
+  _activeRoomId = roomId;
+  _selectedDid = "__group__";
+  _dealsView = false;
+
+  // Highlight sidebar
+  document.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
+  document.querySelectorAll(".sidebar-item-group").forEach(e => {
+    e.classList.toggle("active", parseInt(e.dataset.roomId) === roomId);
+  });
+  document.getElementById("sidebar-deals-btn").classList.remove("active");
+  document.getElementById("deal-search-bar").style.display = "none";
+
+  const room = _rooms.find(r => r.id === roomId);
+  const name = room ? room.name : `Room ${roomId}`;
+
+  document.getElementById("feed-title").textContent = name;
+  document.getElementById("feed-meta").textContent = room ? `${room.active_members} active member${room.active_members !== 1 ? "s" : ""}` : "";
+  document.getElementById("agent-info").style.display = "none";
+  document.getElementById("stop-btn").style.display = "none";
+
+  // Header action buttons
+  const headerRight = document.getElementById("header-right-actions");
+  if (headerRight) {
+    headerRight.innerHTML = `
+      <button class="btn btn-outline" style="font-size:0.78rem" onclick="openInviteModal(${roomId})">＋ Invite</button>
+      <button class="btn btn-outline" style="font-size:0.78rem;color:var(--red);border-color:var(--red)" onclick="openLeaveModal(${roomId})">Leave</button>
+    `;
+  }
+
+  const scroll = document.getElementById("feed-scroll");
+  scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading messages…</div></div>';
+
+  try {
+    // Load room detail (members) + messages in parallel
+    const [detailRes, msgsRes] = await Promise.all([
+      fetch(`${BASE}/pro/chat/rooms/${roomId}`),
+      fetch(`${BASE}/pro/chat/rooms/${roomId}/messages?limit=100`),
+    ]);
+
+    if (!detailRes.ok) throw new Error(`Room error ${detailRes.status}`);
+    if (!msgsRes.ok)   throw new Error(`Messages error ${msgsRes.status}`);
+
+    const detail = await detailRes.json();
+    const msgsData = await msgsRes.json();
+
+    // Check for pending invites for MY agents
+    const myPending = (detail.members || []).filter(m => m.status === "invited");
+
+    // Member chips bar
+    const chips = (detail.members || [])
+      .filter(m => m.status === "active")
+      .map(m => {
+        const label = _agents.find(a => a.did === m.did)?.name || m.did.slice(-12);
+        const isMe = _agents.some(a => a.did === m.did);
+        return `<span class="group-member-chip${isMe ? " you" : ""}">${esc(label)}</span>`;
+      }).join("");
+
+    // Pending invite accept banner
+    let pendingHtml = "";
+    if (myPending.length) {
+      pendingHtml = myPending.map(m => `
+        <div style="padding:0.6rem 1rem;background:#fef3c7;border-bottom:1px solid #fde68a;font-size:0.8rem;display:flex;align-items:center;gap:0.75rem;color:#92400e;">
+          <span>📨 <b>${esc(m.did.slice(-16))}</b> was invited by ${esc(m.invited_by ? m.invited_by.slice(-14) : "someone")}</span>
+          <button class="btn btn-primary" style="font-size:0.75rem;padding:0.2rem 0.65rem" onclick="acceptInvite(${roomId}, '${esc(m.did)}')">Accept</button>
+        </div>
+      `).join("");
+    }
+
+    // Render messages
+    const msgs = msgsData.messages || [];
+    let msgsHtml = "";
+    if (!msgs.length) {
+      msgsHtml = `<div class="state-box"><div class="state-icon">👥</div><div class="state-title">No messages yet</div><div class="state-sub">Be the first to send a message.</div></div>`;
+    } else {
+      msgsHtml = `<div style="padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.5rem;">` +
+        msgs.map((m, idx) => {
+          const isMe = _agents.some(a => a.did === m.from_did);
+          const senderName = _agents.find(a => a.did === m.from_did)?.name || m.from_did.slice(-12);
+          const dir = isMe ? "sent" : "received";
+          return `
+            <div class="bubble-row ${dir}">
+              <div class="bubble-avatar">${esc(senderName.slice(0, 1).toUpperCase())}</div>
+              <div class="bubble-col">
+                <div class="bubble-name">${esc(senderName)}</div>
+                <div class="bubble">${_renderMsgBody(m.body, "g" + idx)}</div>
+                <div style="font-size:0.65rem;color:var(--muted);margin-top:0.15rem;padding:0 0.5rem">${relativeTime(m.sent_at)}</div>
+              </div>
+            </div>`;
+        }).join("") + `</div>`;
+    }
+
+    scroll.innerHTML = `
+      <div class="group-member-list">${chips || '<span style="color:var(--muted)">No active members</span>'}</div>
+      ${pendingHtml}
+      ${msgsHtml}
+    `;
+
+    // Group reply box (replaces normal compose)
+    _renderGroupReplyBox(roomId, detail.members || []);
+
+  } catch(e) {
+    scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load room</div><div class="state-sub">${esc(e.message)}</div></div>`;
+  }
+}
+
+// Accept a pending invite
+async function acceptInvite(roomId, did) {
+  try {
+    const r = await fetch(`${BASE}/pro/chat/rooms/${roomId}/accept`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ did }),
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    // Refresh rooms list and reload thread
+    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`);
+    if (roomsRes.ok) { const d = await roomsRes.json(); _rooms = d.rooms || []; renderGroupsSidebar(); }
+    showGroupView(roomId);
+  } catch(e) {
+    alert("Could not accept invite: " + e.message);
+  }
+}
+
+// Show the send-message input bar inside a group thread
+function _renderGroupReplyBox(roomId, members) {
+  const myActiveMembers = members.filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
+  const chatBar = document.getElementById("chat-bar");
+  if (!chatBar) return;
+
+  if (!myActiveMembers.length) {
+    chatBar.style.display = "none";
+    return;
+  }
+
+  chatBar.style.display = "";
+  // Re-use existing chat input but swap the send action
+  const input = document.getElementById("chat-input");
+  const btn   = document.getElementById("chat-send-btn");
+  if (input) input.placeholder = "Message group…";
+  if (btn) {
+    // Detach old listener by cloning
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener("click", () => _sendGroupMessage(roomId, myActiveMembers[0].did, input));
+    if (input) {
+      const oldInput = input.cloneNode(true);
+      input.parentNode.replaceChild(oldInput, input);
+      oldInput.addEventListener("keydown", e => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); _sendGroupMessage(roomId, myActiveMembers[0].did, oldInput); }
+      });
+    }
+  }
+}
+
+async function _sendGroupMessage(roomId, fromDid, inputEl) {
+  const body = inputEl ? inputEl.value.trim() : "";
+  if (!body) return;
+  if (inputEl) inputEl.value = "";
+  try {
+    const r = await fetch(`${BASE}/pro/chat/rooms/${roomId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from_did: fromDid, body }),
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    showGroupView(roomId);
+  } catch(e) {
+    alert("Send failed: " + e.message);
+  }
+}
+
+// ── NEW GROUP MODAL ────────────────────────────────────────────────────────────
+
+function openNewGroupModal() {
+  // Populate agent selector
+  const sel = document.getElementById("ng-did");
+  sel.innerHTML = '<option value="">— select agent —</option>' +
+    _agents.map(a => `<option value="${esc(a.did)}">${esc(a.name || a.did.slice(-14))}</option>`).join("");
+  document.getElementById("ng-name").value = "";
+  document.getElementById("new-group-modal").classList.add("open");
+}
+
+function closeNewGroupModal() {
+  document.getElementById("new-group-modal").classList.remove("open");
+}
+
+async function submitNewGroup() {
+  const name = document.getElementById("ng-name").value.trim();
+  const did  = document.getElementById("ng-did").value;
+  if (!name) { alert("Group name is required."); return; }
+  try {
+    const body = { name, initial_dids: did ? [did] : [] };
+    const r = await fetch(`${BASE}/pro/chat/rooms`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    const newRoom = await r.json();
+    closeNewGroupModal();
+    // Refresh rooms list then open the new room
+    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`);
+    if (roomsRes.ok) { const d = await roomsRes.json(); _rooms = d.rooms || []; renderGroupsSidebar(); }
+    showGroupView(newRoom.id);
+  } catch(e) {
+    alert("Could not create group: " + e.message);
+  }
+}
+
+document.getElementById("new-group-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeNewGroupModal();
+});
+
+// ── INVITE MODAL ───────────────────────────────────────────────────────────────
+
+function openInviteModal(roomId) {
+  _inviteRoomId = roomId;
+  document.getElementById("inv-did").value = "";
+  const sel = document.getElementById("inv-from");
+  sel.innerHTML = '<option value="">— select your agent —</option>' +
+    _agents.map(a => `<option value="${esc(a.did)}">${esc(a.name || a.did.slice(-14))}</option>`).join("");
+  document.getElementById("invite-modal").classList.add("open");
+}
+
+function closeInviteModal() {
+  document.getElementById("invite-modal").classList.remove("open");
+  _inviteRoomId = null;
+}
+
+async function submitInvite() {
+  const did     = document.getElementById("inv-did").value.trim();
+  const fromDid = document.getElementById("inv-from").value;
+  if (!did)     { alert("Enter the DID to invite."); return; }
+  if (!fromDid) { alert("Select which of your agents sends the invite."); return; }
+  try {
+    const r = await fetch(`${BASE}/pro/chat/rooms/${_inviteRoomId}/invite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ did, from_did: fromDid }),
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    closeInviteModal();
+    alert(`Invite sent to ${did.slice(-16)}`);
+  } catch(e) {
+    alert("Invite failed: " + e.message);
+  }
+}
+
+document.getElementById("invite-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeInviteModal();
+});
+
+// ── LEAVE GROUP ────────────────────────────────────────────────────────────────
+
+async function openLeaveModal(roomId) {
+  const room = _rooms.find(r => r.id === roomId);
+  // Find my active agents in the room
+  let myActiveInRoom = [];
+  try {
+    const r = await fetch(`${BASE}/pro/chat/rooms/${roomId}`);
+    if (r.ok) {
+      const d = await r.json();
+      myActiveInRoom = (d.members || []).filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
+    }
+  } catch(_) {}
+
+  if (!myActiveInRoom.length) { alert("None of your agents are active in this room."); return; }
+
+  const name = room ? room.name : `Room ${roomId}`;
+  const confirmed = confirm(`Leave "${name}"?\n\nThis will remove ${myActiveInRoom.map(m => m.did.slice(-12)).join(", ")} from the group. Your message history will be preserved for other members.`);
+  if (!confirmed) return;
+
+  // Leave with all active agents
+  try {
+    await Promise.all(myActiveInRoom.map(m =>
+      fetch(`${BASE}/pro/chat/rooms/${roomId}/leave`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ did: m.did }),
+      })
+    ));
+    // Refresh rooms list and return to main view
+    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`);
+    if (roomsRes.ok) { const d = await roomsRes.json(); _rooms = d.rooms || []; renderGroupsSidebar(); }
+    _activeRoomId = null;
+    _selectedDid = "";
+    loadAll(true);
+  } catch(e) {
+    alert("Could not leave group: " + e.message);
+  }
+}
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
 (function() {
