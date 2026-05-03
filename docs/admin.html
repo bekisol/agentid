@@ -420,6 +420,32 @@
             </button>
             <div id="schema-result" style="margin-top:0.75rem;font-size:0.8rem;"></div>
           </div>
+          <!-- DEV ONLY — remove this entire block before public launch -->
+          <div class="table-wrap" style="padding:1.25rem;grid-column:span 2;border:2px solid var(--red);">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+              <div class="section-head" style="color:var(--red);margin-bottom:0;">⚠ Danger Zone</div>
+              <span style="font-size:0.7rem;background:var(--red);color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;letter-spacing:0.05em;">DEV ONLY</span>
+              <span style="font-size:0.72rem;color:var(--muted);margin-left:auto;">Remove this section before going public</span>
+            </div>
+            <p style="font-size:0.83rem;color:var(--text-2);margin-bottom:1rem;line-height:1.6;">
+              Permanently deletes <strong style="color:var(--text);">all agents, audit logs, API keys, and verified owners</strong>.
+              Useful during development to start fresh. Master secret only — sub-keys cannot trigger this.
+            </p>
+            <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+              <div style="display:flex;flex-direction:column;gap:0.3rem;flex:1;min-width:200px;">
+                <label style="font-size:0.75rem;color:var(--red);">Type <strong>DELETE ALL DATA</strong> to confirm</label>
+                <input class="search-input" id="reset-confirm-input" placeholder="DELETE ALL DATA"
+                       style="border-color:var(--red);font-family:monospace;" />
+              </div>
+              <button class="btn-sm" id="admin-reset-btn"
+                      style="background:var(--red);color:#fff;border-color:var(--red);font-weight:700;">
+                🗑 Reset All Data
+              </button>
+            </div>
+            <div id="reset-result" style="margin-top:0.75rem;font-size:0.8rem;"></div>
+          </div>
+          <!-- /DEV ONLY -->
+
           <div class="table-wrap" style="padding:1.25rem;grid-column:span 2;">
             <div class="section-head">Migrate Owner</div>
             <p style="font-size:0.83rem;color:var(--text-2);margin-bottom:1rem;line-height:1.6;">
@@ -1018,6 +1044,28 @@ async function loadSystem() {
     </div>
   `;
 }
+
+document.getElementById("admin-reset-btn").addEventListener("click", async () => {
+  const typed = document.getElementById("reset-confirm-input").value.trim();
+  if (typed !== "DELETE ALL DATA") { toast("You must type exactly: DELETE ALL DATA", "err"); return; }
+  const result = await confirm("⚠ RESET ALL DATA",
+    "This will permanently delete ALL agents, audit logs, API keys, and verified owners. There is no undo.",
+    { danger: true });
+  if (!result?.confirmed) return;
+  const btn = document.getElementById("admin-reset-btn");
+  btn.textContent = "Resetting…"; btn.disabled = true;
+  try {
+    await api("/admin/reset", { method: "POST", body: JSON.stringify({ confirm: "DELETE ALL DATA" }) });
+    document.getElementById("reset-result").innerHTML =
+      `<span style="color:var(--green)">✓ All data cleared. The database is now empty.</span>`;
+    document.getElementById("reset-confirm-input").value = "";
+    toast("Reset complete", "ok");
+  } catch(e) {
+    document.getElementById("reset-result").innerHTML = `<span style="color:var(--red)">${esc(String(e))}</span>`;
+    toast(e, "err");
+  }
+  btn.textContent = "🗑 Reset All Data"; btn.disabled = false;
+});
 
 document.getElementById("migrate-owner-btn").addEventListener("click", async () => {
   const oldOwner = document.getElementById("migrate-old").value.trim();
