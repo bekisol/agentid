@@ -741,8 +741,19 @@ function renderFeed() {
 
   if (_unreadOnly) msgs = msgs.filter(m => !m.read);
 
-  // Sort oldest→newest for chat view (newest at bottom)
-  msgs = [...msgs].sort((a, b) => new Date(a.sent_at) - new Date(b.sent_at));
+  // Sort oldest→newest for chat view (newest at bottom).
+  // Tiebreaker when timestamps are equal (common with fast auto-replies):
+  //   1. sent messages before received (instruction before the action it triggered)
+  //   2. auto-replies always after the message they're responding to
+  msgs = [...msgs].sort((a, b) => {
+    const diff = new Date(a.sent_at) - new Date(b.sent_at);
+    if (diff !== 0) return diff;
+    if (a.is_auto_reply && !b.is_auto_reply) return 1;
+    if (!a.is_auto_reply && b.is_auto_reply) return -1;
+    if (a.direction === "sent" && b.direction !== "sent") return -1;
+    if (a.direction !== "sent" && b.direction === "sent") return 1;
+    return 0;
+  });
 
   const agent = _agents.find(a => a.did === _selectedDid);
   titleEl.textContent = agent ? (agent.name || "Agent") : "All Messages";
