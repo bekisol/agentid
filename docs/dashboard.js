@@ -808,7 +808,6 @@ async function loadDashboard() {
     loadDiscoveryStats().catch(e => console.error("loadDiscoveryStats:", e));
     loadAnomalies().catch(e => console.error("loadAnomalies:", e));
     _loadGroups().catch?.(e => console.error("loadGroups:", e));
-    loadPeerBenchmarks();
     _initNetworkObserver();
 
     // Start real-time SSE feed (or restart if already running)
@@ -818,6 +817,9 @@ async function loadDashboard() {
     clearInterval(_anomalyTimer);
     _anomalyTimer = setInterval(loadAnomalies, 60000);
   }
+
+  // Benchmarks — always attempt; shows upgrade prompt for free tier
+  loadPeerBenchmarks();
 
   // Onboarding checklist — shown until all steps done or dismissed
   _renderOnboarding(data);
@@ -3514,6 +3516,11 @@ async function loadPeerBenchmarks() {
   const list = document.getElementById("benchmarks-list");
   const src  = document.getElementById("benchmarks-source");
   if (!list) return;
+  if (!isPro()) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:0.5rem 0;">Upgrade to Pro to see how your agents compare to the network.</div>';
+    if (src) src.textContent = "";
+    return;
+  }
   try {
     const data = await apiFetch("/pro/benchmarks");
     const metrics = data.metrics || [];
@@ -3957,8 +3964,15 @@ function _initNetworkObserver() {
       _netObserver.disconnect(); _netObserver = null;
       loadNetworkGraph().catch(e => console.error("loadNetworkGraph:", e));
     }
-  }, { threshold: 0.1, root: scrollRoot });
+  }, { threshold: 0, root: scrollRoot });
   _netObserver.observe(card);
+  // Fallback: if observer doesn't fire within 3s (card already visible), load directly
+  setTimeout(() => {
+    if (_netObserver) {
+      _netObserver.disconnect(); _netObserver = null;
+      loadNetworkGraph().catch(e => console.error("loadNetworkGraph:", e));
+    }
+  }, 3000);
 }
 
 async function loadNetworkGraph() {
