@@ -923,7 +923,7 @@ function _renderMsgBody(body, idx) {
   const sig = _parseSignedBody(body);
   if (!sig) return esc(body);
   const mainText = sig.payload && sig.payload.body ? sig.payload.body : '';
-  return _renderSigBlock(sig, idx) + (mainText ? esc(mainText) : '');
+  return (mainText ? esc(mainText) + '\n' : '') + _renderSigBlock(sig, idx);
 }
 
 function togglePubkey(idx) {
