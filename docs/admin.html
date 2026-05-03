@@ -825,6 +825,7 @@ async function loadAccounts(page = 1) {
         <td>
           <button class="act-btn" onclick="changeTier(${k.id},'${esc(k.owner)}','${k.tier}')">change tier</button>
           <button class="act-btn danger" onclick="revokeKey(${k.id},'${esc(k.owner)}')">revoke key</button>
+          <button class="act-btn danger" onclick="deleteOwner('${esc(k.owner)}')">delete owner</button>
         </td>
       </tr>`).join("") + `</tbody></table>`;
   renderPager("accounts-pager", page, data.total, 50, loadAccounts);
@@ -836,6 +837,20 @@ async function revokeKey(id, owner) {
   try {
     await api(`/admin/accounts/keys/${id}`, { method:"DELETE" });
     toast("Key revoked", "ok");
+    loadAccounts(_accountPage);
+  } catch(e) { toast(e, "err"); }
+}
+
+async function deleteOwner(owner) {
+  const data = await showFormModal(`Delete Owner — ${owner}`, [
+    { id: "confirm_owner", label: `Type the owner email to confirm: ${owner}`, type: "input", value: "" },
+  ], { danger: true });
+  if (!data) return;
+  if (data.confirm_owner.trim() !== owner) { toast("Email does not match — not deleted", "err"); return; }
+  try {
+    const res = await api(`/admin/accounts/owner/${encodeURIComponent(owner)}`, { method: "DELETE" });
+    const s = res.summary || {};
+    toast(`Owner deleted — ${s.agents_found || 0} agent(s), ${s.api_keys || 0} key(s) removed`, "ok");
     loadAccounts(_accountPage);
   } catch(e) { toast(e, "err"); }
 }
