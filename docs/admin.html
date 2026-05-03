@@ -55,7 +55,7 @@
     .login-err { margin-top:0.75rem; font-size:0.8rem; color:var(--red); text-align:center; display:none; }
 
     /* ── shell ── */
-    #app { display:none; flex:1; overflow:hidden; }
+    #app { display:none; flex-direction:column; flex:1; overflow:hidden; }
     .topbar { background:var(--surface); border-bottom:1px solid var(--border);
               padding:0 1.5rem; height:52px; display:flex; align-items:center;
               justify-content:space-between; flex-shrink:0; }
@@ -227,6 +227,9 @@
       <div class="nav-section">Trust</div>
       <div class="nav-item" data-page="compromised">🚨 Compromised</div>
       <div class="nav-sep"></div>
+      <div class="nav-section">Access</div>
+      <div class="nav-item" data-page="subkeys">🗝️ Sub-keys</div>
+      <div class="nav-sep"></div>
       <div class="nav-section">Logs</div>
       <div class="nav-item" data-page="auditlog">📋 Audit Log</div>
       <div class="nav-item" data-page="adminlog">🔐 Admin Log</div>
@@ -322,6 +325,69 @@
             <button class="btn-sm" style="margin-left:auto;" id="refresh-adminlog-btn">Refresh</button>
           </div>
           <div id="adminlog-body"></div>
+        </div>
+      </div>
+
+      <!-- Sub-keys -->
+      <div class="page" id="page-subkeys">
+        <div class="page-title">Admin Sub-keys</div>
+        <div style="margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+          <p style="font-size:0.83rem;color:var(--text-2);flex:1;">
+            Sub-keys let colleagues access this admin panel without sharing the master secret.
+            Each key has scoped permissions and can be disabled instantly.
+          </p>
+          <button class="btn-sm" id="create-subkey-btn" style="background:var(--accent);color:#fff;border-color:var(--accent);flex-shrink:0;">+ New sub-key</button>
+        </div>
+        <div class="table-wrap">
+          <div id="subkeys-body"><div class="empty"><div class="spinner-sm"></div></div></div>
+        </div>
+        <!-- Create form (hidden by default) -->
+        <div id="subkey-form" style="display:none;margin-top:1rem;">
+          <div class="table-wrap" style="padding:1.25rem;">
+            <div class="section-head" style="margin-bottom:0.75rem;">New sub-key</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+              <div>
+                <label class="field-label">Label</label>
+                <input id="sk-label" class="search-input" style="width:100%;" placeholder="e.g. John (support)" />
+              </div>
+              <div>
+                <label class="field-label">Permissions</label>
+                <div id="sk-perms" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.35rem;">
+                  <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;color:var(--text-2);cursor:pointer;">
+                    <input type="checkbox" value="*" id="sk-perm-all" checked /> Full access
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;color:var(--text-2);cursor:pointer;">
+                    <input type="checkbox" value="agents" class="sk-perm-cb" /> Agents
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;color:var(--text-2);cursor:pointer;">
+                    <input type="checkbox" value="accounts" class="sk-perm-cb" /> Accounts
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;color:var(--text-2);cursor:pointer;">
+                    <input type="checkbox" value="trust" class="sk-perm-cb" /> Trust
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;color:var(--text-2);cursor:pointer;">
+                    <input type="checkbox" value="logs" class="sk-perm-cb" /> Logs
+                  </label>
+                  <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;color:var(--text-2);cursor:pointer;">
+                    <input type="checkbox" value="system" class="sk-perm-cb" /> System
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:0.5rem;">
+              <button class="btn-sm" id="sk-save-btn" style="background:var(--accent);color:#fff;border-color:var(--accent);">Create</button>
+              <button class="btn-sm" id="sk-cancel-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <!-- Key reveal (shown once after creation) -->
+        <div id="subkey-reveal" style="display:none;margin-top:1rem;">
+          <div class="table-wrap" style="padding:1.25rem;border-color:#1E40AF;">
+            <div class="section-head" style="color:var(--blue);margin-bottom:0.5rem;">🔑 Copy this key now — it won't be shown again</div>
+            <div id="subkey-reveal-key" style="font-family:var(--mono);font-size:0.85rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;word-break:break-all;margin-bottom:0.75rem;"></div>
+            <button class="btn-sm" id="sk-copy-btn">Copy to clipboard</button>
+            <button class="btn-sm" id="sk-dismiss-btn" style="margin-left:0.5rem;">Done</button>
+          </div>
         </div>
       </div>
 
@@ -423,18 +489,31 @@ document.getElementById("modal-confirm").addEventListener("click", () => {
 });
 
 // ── login ────────────────────────────────────────────────────────────────────
+let _adminInfo = {};
 async function tryLogin() {
   const secret = document.getElementById("secret-input").value.trim();
   if (!secret) return;
   try {
-    const r = await fetch(BASE + "/admin/system/health", {
-      headers: { "x-admin-secret": secret }
-    });
+    const r = await fetch(BASE + "/admin/whoami", { headers: { "x-admin-secret": secret } });
     if (!r.ok) throw new Error();
+    _adminInfo = await r.json();
     _secret = secret;
     sessionStorage.setItem("agentid_admin_secret", secret);
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("app").style.display = "flex";
+    const isMaster = _adminInfo.role === "master";
+    document.getElementById("top-status").textContent =
+      isMaster ? "master" : `${_adminInfo.label} · ${(_adminInfo.permissions||[]).join(", ")}`;
+    // Hide nav items the sub-key can't access
+    if (!isMaster) {
+      const permMap = { agents:"agents", accounts:"accounts", compromised:"trust",
+                        auditlog:"logs", adminlog:"logs", system:"system", subkeys:"sub_keys" };
+      document.querySelectorAll(".nav-item[data-page]").forEach(el => {
+        const needed = permMap[el.dataset.page];
+        if (needed && !(_adminInfo.permissions||[]).includes("*") && !(_adminInfo.permissions||[]).includes(needed))
+          el.style.display = "none";
+      });
+    }
     loadPage("overview");
   } catch {
     document.getElementById("login-err").style.display = "block";
@@ -474,7 +553,7 @@ function loadPage(page) {
     overview: loadOverview, agents: () => loadAgents(1),
     accounts: () => loadAccounts(1), compromised: loadCompromised,
     auditlog: () => loadAuditLog(1), adminlog: loadAdminLog,
-    system: loadSystem,
+    system: loadSystem, subkeys: loadSubKeys,
   };
   loaders[page]?.();
 }
@@ -768,6 +847,105 @@ document.getElementById("schema-init-btn").addEventListener("click", async () =>
   } catch(e) { toast(e, "err"); }
   btn.textContent = "Run schema init"; btn.disabled = false;
 });
+
+// ── sub-keys ──────────────────────────────────────────────────────────────────
+async function loadSubKeys() {
+  const data = await api("/admin/sub-keys").catch(e => { toast(e,"err"); return null; });
+  if (!data) return;
+  const body = document.getElementById("subkeys-body");
+  if (!data.sub_keys.length) {
+    body.innerHTML = `<div class="empty">No sub-keys yet. Create one to share access with a colleague.</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <table>
+      <thead><tr><th>Label</th><th>Permissions</th><th>Status</th><th>Last Used</th><th>Actions</th></tr></thead>
+      <tbody>` +
+    data.sub_keys.map(k => `
+      <tr>
+        <td style="font-weight:600;color:var(--text)">${esc(k.label)}</td>
+        <td style="font-size:0.78rem;">${
+          (k.permissions||[]).includes("*")
+            ? `<span class="tag tag-purple">full access</span>`
+            : (k.permissions||[]).map(p=>`<span class="tag tag-gray">${esc(p)}</span>`).join(" ")
+        }</td>
+        <td>${k.enabled ? `<span class="tag tag-green">active</span>` : `<span class="tag tag-red">disabled</span>`}</td>
+        <td style="font-size:0.75rem">${k.last_used ? fmtDate(k.last_used) : "never"}</td>
+        <td>
+          <button class="act-btn" onclick="toggleSubKey(${k.id},${!k.enabled})">${k.enabled?"disable":"enable"}</button>
+          <button class="act-btn danger" onclick="deleteSubKey(${k.id},'${esc(k.label)}')">delete</button>
+        </td>
+      </tr>`).join("") + `</tbody></table>`;
+}
+
+document.getElementById("create-subkey-btn").addEventListener("click", () => {
+  document.getElementById("subkey-form").style.display = "block";
+  document.getElementById("subkey-reveal").style.display = "none";
+  document.getElementById("sk-label").focus();
+});
+document.getElementById("sk-cancel-btn").addEventListener("click", () => {
+  document.getElementById("subkey-form").style.display = "none";
+});
+
+// Toggle: checking "Full access" unchecks specific perms and vice versa
+document.getElementById("sk-perm-all").addEventListener("change", e => {
+  document.querySelectorAll(".sk-perm-cb").forEach(cb => { cb.checked = false; cb.disabled = e.target.checked; });
+});
+document.querySelectorAll(".sk-perm-cb").forEach(cb => {
+  cb.addEventListener("change", () => {
+    const anyChecked = [...document.querySelectorAll(".sk-perm-cb")].some(c=>c.checked);
+    if (anyChecked) {
+      document.getElementById("sk-perm-all").checked = false;
+      document.getElementById("sk-perm-all").disabled = true;
+    } else {
+      document.getElementById("sk-perm-all").disabled = false;
+    }
+  });
+});
+
+document.getElementById("sk-save-btn").addEventListener("click", async () => {
+  const label = document.getElementById("sk-label").value.trim();
+  if (!label) { toast("Label is required", "err"); return; }
+  const allChecked = document.getElementById("sk-perm-all").checked;
+  const perms = allChecked
+    ? ["*"]
+    : [...document.querySelectorAll(".sk-perm-cb:checked")].map(c=>c.value);
+  if (!perms.length) { toast("Select at least one permission", "err"); return; }
+  try {
+    const data = await api("/admin/sub-keys", { method:"POST", body: JSON.stringify({label, permissions:perms}) });
+    document.getElementById("subkey-form").style.display = "none";
+    document.getElementById("subkey-reveal").style.display = "block";
+    document.getElementById("subkey-reveal-key").textContent = data.key;
+    toast(`Sub-key "${label}" created`, "ok");
+    loadSubKeys();
+  } catch(e) { toast(e, "err"); }
+});
+
+document.getElementById("sk-copy-btn").addEventListener("click", () => {
+  const key = document.getElementById("subkey-reveal-key").textContent;
+  navigator.clipboard.writeText(key).then(() => toast("Copied!", "ok")).catch(() => toast("Copy failed", "err"));
+});
+document.getElementById("sk-dismiss-btn").addEventListener("click", () => {
+  document.getElementById("subkey-reveal").style.display = "none";
+});
+
+async function toggleSubKey(id, enable) {
+  try {
+    await api(`/admin/sub-keys/${id}`, { method:"PATCH", body: JSON.stringify({enabled: enable}) });
+    toast(enable ? "Sub-key enabled" : "Sub-key disabled", "ok");
+    loadSubKeys();
+  } catch(e) { toast(e, "err"); }
+}
+
+async function deleteSubKey(id, label) {
+  const result = await confirm("Delete Sub-key", `Permanently delete the sub-key for "${label}"? Access will be revoked immediately.`, {danger:true});
+  if (!result?.confirmed) return;
+  try {
+    await api(`/admin/sub-keys/${id}`, { method:"DELETE" });
+    toast("Sub-key deleted", "ok");
+    loadSubKeys();
+  } catch(e) { toast(e, "err"); }
+}
 
 // ── pager ─────────────────────────────────────────────────────────────────────
 // Store loader refs by pager ID so onclick can call them without serializing the function.
