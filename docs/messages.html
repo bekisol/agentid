@@ -472,26 +472,25 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
 
       <!-- Agent identity card — shown when a specific agent is selected -->
-      <div id="agent-info" style="display:none;padding:0.8rem 1.5rem;background:var(--surface2);border-bottom:1px solid var(--border);">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-          <div style="min-width:0;flex:1;display:grid;gap:0.45rem;">
-            <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Agent Identity</div>
+      <div id="agent-info" style="display:none;padding:0.4rem 1.25rem;background:var(--surface2);border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+          <div style="min-width:0;flex:1;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
             <!-- DID -->
-            <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-2);word-break:break-all;" id="agent-info-did"></div>
+            <div style="font-size:0.68rem;font-family:'JetBrains Mono',monospace;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px;" id="agent-info-did"></div>
             <!-- Capabilities -->
-            <div id="agent-info-caps" style="display:flex;flex-wrap:wrap;gap:0.3rem;"></div>
+            <div id="agent-info-caps" style="display:flex;flex-wrap:wrap;gap:0.25rem;"></div>
             <!-- Trust score -->
-            <div id="agent-info-trust" style="font-size:0.78rem;color:var(--muted);">Trust score: <span style="font-style:italic;">loading…</span></div>
+            <div id="agent-info-trust" style="font-size:0.72rem;color:var(--muted);white-space:nowrap;">Trust: <span style="font-style:italic;">…</span></div>
             <!-- Public key toggle -->
             <div id="agent-info-key-wrap" style="display:none;">
-              <button onclick="toggleAgentKey()" style="font-size:0.7rem;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:0;">🔑 Show public key</button>
-              <div id="agent-info-key" style="display:none;margin-top:0.3rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.62rem;font-family:'JetBrains Mono',monospace;word-break:break-all;color:var(--muted);"></div>
+              <button onclick="toggleAgentKey()" style="font-size:0.68rem;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:0;">🔑 key</button>
+              <div id="agent-info-key" style="display:none;position:absolute;z-index:50;margin-top:0.3rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.62rem;font-family:'JetBrains Mono',monospace;word-break:break-all;color:var(--muted);max-width:400px;"></div>
             </div>
           </div>
           <!-- Action buttons -->
-          <div style="display:flex;flex-direction:column;gap:0.4rem;flex-shrink:0;align-self:flex-start;">
-            <button id="compose-btn" onclick="openCompose()" class="btn btn-outline">✉ Send Message</button>
-            <button id="chat-open-btn" onclick="openChat()" class="btn btn-primary" style="display:none;">💬 Chat with Agent</button>
+          <div style="display:flex;flex-direction:row;gap:0.4rem;flex-shrink:0;align-items:center;">
+            <button id="compose-btn" onclick="openCompose()" class="btn btn-outline" style="font-size:0.78rem;padding:0.3rem 0.65rem;">✉ Send Message</button>
+            <button id="chat-open-btn" onclick="openChat()" class="btn btn-primary" style="display:none;font-size:0.78rem;padding:0.3rem 0.65rem;">💬 Chat with Agent</button>
           </div>
         </div>
       </div>
