@@ -6317,7 +6317,11 @@ function _initSidebar() {
       const el = document.getElementById(id);
       const main = document.getElementById('dash-main');
       if (el && main) {
-        main.scrollTo({ top: el.offsetTop - 12, behavior: 'smooth' });
+        // getBoundingClientRect gives position relative to viewport;
+        // subtract main's top and add current scroll to get scroll target
+        const elTop = el.getBoundingClientRect().top;
+        const mainTop = main.getBoundingClientRect().top;
+        main.scrollTo({ top: main.scrollTop + elTop - mainTop - 8, behavior: 'smooth' });
       }
       _setSidebarActive(item.dataset.nav);
     });
