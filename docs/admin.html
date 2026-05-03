@@ -581,7 +581,6 @@ async function tryLogin() {
     if (!r.ok) throw new Error();
     _adminInfo = await r.json();
     _secret = secret;
-    sessionStorage.setItem("agentid_admin_secret", secret);
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("app").style.display = "flex";
     const isMaster = _adminInfo.role === "master";
@@ -606,16 +605,8 @@ async function tryLogin() {
 document.getElementById("login-btn").addEventListener("click", tryLogin);
 document.getElementById("secret-input").addEventListener("keydown", e => { if (e.key === "Enter") tryLogin(); });
 document.getElementById("logout-btn").addEventListener("click", () => {
-  sessionStorage.removeItem("agentid_admin_secret");
   location.reload();
 });
-
-// auto-login from sessionStorage
-const saved = sessionStorage.getItem("agentid_admin_secret");
-if (saved) {
-  document.getElementById("secret-input").value = saved;
-  tryLogin();
-}
 
 // ── navigation ───────────────────────────────────────────────────────────────
 let _currentPage = "overview";
