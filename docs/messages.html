@@ -1109,7 +1109,8 @@ function _renderFileChip(f) {
   const icon = _fileIcon(f.mime_type || '');
   const size = f.size ? _fmtBytes(f.size) : '';
   const name = esc(f.name || 'File');
-  const url  = f.url ? esc(f.url) : '#';
+  const rawUrl = f.url || '';
+  const url = esc(rawUrl.startsWith('/') ? BASE + rawUrl : (rawUrl || `${BASE}/pro/files/${f.file_id}/download`));
   const verified = f.signed_by
     ? `<span style="color:#16a34a;font-size:0.68rem;margin-left:0.4rem" title="Signed by ${esc(f.signed_by)}">✓ verified</span>`
     : '';
