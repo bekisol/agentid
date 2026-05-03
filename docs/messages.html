@@ -1661,7 +1661,7 @@ function renderDealsView() {
       <div class="deal-card-ref">📄 ${esc(d.deal_ref)} <span class="deal-card-type ${esc(type)}">${esc(type)}</span></div>
       <div class="deal-card-headline">${esc(headline)}</div>
       ${hasPrice && d.description ? `<div class="deal-card-desc">${esc(d.description)}</div>` : ""}
-      <div class="deal-card-parties" style="display:flex;flex-direction:column;gap:0.1rem;"><span>🛒 <strong>${esc(buyer)}</strong></span><span>🏷 <strong>${esc(seller)}</strong></span></div>
+      <div class="deal-card-parties" style="display:flex;flex-direction:column;gap:0.1rem;"><span>⬆ Initiator: <strong>${esc(buyer)}</strong></span><span>⬇ Counterparty: <strong>${esc(seller)}</strong></span></div>
       <div class="deal-card-time">Finalized ${esc(when)}</div>
     </div>`;
   }).join("") + `</div>`;
@@ -1701,7 +1701,7 @@ function _filterDeals() {
       <div class="deal-card-ref">📄 ${refHtml} <span class="deal-card-type ${esc(type)}">${esc(type)}</span></div>
       <div class="deal-card-headline">${esc(headline)}</div>
       ${hasPrice && d.description ? `<div class="deal-card-desc">${esc(d.description)}</div>` : ""}
-      <div class="deal-card-parties" style="display:flex;flex-direction:column;gap:0.1rem;"><span>🛒 <strong>${esc(buyer)}</strong></span><span>🏷 <strong>${esc(seller)}</strong></span></div>
+      <div class="deal-card-parties" style="display:flex;flex-direction:column;gap:0.1rem;"><span>⬆ Initiator: <strong>${esc(buyer)}</strong></span><span>⬇ Counterparty: <strong>${esc(seller)}</strong></span></div>
       <div class="deal-card-time">Finalized ${esc(when)}</div>
     </div>`;
   }).join("") + `</div>`;
@@ -1758,13 +1758,13 @@ function renderDealModal(idx, d) {
         ${!price && !d.description ? `<div style="font-size:1rem;color:var(--muted);">Service Agreement</div>` : ""}
         <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem;">Finalized ${esc(when)} · <span style="background:#dcfce7;color:#15803d;font-weight:700;padding:0.1rem 0.4rem;border-radius:20px;">${esc(d.status||"finalized")}</span></div>
       </div>
-      ${agentBlock("🛒 Buyer", d.buyer_did, d.buyer_name, d.buyer_owner, d.buyer_capabilities, d.buyer_public_key)}
-      ${agentBlock("🏷 Seller", d.seller_did, d.seller_name, d.seller_owner, d.seller_capabilities, d.seller_public_key)}
+      ${agentBlock("⬆ Initiator", d.buyer_did, d.buyer_name, d.buyer_owner, d.buyer_capabilities, d.buyer_public_key)}
+      ${agentBlock("⬇ Counterparty", d.seller_did, d.seller_name, d.seller_owner, d.seller_capabilities, d.seller_public_key)}
       ${(d.seller_body || d.buyer_body) ? `<div>
         <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:0.35rem;">Signed Exchange</div>
-        ${d.seller_body ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Seller / Offer</div>
+        ${d.seller_body ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Counterparty / Proposal</div>
         <div style="font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:140px;overflow-y:auto;color:var(--text-2);margin-bottom:0.5rem;">${esc(d.seller_body)}</div>` : ""}
-        ${d.buyer_body ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Buyer / Acceptance</div>
+        ${d.buyer_body ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Initiator / Acceptance</div>
         <div style="font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:140px;overflow-y:auto;color:var(--text-2);">${esc(d.buyer_body)}</div>` : ""}
       </div>` : ""}
       <div style="display:flex;gap:0.5rem;justify-content:flex-end;padding-top:0.25rem;border-top:1px solid var(--border);">
@@ -1854,8 +1854,8 @@ ${price || d.description ? `
   ${d.description ? `<div class="desc-line">${d.description.replace(/</g,"&lt;")}</div>` : ""}
 </div>` : ""}
 
-${agentSection("🛒 Buyer", d.buyer_did, d.buyer_name, d.buyer_owner, d.buyer_capabilities, d.buyer_public_key)}
-${agentSection("🏷 Seller", d.seller_did, d.seller_name, d.seller_owner, d.seller_capabilities, d.seller_public_key)}
+${agentSection("⬆ Initiator", d.buyer_did, d.buyer_name, d.buyer_owner, d.buyer_capabilities, d.buyer_public_key)}
+${agentSection("⬇ Counterparty", d.seller_did, d.seller_name, d.seller_owner, d.seller_capabilities, d.seller_public_key)}
 
 ${d.conversation_start_at ? `
 <div class="section">
@@ -1866,9 +1866,9 @@ ${d.conversation_start_at ? `
 ${(d.seller_body || d.buyer_body) ? `
 <div class="section">
   <div class="section-title">📋 Signed Exchange</div>
-  ${d.seller_body ? `<div style="font-size:0.7rem;font-weight:700;color:#78716c;margin:0.4rem 0 0.2rem;">Seller / Offer</div>
+  ${d.seller_body ? `<div style="font-size:0.7rem;font-weight:700;color:#78716c;margin:0.4rem 0 0.2rem;">Counterparty / Proposal</div>
   <div class="acceptance">${d.seller_body.replace(/</g,"&lt;")}</div>` : ""}
-  ${d.buyer_body ? `<div style="font-size:0.7rem;font-weight:700;color:#78716c;margin:0.6rem 0 0.2rem;">Buyer / Acceptance</div>
+  ${d.buyer_body ? `<div style="font-size:0.7rem;font-weight:700;color:#78716c;margin:0.6rem 0 0.2rem;">Initiator / Acceptance</div>
   <div class="acceptance">${d.buyer_body.replace(/</g,"&lt;")}</div>` : ""}
 </div>` : ""}
 
