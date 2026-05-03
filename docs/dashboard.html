@@ -98,6 +98,9 @@
 
     /* ── Mobile responsive ── */
     @media (max-width: 768px) {
+      #dashboard { flex-direction: column; height: auto; overflow: visible; }
+      .dash-sidebar { display: none; }   /* collapsed on mobile */
+      .dash-main { padding: 1rem; }
       nav { padding: 0 1rem; height: 52px; }
       .nav-logo { font-size: 0.88rem; }
       .nav-actions { gap: 0.4rem !important; }
@@ -404,12 +407,89 @@
 
     .login-footer-note a { color: var(--accent); text-decoration: underline; }
 
-    /* ── DASHBOARD ── */
+    /* ── DASHBOARD (flex shell: sidebar + scrollable main) ── */
     #dashboard {
-      display: none;
-      max-width: 1440px;
-      margin: 0 auto;
+      display: none;          /* JS switches to flex on login */
+      flex-direction: row;
+      height: calc(100vh - 58px);
+      overflow: hidden;
+    }
+
+    /* ── SIDEBAR ── */
+    .dash-sidebar {
+      width: 210px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .dsb-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.85rem 0.95rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .dsb-brand:hover { text-decoration: none; color: var(--text); }
+    .dsb-section-label {
+      padding: 0.65rem 0.95rem 0.2rem;
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .dsb-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.95rem;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-2);
+      cursor: pointer;
+      border-left: 2px solid transparent;
+      transition: background 0.1s, color 0.1s;
+      text-decoration: none;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .dsb-item:hover { background: var(--surface2); color: var(--text); text-decoration: none; }
+    .dsb-item.active {
+      color: var(--accent);
+      background: var(--accent-light);
+      border-left-color: var(--accent);
+      font-weight: 600;
+    }
+    .dsb-item svg { flex-shrink: 0; opacity: 0.6; }
+    .dsb-item.active svg { opacity: 1; }
+    .dsb-item.dsb-page-link { color: var(--muted); font-size: 0.8rem; }
+    .dsb-item.dsb-page-link:hover { color: var(--text); }
+    .dsb-divider { height: 1px; background: var(--border); margin: 0.35rem 0.6rem; flex-shrink: 0; }
+    .dsb-footer {
+      margin-top: auto;
+      padding: 0.7rem 0.95rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.73rem;
+      color: var(--muted);
+      flex-shrink: 0;
+      line-height: 1.45;
+    }
+    /* ── MAIN content pane (scrollable) ── */
+    .dash-main {
+      flex: 1;
+      overflow-y: auto;
       padding: 1.4rem 2rem;
+      min-width: 0;
     }
 
     /* ── DASH HEADER ── */
@@ -2480,6 +2560,66 @@
 <!-- DASHBOARD -->
 <div id="dashboard" style="display:none;">
 
+  <!-- ── SIDEBAR NAV ── -->
+  <aside class="dash-sidebar" id="dash-sidebar">
+    <a class="dsb-brand" href="index.html">
+      <div class="logo-mark" style="width:22px;height:22px;font-size:0.6rem;">AI</div>
+      AgentID
+    </a>
+
+    <div class="dsb-section-label">Dashboard</div>
+
+    <a class="dsb-item active" data-nav="overview" href="#section-overview">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      Overview
+    </a>
+    <a class="dsb-item" data-nav="agents" href="#section-agents">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.8" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 13.5c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Agents
+    </a>
+    <a class="dsb-item" data-nav="analytics" href="#section-analytics">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 12l3.5-4 3 2.5 3-5 2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Analytics
+    </a>
+    <a class="dsb-item" data-nav="network" href="#section-network">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="3" cy="4" r="1.5" stroke="currentColor" stroke-width="1.4"/><circle cx="13" cy="4" r="1.5" stroke="currentColor" stroke-width="1.4"/><circle cx="3" cy="12" r="1.5" stroke="currentColor" stroke-width="1.4"/><circle cx="13" cy="12" r="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M4.3 4.8L6.2 6.5M11.7 4.8L9.8 6.5M4.3 11.2L6.2 9.5M11.7 11.2L9.8 9.5" stroke="currentColor" stroke-width="1.2"/></svg>
+      Network
+    </a>
+    <a class="dsb-item" data-nav="audit" href="#section-audit">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 6.5h6M5 9.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Audit Log
+    </a>
+    <a class="dsb-item" data-nav="signing" href="#section-signing">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4.5 12.5l1.2-3.5 5-5 2.3 2.3-5 5-3.5 1.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M9 4.5l2.5 2.5" stroke="currentColor" stroke-width="1.4"/></svg>
+      Signing
+    </a>
+    <a class="dsb-item" data-nav="playground" href="#section-playground">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 5l4 3-4 3V5z" fill="currentColor" opacity="0.65"/><path d="M10 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      API
+    </a>
+
+    <div class="dsb-divider"></div>
+    <div class="dsb-section-label">Navigate</div>
+
+    <a class="dsb-item dsb-page-link" href="messages.html">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 5.5l6.5 4 6.5-4" stroke="currentColor" stroke-width="1.4"/></svg>
+      Messages
+    </a>
+    <a class="dsb-item dsb-page-link" href="network.html">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 2.5c-1.8 2.5-1.8 8.5 0 11M8 2.5c1.8 2.5 1.8 8.5 0 11M2.5 8h11" stroke="currentColor" stroke-width="1.2"/></svg>
+      Network Map
+    </a>
+    <a class="dsb-item dsb-page-link" href="my-agents.html">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 3h10v2H3zM3 7h7v2H3zM3 11h5v2H3z" fill="currentColor" opacity="0.6"/></svg>
+      My Agents
+    </a>
+
+    <div class="dsb-footer" id="dsb-footer-user"></div>
+  </aside>
+
+  <!-- ── MAIN content pane ── -->
+  <div class="dash-main" id="dash-main">
+
   <!-- Header -->
   <div class="dash-header">
     <div>
@@ -3030,7 +3170,7 @@ curl https://api.agentid-protocol.com/agents \
   <div id="badge-section"></div>
 
   <!-- Stats -->
-  <div class="stats-grid">
+  <div class="stats-grid" id="section-overview">
     <div class="stat-card">
       <div class="stat-label">Agents Registered</div>
       <div class="stat-value" id="stat-agents">—</div>
@@ -3107,7 +3247,7 @@ curl https://api.agentid-protocol.com/agents \
   </div>
 
   <!-- Charts -->
-  <div class="two-col" data-min-tier="pro" data-lock-feature="Analytics charts">
+  <div class="two-col" id="section-analytics" data-min-tier="pro" data-lock-feature="Analytics charts">
     <div class="card">
       <div class="card-header">
         <div class="card-title">Registrations — Last 30 Days</div>
@@ -3146,6 +3286,7 @@ curl https://api.agentid-protocol.com/agents \
   </div>
 
   <!-- Agent Network Graph -->
+  <div id="section-network"></div>
   <div id="network-graph-card" data-min-tier="pro" data-lock-feature="Agent network"
        style="margin-bottom:1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius,10px);overflow:hidden;">
     <!-- Header bar -->
@@ -3210,7 +3351,7 @@ curl https://api.agentid-protocol.com/agents \
   </div>
 
   <!-- Activity + Audit -->
-  <div class="two-col" data-min-tier="pro" data-lock-feature="Activity & audit log">
+  <div class="two-col" id="section-audit" data-min-tier="pro" data-lock-feature="Activity & audit log">
     <div class="card">
       <div class="card-header" style="display:flex;align-items:center;gap:0.5rem;">
         <div class="card-title">Activity — last 7 days</div>
@@ -3233,7 +3374,7 @@ curl https://api.agentid-protocol.com/agents \
   </div>
 
   <!-- Signing Activity -->
-  <div class="card" style="margin-bottom:1.25rem;" data-min-tier="pro" data-lock-feature="Signing activity">
+  <div class="card" id="section-signing" style="margin-bottom:1.25rem;" data-min-tier="pro" data-lock-feature="Signing activity">
     <div class="card-header">
       <div class="card-title">Signing Activity</div>
       <span id="signing-count-label" style="font-size:0.8rem;color:var(--muted);"></span>
@@ -3282,7 +3423,7 @@ curl https://api.agentid-protocol.com/agents \
   </div>
 
   <!-- My Agents table -->
-  <div class="card" style="margin-bottom:2rem;">
+  <div class="card" id="section-agents" style="margin-bottom:2rem;">
     <div class="card-header">
       <div class="card-title">My Agents</div>
       <div style="display:flex;align-items:center;gap:0.75rem;">
@@ -3328,7 +3469,7 @@ curl https://api.agentid-protocol.com/agents \
   </div>
 
   <!-- ── API PLAYGROUND ── -->
-  <div class="card" style="margin-bottom:2rem;">
+  <div class="card" id="section-playground" style="margin-bottom:2rem;">
     <div class="card-header">
       <div class="card-title">API Playground</div>
       <span style="font-size:0.78rem;color:var(--muted);">Your API key is pre-filled automatically</span>
@@ -3382,6 +3523,7 @@ curl https://api.agentid-protocol.com/agents \
     </div>
   </div>
 
+  </div><!-- /dash-main -->
 </div><!-- /dashboard -->
 
 <!-- ── CREATE GROUP MODAL ── -->
@@ -3796,7 +3938,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260503-17"></script>
+<script src="dashboard.js?v=20260503-18"></script>
 
 </body>
 </html>

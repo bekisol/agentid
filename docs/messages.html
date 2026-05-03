@@ -28,6 +28,31 @@
       --red: #DC2626; --red-bg: #FEF2F2;
       --yellow: #D97706; --yellow-bg: #FFFBEB;
     }
+    html[data-theme="dark"] {
+      --bg: #0e0f12; --surface: #17181c; --surface2: #1f2025;
+      --border: #2a2c33; --border-dark: #3a3d45;
+      --text: #f0eee9; --text-2: #c5c1b8; --muted: #8a847a;
+      --accent: #ee7d4a; --accent-light: #2a1d12; --accent-border: #7a4824;
+      --blue: #2bb8a0; --blue-dark: #1d9e88; --blue-light: #0d2d28;
+      --sent-bg: #3a5a82; --sent-bg-dark: #2e4a6e;
+      --green: #4ade80; --green-bg: #0f2f1d;
+      --red: #f87171; --red-bg: #2f1414;
+      --yellow: #facc15; --yellow-bg: #2f240a;
+    }
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme="light"]) {
+        --bg: #0e0f12; --surface: #17181c; --surface2: #1f2025;
+        --border: #2a2c33; --border-dark: #3a3d45;
+        --text: #f0eee9; --text-2: #c5c1b8; --muted: #8a847a;
+        --accent: #ee7d4a; --accent-light: #2a1d12; --accent-border: #7a4824;
+        --blue: #2bb8a0; --blue-dark: #1d9e88; --blue-light: #0d2d28;
+        --sent-bg: #3a5a82; --sent-bg-dark: #2e4a6e;
+        --green: #4ade80; --green-bg: #0f2f1d;
+        --red: #f87171; --red-bg: #2f1414;
+        --yellow: #facc15; --yellow-bg: #2f240a;
+      }
+    }
+
     body { background:var(--bg); color:var(--text); font-family:"Inter",-apple-system,sans-serif; line-height:1.6; font-size:15px; -webkit-font-smoothing:antialiased; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
     a { color:var(--accent); text-decoration:none; }
 
@@ -204,7 +229,13 @@
     <a href="my-agents.html">← My Agents</a>
     <a href="agents.html" target="_blank">Public Registry</a>
   </div>
-  <div class="topbar-user" id="topbar-user"></div>
+  <div style="display:flex;align-items:center;gap:0.75rem;">
+    <div class="topbar-user" id="topbar-user"></div>
+    <button id="msg-theme-btn" title="Toggle theme"
+      style="width:30px;height:30px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:0.9rem;transition:color 0.15s,border-color 0.15s;">
+      ☀
+    </button>
+  </div>
 </div>
 
 <!-- Auth wall -->
@@ -1468,6 +1499,30 @@ function closeDealModal() {
 document.getElementById("deal-detail-modal").addEventListener("click", function(e) {
   if (e.target === this) closeDealModal();
 });
+
+// ── THEME ─────────────────────────────────────────────────────────────────────
+(function() {
+  const saved = localStorage.getItem('agentid_theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  const btn = document.getElementById('msg-theme-btn');
+  if (btn) {
+    const _update = () => {
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+        (!document.documentElement.getAttribute('data-theme') &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches);
+      btn.textContent = dark ? '☀' : '🌙';
+    };
+    _update();
+    btn.addEventListener('click', () => {
+      const curr = document.documentElement.getAttribute('data-theme');
+      const isDark = curr === 'dark' || (!curr && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      const next = isDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('agentid_theme', next);
+      _update();
+    });
+  }
+})();
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 function boot() {

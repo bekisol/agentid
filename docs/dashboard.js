@@ -690,6 +690,7 @@ async function loadDashboard() {
     ? { owner: meRaw.email, tier: meRaw.tier }
     : meRaw;
   CURRENT_TIER = String(me.tier || "free");
+  if (me.owner) sessionStorage.setItem('agentid_owner', me.owner);
 
   // Pro/Enterprise users get the full analytics payload. Free tier skips it.
   let data;
@@ -704,8 +705,10 @@ async function loadDashboard() {
   }
 
   document.getElementById("login-screen").style.display = "none";
-  document.getElementById("dashboard").style.display = "block";
+  document.getElementById("dashboard").style.display = "flex";
   document.getElementById("logout-btn").style.display = "flex";
+  _initSidebar();
+  _sidebarUpdateUser();
   const cmdkBtn = document.getElementById("cmdk-btn");
   if (cmdkBtn) cmdkBtn.style.display = "inline-flex";
   const notifBtn = document.getElementById("notif-btn");
@@ -6301,6 +6304,58 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
     document.getElementById("login-screen").style.display = "flex";
   })();
 });
+
+// ── SIDEBAR NAV ──────────────────────────────────────────────────────────────
+const _NAV_SECTIONS = ['overview','agents','analytics','network','audit','signing','playground'];
+
+function _initSidebar() {
+  // Click handlers
+  document.querySelectorAll('.dsb-item[data-nav]').forEach(item => {
+    item.addEventListener('click', e => {
+      e.preventDefault();
+      const id = 'section-' + item.dataset.nav;
+      const el = document.getElementById(id);
+      const main = document.getElementById('dash-main');
+      if (el && main) {
+        main.scrollTo({ top: el.offsetTop - 12, behavior: 'smooth' });
+      }
+      _setSidebarActive(item.dataset.nav);
+    });
+  });
+  // Scroll spy
+  const main = document.getElementById('dash-main');
+  if (main) main.addEventListener('scroll', _sidebarScrollSpy, { passive: true });
+  // Populate footer with user info
+  _sidebarUpdateUser();
+}
+
+function _setSidebarActive(nav) {
+  document.querySelectorAll('.dsb-item[data-nav]').forEach(el => {
+    el.classList.toggle('active', el.dataset.nav === nav);
+  });
+}
+
+function _sidebarScrollSpy() {
+  const main = document.getElementById('dash-main');
+  if (!main) return;
+  const scrollTop = main.scrollTop + 100;
+  let current = 'overview';
+  for (const s of _NAV_SECTIONS) {
+    const el = document.getElementById('section-' + s);
+    if (el && el.offsetTop <= scrollTop) current = s;
+  }
+  _setSidebarActive(current);
+}
+
+function _sidebarUpdateUser() {
+  const footer = document.getElementById('dsb-footer-user');
+  if (!footer) return;
+  const email = sessionStorage.getItem('agentid_owner') ||
+                sessionStorage.getItem('agentid_email') || '';
+  const tier  = (typeof CURRENT_TIER !== 'undefined' && CURRENT_TIER) ? CURRENT_TIER : '';
+  footer.innerHTML = (email ? `<div style="font-weight:600;color:var(--text-2);margin-bottom:0.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(email)}">${esc(email)}</div>` : '') +
+    (tier ? `<div style="text-transform:capitalize;">${esc(tier)} plan</div>` : '');
+}
 
 // Visible banner shown on the login screen when a previously-authenticated
 // user's session has dropped, so they don't sit confused on the login page.
