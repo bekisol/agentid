@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentID — Admin</title>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self' 'unsafe-inline';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src https://fonts.gstatic.com;
+             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
+             img-src 'self' data:;
+             frame-ancestors 'none';" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --bg:       #0F1117;
+      --surface:  #1A1D27;
+      --surface2: #222636;
+      --surface3: #2A2F45;
+      --border:   #2E3348;
+      --text:     #E8EAF0;
+      --text-2:   #9DA3B8;
+      --muted:    #6B7280;
+      --accent:   #6366F1;
+      --accent-h: #818CF8;
+      --green:    #10B981;
+      --red:      #EF4444;
+      --yellow:   #F59E0B;
+      --blue:     #3B82F6;
+      --mono:     "JetBrains Mono", monospace;
+    }
+    body { background:var(--bg); color:var(--text); font-family:"Inter",-apple-system,sans-serif;
+           font-size:14px; line-height:1.6; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+    /* ── login ── */
+    #login-screen { display:flex; align-items:center; justify-content:center; flex:1; }
+    .login-card { background:var(--surface); border:1px solid var(--border); border-radius:16px;
+                  padding:2.5rem 2rem; max-width:380px; width:100%; }
+    .login-title { font-size:1.3rem; font-weight:800; margin-bottom:0.25rem; }
+    .login-sub   { font-size:0.82rem; color:var(--text-2); margin-bottom:1.5rem; }
+    .field-label { font-size:0.75rem; font-weight:600; color:var(--text-2); margin-bottom:0.35rem; display:block; }
+    .field-input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px;
+                   padding:0.6rem 0.8rem; color:var(--text); font-size:0.88rem; font-family:var(--mono);
+                   outline:none; }
+    .field-input:focus { border-color:var(--accent); }
+    .btn-login { width:100%; margin-top:1rem; background:var(--accent); color:#fff; border:none;
+                 border-radius:8px; padding:0.65rem; font-size:0.9rem; font-weight:700;
+                 cursor:pointer; transition:opacity 0.15s; }
+    .btn-login:hover { opacity:0.88; }
+    .login-err { margin-top:0.75rem; font-size:0.8rem; color:var(--red); text-align:center; display:none; }
+
+    /* ── shell ── */
+    #app { display:none; flex:1; overflow:hidden; }
+    .topbar { background:var(--surface); border-bottom:1px solid var(--border);
+              padding:0 1.5rem; height:52px; display:flex; align-items:center;
+              justify-content:space-between; flex-shrink:0; }
+    .topbar-brand { font-size:0.95rem; font-weight:800; display:flex; align-items:center; gap:0.5rem; }
+    .admin-badge { background:var(--accent); color:#fff; font-size:0.6rem; font-weight:800;
+                   padding:0.1rem 0.45rem; border-radius:4px; letter-spacing:0.06em; text-transform:uppercase; }
+    .topbar-right { display:flex; align-items:center; gap:0.75rem; }
+    .btn-sm { background:var(--surface2); border:1px solid var(--border); color:var(--text-2);
+              border-radius:6px; padding:0.3rem 0.75rem; font-size:0.78rem; font-weight:600;
+              cursor:pointer; }
+    .btn-sm:hover { border-color:var(--accent); color:var(--accent-h); }
+    .shell { display:flex; flex:1; overflow:hidden; }
+
+    /* ── sidebar ── */
+    .sidebar { width:210px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border);
+               display:flex; flex-direction:column; padding:0.75rem 0; overflow-y:auto; }
+    .nav-item { padding:0.5rem 1rem; cursor:pointer; font-size:0.84rem; font-weight:500;
+                color:var(--text-2); display:flex; align-items:center; gap:0.6rem;
+                border-left:2px solid transparent; border-radius:0 6px 6px 0; margin:0 0.4rem 0.1rem 0; }
+    .nav-item:hover { background:var(--surface2); color:var(--text); }
+    .nav-item.active { background:var(--surface3); color:var(--accent-h);
+                       border-left-color:var(--accent); }
+    .nav-sep { height:1px; background:var(--border); margin:0.5rem 1rem; }
+    .nav-section { font-size:0.65rem; font-weight:700; color:var(--muted); letter-spacing:0.08em;
+                   text-transform:uppercase; padding:0.5rem 1rem 0.2rem; }
+
+    /* ── main ── */
+    .main { flex:1; overflow-y:auto; padding:1.5rem; }
+    .page { display:none; }
+    .page.active { display:block; }
+    .page-title { font-size:1.1rem; font-weight:800; margin-bottom:1.25rem; }
+
+    /* ── stat cards ── */
+    .stat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:0.75rem; margin-bottom:1.5rem; }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1rem; }
+    .stat-val  { font-size:1.6rem; font-weight:800; line-height:1; }
+    .stat-lbl  { font-size:0.73rem; color:var(--text-2); margin-top:0.2rem; }
+    .stat-card.green { border-color:#064E3B; }
+    .stat-card.green .stat-val { color:var(--green); }
+    .stat-card.red   { border-color:#7F1D1D; }
+    .stat-card.red   .stat-val { color:var(--red); }
+    .stat-card.blue  { border-color:#1E3A5F; }
+    .stat-card.blue  .stat-val { color:var(--blue); }
+    .stat-card.yellow { border-color:#78350F; }
+    .stat-card.yellow .stat-val { color:var(--yellow); }
+    .stat-card.purple { border-color:#3730A3; }
+    .stat-card.purple .stat-val { color:var(--accent-h); }
+
+    /* ── tables ── */
+    .table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+    .table-toolbar { padding:0.75rem 1rem; border-bottom:1px solid var(--border);
+                     display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
+    .search-input { background:var(--bg); border:1px solid var(--border); border-radius:6px;
+                    padding:0.4rem 0.7rem; color:var(--text); font-size:0.83rem; outline:none; min-width:200px; }
+    .search-input:focus { border-color:var(--accent); }
+    table { width:100%; border-collapse:collapse; }
+    th { padding:0.6rem 1rem; font-size:0.72rem; font-weight:700; color:var(--muted);
+         text-transform:uppercase; letter-spacing:0.05em; text-align:left;
+         border-bottom:1px solid var(--border); }
+    td { padding:0.6rem 1rem; font-size:0.82rem; border-bottom:1px solid var(--border);
+         color:var(--text-2); vertical-align:middle; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:var(--surface2); }
+    .mono { font-family:var(--mono); font-size:0.75rem; color:var(--muted); }
+    .tag  { display:inline-block; font-size:0.62rem; font-weight:700; padding:0.1rem 0.4rem;
+            border-radius:4px; text-transform:uppercase; letter-spacing:0.04em; }
+    .tag-green  { background:#064E3B; color:#34D399; }
+    .tag-red    { background:#7F1D1D; color:#FCA5A5; }
+    .tag-yellow { background:#78350F; color:#FCD34D; }
+    .tag-blue   { background:#1E3A5F; color:#93C5FD; }
+    .tag-gray   { background:var(--surface3); color:var(--text-2); }
+    .tag-purple { background:#3730A3; color:#C4B5FD; }
+    .act-btn { background:none; border:1px solid var(--border); border-radius:5px;
+               color:var(--text-2); font-size:0.72rem; padding:0.2rem 0.55rem;
+               cursor:pointer; margin-right:0.25rem; }
+    .act-btn:hover { border-color:var(--accent); color:var(--accent-h); }
+    .act-btn.danger:hover { border-color:var(--red); color:var(--red); }
+
+    /* ── pagination ── */
+    .pager { display:flex; align-items:center; gap:0.5rem; padding:0.75rem 1rem;
+             border-top:1px solid var(--border); font-size:0.8rem; color:var(--text-2); }
+    .pager button { background:var(--surface2); border:1px solid var(--border); color:var(--text-2);
+                    border-radius:5px; padding:0.25rem 0.6rem; cursor:pointer; font-size:0.78rem; }
+    .pager button:hover { border-color:var(--accent); color:var(--accent-h); }
+    .pager button:disabled { opacity:0.35; cursor:default; }
+
+    /* ── misc ── */
+    .section-head { font-size:0.78rem; font-weight:700; color:var(--text-2); margin-bottom:0.6rem; text-transform:uppercase; letter-spacing:0.05em; }
+    .empty { padding:2.5rem; text-align:center; color:var(--muted); font-size:0.85rem; }
+    .spinner-sm { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent);
+                  border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .health-row { display:flex; align-items:center; justify-content:space-between;
+                  padding:0.6rem 0; border-bottom:1px solid var(--border); }
+    .health-row:last-child { border-bottom:none; }
+    .health-label { font-size:0.84rem; color:var(--text-2); }
+    .dot-ok  { width:8px; height:8px; border-radius:50%; background:var(--green); display:inline-block; }
+    .dot-err { width:8px; height:8px; border-radius:50%; background:var(--red); display:inline-block; }
+    .ops-bar { display:flex; flex-direction:column; gap:0.4rem; margin-top:0.5rem; }
+    .ops-row { display:flex; align-items:center; gap:0.6rem; font-size:0.78rem; }
+    .ops-name { width:140px; color:var(--text-2); font-family:var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ops-track { flex:1; height:6px; background:var(--surface3); border-radius:3px; overflow:hidden; }
+    .ops-fill  { height:100%; background:var(--accent); border-radius:3px; }
+    .ops-count { width:40px; text-align:right; color:var(--muted); }
+
+    /* ── confirm modal ── */
+    .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.65); display:flex;
+                align-items:center; justify-content:center; z-index:1000; display:none; }
+    .modal-bg.open { display:flex; }
+    .modal { background:var(--surface); border:1px solid var(--border); border-radius:14px;
+             padding:1.75rem; max-width:420px; width:90%; }
+    .modal-title { font-size:1rem; font-weight:800; margin-bottom:0.5rem; }
+    .modal-body  { font-size:0.85rem; color:var(--text-2); margin-bottom:1.25rem; line-height:1.6; }
+    .modal-input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:7px;
+                   padding:0.5rem 0.75rem; color:var(--text); font-size:0.85rem; outline:none; margin-bottom:1rem; }
+    .modal-input:focus { border-color:var(--red); }
+    .modal-actions { display:flex; gap:0.5rem; justify-content:flex-end; }
+    .btn-cancel  { background:var(--surface2); border:1px solid var(--border); color:var(--text-2);
+                   border-radius:7px; padding:0.45rem 1rem; font-size:0.83rem; cursor:pointer; }
+    .btn-confirm { background:var(--red); color:#fff; border:none; border-radius:7px;
+                   padding:0.45rem 1rem; font-size:0.83rem; font-weight:700; cursor:pointer; }
+    .btn-confirm:disabled { opacity:0.4; cursor:default; }
+    .btn-confirm.safe { background:var(--accent); }
+    .btn-confirm.green-btn { background:var(--green); }
+    .toast { position:fixed; bottom:1.5rem; right:1.5rem; background:var(--surface2);
+             border:1px solid var(--border); border-radius:8px; padding:0.6rem 1rem;
+             font-size:0.82rem; z-index:2000; opacity:0; transition:opacity 0.2s;
+             pointer-events:none; max-width:320px; }
+    .toast.show { opacity:1; }
+    .toast.ok   { border-color:var(--green); color:var(--green); }
+    .toast.err  { border-color:var(--red);   color:var(--red); }
+  </style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-title">AgentID Admin</div>
+    <div class="login-sub">Enter your admin secret to continue.</div>
+    <label class="field-label">Admin Secret</label>
+    <input id="secret-input" type="password" class="field-input" placeholder="••••••••••••••••"
+           autocomplete="current-password" />
+    <button class="btn-login" id="login-btn">Sign in</button>
+    <div class="login-err" id="login-err">Invalid admin secret.</div>
+  </div>
+</div>
+
+<!-- App shell -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">
+      AgentID <span class="admin-badge">Admin</span>
+    </div>
+    <div class="topbar-right">
+      <span id="top-status" style="font-size:0.75rem;color:var(--muted);"></span>
+      <button class="btn-sm" id="logout-btn">Sign out</button>
+    </div>
+  </div>
+  <div class="shell">
+    <nav class="sidebar">
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" data-page="overview">📊 Dashboard</div>
+      <div class="nav-sep"></div>
+      <div class="nav-section">Manage</div>
+      <div class="nav-item" data-page="agents">🤖 Agents</div>
+      <div class="nav-item" data-page="accounts">🔑 Accounts</div>
+      <div class="nav-sep"></div>
+      <div class="nav-section">Trust</div>
+      <div class="nav-item" data-page="compromised">🚨 Compromised</div>
+      <div class="nav-sep"></div>
+      <div class="nav-section">Logs</div>
+      <div class="nav-item" data-page="auditlog">📋 Audit Log</div>
+      <div class="nav-item" data-page="adminlog">🔐 Admin Log</div>
+      <div class="nav-sep"></div>
+      <div class="nav-section">System</div>
+      <div class="nav-item" data-page="system">⚙️ System</div>
+    </nav>
+    <main class="main">
+
+      <!-- Overview -->
+      <div class="page active" id="page-overview">
+        <div class="page-title">Dashboard</div>
+        <div class="stat-grid" id="stat-grid"><div class="spinner-sm"></div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+          <div class="table-wrap" style="padding:1rem;">
+            <div class="section-head">Top Operations (7 days)</div>
+            <div id="top-ops"><div class="spinner-sm"></div></div>
+          </div>
+          <div class="table-wrap" style="padding:1rem;">
+            <div class="section-head">Message Stats</div>
+            <div id="msg-stats"><div class="spinner-sm"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agents -->
+      <div class="page" id="page-agents">
+        <div class="page-title">Agents</div>
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <input class="search-input" id="agent-search" placeholder="Search name, DID, owner…" />
+            <button class="btn-sm" id="agent-search-btn">Search</button>
+            <span style="font-size:0.75rem;color:var(--muted);margin-left:auto;" id="agent-count"></span>
+          </div>
+          <div id="agents-table-body"></div>
+          <div class="pager" id="agents-pager"></div>
+        </div>
+      </div>
+
+      <!-- Accounts -->
+      <div class="page" id="page-accounts">
+        <div class="page-title">Accounts & API Keys</div>
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <input class="search-input" id="account-search" placeholder="Search owner, label…" />
+            <select id="account-tier" class="search-input" style="min-width:120px;">
+              <option value="">All tiers</option>
+              <option value="free">Free</option>
+              <option value="pro">Pro</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+            <button class="btn-sm" id="account-search-btn">Search</button>
+            <span style="font-size:0.75rem;color:var(--muted);margin-left:auto;" id="account-count"></span>
+          </div>
+          <div id="accounts-table-body"></div>
+          <div class="pager" id="accounts-pager"></div>
+        </div>
+      </div>
+
+      <!-- Compromised -->
+      <div class="page" id="page-compromised">
+        <div class="page-title">Compromised Agents</div>
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <span style="font-size:0.8rem;color:var(--text-2);">Agents flagged in the trust network</span>
+            <button class="btn-sm" style="margin-left:auto;" id="refresh-comp-btn">Refresh</button>
+          </div>
+          <div id="compromised-body"></div>
+        </div>
+      </div>
+
+      <!-- Audit log -->
+      <div class="page" id="page-auditlog">
+        <div class="page-title">Audit Log</div>
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <input class="search-input" id="audit-did" placeholder="Filter by DID…" style="min-width:180px;" />
+            <input class="search-input" id="audit-op" placeholder="Filter by operation…" style="min-width:140px;" />
+            <button class="btn-sm" id="audit-search-btn">Filter</button>
+            <span style="font-size:0.75rem;color:var(--muted);margin-left:auto;" id="audit-count"></span>
+          </div>
+          <div id="audit-table-body"></div>
+          <div class="pager" id="audit-pager"></div>
+        </div>
+      </div>
+
+      <!-- Admin log -->
+      <div class="page" id="page-adminlog">
+        <div class="page-title">Admin Action Log</div>
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <span style="font-size:0.8rem;color:var(--text-2);">All actions taken via this admin panel</span>
+            <button class="btn-sm" style="margin-left:auto;" id="refresh-adminlog-btn">Refresh</button>
+          </div>
+          <div id="adminlog-body"></div>
+        </div>
+      </div>
+
+      <!-- System -->
+      <div class="page" id="page-system">
+        <div class="page-title">System</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="table-wrap" style="padding:1.25rem;">
+            <div class="section-head">Health</div>
+            <div id="health-body"><div class="spinner-sm"></div></div>
+          </div>
+          <div class="table-wrap" style="padding:1.25rem;">
+            <div class="section-head">Schema</div>
+            <p style="font-size:0.83rem;color:var(--text-2);margin-bottom:1rem;line-height:1.6;">
+              Re-runs all schema init functions (CREATE TABLE IF NOT EXISTS, ALTER TABLE ADD COLUMN IF NOT EXISTS).
+              Safe to run at any time — idempotent.
+            </p>
+            <button class="btn-sm" id="schema-init-btn" style="background:var(--accent);color:#fff;border-color:var(--accent);">
+              Run schema init
+            </button>
+            <div id="schema-result" style="margin-top:0.75rem;font-size:0.8rem;"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Confirm action</div>
+    <div class="modal-body"  id="modal-body"></div>
+    <input class="modal-input" id="modal-reason" placeholder="Reason (optional)" />
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modal-cancel">Cancel</button>
+      <button class="btn-confirm" id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BASE = "https://api.agentid-protocol.com";
+let _secret = "";
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function api(path, opts = {}) {
+  return fetch(BASE + path, {
+    ...opts,
+    headers: { "x-admin-secret": _secret, "content-type": "application/json", ...(opts.headers || {}) },
+  }).then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e.detail || "Error")));
+}
+
+function toast(msg, type = "ok") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => el.classList.remove("show"), 3000);
+}
+
+function fmtDate(s) {
+  if (!s) return "—";
+  const d = new Date(s);
+  return d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+}
+
+function tagHtml(text, cls) { return `<span class="tag tag-${cls}">${text}</span>`; }
+
+function tierTag(t) {
+  const m = {enterprise:"purple", pro:"blue", free:"gray"};
+  return tagHtml(t, m[t] || "gray");
+}
+
+// ── confirm modal ─────────────────────────────────────────────────────────────
+let _modalResolve = null;
+function confirm(title, body, {danger=true, showReason=false} = {}) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").textContent = body;
+  const reasonEl = document.getElementById("modal-reason");
+  reasonEl.style.display = showReason ? "block" : "none";
+  reasonEl.value = "";
+  const btn = document.getElementById("modal-confirm");
+  btn.className = "btn-confirm" + (danger ? "" : " safe");
+  document.getElementById("modal-bg").classList.add("open");
+  return new Promise(res => { _modalResolve = res; });
+}
+
+document.getElementById("modal-cancel").addEventListener("click", () => {
+  document.getElementById("modal-bg").classList.remove("open");
+  if (_modalResolve) _modalResolve(null);
+});
+document.getElementById("modal-confirm").addEventListener("click", () => {
+  const reason = document.getElementById("modal-reason").value.trim();
+  document.getElementById("modal-bg").classList.remove("open");
+  if (_modalResolve) _modalResolve({ confirmed: true, reason });
+});
+
+// ── login ────────────────────────────────────────────────────────────────────
+async function tryLogin() {
+  const secret = document.getElementById("secret-input").value.trim();
+  if (!secret) return;
+  try {
+    const r = await fetch(BASE + "/admin/system/health", {
+      headers: { "x-admin-secret": secret }
+    });
+    if (!r.ok) throw new Error();
+    _secret = secret;
+    sessionStorage.setItem("agentid_admin_secret", secret);
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+    loadPage("overview");
+  } catch {
+    document.getElementById("login-err").style.display = "block";
+  }
+}
+
+document.getElementById("login-btn").addEventListener("click", tryLogin);
+document.getElementById("secret-input").addEventListener("keydown", e => { if (e.key === "Enter") tryLogin(); });
+document.getElementById("logout-btn").addEventListener("click", () => {
+  sessionStorage.removeItem("agentid_admin_secret");
+  location.reload();
+});
+
+// auto-login from sessionStorage
+const saved = sessionStorage.getItem("agentid_admin_secret");
+if (saved) {
+  document.getElementById("secret-input").value = saved;
+  tryLogin();
+}
+
+// ── navigation ───────────────────────────────────────────────────────────────
+let _currentPage = "overview";
+document.querySelectorAll(".nav-item").forEach(el => {
+  el.addEventListener("click", () => {
+    const page = el.dataset.page;
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    el.classList.add("active");
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+    document.getElementById("page-" + page).classList.add("active");
+    _currentPage = page;
+    loadPage(page);
+  });
+});
+
+function loadPage(page) {
+  const loaders = {
+    overview: loadOverview, agents: () => loadAgents(1),
+    accounts: () => loadAccounts(1), compromised: loadCompromised,
+    auditlog: () => loadAuditLog(1), adminlog: loadAdminLog,
+    system: loadSystem,
+  };
+  loaders[page]?.();
+}
+
+// ── overview ─────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  const [ov, ms] = await Promise.all([
+    api("/admin/overview").catch(() => null),
+    api("/admin/messages/stats").catch(() => null),
+  ]);
+  if (!ov) return;
+  document.getElementById("stat-grid").innerHTML = `
+    <div class="stat-card purple"><div class="stat-val">${ov.agents.total}</div><div class="stat-lbl">Total Agents</div></div>
+    <div class="stat-card blue"><div class="stat-val">${ov.agents.public}</div><div class="stat-lbl">Public Agents</div></div>
+    <div class="stat-card"><div class="stat-val">${ov.accounts.total}</div><div class="stat-lbl">Accounts</div></div>
+    <div class="stat-card green"><div class="stat-val">${ov.activity.events_24h}</div><div class="stat-lbl">Events (24h)</div></div>
+    <div class="stat-card blue"><div class="stat-val">${ov.activity.verifications_24h}</div><div class="stat-lbl">Verifications (24h)</div></div>
+    <div class="stat-card yellow"><div class="stat-val">${ov.trust.badges}</div><div class="stat-lbl">Verified Badges</div></div>
+    <div class="stat-card red"><div class="stat-val">${ov.trust.compromised}</div><div class="stat-lbl">Compromised</div></div>
+    <div class="stat-card red"><div class="stat-val">${ov.trust.revoked}</div><div class="stat-lbl">Revoked</div></div>
+  `;
+  if (ov.top_operations_7d?.length) {
+    const max = ov.top_operations_7d[0].count;
+    document.getElementById("top-ops").innerHTML = `<div class="ops-bar">` +
+      ov.top_operations_7d.map(o => `
+        <div class="ops-row">
+          <div class="ops-name">${o.op}</div>
+          <div class="ops-track"><div class="ops-fill" style="width:${Math.round(o.count/max*100)}%"></div></div>
+          <div class="ops-count">${o.count}</div>
+        </div>`).join("") + `</div>`;
+  }
+  if (ms) {
+    document.getElementById("msg-stats").innerHTML = `
+      <div class="health-row"><span class="health-label">Total messages</span><strong>${ms.total.toLocaleString()}</strong></div>
+      <div class="health-row"><span class="health-label">Last 24h</span><strong>${ms.last_24h}</strong></div>
+      <div class="health-row"><span class="health-label">Auto-replies</span><strong>${ms.auto_replies.toLocaleString()}</strong></div>
+      ${ms.top_senders_7d?.map(s=>`<div class="health-row"><span class="health-label mono">${s.did.slice(-16)}</span><strong>${s.count}</strong></div>`).join("")}
+    `;
+  }
+}
+
+// ── agents ────────────────────────────────────────────────────────────────────
+let _agentPage = 1;
+async function loadAgents(page = 1) {
+  _agentPage = page;
+  const q = document.getElementById("agent-search").value.trim();
+  const data = await api(`/admin/agents?q=${encodeURIComponent(q)}&page=${page}&limit=50`).catch(e => { toast(e, "err"); return null; });
+  if (!data) return;
+  document.getElementById("agent-count").textContent = `${data.total} agents`;
+  if (!data.agents.length) {
+    document.getElementById("agents-table-body").innerHTML = `<div class="empty">No agents found.</div>`;
+    document.getElementById("agents-pager").innerHTML = "";
+    return;
+  }
+  document.getElementById("agents-table-body").innerHTML = `
+    <table>
+      <thead><tr><th>Name</th><th>DID</th><th>Owner</th><th>Flags</th><th>Events 7d</th><th>Actions</th></tr></thead>
+      <tbody>` +
+    data.agents.map(a => `
+      <tr>
+        <td style="font-weight:600;color:var(--text)">${esc(a.name)}</td>
+        <td class="mono">${a.did.slice(0,20)}…</td>
+        <td class="mono">${esc(a.owner)}</td>
+        <td>
+          ${a.has_badge ? tagHtml("✓ badge","green") : ""}
+          ${a.is_revoked ? tagHtml("revoked","red") : ""}
+          ${a.is_deprecated ? tagHtml("deprecated","yellow") : ""}
+          ${a.private ? tagHtml("private","gray") : ""}
+        </td>
+        <td style="color:var(--text)">${a.events_7d}</td>
+        <td>
+          ${a.has_badge
+            ? `<button class="act-btn danger" onclick="agentAction('revoke_badge','${a.did}','${esc(a.name)}')">- badge</button>`
+            : `<button class="act-btn" onclick="agentAction('grant_badge','${a.did}','${esc(a.name)}')">+ badge</button>`}
+          ${a.is_revoked
+            ? `<button class="act-btn" onclick="agentAction('unrevoke','${a.did}','${esc(a.name)}')">unrevoke</button>`
+            : `<button class="act-btn danger" onclick="agentAction('revoke','${a.did}','${esc(a.name)}')">revoke</button>`}
+          ${a.is_deprecated
+            ? `<button class="act-btn" onclick="agentAction('undeprecate','${a.did}','${esc(a.name)}')">undeprecate</button>`
+            : `<button class="act-btn danger" onclick="agentAction('deprecate','${a.did}','${esc(a.name)}')">deprecate</button>`}
+        </td>
+      </tr>`).join("") + `</tbody></table>`;
+  renderPager("agents-pager", page, data.total, 50, loadAgents);
+}
+
+async function agentAction(action, did, name) {
+  const labels = {
+    revoke: ["Revoke Agent", `Revoke ${name}? This adds them to the revoked list.`, true],
+    unrevoke: ["Unrevoke Agent", `Remove ${name} from the revoked list?`, false],
+    deprecate: ["Deprecate Agent", `Mark ${name} as deprecated?`, true],
+    undeprecate: ["Undeprecate Agent", `Remove deprecated flag from ${name}?`, false],
+    grant_badge: ["Grant Badge", `Grant verified badge to ${name}?`, false],
+    revoke_badge: ["Revoke Badge", `Remove verified badge from ${name}?`, true],
+  };
+  const [title, body, danger] = labels[action];
+  const result = await confirm(title, body, { danger, showReason: danger });
+  if (!result) return;
+  const paths = {
+    revoke: ["POST", `/admin/agents/${did}/revoke`],
+    unrevoke: ["POST", `/admin/agents/${did}/unrevoke`],
+    deprecate: ["POST", `/admin/agents/${did}/deprecate`],
+    undeprecate: ["POST", `/admin/agents/${did}/undeprecate`],
+    grant_badge: ["POST", `/admin/agents/${did}/badge`],
+    revoke_badge: ["DELETE", `/admin/agents/${did}/badge`],
+  };
+  const [method, path] = paths[action];
+  try {
+    await api(path, { method, body: JSON.stringify({ reason: result.reason || "" }) });
+    toast(`Done: ${action} on ${name}`, "ok");
+    loadAgents(_agentPage);
+  } catch(e) { toast(e, "err"); }
+}
+
+document.getElementById("agent-search-btn").addEventListener("click", () => loadAgents(1));
+document.getElementById("agent-search").addEventListener("keydown", e => { if (e.key==="Enter") loadAgents(1); });
+
+// ── accounts ──────────────────────────────────────────────────────────────────
+let _accountPage = 1;
+async function loadAccounts(page = 1) {
+  _accountPage = page;
+  const q = document.getElementById("account-search").value.trim();
+  const tier = document.getElementById("account-tier").value;
+  const data = await api(`/admin/accounts?q=${encodeURIComponent(q)}&tier=${tier}&page=${page}&limit=50`).catch(e => { toast(e,"err"); return null; });
+  if (!data) return;
+  document.getElementById("account-count").textContent = `${data.total} keys`;
+  if (!data.keys.length) {
+    document.getElementById("accounts-table-body").innerHTML = `<div class="empty">No accounts found.</div>`;
+    document.getElementById("accounts-pager").innerHTML = ""; return;
+  }
+  document.getElementById("accounts-table-body").innerHTML = `
+    <table>
+      <thead><tr><th>Owner</th><th>Tier</th><th>Label</th><th>Last Used</th><th>IP</th><th>Actions</th></tr></thead>
+      <tbody>` +
+    data.keys.map(k => `
+      <tr>
+        <td class="mono" style="color:var(--text)">${esc(k.owner)}</td>
+        <td>${tierTag(k.tier)}</td>
+        <td style="color:var(--text-2)">${esc(k.label||"—")}</td>
+        <td style="font-size:0.75rem">${k.last_used ? fmtDate(k.last_used) : "never"}</td>
+        <td class="mono">${k.last_used_ip||"—"}</td>
+        <td>
+          <button class="act-btn danger" onclick="revokeKey(${k.id},'${esc(k.owner)}')">revoke key</button>
+        </td>
+      </tr>`).join("") + `</tbody></table>`;
+  renderPager("accounts-pager", page, data.total, 50, loadAccounts);
+}
+
+async function revokeKey(id, owner) {
+  const result = await confirm("Revoke API Key", `Permanently revoke the API key for ${owner}? They will lose access immediately.`, {danger:true});
+  if (!result?.confirmed) return;
+  try {
+    await api(`/admin/accounts/keys/${id}`, { method:"DELETE" });
+    toast("Key revoked", "ok");
+    loadAccounts(_accountPage);
+  } catch(e) { toast(e, "err"); }
+}
+
+document.getElementById("account-search-btn").addEventListener("click", () => loadAccounts(1));
+document.getElementById("account-search").addEventListener("keydown", e => { if (e.key==="Enter") loadAccounts(1); });
+
+// ── compromised ───────────────────────────────────────────────────────────────
+async function loadCompromised() {
+  const data = await api("/admin/trust/compromised").catch(e => { toast(e,"err"); return null; });
+  if (!data) return;
+  if (!data.compromised.length) {
+    document.getElementById("compromised-body").innerHTML = `<div class="empty">No compromised agents.</div>`;
+    return;
+  }
+  document.getElementById("compromised-body").innerHTML = `
+    <table>
+      <thead><tr><th>Agent</th><th>DID</th><th>Reason</th><th>Reported By</th><th>Date</th><th>Actions</th></tr></thead>
+      <tbody>` +
+    data.compromised.map(c => `
+      <tr>
+        <td style="font-weight:600;color:var(--text)">${esc(c.name||"—")}</td>
+        <td class="mono">${(c.did||"").slice(0,20)}…</td>
+        <td style="color:var(--text-2)">${esc(c.reason||"—")}</td>
+        <td class="mono">${esc(c.reported_by||"—")}</td>
+        <td style="font-size:0.75rem">${fmtDate(c.reported_at)}</td>
+        <td>
+          <button class="act-btn" onclick="unflagCompromised('${c.did}','${esc(c.name||c.did)}')">unflag</button>
+        </td>
+      </tr>`).join("") + `</tbody></table>`;
+}
+
+async function unflagCompromised(did, name) {
+  const result = await confirm("Unflag Agent", `Remove ${name} from the compromised list?`, {danger:false});
+  if (!result?.confirmed) return;
+  try {
+    await api(`/admin/trust/compromised/${did}`, { method:"DELETE" });
+    toast("Unflagged", "ok");
+    loadCompromised();
+  } catch(e) { toast(e, "err"); }
+}
+
+document.getElementById("refresh-comp-btn").addEventListener("click", loadCompromised);
+
+// ── audit log ─────────────────────────────────────────────────────────────────
+let _auditPage = 1;
+async function loadAuditLog(page = 1) {
+  _auditPage = page;
+  const did = document.getElementById("audit-did").value.trim();
+  const op  = document.getElementById("audit-op").value.trim();
+  const data = await api(`/admin/audit-log?did=${encodeURIComponent(did)}&op=${encodeURIComponent(op)}&page=${page}&limit=100`).catch(e => { toast(e,"err"); return null; });
+  if (!data) return;
+  document.getElementById("audit-count").textContent = `${data.total.toLocaleString()} events`;
+  if (!data.events.length) {
+    document.getElementById("audit-table-body").innerHTML = `<div class="empty">No events found.</div>`;
+    document.getElementById("audit-pager").innerHTML = ""; return;
+  }
+  const statusTag = s => s === "ok" || s === "valid" ? tagHtml(s,"green") : tagHtml(s||"?","red");
+  document.getElementById("audit-table-body").innerHTML = `
+    <table>
+      <thead><tr><th>Time</th><th>Operation</th><th>DID</th><th>Status</th><th>IP</th><th>Counterparty</th></tr></thead>
+      <tbody>` +
+    data.events.map(e => `
+      <tr>
+        <td style="font-size:0.75rem;white-space:nowrap">${fmtDate(e.ts)}</td>
+        <td><span class="tag tag-blue">${esc(e.operation)}</span></td>
+        <td class="mono">${(e.did||"").slice(0,20)}…</td>
+        <td>${statusTag(e.status)}</td>
+        <td class="mono">${e.ip||"—"}</td>
+        <td class="mono">${e.counterparty ? e.counterparty.slice(0,16)+"…" : "—"}</td>
+      </tr>`).join("") + `</tbody></table>`;
+  renderPager("audit-pager", page, data.total, 100, loadAuditLog);
+}
+
+document.getElementById("audit-search-btn").addEventListener("click", () => loadAuditLog(1));
+document.getElementById("audit-did").addEventListener("keydown", e => { if (e.key==="Enter") loadAuditLog(1); });
+document.getElementById("audit-op").addEventListener("keydown",  e => { if (e.key==="Enter") loadAuditLog(1); });
+
+// ── admin log ─────────────────────────────────────────────────────────────────
+async function loadAdminLog() {
+  const data = await api("/admin/admin-log?limit=100").catch(e => { toast(e,"err"); return null; });
+  if (!data) return;
+  if (!data.log.length) {
+    document.getElementById("adminlog-body").innerHTML = `<div class="empty">No admin actions yet.</div>`;
+    return;
+  }
+  document.getElementById("adminlog-body").innerHTML = `
+    <table>
+      <thead><tr><th>Time</th><th>Action</th><th>Target</th><th>Detail</th><th>IP</th></tr></thead>
+      <tbody>` +
+    data.log.map(r => `
+      <tr>
+        <td style="font-size:0.75rem;white-space:nowrap">${fmtDate(r.ts)}</td>
+        <td><span class="tag tag-purple">${esc(r.action)}</span></td>
+        <td class="mono">${r.target ? r.target.slice(0,24) : "—"}</td>
+        <td style="color:var(--text-2);font-size:0.78rem">${esc(r.detail||"—")}</td>
+        <td class="mono">${r.ip||"—"}</td>
+      </tr>`).join("") + `</tbody></table>`;
+}
+
+document.getElementById("refresh-adminlog-btn").addEventListener("click", loadAdminLog);
+
+// ── system ────────────────────────────────────────────────────────────────────
+async function loadSystem() {
+  const data = await api("/admin/system/health").catch(() => null);
+  if (!data) return;
+  document.getElementById("health-body").innerHTML = `
+    <div class="health-row">
+      <span class="health-label">Database</span>
+      <span><span class="dot-${data.db==="ok"?"ok":"err"}"></span> ${data.db}</span>
+    </div>
+    <div class="health-row">
+      <span class="health-label">Tables</span>
+      <strong>${data.tables}</strong>
+    </div>
+    <div class="health-row">
+      <span class="health-label">Admin secret</span>
+      <span>${data.admin_secret_set ? tagHtml("set","green") : tagHtml("not set","red")}</span>
+    </div>
+    <div class="health-row">
+      <span class="health-label">Server time</span>
+      <span style="font-size:0.75rem">${fmtDate(data.ts)}</span>
+    </div>
+  `;
+}
+
+document.getElementById("schema-init-btn").addEventListener("click", async () => {
+  const result = await confirm("Run schema init", "Re-run all CREATE TABLE IF NOT EXISTS and ALTER TABLE statements. Safe and idempotent.", {danger:false});
+  if (!result?.confirmed) return;
+  const btn = document.getElementById("schema-init-btn");
+  btn.textContent = "Running…"; btn.disabled = true;
+  try {
+    const data = await api("/admin/schema/init", {method:"POST"});
+    document.getElementById("schema-result").innerHTML =
+      data.ok ? `<span style="color:var(--green)">✓ Schema init completed.</span>` :
+                `<span style="color:var(--red)">Errors: ${data.errors.join(", ")}</span>`;
+    toast(data.ok ? "Schema init done" : "Schema init had errors", data.ok ? "ok" : "err");
+  } catch(e) { toast(e, "err"); }
+  btn.textContent = "Run schema init"; btn.disabled = false;
+});
+
+// ── pager ─────────────────────────────────────────────────────────────────────
+function renderPager(id, page, total, limit, loader) {
+  const pages = Math.ceil(total / limit);
+  document.getElementById(id).innerHTML = `
+    <button ${page<=1?"disabled":""} onclick="(${loader})(${page-1})">← Prev</button>
+    <span>Page ${page} of ${pages}</span>
+    <button ${page>=pages?"disabled":""} onclick="(${loader})(${page+1})">Next →</button>
+  `;
+}
+
+// ── utils ─────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+</script>
+</body>
+</html>
