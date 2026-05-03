@@ -269,9 +269,9 @@
         <div class="page-title">Agents</div>
         <div class="table-wrap">
           <div class="table-toolbar">
-            <input class="search-input" id="agent-search" placeholder="Search name, DID, owner…" />
+            <input class="search-input" id="agent-search" placeholder="Search name, DID, owner…" style="flex:1;" />
             <button class="btn-sm" id="agent-search-btn">Search</button>
-            <span style="font-size:0.75rem;color:var(--muted);margin-left:auto;" id="agent-count"></span>
+            <span style="font-size:0.75rem;color:var(--muted);" id="agent-count"></span>
           </div>
           <div id="agents-table-body"></div>
           <div class="pager" id="agents-pager"></div>
@@ -581,6 +581,8 @@ async function tryLogin() {
     if (!r.ok) throw new Error();
     _adminInfo = await r.json();
     _secret = secret;
+    sessionStorage.setItem("agentid_admin_secret", secret);
+    sessionStorage.setItem("agentid_admin_login_ts", Date.now().toString());
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("app").style.display = "flex";
     const isMaster = _adminInfo.role === "master";
@@ -605,8 +607,22 @@ async function tryLogin() {
 document.getElementById("login-btn").addEventListener("click", tryLogin);
 document.getElementById("secret-input").addEventListener("keydown", e => { if (e.key === "Enter") tryLogin(); });
 document.getElementById("logout-btn").addEventListener("click", () => {
+  sessionStorage.removeItem("agentid_admin_secret");
+  sessionStorage.removeItem("agentid_admin_login_ts");
   location.reload();
 });
+
+// Auto-login if session is less than 5 minutes old
+const _SESSION_TTL = 5 * 60 * 1000;
+const _savedSecret = sessionStorage.getItem("agentid_admin_secret");
+const _savedTs     = parseInt(sessionStorage.getItem("agentid_admin_login_ts") || "0", 10);
+if (_savedSecret && (Date.now() - _savedTs) < _SESSION_TTL) {
+  document.getElementById("secret-input").value = _savedSecret;
+  tryLogin();
+} else {
+  sessionStorage.removeItem("agentid_admin_secret");
+  sessionStorage.removeItem("agentid_admin_login_ts");
+}
 
 // ── navigation ───────────────────────────────────────────────────────────────
 let _currentPage = "overview";
