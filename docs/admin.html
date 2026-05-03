@@ -715,6 +715,11 @@ document.getElementById("account-search-btn").addEventListener("click", () => lo
 document.getElementById("account-search").addEventListener("keydown", e => { if (e.key==="Enter") loadAccounts(1); });
 
 // ── compromised ───────────────────────────────────────────────────────────────
+const _kindColors = {
+  key_leak: "red", impersonation: "red", malicious_behavior: "yellow",
+  deprecated: "gray", admin: "purple"
+};
+
 async function loadCompromised() {
   const data = await api("/admin/trust/compromised").catch(e => { toast(e,"err"); return null; });
   if (!data) return;
@@ -722,21 +727,65 @@ async function loadCompromised() {
     document.getElementById("compromised-body").innerHTML = `<div class="empty">No compromised agents.</div>`;
     return;
   }
+
+  const rows = data.compromised.map((c, i) => {
+    const activityHtml = c.last_activity?.length
+      ? `<table style="width:100%;margin-top:0.5rem;font-size:0.75rem;border-collapse:collapse;">
+           <tr style="color:var(--muted);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;">
+             <td style="padding:2px 8px;">Time</td><td style="padding:2px 8px;">Operation</td>
+             <td style="padding:2px 8px;">Status</td><td style="padding:2px 8px;">Counterparty</td>
+             <td style="padding:2px 8px;">IP</td>
+           </tr>` +
+         c.last_activity.map(a => `
+           <tr style="border-top:1px solid var(--border);">
+             <td style="padding:3px 8px;color:var(--muted);white-space:nowrap;">${fmtDate(a.ts)}</td>
+             <td style="padding:3px 8px;"><span class="tag tag-blue">${esc(a.operation)}</span></td>
+             <td style="padding:3px 8px;">${a.status==="ok"||a.status==="valid"
+               ? `<span class="tag tag-green">${esc(a.status)}</span>`
+               : `<span class="tag tag-red">${esc(a.status||"?")}</span>`}</td>
+             <td style="padding:3px 8px;font-family:var(--mono);color:var(--muted);">${a.counterparty ? a.counterparty.slice(0,18)+"…" : "—"}</td>
+             <td style="padding:3px 8px;font-family:var(--mono);color:var(--muted);">${esc(a.ip||"—")}</td>
+           </tr>`).join("") +
+         `</table>`
+      : `<span style="color:var(--muted);font-size:0.78rem;">No audit events found for this agent.</span>`;
+
+    const kindColor = _kindColors[c.kind] || "gray";
+    return `
+      <tr style="cursor:pointer;" onclick="toggleActivity('activity-${i}')">
+        <td style="font-weight:600;color:var(--text)">
+          ${esc(c.name||"—")}
+          ${c.owner ? `<div style="font-size:0.7rem;color:var(--muted);font-weight:400;">${esc(c.owner)}</div>` : ""}
+        </td>
+        <td class="mono">${(c.did||"").slice(0,20)}…</td>
+        <td><span class="tag tag-${kindColor}">${esc(c.kind||"?")}</span></td>
+        <td style="color:var(--text-2);max-width:320px;">${esc(c.reason||"—")}</td>
+        <td class="mono" style="font-size:0.72rem;">${esc(c.reported_by||"—")}</td>
+        <td style="font-size:0.75rem;white-space:nowrap;">${fmtDate(c.reported_at)}</td>
+        <td>
+          <button class="act-btn" style="margin-bottom:0.2rem;" onclick="event.stopPropagation();toggleActivity('activity-${i}')">activity ▾</button>
+          <button class="act-btn danger" onclick="event.stopPropagation();unflagCompromised('${c.did}','${esc(c.name||c.did)}')">unflag</button>
+        </td>
+      </tr>
+      <tr id="activity-${i}" style="display:none;">
+        <td colspan="7" style="padding:0.75rem 1rem;background:var(--bg);border-top:1px solid var(--border);">
+          <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.35rem;">
+            Last 5 audit events — use this to assess if the flag is valid before unflagging
+          </div>
+          ${activityHtml}
+        </td>
+      </tr>`;
+  }).join("");
+
   document.getElementById("compromised-body").innerHTML = `
     <table>
-      <thead><tr><th>Agent</th><th>DID</th><th>Reason</th><th>Reported By</th><th>Date</th><th>Actions</th></tr></thead>
-      <tbody>` +
-    data.compromised.map(c => `
-      <tr>
-        <td style="font-weight:600;color:var(--text)">${esc(c.name||"—")}</td>
-        <td class="mono">${(c.did||"").slice(0,20)}…</td>
-        <td style="color:var(--text-2)">${esc(c.reason||"—")}</td>
-        <td class="mono">${esc(c.reported_by||"—")}</td>
-        <td style="font-size:0.75rem">${fmtDate(c.reported_at)}</td>
-        <td>
-          <button class="act-btn" onclick="unflagCompromised('${c.did}','${esc(c.name||c.did)}')">unflag</button>
-        </td>
-      </tr>`).join("") + `</tbody></table>`;
+      <thead><tr><th>Agent</th><th>DID</th><th>Kind</th><th>Reason</th><th>Reported By</th><th>Date</th><th>Actions</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function toggleActivity(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === "none" ? "table-row" : "none";
 }
 
 async function unflagCompromised(did, name) {
