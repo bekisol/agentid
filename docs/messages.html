@@ -639,6 +639,13 @@ let _inviteRoomId = null; // room being invited into (for modal)
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
+// Encode a DID for use as a URL *path* segment.
+// encodeURIComponent() encodes colons (%3A) which breaks routing on some proxies.
+// DIDs contain only [a-z0-9:] so we only need to encode the genuinely unsafe chars.
+function encodeDidPath(did) {
+  return did.replace(/[^a-zA-Z0-9:_\-\.~]/g, c => encodeURIComponent(c));
+}
+
 function relativeTime(iso) {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();
@@ -664,7 +671,7 @@ async function fetchAgents() {
 
 async function fetchMessages(did) {
   const params = new URLSearchParams({ limit: 200, include_sent: "true" });
-  const r = await fetch(`${BASE}/agents/${encodeURIComponent(did)}/messages?${params}`, {
+  const r = await fetch(`${BASE}/agents/${encodeDidPath(did)}/messages?${params}`, {
     headers: apiHeaders(),
     credentials: "include",
   });
@@ -843,7 +850,7 @@ async function sendMessage() {
 
   btn.disabled = true; btn.textContent = "Sending…";
   try {
-    const r = await fetch(`${BASE}/agents/${encodeURIComponent(toDid)}/messages`, {
+    const r = await fetch(`${BASE}/agents/${encodeDidPath(toDid)}/messages`, {
       method: "POST",
       headers: apiHeaders(),
       body: JSON.stringify({ from_did: fromDid, subject, body }),
@@ -944,7 +951,7 @@ function renderFeed() {
       : `<span style="font-size:0.72rem;color:var(--muted);">No capabilities listed</span>`;
     const trustEl = document.getElementById("agent-info-trust");
     trustEl.innerHTML = "Trust score: <span style='font-style:italic;color:var(--muted);'>loading…</span>";
-    fetch(`${BASE}/agents/${encodeURIComponent(agent.did)}/trust-score`, { headers: apiHeaders(), credentials:"include" })
+    fetch(`${BASE}/agents/${encodeDidPath(agent.did)}/trust-score`, { headers: apiHeaders(), credentials:"include" })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (!d || d.error) { trustEl.innerHTML = "Trust score: <span style='color:var(--muted);'>unavailable</span>"; return; }
@@ -1149,7 +1156,7 @@ async function deleteSelected() {
   try {
     await Promise.all(
       Object.entries(byAgent).map(([did, msgIds]) =>
-        fetch(`${BASE}/agents/${encodeURIComponent(did)}/messages`, {
+        fetch(`${BASE}/agents/${encodeDidPath(did)}/messages`, {
           method: "DELETE",
           headers: apiHeaders(),
           body: JSON.stringify({ ids: msgIds }),
@@ -1200,7 +1207,7 @@ function _startChatPoll() {
     const box = document.getElementById("chat-panel-messages");
     const prevCount = box.querySelectorAll(".chat-msg").length;
     try {
-      const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_chatDid)}/chat/history?limit=60`, {
+      const r = await fetch(`${BASE}/pro/agents/${encodeDidPath(_chatDid)}/chat/history?limit=60`, {
         headers: apiHeaders(), credentials: "include",
       });
       if (!r.ok) return;
@@ -1218,7 +1225,7 @@ async function loadChatHistory() {
   const box = document.getElementById("chat-panel-messages");
   box.innerHTML = '<div class="chat-typing">Loading history…</div>';
   try {
-    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_chatDid)}/chat/history?limit=60`, {
+    const r = await fetch(`${BASE}/pro/agents/${encodeDidPath(_chatDid)}/chat/history?limit=60`, {
       headers: apiHeaders(), credentials: "include",
     });
     if (!r.ok) throw new Error(`${r.status}`);
@@ -1302,7 +1309,7 @@ async function sendChatMessage() {
 
   btn.disabled = true;
   try {
-    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_chatDid)}/chat`, {
+    const r = await fetch(`${BASE}/pro/agents/${encodeDidPath(_chatDid)}/chat`, {
       method: "POST",
       headers: apiHeaders(),
       body: JSON.stringify({ message: text }),
