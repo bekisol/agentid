@@ -184,6 +184,10 @@
     .deal-badge:hover { background:#dcfce7; }
 
     /* Sidebar deals item */
+    .sidebar-search { padding:0.5rem 0.75rem; flex-shrink:0; border-bottom:1px solid var(--border); }
+    .sidebar-search input { width:100%; box-sizing:border-box; padding:0.35rem 0.6rem; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:0.8rem; font-family:inherit; outline:none; }
+    .sidebar-search input::placeholder { color:var(--muted); }
+    .sidebar-search input:focus { border-color:var(--accent); }
     .sidebar-section { padding:0.45rem 1.1rem; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-top:0.25rem; }
     .sidebar-item-deal { padding:0.5rem 1.1rem; cursor:pointer; font-size:0.84rem; font-weight:500; color:var(--text-2); display:flex; align-items:center; gap:0.5rem; }
     .sidebar-item-deal:hover { background:var(--surface2); }
@@ -323,6 +327,9 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-title">My Agents</div>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" id="sidebar-search-input" placeholder="Search agents…" oninput="_filterSidebar(this.value)" autocomplete="off" />
       </div>
       <div class="sidebar-list" id="sidebar-list">
         <div style="padding:1rem;text-align:center;"><div class="spinner"></div></div>
@@ -645,6 +652,13 @@ function setFeedLoading() {
 }
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
+let _sidebarQuery = '';
+
+function _filterSidebar(q) {
+  _sidebarQuery = q.trim().toLowerCase();
+  renderSidebar();
+}
+
 function renderSidebar() {
   const list = document.getElementById("sidebar-list");
 
@@ -655,26 +669,36 @@ function renderSidebar() {
   });
   const totalUnread = Object.values(unreadMap).reduce((a, b) => a + b, 0);
 
-  let html = `
-    <div class="sidebar-item${_selectedDid === "" ? " active" : ""}" data-did="">
-      <span class="sidebar-item-name">All agents</span>
-      ${totalUnread > 0
-        ? `<span class="sidebar-badge">${totalUnread}</span>`
-        : `<span class="sidebar-badge-zero">${_messages.length}</span>`}
-    </div>
-    <div class="sidebar-sep"></div>
-  `;
+  const q = _sidebarQuery;
+  const filtered = q
+    ? _agents.filter(a => (a.name || '').toLowerCase().includes(q) || a.did.toLowerCase().includes(q))
+    : _agents;
 
-  if (!_agents.length) {
-    html += `<div style="padding:1rem;text-align:center;font-size:0.8rem;color:var(--muted);">No agents yet</div>`;
+  let html = '';
+  if (!q) {
+    html += `
+      <div class="sidebar-item${_selectedDid === "" ? " active" : ""}" data-did="">
+        <span class="sidebar-item-name">All agents</span>
+        ${totalUnread > 0
+          ? `<span class="sidebar-badge">${totalUnread}</span>`
+          : `<span class="sidebar-badge-zero">${_messages.length}</span>`}
+      </div>
+      <div class="sidebar-sep"></div>
+    `;
+  }
+
+  if (!filtered.length) {
+    html += `<div style="padding:1rem;text-align:center;font-size:0.8rem;color:var(--muted);">${q ? 'No matches' : 'No agents yet'}</div>`;
   } else {
-    _agents.forEach(a => {
+    filtered.forEach(a => {
       const u = unreadMap[a.did] || 0;
       const total = _messages.filter(m => m._agentDid === a.did).length;
       const active = _selectedDid === a.did;
+      const label = esc(a.name || a.did.slice(-12));
+      const highlighted = q ? label.replace(new RegExp(`(${esc(q)})`, 'gi'), '<mark style="background:var(--accent-light);color:var(--accent);border-radius:2px;">$1</mark>') : label;
       html += `
         <div class="sidebar-item${active ? " active" : ""}" data-did="${esc(a.did)}">
-          <span class="sidebar-item-name" title="${esc(a.name || a.did)}">${esc(a.name || a.did.slice(-12))}</span>
+          <span class="sidebar-item-name" title="${esc(a.name || a.did)}">${highlighted}</span>
           ${u > 0
             ? `<span class="sidebar-badge">${u}</span>`
             : `<span class="sidebar-badge-zero">${total}</span>`}
