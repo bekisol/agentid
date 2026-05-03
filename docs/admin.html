@@ -270,6 +270,15 @@
         <div class="table-wrap">
           <div class="table-toolbar">
             <input class="search-input" id="agent-search" placeholder="Search name, DID, owner…" style="flex:1;" />
+            <select id="agent-flag" class="search-input" style="min-width:130px;">
+              <option value="">All flags</option>
+              <option value="badge">✓ Verified badge</option>
+              <option value="revoked">Revoked</option>
+              <option value="deprecated">Deprecated</option>
+              <option value="private">Private</option>
+            </select>
+            <input type="date" id="agent-date-from" class="search-input" style="min-width:130px;" title="Created from" />
+            <input type="date" id="agent-date-to"   class="search-input" style="min-width:130px;" title="Created to" />
             <button class="btn-sm" id="agent-search-btn">Search</button>
             <span style="font-size:0.75rem;color:var(--muted);" id="agent-count"></span>
           </div>
@@ -290,6 +299,8 @@
               <option value="pro">Pro</option>
               <option value="enterprise">Enterprise</option>
             </select>
+            <input type="date" id="account-date-from" class="search-input" style="min-width:130px;" title="Created from" />
+            <input type="date" id="account-date-to"   class="search-input" style="min-width:130px;" title="Created to" />
             <button class="btn-sm" id="account-search-btn">Search</button>
             <button class="btn-sm" id="issue-key-btn" style="background:var(--accent);color:#fff;border-color:var(--accent);margin-left:auto;">+ Issue Key</button>
             <span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem;" id="account-count"></span>
@@ -305,9 +316,27 @@
         <div class="table-wrap">
           <div class="table-toolbar">
             <span style="font-size:0.8rem;color:var(--text-2);">Agents flagged in the trust network</span>
-            <button class="btn-sm" style="margin-left:auto;" id="refresh-comp-btn">Refresh</button>
+            <div style="margin-left:auto;display:flex;gap:0.5rem;">
+              <button class="btn-sm" id="comp-view-table" style="background:var(--accent);color:#fff;border-color:var(--accent);">☰ Table</button>
+              <button class="btn-sm" id="comp-view-map">🗺 Map</button>
+              <button class="btn-sm" id="refresh-comp-btn">Refresh</button>
+            </div>
           </div>
           <div id="compromised-body"></div>
+        </div>
+        <!-- Interaction map (hidden until Map tab clicked) -->
+        <div id="threat-map-wrap" style="display:none;margin-top:1rem;">
+          <div class="table-wrap" style="padding:1rem;">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;flex-wrap:wrap;">
+              <div class="section-head" style="margin-bottom:0;">Interaction Map</div>
+              <span style="font-size:0.75rem;color:var(--muted);">Red = compromised · Blue = interaction partners · Line thickness = interaction volume</span>
+              <div style="margin-left:auto;display:flex;gap:0.4rem;align-items:center;">
+                <span style="font-size:0.72rem;color:var(--muted);">Scroll to zoom · Drag to pan</span>
+              </div>
+            </div>
+            <canvas id="threat-map-canvas" style="width:100%;height:500px;border-radius:6px;background:var(--bg);display:block;cursor:grab;"></canvas>
+            <div id="threat-map-empty" style="display:none;" class="empty">No compromised agents to map.</div>
+          </div>
         </div>
       </div>
 
@@ -318,6 +347,8 @@
           <div class="table-toolbar">
             <input class="search-input" id="audit-did" placeholder="Filter by DID…" style="min-width:180px;" />
             <input class="search-input" id="audit-op" placeholder="Filter by operation…" style="min-width:140px;" />
+            <input type="date" id="audit-date-from" class="search-input" style="min-width:130px;" title="From date" />
+            <input type="date" id="audit-date-to"   class="search-input" style="min-width:130px;" title="To date" />
             <button class="btn-sm" id="audit-search-btn">Filter</button>
             <span style="font-size:0.75rem;color:var(--muted);margin-left:auto;" id="audit-count"></span>
           </div>
@@ -689,8 +720,15 @@ async function loadOverview() {
 let _agentPage = 1;
 async function loadAgents(page = 1) {
   _agentPage = page;
-  const q = document.getElementById("agent-search").value.trim();
-  const data = await api(`/admin/agents?q=${encodeURIComponent(q)}&page=${page}&limit=50`).catch(e => { toast(e, "err"); return null; });
+  const q        = document.getElementById("agent-search").value.trim();
+  const flag     = document.getElementById("agent-flag").value;
+  const dateFrom = document.getElementById("agent-date-from").value;
+  const dateTo   = document.getElementById("agent-date-to").value;
+  const qs = new URLSearchParams({ q, page, limit: 50 });
+  if (flag)     qs.set("flag", flag);
+  if (dateFrom) qs.set("date_from", dateFrom);
+  if (dateTo)   qs.set("date_to", dateTo);
+  const data = await api(`/admin/agents?${qs}`).catch(e => { toast(e, "err"); return null; });
   if (!data) return;
   document.getElementById("agent-count").textContent = `${data.total} agents`;
   if (!data.agents.length) {
@@ -809,9 +847,14 @@ document.getElementById("agent-search").addEventListener("keydown", e => { if (e
 let _accountPage = 1;
 async function loadAccounts(page = 1) {
   _accountPage = page;
-  const q = document.getElementById("account-search").value.trim();
-  const tier = document.getElementById("account-tier").value;
-  const data = await api(`/admin/accounts?q=${encodeURIComponent(q)}&tier=${tier}&page=${page}&limit=50`).catch(e => { toast(e,"err"); return null; });
+  const q        = document.getElementById("account-search").value.trim();
+  const tier     = document.getElementById("account-tier").value;
+  const dateFrom = document.getElementById("account-date-from").value;
+  const dateTo   = document.getElementById("account-date-to").value;
+  const qs = new URLSearchParams({ q, tier, page, limit: 50 });
+  if (dateFrom) qs.set("date_from", dateFrom);
+  if (dateTo)   qs.set("date_to", dateTo);
+  const data = await api(`/admin/accounts?${qs}`).catch(e => { toast(e,"err"); return null; });
   if (!data) return;
   document.getElementById("account-count").textContent = `${data.total} keys`;
   if (!data.keys.length) {
@@ -932,7 +975,10 @@ async function loadCompromised() {
              <td style="padding:3px 8px;font-family:var(--mono);color:var(--muted);">${esc(a.ip||"—")}</td>
            </tr>`).join("") +
          `</table>`
-      : `<span style="color:var(--muted);font-size:0.78rem;">No audit events found for this agent.</span>`;
+      : `<span style="color:var(--muted);font-size:0.78rem;">No audit events found for this agent.
+          <button class="act-btn" style="margin-left:0.5rem;"
+            onclick="searchAuditForDid('${c.did}')">Search audit log</button>
+         </span>`;
 
     const kindColor = _kindColors[c.kind] || "gray";
     return `
@@ -983,15 +1029,276 @@ async function unflagCompromised(did, name) {
   } catch(e) { toast(e, "err"); }
 }
 
-document.getElementById("refresh-comp-btn").addEventListener("click", loadCompromised);
+function searchAuditForDid(did) {
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  document.querySelector('.nav-item[data-page="auditlog"]').classList.add("active");
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById("page-auditlog").classList.add("active");
+  document.getElementById("audit-did").value = did;
+  loadAuditLog(1);
+}
+
+document.getElementById("refresh-comp-btn").addEventListener("click", () => {
+  loadCompromised();
+  if (document.getElementById("threat-map-wrap").style.display !== "none") loadThreatMap();
+});
+
+// ── compromised view toggle ────────────────────────────────────────────────────
+document.getElementById("comp-view-table").addEventListener("click", () => {
+  document.getElementById("compromised-body").parentElement.style.display = "";
+  document.getElementById("threat-map-wrap").style.display = "none";
+  document.getElementById("comp-view-table").style.background = "var(--accent)";
+  document.getElementById("comp-view-table").style.color = "#fff";
+  document.getElementById("comp-view-map").style.background = "";
+  document.getElementById("comp-view-map").style.color = "";
+});
+document.getElementById("comp-view-map").addEventListener("click", () => {
+  document.getElementById("compromised-body").parentElement.style.display = "none";
+  document.getElementById("threat-map-wrap").style.display = "";
+  document.getElementById("comp-view-map").style.background = "var(--accent)";
+  document.getElementById("comp-view-map").style.color = "#fff";
+  document.getElementById("comp-view-table").style.background = "";
+  document.getElementById("comp-view-table").style.color = "";
+  loadThreatMap();
+});
+
+// ── threat map ────────────────────────────────────────────────────────────────
+let _tmAnimId = null;
+
+async function loadThreatMap() {
+  const canvas = document.getElementById("threat-map-canvas");
+  const emptyEl = document.getElementById("threat-map-empty");
+  const ctx = canvas.getContext("2d");
+
+  // Fit canvas to CSS size
+  const W = canvas.clientWidth  || 900;
+  const H = canvas.clientHeight || 500;
+  canvas.width  = W;
+  canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#0F1117";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#6B7280";
+  ctx.font = "13px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Loading…", W/2, H/2);
+
+  const data = await api("/admin/trust/interaction-graph").catch(() => null);
+  if (!data || !data.nodes.length) {
+    canvas.style.display = "none";
+    emptyEl.style.display = "";
+    return;
+  }
+  canvas.style.display = "block";
+  emptyEl.style.display = "none";
+
+  // ── build simulation nodes & edges ──────────────────────────────────────────
+  const nodes = data.nodes.map((n, i) => ({
+    ...n,
+    x: W/2 + (Math.random() - 0.5) * W * 0.6,
+    y: H/2 + (Math.random() - 0.5) * H * 0.6,
+    vx: 0, vy: 0,
+    r: n.type === "compromised" ? 18 : 12,
+  }));
+  const nodeById = {};
+  nodes.forEach(n => { nodeById[n.id] = n; });
+
+  const edges = (data.edges || []).map(e => ({
+    source: nodeById[e.from],
+    target: nodeById[e.to],
+    count: e.count,
+    ops: e.ops || [],
+  })).filter(e => e.source && e.target);
+
+  const maxEdgeCount = edges.reduce((m, e) => Math.max(m, e.count), 1);
+
+  // ── pan / zoom state ─────────────────────────────────────────────────────────
+  let panX = 0, panY = 0, scale = 1;
+  let dragging = false, lastMX = 0, lastMY = 0;
+  let hovered = null;
+
+  function toScreen(x, y) {
+    return { sx: x * scale + panX + W/2, sy: y * scale + panY + H/2 };
+  }
+  function toWorld(sx, sy) {
+    return { x: (sx - W/2 - panX) / scale, y: (sy - H/2 - panY) / scale };
+  }
+
+  canvas.onwheel = e => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    scale = Math.max(0.2, Math.min(5, scale * delta));
+    drawFrame();
+  };
+  canvas.onmousedown = e => { dragging = true; lastMX = e.offsetX; lastMY = e.offsetY; canvas.style.cursor = "grabbing"; };
+  canvas.onmouseup   = () => { dragging = false; canvas.style.cursor = "grab"; };
+  canvas.onmouseleave = () => { dragging = false; hovered = null; };
+  canvas.onmousemove = e => {
+    if (dragging) {
+      panX += e.offsetX - lastMX;
+      panY += e.offsetY - lastMY;
+      lastMX = e.offsetX; lastMY = e.offsetY;
+      drawFrame(); return;
+    }
+    const wp = toWorld(e.offsetX, e.offsetY);
+    hovered = nodes.find(n => {
+      const dx = n.x - wp.x, dy = n.y - wp.y;
+      return Math.sqrt(dx*dx + dy*dy) < n.r / scale + 4;
+    }) || null;
+  };
+
+  // ── draw ─────────────────────────────────────────────────────────────────────
+  function drawFrame() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#0F1117";
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+
+    // Edges
+    edges.forEach(e => {
+      const s = toScreen(e.source.x, e.source.y);
+      const t = toScreen(e.target.x, e.target.y);
+      const alpha = 0.15 + (e.count / maxEdgeCount) * 0.65;
+      const lw    = 1 + (e.count / maxEdgeCount) * 3;
+      ctx.beginPath();
+      ctx.moveTo(s.sx, s.sy);
+      ctx.lineTo(t.sx, t.sy);
+      ctx.strokeStyle = `rgba(239,68,68,${alpha})`;
+      ctx.lineWidth = lw * scale;
+      ctx.stroke();
+    });
+
+    // Nodes
+    nodes.forEach(n => {
+      const { sx, sy } = toScreen(n.x, n.y);
+      const r = n.r * scale;
+      const isHov = n === hovered;
+
+      // Glow for compromised
+      if (n.type === "compromised") {
+        ctx.beginPath();
+        ctx.arc(sx, sy, r + 5 * scale, 0, Math.PI*2);
+        ctx.fillStyle = isHov ? "rgba(239,68,68,0.3)" : "rgba(239,68,68,0.12)";
+        ctx.fill();
+      }
+
+      // Circle fill
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI*2);
+      if (n.type === "compromised") {
+        ctx.fillStyle = isHov ? "#FCA5A5" : "#EF4444";
+      } else {
+        ctx.fillStyle = isHov ? "#93C5FD" : "#3B82F6";
+      }
+      ctx.fill();
+      ctx.strokeStyle = isHov ? "#fff" : (n.type === "compromised" ? "#FCA5A5" : "#60A5FA");
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Label
+      if (scale > 0.5) {
+        const label = n.name.length > 14 ? n.name.slice(0, 12) + "…" : n.name;
+        const fontSize = Math.max(9, Math.min(13, 11 * scale));
+        ctx.font = `${n.type === "compromised" ? "700" : "400"} ${fontSize}px Inter, sans-serif`;
+        ctx.fillStyle = "#E8EAF0";
+        ctx.textAlign = "center";
+        ctx.fillText(label, sx, sy + r + fontSize + 2);
+      }
+
+      // Tooltip
+      if (isHov) {
+        const lines = [`${n.name}`, n.type === "compromised" ? `⚠ compromised (${n.kind||"?"})` : "interaction partner"];
+        const connCount = edges.filter(e => e.source === n || e.target === n).reduce((s,e)=>s+e.count,0);
+        if (connCount) lines.push(`${connCount} interactions`);
+        const tw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 20;
+        const th = lines.length * 18 + 12;
+        let tx = sx + r + 10, ty = sy - th/2;
+        if (tx + tw > W) tx = sx - r - tw - 10;
+        ctx.fillStyle = "rgba(26,29,39,0.95)";
+        ctx.strokeStyle = "#2E3348";
+        ctx.lineWidth = 1;
+        roundRect(ctx, tx, ty, tw, th, 6);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#E8EAF0";
+        ctx.font = "12px Inter, sans-serif";
+        ctx.textAlign = "left";
+        lines.forEach((l, i) => ctx.fillText(l, tx + 10, ty + 16 + i * 18));
+      }
+    });
+
+    ctx.restore();
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+    ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+    ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
+    ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r);
+    ctx.closePath();
+  }
+
+  // ── force simulation ──────────────────────────────────────────────────────────
+  const REPEL  = 3500;
+  const SPRING = 0.018;
+  const REST   = 120;
+  const DAMP   = 0.78;
+  const CENTER = 0.004;
+
+  if (_tmAnimId) cancelAnimationFrame(_tmAnimId);
+  let tick = 0;
+
+  function simulate() {
+    // Repulsion
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i+1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.sqrt(dx*dx + dy*dy) || 0.1;
+        const f = REPEL / (d * d);
+        const fx = (dx/d)*f, fy = (dy/d)*f;
+        a.vx -= fx; a.vy -= fy;
+        b.vx += fx; b.vy += fy;
+      }
+    }
+    // Spring (edges)
+    edges.forEach(e => {
+      const dx = e.target.x - e.source.x;
+      const dy = e.target.y - e.source.y;
+      const d  = Math.sqrt(dx*dx + dy*dy) || 0.1;
+      const f  = (d - REST) * SPRING;
+      const fx = (dx/d)*f, fy = (dy/d)*f;
+      e.source.vx += fx; e.source.vy += fy;
+      e.target.vx -= fx; e.target.vy -= fy;
+    });
+    // Center gravity
+    nodes.forEach(n => {
+      n.vx -= n.x * CENTER;
+      n.vy -= n.y * CENTER;
+      n.vx *= DAMP; n.vy *= DAMP;
+      n.x  += n.vx; n.y  += n.vy;
+    });
+
+    drawFrame();
+    tick++;
+    if (tick < 280) _tmAnimId = requestAnimationFrame(simulate);
+  }
+  simulate();
 
 // ── audit log ─────────────────────────────────────────────────────────────────
 let _auditPage = 1;
 async function loadAuditLog(page = 1) {
   _auditPage = page;
-  const did = document.getElementById("audit-did").value.trim();
-  const op  = document.getElementById("audit-op").value.trim();
-  const data = await api(`/admin/audit-log?did=${encodeURIComponent(did)}&op=${encodeURIComponent(op)}&page=${page}&limit=100`).catch(e => { toast(e,"err"); return null; });
+  const did      = document.getElementById("audit-did").value.trim();
+  const op       = document.getElementById("audit-op").value.trim();
+  const dateFrom = document.getElementById("audit-date-from").value;
+  const dateTo   = document.getElementById("audit-date-to").value;
+  const qs = new URLSearchParams({ did, op, page, limit: 100 });
+  if (dateFrom) qs.set("date_from", dateFrom);
+  if (dateTo)   qs.set("date_to", dateTo);
+  const data = await api(`/admin/audit-log?${qs}`).catch(e => { toast(e,"err"); return null; });
   if (!data) return;
   document.getElementById("audit-count").textContent = `${data.total.toLocaleString()} events`;
   if (!data.events.length) {
@@ -1288,19 +1595,34 @@ async function deleteSubKey(id, label) {
 }
 
 // ── pager ─────────────────────────────────────────────────────────────────────
-// Store loader refs by pager ID so onclick can call them without serializing the function.
 const _pagerLoaders = {};
 function renderPager(id, page, total, limit, loader) {
   _pagerLoaders[id] = loader;
-  const pages = Math.ceil(total / limit);
+  const pages = Math.ceil(total / limit) || 1;
   const el = document.getElementById(id);
   el.innerHTML = `
     <button id="${id}-prev" ${page<=1?"disabled":""}>← Prev</button>
-    <span>Page ${page} of ${pages}</span>
+    <span style="color:var(--muted)">Page ${page} of ${pages}</span>
     <button id="${id}-next" ${page>=pages?"disabled":""}>Next →</button>
+    <span style="color:var(--muted);margin-left:0.5rem;font-size:0.75rem;">Jump:</span>
+    <input id="${id}-jump" type="number" min="1" max="${pages}" placeholder="${page}"
+           style="width:56px;background:var(--bg);border:1px solid var(--border);border-radius:5px;
+                  padding:0.2rem 0.4rem;color:var(--text);font-size:0.78rem;outline:none;" />
+    <button id="${id}-go">Go</button>
+    <span style="margin-left:auto;font-size:0.75rem;color:var(--muted);">${total.toLocaleString()} total</span>
   `;
   el.querySelector(`#${id}-prev`).addEventListener("click", () => _pagerLoaders[id](page - 1));
   el.querySelector(`#${id}-next`).addEventListener("click", () => _pagerLoaders[id](page + 1));
+  el.querySelector(`#${id}-go`).addEventListener("click", () => {
+    const v = parseInt(el.querySelector(`#${id}-jump`).value, 10);
+    if (v >= 1 && v <= pages) _pagerLoaders[id](v);
+  });
+  el.querySelector(`#${id}-jump`).addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      const v = parseInt(e.target.value, 10);
+      if (v >= 1 && v <= pages) _pagerLoaders[id](v);
+    }
+  });
 }
 
 // ── utils ─────────────────────────────────────────────────────────────────────
