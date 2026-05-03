@@ -1109,13 +1109,13 @@ function _renderFileChip(f) {
   const icon = _fileIcon(f.mime_type || '');
   const size = f.size ? _fmtBytes(f.size) : '';
   const name = esc(f.name || 'File');
-  const rawUrl = f.url || '';
-  const url = esc(rawUrl.startsWith('/') ? BASE + rawUrl : (rawUrl || `${BASE}/pro/files/${f.file_id}/download`));
   const verified = f.signed_by
     ? `<span style="color:#16a34a;font-size:0.68rem;margin-left:0.4rem" title="Signed by ${esc(f.signed_by)}">✓ verified</span>`
     : '';
+  // Use onclick fetch so the API key header is sent — browser <a download> can't set headers
+  const onclick = `_downloadFile('${f.file_id}','${esc(f.name || 'file')}');return false;`;
   return `
-    <a href="${url}" target="_blank" rel="noopener" class="file-chip" download>
+    <a href="#" class="file-chip" onclick="${onclick}">
       <span class="file-chip-icon">${icon}</span>
       <span class="file-chip-info">
         <span class="file-chip-name">${name}</span>
@@ -1124,6 +1124,21 @@ function _renderFileChip(f) {
       ${verified}
       <span class="file-chip-dl">↓</span>
     </a>`;
+}
+
+async function _downloadFile(fileId, filename) {
+  try {
+    const r = await fetch(`${BASE}/pro/files/${fileId}/download`, { headers: apiHeaders() });
+    if (!r.ok) { alert('Download failed: ' + r.status); return; }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch(e) {
+    alert('Download error: ' + e.message);
+  }
 }
 
 function _fileIcon(mime) {
