@@ -2333,7 +2333,7 @@ async function acceptInvite(roomId, did) {
 
 // Show the send-message input bar inside a group thread
 function _renderGroupReplyBox(roomId, members) {
-  const myActiveMembers = members.filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
+  const myActiveMembers = members.filter(m => (m.status === "active" || m.status === "invited") && _agents.some(a => a.did === m.did));
   const chatBar = document.getElementById("chat-bar");
   if (!chatBar) return;
 
