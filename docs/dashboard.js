@@ -97,6 +97,75 @@ if (apiKey && !sessionStorage.getItem("agentid_key")) {
 let trendChart, capChart;
 let _anomalyTimer = null;
 
+// ── auto-poll ─────────────────────────────────────────────────────────────────
+let _pollTimer   = null;
+let _lastRefresh = 0;
+const POLL_MS    = 5_000;
+
+async function _lightRefresh() {
+  if (!apiKey && !sessionStorage.getItem("agentid_key")) return;
+  if (document.visibilityState === "hidden") return;
+  try {
+    // Refresh stats counters (cheap overview call)
+    const data = await apiFetch(
+      isPro() ? "/pro/analytics/overview" : "/pro/keys/me"
+    ).catch(() => null);
+    if (data) {
+      const agentsReg   = Number(data.usage?.agents_registered) || 0;
+      const auditEvents = Number(data.usage?.audit_events)      || 0;
+      const totalActivity = (data.activity_last_7d || []).reduce((s,r) => s + r.count, 0);
+      const el = id => document.getElementById(id);
+      if (el("stat-agents"))    el("stat-agents").textContent    = agentsReg;
+      if (el("stat-events"))    el("stat-events").textContent    = auditEvents.toLocaleString();
+      if (el("stat-active"))    el("stat-active").textContent    = totalActivity.toLocaleString();
+      const limit = TIER_LIMITS[String(data.tier || "free")] ?? 100;
+      const pct   = limit === Infinity ? 0 : Math.min(100, Math.round((agentsReg / limit) * 100));
+      const fill  = el("usage-fill");
+      if (fill) {
+        fill.style.width = (limit === Infinity ? 2 : pct) + "%";
+        fill.style.background = pct > 90 ? "var(--red)" : pct > 70 ? "var(--yellow)" : "var(--accent)";
+      }
+      if (el("usage-label") && limit !== Infinity)
+        el("usage-label").textContent = `${agentsReg.toLocaleString()} / ${limit.toLocaleString()} agents`;
+    }
+    // Refresh the sections users watch most
+    loadAuditLog().catch(() => {});
+    loadAgentsTable().catch?.(() => {});
+    _loadTrustScoreWidget().catch?.(() => {});
+    _tickLiveIndicator();
+  } catch (_) {}
+}
+
+function _tickLiveIndicator() {
+  _lastRefresh = Date.now();
+  const dot  = document.querySelector("#live-indicator .live-dot");
+  const ts   = document.querySelector("#live-indicator .live-ts");
+  if (dot) { dot.style.opacity = "1"; setTimeout(() => { if (dot) dot.style.opacity = "0.4"; }, 800); }
+  if (ts)  ts.textContent = "just now";
+  clearInterval(_tickLiveIndicator._t);
+  _tickLiveIndicator._t = setInterval(() => {
+    if (!ts) return;
+    const s = Math.floor((Date.now() - _lastRefresh) / 1000);
+    ts.textContent = s < 60 ? `${s}s ago` : `${Math.floor(s/60)}m ago`;
+  }, 5_000);
+}
+
+function startPolling() {
+  stopPolling();
+  _tickLiveIndicator();
+  _pollTimer = setInterval(_lightRefresh, POLL_MS);
+}
+
+function stopPolling() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && (apiKey || sessionStorage.getItem("agentid_key"))) {
+    _lightRefresh();
+  }
+});
+
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 let sessionTimer = null;
 
@@ -526,6 +595,7 @@ async function logout() {
   authMode = "session";   // default for next visit
   clearTimeout(sessionTimer);
   clearInterval(_anomalyTimer);
+  stopPolling();
   stopSse();
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
@@ -748,6 +818,9 @@ async function loadDashboard() {
   // yet, auto-mint a starter key and surface it with copy-paste snippets.
   // No-op for existing accounts.
   _maybeShowWelcome();
+
+  // Start 5s auto-poll after first successful load
+  startPolling();
 }
 
 // ── ONBOARDING CHECKLIST ──────────────────────────────────────────────────────
