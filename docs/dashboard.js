@@ -3949,12 +3949,15 @@ function _initNetworkObserver() {
   const card = document.getElementById("network-graph-card");
   if (!card) return;
   if (_netObserver) { _netObserver.disconnect(); _netObserver = null; }
+  // root: dash-main (the actual scroll container) — viewport root doesn't
+  // fire when content scrolls inside an overflow:auto pane, not the window
+  const scrollRoot = document.getElementById("dash-main") || null;
   _netObserver = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting) {
       _netObserver.disconnect(); _netObserver = null;
       loadNetworkGraph().catch(e => console.error("loadNetworkGraph:", e));
     }
-  }, { threshold: 0.1 });
+  }, { threshold: 0.1, root: scrollRoot });
   _netObserver.observe(card);
 }
 
