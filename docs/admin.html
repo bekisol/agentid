@@ -169,6 +169,15 @@
              padding:1.75rem; max-width:420px; width:90%; }
     .modal-title { font-size:1rem; font-weight:800; margin-bottom:0.5rem; }
     .modal-body  { font-size:0.85rem; color:var(--text-2); margin-bottom:1.25rem; line-height:1.6; }
+    .form-field { display:flex; flex-direction:column; gap:0.3rem; }
+    .form-field label { font-size:0.75rem; color:var(--text-2); }
+    .form-field input, .form-field textarea, .form-field select {
+      background:var(--bg); border:1px solid var(--border); border-radius:7px;
+      padding:0.45rem 0.65rem; color:var(--text); font-size:0.83rem;
+      outline:none; font-family:inherit;
+    }
+    .form-field textarea { resize:vertical; min-height:60px; }
+    .form-field input:focus, .form-field textarea:focus, .form-field select:focus { border-color:var(--accent); }
     .modal-input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:7px;
                    padding:0.5rem 0.75rem; color:var(--text); font-size:0.85rem; outline:none; margin-bottom:1rem; }
     .modal-input:focus { border-color:var(--red); }
@@ -282,7 +291,8 @@
               <option value="enterprise">Enterprise</option>
             </select>
             <button class="btn-sm" id="account-search-btn">Search</button>
-            <span style="font-size:0.75rem;color:var(--muted);margin-left:auto;" id="account-count"></span>
+            <button class="btn-sm" id="issue-key-btn" style="background:var(--accent);color:#fff;border-color:var(--accent);margin-left:auto;">+ Issue Key</button>
+            <span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem;" id="account-count"></span>
           </div>
           <div id="accounts-table-body"></div>
           <div class="pager" id="accounts-pager"></div>
@@ -410,6 +420,27 @@
             </button>
             <div id="schema-result" style="margin-top:0.75rem;font-size:0.8rem;"></div>
           </div>
+          <div class="table-wrap" style="padding:1.25rem;grid-column:span 2;">
+            <div class="section-head">Migrate Owner</div>
+            <p style="font-size:0.83rem;color:var(--text-2);margin-bottom:1rem;line-height:1.6;">
+              Rename an owner identifier (email) across all tables — agents, API keys, webhooks, billing records, etc.
+              Use this when a user changes their email or you need to merge two accounts.
+            </p>
+            <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+              <div style="display:flex;flex-direction:column;gap:0.3rem;flex:1;min-width:180px;">
+                <label style="font-size:0.75rem;color:var(--text-2);">Current owner (old email)</label>
+                <input class="search-input" id="migrate-old" placeholder="old@example.com" />
+              </div>
+              <div style="display:flex;flex-direction:column;gap:0.3rem;flex:1;min-width:180px;">
+                <label style="font-size:0.75rem;color:var(--text-2);">New owner (new email)</label>
+                <input class="search-input" id="migrate-new" placeholder="new@example.com" />
+              </div>
+              <button class="btn-sm" id="migrate-owner-btn" style="background:var(--yellow);color:#000;border-color:var(--yellow);">
+                Migrate
+              </button>
+            </div>
+            <div id="migrate-result" style="margin-top:0.75rem;font-size:0.8rem;"></div>
+          </div>
         </div>
       </div>
 
@@ -426,6 +457,32 @@
     <div class="modal-actions">
       <button class="btn-cancel" id="modal-cancel">Cancel</button>
       <button class="btn-confirm" id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Form modal (multi-field) -->
+<div class="modal-bg" id="form-modal-bg">
+  <div class="modal" style="min-width:340px;max-width:480px;">
+    <div class="modal-title" id="form-modal-title">Edit</div>
+    <div id="form-modal-fields" style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1rem;"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="form-modal-cancel">Cancel</button>
+      <button class="btn-confirm safe" id="form-modal-confirm">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Key reveal modal -->
+<div class="modal-bg" id="key-modal-bg">
+  <div class="modal">
+    <div class="modal-title">New API Key Created</div>
+    <p style="font-size:0.83rem;color:var(--text-2);margin-bottom:0.75rem;">Copy this key now — it will not be shown again.</p>
+    <div id="key-modal-reveal" style="font-family:monospace;font-size:0.78rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.75rem;word-break:break-all;color:var(--accent-h);margin-bottom:0.75rem;"></div>
+    <p id="key-modal-meta" style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="key-modal-copy">📋 Copy</button>
+      <button class="btn-confirm safe" id="key-modal-close">Done</button>
     </div>
   </div>
 </div>
@@ -608,6 +665,9 @@ async function loadAgents(page = 1) {
     document.getElementById("agents-pager").innerHTML = "";
     return;
   }
+  const agentDataMap = {};
+  data.agents.forEach(a => agentDataMap[a.did] = a);
+  window._agentDataMap = agentDataMap;
   document.getElementById("agents-table-body").innerHTML = `
     <table>
       <thead><tr><th>Name</th><th>DID</th><th>Owner</th><th>Flags</th><th>Events 7d</th><th>Actions</th></tr></thead>
@@ -615,7 +675,7 @@ async function loadAgents(page = 1) {
     data.agents.map(a => `
       <tr>
         <td style="font-weight:600;color:var(--text)">${esc(a.name)}</td>
-        <td class="mono">${a.did.slice(0,20)}…</td>
+        <td class="mono" title="${esc(a.did)}">${a.did.slice(0,20)}…</td>
         <td class="mono">${esc(a.owner)}</td>
         <td>
           ${a.has_badge ? tagHtml("✓ badge","green") : ""}
@@ -634,6 +694,9 @@ async function loadAgents(page = 1) {
           ${a.is_deprecated
             ? `<button class="act-btn" onclick="agentAction('undeprecate','${a.did}','${esc(a.name)}')">undeprecate</button>`
             : `<button class="act-btn danger" onclick="agentAction('deprecate','${a.did}','${esc(a.name)}')">deprecate</button>`}
+          <button class="act-btn" onclick="editAgent('${a.did}')">edit</button>
+          <button class="act-btn" onclick="agentAction('toggle_private','${a.did}','${esc(a.name)}')">${a.private ? "unprivate" : "private"}</button>
+          <button class="act-btn danger" onclick="hardDeleteAgent('${a.did}','${esc(a.name)}')">delete</button>
         </td>
       </tr>`).join("") + `</tbody></table>`;
   renderPager("agents-pager", page, data.total, 50, loadAgents);
@@ -647,6 +710,7 @@ async function agentAction(action, did, name) {
     undeprecate: ["Undeprecate Agent", `Remove deprecated flag from ${name}?`, false],
     grant_badge: ["Grant Badge", `Grant verified badge to ${name}?`, false],
     revoke_badge: ["Revoke Badge", `Remove verified badge from ${name}?`, true],
+    toggle_private: ["Toggle Visibility", `Toggle private/public flag for ${name}?`, false],
   };
   const [title, body, danger] = labels[action];
   const result = await confirm(title, body, { danger, showReason: danger });
@@ -658,11 +722,49 @@ async function agentAction(action, did, name) {
     undeprecate: ["POST", `/admin/agents/${did}/undeprecate`],
     grant_badge: ["POST", `/admin/agents/${did}/badge`],
     revoke_badge: ["DELETE", `/admin/agents/${did}/badge`],
+    toggle_private: ["POST", `/admin/agents/${did}/visibility`],
   };
   const [method, path] = paths[action];
   try {
     await api(path, { method, body: JSON.stringify({ reason: result.reason || "" }) });
     toast(`Done: ${action} on ${name}`, "ok");
+    loadAgents(_agentPage);
+  } catch(e) { toast(e, "err"); }
+}
+
+async function editAgent(did) {
+  const a = (window._agentDataMap || {})[did];
+  if (!a) { toast("Agent data not found, reload the page", "err"); return; }
+  const data = await showFormModal("Edit Agent: " + a.name, [
+    { id: "name",         label: "Name",         type: "input",    value: a.name || "" },
+    { id: "description",  label: "Description",  type: "textarea", value: a.description || "" },
+    { id: "tags",         label: "Tags (comma-separated)", type: "input", value: (a.tags||[]).join(", ") },
+    { id: "capabilities", label: "Capabilities (comma-separated)", type: "input", value: (a.capabilities||[]).join(", ") },
+  ]);
+  if (!data) return;
+  const payload = {};
+  if (data.name.trim())         payload.name = data.name.trim();
+  if (data.description !== undefined) payload.description = data.description;
+  payload.tags         = data.tags.split(",").map(s=>s.trim()).filter(Boolean);
+  payload.capabilities = data.capabilities.split(",").map(s=>s.trim()).filter(Boolean);
+  try {
+    await api(`/admin/agents/${did}`, { method: "PATCH", body: JSON.stringify(payload) });
+    toast("Agent updated", "ok");
+    loadAgents(_agentPage);
+  } catch(e) { toast(e, "err"); }
+}
+
+async function hardDeleteAgent(did, name) {
+  const data = await showFormModal("Hard Delete Agent", [
+    { id: "reason", label: "Reason (required)", type: "input", value: "" },
+    { id: "confirm_did", label: `Type the full DID to confirm: ${did}`, type: "input", value: "" },
+  ], { danger: true });
+  if (!data) return;
+  if (!data.reason.trim()) { toast("Reason is required", "err"); return; }
+  if (data.confirm_did.trim() !== did) { toast("DID does not match — not deleted", "err"); return; }
+  try {
+    await api(`/admin/agents/${did}`, { method: "DELETE", body: JSON.stringify({ reason: data.reason.trim(), confirm_did: data.confirm_did.trim() }) });
+    toast(`Agent ${name} permanently deleted`, "ok");
     loadAgents(_agentPage);
   } catch(e) { toast(e, "err"); }
 }
@@ -695,6 +797,7 @@ async function loadAccounts(page = 1) {
         <td style="font-size:0.75rem">${k.last_used ? fmtDate(k.last_used) : "never"}</td>
         <td class="mono">${k.last_used_ip||"—"}</td>
         <td>
+          <button class="act-btn" onclick="changeTier(${k.id},'${esc(k.owner)}','${k.tier}')">change tier</button>
           <button class="act-btn danger" onclick="revokeKey(${k.id},'${esc(k.owner)}')">revoke key</button>
         </td>
       </tr>`).join("") + `</tbody></table>`;
@@ -710,6 +813,40 @@ async function revokeKey(id, owner) {
     loadAccounts(_accountPage);
   } catch(e) { toast(e, "err"); }
 }
+
+async function changeTier(id, owner, currentTier) {
+  const data = await showFormModal(`Change Tier — ${owner}`, [
+    { id: "new_tier", label: "New tier", type: "select",
+      options: ["free", "pro", "enterprise"], value: currentTier },
+    { id: "reason", label: "Reason (optional)", type: "input", value: "" },
+  ]);
+  if (!data) return;
+  if (data.new_tier === currentTier) { toast("No change — same tier selected", "err"); return; }
+  try {
+    await api(`/admin/accounts/keys/${id}/tier`, { method:"PATCH",
+      body: JSON.stringify({ new_tier: data.new_tier, reason: data.reason }) });
+    toast(`Tier changed to ${data.new_tier}`, "ok");
+    loadAccounts(_accountPage);
+  } catch(e) { toast(e, "err"); }
+}
+
+document.getElementById("issue-key-btn").addEventListener("click", async () => {
+  const data = await showFormModal("Issue New API Key", [
+    { id: "owner",  label: "Owner email",    type: "input",  value: "" },
+    { id: "tier",   label: "Tier",           type: "select", options: ["free","pro","enterprise"], value: "free" },
+    { id: "label",  label: "Label (optional)", type: "input", value: "" },
+    { id: "scopes", label: "Scopes (leave blank for full access)", type: "input", value: "" },
+  ]);
+  if (!data) return;
+  if (!data.owner.trim()) { toast("Owner is required", "err"); return; }
+  try {
+    const res = await api("/admin/accounts/keys", { method:"POST",
+      body: JSON.stringify({ owner: data.owner.trim(), tier: data.tier,
+                             label: data.label.trim(), scopes: data.scopes.trim() }) });
+    showKeyModal(res.key, `Owner: ${res.owner} · Tier: ${res.tier}`);
+    loadAccounts(_accountPage);
+  } catch(e) { toast(e, "err"); }
+});
 
 document.getElementById("account-search-btn").addEventListener("click", () => loadAccounts(1));
 document.getElementById("account-search").addEventListener("keydown", e => { if (e.key==="Enter") loadAccounts(1); });
@@ -882,6 +1019,26 @@ async function loadSystem() {
   `;
 }
 
+document.getElementById("migrate-owner-btn").addEventListener("click", async () => {
+  const oldOwner = document.getElementById("migrate-old").value.trim();
+  const newOwner = document.getElementById("migrate-new").value.trim();
+  if (!oldOwner || !newOwner) { toast("Both fields required", "err"); return; }
+  const result = await confirm("Migrate Owner",
+    `Rename all records for "${oldOwner}" to "${newOwner}"? This updates agents, API keys, webhooks, and billing records.`,
+    {danger:true});
+  if (!result?.confirmed) return;
+  const btn = document.getElementById("migrate-owner-btn");
+  btn.textContent = "Migrating…"; btn.disabled = true;
+  try {
+    const data = await api("/admin/migrate-owner", {method:"POST",
+      body: JSON.stringify({old_owner: oldOwner, new_owner: newOwner})});
+    document.getElementById("migrate-result").innerHTML =
+      `<span style="color:var(--green)">✓ Migrated ${data.total_rows} row(s) across ${Object.keys(data.rows_updated_per_table).length} table(s).</span>`;
+    toast("Owner migrated", "ok");
+  } catch(e) { toast(e, "err"); document.getElementById("migrate-result").innerHTML = `<span style="color:var(--red)">${esc(String(e))}</span>`; }
+  btn.textContent = "Migrate"; btn.disabled = false;
+});
+
 document.getElementById("schema-init-btn").addEventListener("click", async () => {
   const result = await confirm("Run schema init", "Re-run all CREATE TABLE IF NOT EXISTS and ALTER TABLE statements. Safe and idempotent.", {danger:false});
   if (!result?.confirmed) return;
@@ -895,6 +1052,70 @@ document.getElementById("schema-init-btn").addEventListener("click", async () =>
     toast(data.ok ? "Schema init done" : "Schema init had errors", data.ok ? "ok" : "err");
   } catch(e) { toast(e, "err"); }
   btn.textContent = "Run schema init"; btn.disabled = false;
+});
+
+// ── form modal ────────────────────────────────────────────────────────────────
+let _formModalResolve = null;
+let _formModalFields = [];
+function showFormModal(title, fields, {danger=false} = {}) {
+  _formModalFields = fields;
+  document.getElementById("form-modal-title").textContent = title;
+  const container = document.getElementById("form-modal-fields");
+  container.innerHTML = fields.map(f => {
+    const id = `fm-${f.id}`;
+    if (f.type === "select") {
+      return `<div class="form-field">
+        <label for="${id}">${esc(f.label)}</label>
+        <select id="${id}">${(f.options||[]).map(o=>`<option value="${esc(o)}"${o===f.value?" selected":""}>${esc(o)}</option>`).join("")}</select>
+      </div>`;
+    }
+    if (f.type === "textarea") {
+      return `<div class="form-field">
+        <label for="${id}">${esc(f.label)}</label>
+        <textarea id="${id}">${esc(f.value||"")}</textarea>
+      </div>`;
+    }
+    return `<div class="form-field">
+      <label for="${id}">${esc(f.label)}</label>
+      <input id="${id}" type="text" value="${esc(f.value||"")}" />
+    </div>`;
+  }).join("");
+  const btn = document.getElementById("form-modal-confirm");
+  btn.className = "btn-confirm" + (danger ? "" : " safe");
+  document.getElementById("form-modal-bg").classList.add("open");
+  return new Promise(res => { _formModalResolve = res; });
+}
+
+// Re-attach modal button handlers after redefining showFormModal
+document.getElementById("form-modal-cancel").onclick = () => {
+  document.getElementById("form-modal-bg").classList.remove("open");
+  if (_formModalResolve) { _formModalResolve(null); _formModalResolve = null; }
+};
+document.getElementById("form-modal-confirm").onclick = () => {
+  document.getElementById("form-modal-bg").classList.remove("open");
+  if (_formModalResolve) {
+    const result = {};
+    _formModalFields.forEach(f => {
+      const el = document.getElementById(`fm-${f.id}`);
+      result[f.id] = el ? el.value : "";
+    });
+    _formModalResolve(result);
+    _formModalResolve = null;
+  }
+};
+
+// ── key reveal modal ──────────────────────────────────────────────────────────
+function showKeyModal(key, meta = "") {
+  document.getElementById("key-modal-reveal").textContent = key;
+  document.getElementById("key-modal-meta").textContent = meta;
+  document.getElementById("key-modal-bg").classList.add("open");
+}
+document.getElementById("key-modal-copy").addEventListener("click", () => {
+  const key = document.getElementById("key-modal-reveal").textContent;
+  navigator.clipboard.writeText(key).then(() => toast("Key copied!", "ok")).catch(() => toast("Copy failed","err"));
+});
+document.getElementById("key-modal-close").addEventListener("click", () => {
+  document.getElementById("key-modal-bg").classList.remove("open");
 });
 
 // ── sub-keys ──────────────────────────────────────────────────────────────────
