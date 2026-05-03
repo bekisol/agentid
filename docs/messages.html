@@ -1181,7 +1181,13 @@ async function _uploadFileToBE(file, fromDid) {
   const form = new FormData();
   form.append("file", file, file.name);
   if (fromDid) form.append("from_did", fromDid);
-  const r = await fetch(`${BASE}/pro/files/upload`, { method: "POST", body: form });
+  // Note: do NOT include Content-Type — browser sets it with the multipart boundary
+  const r = await fetch(`${BASE}/pro/files/upload`, {
+    method: "POST",
+    headers: { "x-api-key": apiKey },
+    credentials: "include",
+    body: form,
+  });
   if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
   return r.json();
 }
