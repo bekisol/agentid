@@ -150,14 +150,11 @@
     .pubkey-box { margin-top:0.25rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.35rem 0.5rem; font-size:0.6rem; font-family:"JetBrains Mono",monospace; word-break:break-all; color:var(--muted); max-width:340px; }
 
     /* ── Signature block ── */
-    .sig-block { margin-top:0.5rem; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.15); font-size:0.72rem; }
-    .bubble-row.received .sig-block { border-color:var(--border); }
-    .sig-header { display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0.6rem; cursor:pointer; user-select:none; background:rgba(255,255,255,0.08); }
-    .bubble-row.received .sig-header { background:var(--surface2); }
+    .sig-block { margin-bottom:0.5rem; border-radius:8px; overflow:hidden; border:1px solid rgba(74,222,128,0.3); font-size:0.72rem; }
+    .bubble-row.received .sig-block { border-color:rgba(74,222,128,0.25); }
+    .sig-header { display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0.6rem; background:rgba(74,222,128,0.08); }
+    .bubble-row.received .sig-header { background:rgba(74,222,128,0.06); }
     .sig-badge { display:inline-flex; align-items:center; gap:0.25rem; font-size:0.65rem; font-weight:700; color:#4ade80; letter-spacing:0.03em; flex-shrink:0; }
-    .sig-did { font-family:"JetBrains Mono",monospace; font-size:0.62rem; opacity:0.65; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
-    .sig-chevron { font-size:0.6rem; opacity:0.5; flex-shrink:0; transition:transform 0.2s; }
-    .sig-chevron.open { transform:rotate(180deg); }
     .sig-details { padding:0.5rem 0.6rem; display:flex; flex-direction:column; gap:0.3rem; background:rgba(0,0,0,0.12); }
     .bubble-row.received .sig-details { background:var(--bg); }
     .sig-row { display:grid; grid-template-columns:60px 1fr; gap:0.4rem; align-items:baseline; }
@@ -361,6 +358,18 @@ document.addEventListener("DOMContentLoaded", () => {
           <button class="btn btn-danger" id="delete-selected-btn" onclick="deleteSelected()" style="font-size:0.78rem;" disabled>🗑 Delete</button>
           <button class="btn btn-outline" onclick="toggleSelectMode()" style="font-size:0.78rem;">Cancel</button>
         </div>
+      </div>
+
+      <!-- Deal search — shown only in deals view -->
+      <div id="deal-search-bar" style="display:none;padding:0.6rem 1.25rem;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:0.5rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0 0.75rem;transition:border-color 0.15s;" id="deal-search-inner">
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="color:var(--muted);flex-shrink:0;"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <input id="deal-search-input" type="text" placeholder="Search by deal ID, amount, or agent…"
+            style="flex:1;border:none;background:transparent;padding:0.45rem 0;font-size:0.82rem;font-family:inherit;color:var(--text);outline:none;" oninput="_filterDeals()" />
+          <button onclick="document.getElementById('deal-search-input').value='';_filterDeals();"
+            style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.85rem;padding:0.15rem 0.2rem;border-radius:4px;" title="Clear">✕</button>
+        </div>
+        <div id="deal-search-count" style="font-size:0.72rem;color:var(--muted);margin-top:0.35rem;min-height:1rem;"></div>
       </div>
 
       <!-- Agent identity card — shown when a specific agent is selected -->
@@ -683,6 +692,7 @@ function renderSidebar() {
       list.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
       el.classList.add("active");
       document.getElementById("sidebar-deals-btn").classList.remove("active");
+      document.getElementById("deal-search-bar").style.display = "none";
       renderFeed();
     });
   });
@@ -912,9 +922,8 @@ function _renderMsgBody(body, idx) {
   if (!body) return '';
   const sig = _parseSignedBody(body);
   if (!sig) return esc(body);
-  // Extract the human-readable text from inside the payload, stripping the raw sig lines
   const mainText = sig.payload && sig.payload.body ? sig.payload.body : '';
-  return (mainText ? esc(mainText) + '\n' : '') + _renderSigBlock(sig, idx);
+  return _renderSigBlock(sig, idx) + (mainText ? esc(mainText) : '');
 }
 
 function togglePubkey(idx) {
@@ -939,30 +948,17 @@ function _parseSignedBody(body) {
 }
 
 function _renderSigBlock(sig, idx) {
-  const shortDid = sig.did ? '…' + sig.did.slice(-14) : '';
-  const shortSig = sig.signature ? sig.signature.slice(0, 20) + '…' : '';
   return `<div class="sig-block" id="sigb-${idx}">
-    <div class="sig-header" onclick="_toggleSig(${idx})">
+    <div class="sig-header">
       <span class="sig-badge">✓ Signed by AgentID</span>
-      <span class="sig-did">${esc(shortDid)}</span>
-      <span class="sig-chevron" id="sigc-${idx}">▾</span>
     </div>
-    <div class="sig-details" id="sigd-${idx}" style="display:none;">
+    <div class="sig-details">
       <div class="sig-row"><span class="sig-row-label">DID</span><span class="sig-row-val">${esc(sig.did)}</span></div>
       ${sig.payload ? `<div class="sig-row"><span class="sig-row-label">Nonce</span><span class="sig-row-val">${esc(sig.payload.nonce||'')}</span></div>
       <div class="sig-row"><span class="sig-row-label">Time</span><span class="sig-row-val">${sig.payload.timestamp ? new Date(sig.payload.timestamp*1000).toLocaleString() : ''}</span></div>` : ''}
       <div class="sig-row"><span class="sig-row-label">Sig</span><span class="sig-row-val">${esc(sig.signature)}</span></div>
     </div>
   </div>`;
-}
-
-function _toggleSig(idx) {
-  const det = document.getElementById('sigd-' + idx);
-  const chv = document.getElementById('sigc-' + idx);
-  if (!det) return;
-  const open = det.style.display === 'none';
-  det.style.display = open ? '' : 'none';
-  if (chv) chv.classList.toggle('open', open);
 }
 
 // ── SELECT & DELETE ───────────────────────────────────────────────────────────
@@ -1334,6 +1330,8 @@ async function showDealsView() {
   document.getElementById("feed-title").textContent = "Signed Deals";
   document.getElementById("feed-meta").textContent = "";
   document.getElementById("agent-info").style.display = "none";
+  document.getElementById("deal-search-bar").style.display = "";
+  document.getElementById("deal-search-input").value = "";
   const scroll = document.getElementById("feed-scroll");
   scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading deals…</div></div>';
   try {
@@ -1365,6 +1363,46 @@ function renderDealsView() {
     const when = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "";
     return `<div class="deal-card" onclick="openDealDetail(${i})" style="cursor:pointer;">
       <div class="deal-card-ref">📄 ${esc(d.deal_ref)} <span class="deal-card-type ${esc(type)}">${esc(type)}</span></div>
+      <div class="deal-card-headline">${esc(headline)}</div>
+      ${hasPrice && d.description ? `<div class="deal-card-desc">${esc(d.description)}</div>` : ""}
+      <div class="deal-card-parties">🛒 Buyer: <strong>${esc(buyer)}</strong> &nbsp;·&nbsp; 🏷 Seller: <strong>${esc(seller)}</strong></div>
+      <div class="deal-card-time">Finalized ${esc(when)}</div>
+    </div>`;
+  }).join("") + `</div>`;
+}
+
+function _filterDeals() {
+  const q = (document.getElementById("deal-search-input").value || "").toLowerCase().trim();
+  const countEl = document.getElementById("deal-search-count");
+  const filtered = q ? _deals.filter(d => {
+    return (d.deal_ref||"").toLowerCase().includes(q) ||
+           (d.buyer_name||"").toLowerCase().includes(q) ||
+           (d.seller_name||"").toLowerCase().includes(q) ||
+           (d.buyer_did||"").toLowerCase().includes(q) ||
+           (d.seller_did||"").toLowerCase().includes(q) ||
+           String(d.price||"").includes(q) ||
+           (d.description||"").toLowerCase().includes(q);
+  }) : _deals;
+  const scroll = document.getElementById("feed-scroll");
+  if (!filtered.length) {
+    scroll.innerHTML = `<div class="state-box"><div class="state-icon">🔍</div><div class="state-title">No deals match "${esc(q)}"</div></div>`;
+    countEl.textContent = "0 results";
+    return;
+  }
+  countEl.textContent = q ? `${filtered.length} of ${_deals.length} deals` : "";
+  scroll.innerHTML = `<div class="deals-wrap">` + filtered.map((d, i) => {
+    const realIdx = _deals.indexOf(d);
+    const buyer   = d.buyer_name  || d.buyer_did.slice(-12);
+    const seller  = d.seller_name || d.seller_did.slice(-12);
+    const type    = d.deal_type || "sale";
+    const hasPrice = d.price != null && d.price > 0;
+    const headline = hasPrice
+      ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}`
+      : (d.description ? d.description.slice(0, 60) + (d.description.length > 60 ? "…" : "") : "Service Agreement");
+    const when = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "";
+    const refHtml = q ? esc(d.deal_ref||"").replace(new RegExp(esc(q),'gi'), m=>`<mark style="background:var(--yellow-bg);color:var(--yellow);border-radius:2px;">${m}</mark>`) : esc(d.deal_ref||"");
+    return `<div class="deal-card" onclick="openDealDetail(${realIdx})" style="cursor:pointer;">
+      <div class="deal-card-ref">📄 ${refHtml} <span class="deal-card-type ${esc(type)}">${esc(type)}</span></div>
       <div class="deal-card-headline">${esc(headline)}</div>
       ${hasPrice && d.description ? `<div class="deal-card-desc">${esc(d.description)}</div>` : ""}
       <div class="deal-card-parties">🛒 Buyer: <strong>${esc(buyer)}</strong> &nbsp;·&nbsp; 🏷 Seller: <strong>${esc(seller)}</strong></div>
