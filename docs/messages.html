@@ -267,6 +267,14 @@
       .sidebar { width:100%; height:auto; max-height:44px; overflow:hidden; border-right:none; border-bottom:1px solid var(--border); }
       .sidebar.open { max-height:220px; }
     }
+    /* ── File chip ── */
+    .file-chip { display:inline-flex; align-items:center; gap:0.5rem; margin-top:0.45rem; padding:0.4rem 0.65rem; background:var(--surface2); border:1px solid var(--border); border-radius:10px; text-decoration:none; color:var(--text); font-size:0.78rem; max-width:280px; cursor:pointer; transition:background 0.15s,border-color 0.15s; }
+    .file-chip:hover { background:var(--bg); border-color:var(--accent); }
+    .file-chip-icon { font-size:1.1rem; flex-shrink:0; }
+    .file-chip-info { display:flex; flex-direction:column; min-width:0; flex:1; }
+    .file-chip-name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .file-chip-meta { font-size:0.68rem; color:var(--muted); }
+    .file-chip-dl { font-size:0.8rem; color:var(--muted); flex-shrink:0; }
   </style>
 </head>
 <body>
@@ -490,6 +498,21 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="feed-scroll" id="feed-scroll">
         <div class="state-box"><div class="spinner"></div><div class="state-title">Loading messages…</div></div>
       </div>
+      <!-- Group reply bar — shown when a group room is active -->
+      <div id="chat-bar" style="display:none;border-top:1px solid var(--border);padding:0.6rem 1rem;display:none;flex-direction:column;gap:0.4rem;background:var(--surface);">
+        <div id="chat-bar-file-preview" style="display:none;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.78rem;">
+          <span id="chat-bar-file-icon" style="font-size:1rem;">📎</span>
+          <span id="chat-bar-file-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2);"></span>
+          <button onclick="_clearGroupFile()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.9rem;padding:0.1rem 0.25rem;border-radius:4px;">✕</button>
+        </div>
+        <div style="display:flex;gap:0.5rem;align-items:flex-end;">
+          <label title="Attach file" style="cursor:pointer;display:flex;align-items:center;color:var(--muted);font-size:1.1rem;flex-shrink:0;padding:0.3rem;" id="chat-bar-attach-btn">
+            📎<input type="file" id="chat-bar-file-input" style="display:none;" onchange="_onGroupFileSelected(this)" />
+          </label>
+          <textarea id="group-chat-input" rows="1" placeholder="Message group…" oninput="autoResizeChatInput(this)" style="flex:1;resize:none;border:1px solid var(--border-dark);border-radius:8px;padding:0.45rem 0.65rem;font-size:0.84rem;font-family:inherit;outline:none;max-height:80px;line-height:1.4;background:var(--surface);color:var(--text);"></textarea>
+          <button class="chat-send-btn" id="group-chat-send-btn" style="height:2.2rem;">Send</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -518,6 +541,18 @@ document.addEventListener("DOMContentLoaded", () => {
       <div>
         <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">Message</label>
         <textarea id="compose-body" rows="4" placeholder="Write your message…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.875rem;font-family:inherit;color:var(--text);background:var(--surface);outline:none;resize:vertical;"></textarea>
+      </div>
+      <div>
+        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">Attach file <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <div id="compose-file-preview" style="display:none;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.78rem;margin-bottom:0.4rem;">
+          <span id="compose-file-icon" style="font-size:1rem;">📎</span>
+          <span id="compose-file-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2);"></span>
+          <button type="button" onclick="_clearComposeFile()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.9rem;padding:0.1rem 0.25rem;border-radius:4px;">✕</button>
+        </div>
+        <label style="display:inline-flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.78rem;color:var(--accent);font-weight:600;">
+          📎 Choose file
+          <input type="file" id="compose-file-input" style="display:none;" onchange="_onComposeFileSelected(this)" />
+        </label>
       </div>
       <div id="compose-error" style="display:none;color:var(--red);font-size:0.8rem;"></div>
       <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
@@ -643,6 +678,8 @@ let _unreadOnly = false;
 let _rooms = [];          // [{id, name, active_members, pending_invites, is_owner}]
 let _activeRoomId = null; // currently viewed room id
 let _inviteRoomId = null; // room being invited into (for modal)
+let _composePendingFile = null;  // { file, fileRef } for compose modal
+let _groupPendingFile   = null;  // { file, fileRef } for group reply bar
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -842,6 +879,7 @@ function openCompose() {
 
 function closeCompose() {
   document.getElementById("compose-modal").style.display = "none";
+  _clearComposeFile();
 }
 
 async function sendMessage() {
@@ -858,15 +896,23 @@ async function sendMessage() {
 
   btn.disabled = true; btn.textContent = "Sending…";
   try {
+    let fileRef = null;
+    if (_composePendingFile) {
+      btn.textContent = "Uploading…";
+      const uploaded = await _uploadFileToBE(_composePendingFile.file, fromDid);
+      fileRef = { file_id: uploaded.file_id, name: uploaded.name, mime_type: uploaded.mime_type,
+                  size: uploaded.size, url: uploaded.url, sha256: uploaded.sha256, signed_by: uploaded.from_did };
+    }
     const r = await fetch(`${BASE}/agents/${encodeDidPath(toDid)}/messages`, {
       method: "POST",
       headers: apiHeaders(),
-      body: JSON.stringify({ from_did: fromDid, subject, body }),
+      body: JSON.stringify({ from_did: fromDid, subject, body, file_ref: fileRef }),
     });
     if (!r.ok) {
       const t = await r.text();
       throw new Error(t || `Error ${r.status}`);
     }
+    _clearComposeFile();
     closeCompose();
     loadAll(true);
   } catch(e) {
@@ -1040,7 +1086,7 @@ function renderFeed() {
         <div class="bubble-avatar">${avatarLetter}</div>
         <div class="bubble-col">
           <div class="bubble-name">${esc(senderLabel)}${newTag}${agentTag}${a2aTag}</div>
-          <div class="bubble${autoTag}">${subjectHtml}${_renderMsgBody(m.body, idx)}</div>
+          <div class="bubble${autoTag}">${subjectHtml}${_renderMsgBody(m.body, idx, m.file_ref)}</div>
           <div class="bubble-time">${timeStr}${m.is_auto_reply ? " · auto-reply" : ""}${pkHtml}</div>
         </div>
       </div>`;
@@ -1050,12 +1096,92 @@ function renderFeed() {
   if (atBottom) scroll.scrollTop = scroll.scrollHeight;
 }
 
-function _renderMsgBody(body, idx) {
-  if (!body) return '';
+function _renderMsgBody(body, idx, fileRef) {
+  const fileHtml = fileRef ? _renderFileChip(fileRef) : '';
+  if (!body) return fileHtml;
   const sig = _parseSignedBody(body);
-  if (!sig) return esc(body);
+  if (!sig) return esc(body) + fileHtml;
   const mainText = sig.payload && sig.payload.body ? sig.payload.body : '';
-  return (mainText ? esc(mainText) + '\n' : '') + _renderSigBlock(sig, idx);
+  return (mainText ? esc(mainText) + '\n' : '') + _renderSigBlock(sig, idx) + fileHtml;
+}
+
+function _renderFileChip(f) {
+  if (!f || !f.file_id) return '';
+  const icon = _fileIcon(f.mime_type || '');
+  const size = f.size ? _fmtBytes(f.size) : '';
+  const name = esc(f.name || 'File');
+  const url  = f.url ? esc(f.url) : '#';
+  const verified = f.signed_by
+    ? `<span style="color:#16a34a;font-size:0.68rem;margin-left:0.4rem" title="Signed by ${esc(f.signed_by)}">✓ verified</span>`
+    : '';
+  return `
+    <a href="${url}" target="_blank" rel="noopener" class="file-chip" download>
+      <span class="file-chip-icon">${icon}</span>
+      <span class="file-chip-info">
+        <span class="file-chip-name">${name}</span>
+        <span class="file-chip-meta">${size}</span>
+      </span>
+      ${verified}
+      <span class="file-chip-dl">↓</span>
+    </a>`;
+}
+
+function _fileIcon(mime) {
+  if (mime.includes('pdf'))         return '📄';
+  if (mime.includes('spreadsheet') || mime.includes('excel') || mime.endsWith('.xls')) return '📊';
+  if (mime.includes('wordprocessing') || mime.includes('msword')) return '📝';
+  if (mime.includes('presentation') || mime.includes('powerpoint')) return '📑';
+  if (mime.startsWith('image/'))    return '🖼️';
+  if (mime.startsWith('text/'))     return '📃';
+  if (mime === 'application/json')  return '{}';
+  return '📎';
+}
+
+function _fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+// ── FILE UPLOAD HELPERS ───────────────────────────────────────────────────────
+
+async function _uploadFileToBE(file, fromDid) {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  if (fromDid) form.append("from_did", fromDid);
+  const r = await fetch(`${BASE}/pro/files/upload`, { method: "POST", body: form });
+  if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+  return r.json();
+}
+
+function _onComposeFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _composePendingFile = { file, fileRef: null };
+  document.getElementById("compose-file-name").textContent = file.name + " (" + _fmtBytes(file.size) + ")";
+  document.getElementById("compose-file-icon").textContent = _fileIcon(file.type);
+  document.getElementById("compose-file-preview").style.display = "flex";
+}
+
+function _clearComposeFile() {
+  _composePendingFile = null;
+  document.getElementById("compose-file-input").value = "";
+  document.getElementById("compose-file-preview").style.display = "none";
+}
+
+function _onGroupFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _groupPendingFile = { file, fileRef: null };
+  document.getElementById("chat-bar-file-name").textContent = file.name + " (" + _fmtBytes(file.size) + ")";
+  document.getElementById("chat-bar-file-icon").textContent = _fileIcon(file.type);
+  document.getElementById("chat-bar-file-preview").style.display = "flex";
+}
+
+function _clearGroupFile() {
+  _groupPendingFile = null;
+  document.getElementById("chat-bar-file-input").value = "";
+  document.getElementById("chat-bar-file-preview").style.display = "none";
 }
 
 function togglePubkey(idx) {
@@ -1208,10 +1334,12 @@ function closeChat() {
 }
 
 let _chatPollTimer = null;
+let _chatSending   = false;   // true while waiting for agent reply — poll skips re-render
+
 function _startChatPoll() {
   _stopChatPoll();
   _chatPollTimer = setInterval(async () => {
-    if (!_chatDid) return;
+    if (!_chatDid || _chatSending) return;  // never wipe optimistic messages mid-send
     const box = document.getElementById("chat-panel-messages");
     const prevCount = box.querySelectorAll(".chat-msg").length;
     try {
@@ -1221,7 +1349,9 @@ function _startChatPoll() {
       if (!r.ok) return;
       const data = await r.json();
       const msgs = data.messages || [];
-      if (msgs.length !== prevCount) renderChatMessages(msgs);
+      // Only re-render if history has MORE messages than DOM — never fewer,
+      // because the user's optimistic message is already shown.
+      if (msgs.length > prevCount) renderChatMessages(msgs);
     } catch(_) {}
   }, 3000);
 }
@@ -1316,6 +1446,7 @@ async function sendChatMessage() {
   box.scrollTop = box.scrollHeight;
 
   btn.disabled = true;
+  _chatSending  = true;
   try {
     const r = await fetch(`${BASE}/pro/agents/${encodeDidPath(_chatDid)}/chat`, {
       method: "POST",
@@ -1327,7 +1458,6 @@ async function sendChatMessage() {
     if (!r.ok) {
       appendChatMsg("agent", `⚠️ ${data.detail || "Error — please try again."}`);
     } else {
-      // Show activity footnotes before the reply (agent actions are documented)
       if (data.activity && data.activity.length) {
         appendChatActivity(data.activity);
       }
@@ -1336,9 +1466,11 @@ async function sendChatMessage() {
   } catch(e) {
     typingEl.remove();
     appendChatMsg("agent", "⚠️ Network error — please try again.");
+  } finally {
+    _chatSending  = false;
+    btn.disabled  = false;
+    input.focus();
   }
-  btn.disabled = false;
-  input.focus();
 }
 
 function chatKeydown(e) {
@@ -1863,7 +1995,7 @@ async function showGroupView(roomId) {
               <div class="bubble-avatar">${esc(senderName.slice(0, 1).toUpperCase())}</div>
               <div class="bubble-col">
                 <div class="bubble-name">${esc(senderName)}</div>
-                <div class="bubble">${_renderMsgBody(m.body, "g" + idx)}</div>
+                <div class="bubble">${_renderMsgBody(m.body, "g" + idx, m.file_ref)}</div>
                 <div style="font-size:0.65rem;color:var(--muted);margin-top:0.15rem;padding:0 0.5rem">${relativeTime(m.sent_at)}</div>
               </div>
             </div>`;
@@ -1913,35 +2045,40 @@ function _renderGroupReplyBox(roomId, members) {
     return;
   }
 
-  chatBar.style.display = "";
-  // Re-use existing chat input but swap the send action
-  const input = document.getElementById("chat-input");
-  const btn   = document.getElementById("chat-send-btn");
-  if (input) input.placeholder = "Message group…";
-  if (btn) {
-    // Detach old listener by cloning
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
-    newBtn.addEventListener("click", () => _sendGroupMessage(roomId, myActiveMembers[0].did, input));
-    if (input) {
-      const oldInput = input.cloneNode(true);
-      input.parentNode.replaceChild(oldInput, input);
-      oldInput.addEventListener("keydown", e => {
-        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); _sendGroupMessage(roomId, myActiveMembers[0].did, oldInput); }
-      });
-    }
-  }
+  chatBar.style.display = "flex";
+  const input = document.getElementById("group-chat-input");
+  const btn   = document.getElementById("group-chat-send-btn");
+  if (!input || !btn) return;
+
+  // Detach old listeners by cloning nodes
+  const newBtn   = btn.cloneNode(true);
+  const newInput = input.cloneNode(true);
+  btn.parentNode.replaceChild(newBtn, btn);
+  input.parentNode.replaceChild(newInput, input);
+
+  const doSend = () => _sendGroupMessage(roomId, myActiveMembers[0].did, newInput);
+  newBtn.addEventListener("click", doSend);
+  newInput.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); }
+  });
 }
 
 async function _sendGroupMessage(roomId, fromDid, inputEl) {
   const body = inputEl ? inputEl.value.trim() : "";
-  if (!body) return;
+  if (!body && !_groupPendingFile) return;
   if (inputEl) inputEl.value = "";
   try {
+    let fileRef = null;
+    if (_groupPendingFile) {
+      const uploaded = await _uploadFileToBE(_groupPendingFile.file, fromDid);
+      fileRef = { file_id: uploaded.file_id, name: uploaded.name, mime_type: uploaded.mime_type,
+                  size: uploaded.size, url: uploaded.url, sha256: uploaded.sha256, signed_by: uploaded.from_did };
+      _clearGroupFile();
+    }
     const r = await fetch(`${BASE}/pro/chat/rooms/${roomId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from_did: fromDid, body }),
+      body: JSON.stringify({ from_did: fromDid, body: body || `[File: ${fileRef?.name}]`, file_ref: fileRef }),
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
     showGroupView(roomId);
