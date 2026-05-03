@@ -102,8 +102,13 @@ let _pollTimer   = null;
 let _lastRefresh = 0;
 const POLL_MS    = 5_000;
 
+// Returns true when the user has an active session (API key or cookie-based).
+function _isLoggedIn() {
+  return !!(apiKey || sessionStorage.getItem("agentid_key") || authMode === "session");
+}
+
 async function _lightRefresh() {
-  if (!apiKey && !sessionStorage.getItem("agentid_key")) return;
+  if (!_isLoggedIn()) return;
   if (document.visibilityState === "hidden") return;
   try {
     // Refresh stats counters (cheap overview call)
@@ -129,11 +134,11 @@ async function _lightRefresh() {
         el("usage-label").textContent = `${agentsReg.toLocaleString()} / ${limit.toLocaleString()} agents`;
     }
     // Refresh the sections users watch most
-    loadAuditLog().catch(() => {});
-    loadAgentsTable().catch?.(() => {});
-    _loadTrustScoreWidget().catch?.(() => {});
+    loadAuditLog().catch(e => console.warn("poll loadAuditLog:", e));
+    loadAgentsTable().catch(e => console.warn("poll loadAgentsTable:", e));
+    _loadTrustScoreWidget().catch(e => console.warn("poll trustScore:", e));
     _tickLiveIndicator();
-  } catch (_) {}
+  } catch (e) { console.warn("_lightRefresh error:", e); }
 }
 
 function _tickLiveIndicator() {
@@ -152,7 +157,7 @@ function _tickLiveIndicator() {
 
 function startPolling() {
   stopPolling();
-  _tickLiveIndicator();
+  _lightRefresh();                              // immediate first tick
   _pollTimer = setInterval(_lightRefresh, POLL_MS);
 }
 
@@ -161,7 +166,7 @@ function stopPolling() {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && (apiKey || sessionStorage.getItem("agentid_key"))) {
+  if (document.visibilityState === "visible" && _isLoggedIn()) {
     _lightRefresh();
   }
 });
