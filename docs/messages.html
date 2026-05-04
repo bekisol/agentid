@@ -1360,8 +1360,12 @@ async function deleteSelected() {
   const deletedSet = new Set(ids);
   _messages = _messages.filter(m => !deletedSet.has(m.id));
   _selectedIds.clear();
-  _lastRenderKey = "";
-  updateSelectBar();
+  _lastRenderKey = null; // null (not "") so empty-inbox state renders correctly
+  // Exit select mode
+  _selectMode = false;
+  document.body.classList.remove("select-mode");
+  document.getElementById("select-bar").classList.remove("visible");
+  document.getElementById("select-toggle-btn").textContent = "☑ Select";
   renderFeed();
   btn.textContent = "🗑 Delete";
 }

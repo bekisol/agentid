@@ -174,8 +174,8 @@ function computeRingLayout(nodes, W, H) {
     const inRing    = nodes.slice(idx, idx + capacity);
     const offset    = (ring % 2) * (Math.PI / inRing.length); // stagger alternate rings
     inRing.forEach((node, i) => {
-      const angle = (2*Math.PI*i/inRing.length) - Math.PI/2 + offset + (Math.random()-0.5)*0.12;
-      const r     = radius + (Math.random()-0.5)*spacing*0.25;
+      const angle = (2*Math.PI*i/inRing.length) - Math.PI/2 + offset;
+      const r     = radius;
       node.x = r * Math.cos(angle);
       node.y = r * Math.sin(angle);
     });
@@ -191,7 +191,7 @@ function computeEgoLayout(center, neighbours, W, H) {
   const R = Math.min(W,H) * 0.35;
   const n = neighbours.length;
   neighbours.forEach((node,i) => {
-    const angle = (2*Math.PI*i/n) - Math.PI/2 + (Math.random()-0.5)*0.1;
+    const angle = (2*Math.PI*i/n) - Math.PI/2;
     node.x = R * Math.cos(angle);
     node.y = R * Math.sin(angle);
   });
@@ -513,22 +513,17 @@ function egoSimTick() {
     }
   }
 
-  // Gentle perpetual drift — keeps nodes softly floating after physics settles.
-  // Each node gets a unique phase so they move independently rather than in sync.
-  // Terminal drift velocity ≈ 0.022 / (1 - 0.84) ≈ 0.14 px/frame (~8 px/s).
-  const T = _egoStep * 0.022;
-  nodes.forEach((n, i) => {
-    if (n===center || n===drag) return;
-    n.vx += 0.022 * Math.sin(T + i * 2.39);
-    n.vy += 0.022 * Math.cos(T + i * 1.57);
-  });
 }
 
 function egoAnimate() {
   egoSimTick(); draw(); _egoStep++;
-  // Keep running as long as we're in ego mode — never go static
-  if (_net.egoMode) _egoAnimId = requestAnimationFrame(egoAnimate);
-  else _egoAnimId = null;
+  if (!_net.egoMode) { _egoAnimId = null; return; }
+  // Stop when kinetic energy is negligible (after at least 60 frames)
+  if (_egoStep > 60) {
+    const ke = _net.nodes.reduce((s,n) => s + n.vx*n.vx + n.vy*n.vy, 0);
+    if (ke < 0.05) { _egoAnimId = null; return; }
+  }
+  _egoAnimId = requestAnimationFrame(egoAnimate);
 }
 
 // ── Selection & ego mode ──────────────────────────────────────────────────
@@ -583,7 +578,9 @@ function enterEgoMode(centerNode) {
     return {
       did, name:ag?.name||(did.length>14?did.slice(-12):did), icon,
       color:ownedDids.has(did)?color:"#f59e0b",
-      tags:ag?.tags||[], external:!ownedDids.has(did),
+      tags:ag?.metadata?.tags||[], caps:ag?.capabilities||[],
+      description:ag?.metadata?.description||"",
+      external:!ownedDids.has(did),
       x:0, y:0, vx:0, vy:0, r:Math.round(r),
     };
   });
@@ -825,39 +822,51 @@ function renderDetailPanel(node) {
     ${connGrp(inbound,"↓ Inbound","←")}${connGrp(outbound,"↑ Outbound","→")}</div>`
     :`<div style="padding:0.75rem 1rem;font-size:0.75rem;color:var(--muted);">No interactions in this period</div>`;
 
-  const tags    = (ag?.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+  const caps    = (node.caps||ag?.capabilities||[]);
+  const tags    = (node.tags||ag?.metadata?.tags||[]);
+  const desc    = node.description||ag?.metadata?.description||"";
+  const capsHtml = caps.length
+    ? `<div style="padding:0.5rem 1rem;border-bottom:1px solid var(--border2);">
+        <div class="detail-section-title" style="padding-bottom:0.35rem;">Capabilities</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">${caps.map(c=>`<span style="background:rgba(99,102,241,0.15);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:2px 8px;font-size:0.65rem;">${esc(c)}</span>`).join("")}</div>
+      </div>` : "";
+  const tagsHtml = tags.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:0.3rem;padding:0.4rem 1rem 0;">${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`
+    : "";
   const created = ag?.created_at?new Date(ag.created_at).toLocaleDateString():"—";
   const lastAct = stats.latestTs?relTime(stats.latestTs):"—";
+  const profileUrl = `agent.html?did=${encodeURIComponent(node.did)}`;
+  const msgUrl     = `messages.html`;
 
   panel.innerHTML=`
     <div class="detail-header">
-      <div class="detail-icon">${node.icon}</div>
+      <div class="detail-icon" style="font-size:1.6rem;">${node.icon}</div>
       <div style="min-width:0;flex:1;">
-        <div class="detail-name">${esc(node.name)}${isComp?` <span style="color:#ef4444;font-size:0.7rem;">⚠ flagged</span>`:""}${node.external?` <span style="color:#475569;font-size:0.7rem;">ext</span>`:""}</div>
-        <div class="detail-did">${esc(node.did)}</div>
+        <div class="detail-name">${esc(node.name)}${isComp?` <span style="color:#ef4444;font-size:0.7rem;">⚠ flagged</span>`:""}${node.external?` <span style="color:#f59e0b;font-size:0.65rem;padding:1px 5px;border:1px solid rgba(245,158,11,0.3);border-radius:8px;">ext</span>`:""}</div>
+        <div class="detail-did" id="dp-did" style="cursor:pointer;transition:color 0.15s;" title="Click to copy">${esc(node.did)}</div>
       </div>
       <button class="detail-close" id="dp-close">✕</button>
     </div>
-    ${ag?.description?`<div class="detail-desc">${esc(ag.description)}</div>`:""}
-    ${tags?`<div class="tag-row">${tags}</div>`:""}
+    ${desc?`<div class="detail-desc" style="padding:0.5rem 1rem;font-size:0.73rem;color:var(--muted);line-height:1.5;border-bottom:1px solid var(--border2);">${esc(desc)}</div>`:""}
+    ${tagsHtml}
     ${flagsHtml}
-    <div class="stat-grid" id="dp-stats">
-      <div class="stat-box"><div class="stat-val" style="font-size:1.1rem;">…</div><div class="stat-lbl">Trust</div></div>
-      <div class="stat-box"><div class="stat-val">${stats.interactions||0}</div><div class="stat-lbl">Events</div></div>
-      <div class="stat-box"><div class="stat-val">${stats.verifyCount||0}</div><div class="stat-lbl">Verifies</div></div>
-      <div class="stat-box"><div class="stat-val">${inbound.length+outbound.length}</div><div class="stat-lbl">Conns</div></div>
-      <div class="stat-box" style="grid-column:span 2;"><div class="stat-val" style="font-size:0.85rem;">${esc(lastAct)}</div><div class="stat-lbl">Last active</div></div>
+    <div class="stat-grid" id="dp-stats" style="padding:0.6rem 1rem;display:grid;grid-template-columns:repeat(3,1fr);gap:0.4rem;">
+      <div class="stat-box" style="text-align:center;background:rgba(255,255,255,0.03);border-radius:8px;padding:0.5rem 0.25rem;"><div class="stat-val" style="font-size:1.1rem;font-weight:600;">…</div><div class="stat-lbl" style="font-size:0.6rem;color:var(--muted);margin-top:2px;">Trust</div></div>
+      <div class="stat-box" style="text-align:center;background:rgba(255,255,255,0.03);border-radius:8px;padding:0.5rem 0.25rem;"><div class="stat-val" style="font-size:1.1rem;font-weight:600;">${stats.interactions||0}</div><div class="stat-lbl" style="font-size:0.6rem;color:var(--muted);margin-top:2px;">Events</div></div>
+      <div class="stat-box" style="text-align:center;background:rgba(255,255,255,0.03);border-radius:8px;padding:0.5rem 0.25rem;"><div class="stat-val" style="font-size:1.1rem;font-weight:600;">${inbound.length+outbound.length}</div><div class="stat-lbl" style="font-size:0.6rem;color:var(--muted);margin-top:2px;">Conns</div></div>
     </div>
+    ${capsHtml}
     <div style="padding:0 1rem 0.75rem;border-bottom:1px solid var(--border2);">
       <div class="detail-section-title" style="padding:0.7rem 0 0.4rem;">Activity — last ${_days}d</div>
       <svg width="${svgW}" height="${svgH}" style="display:block;">${barsHtml}</svg>
-      <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:var(--muted);margin-top:3px;"><span>${_days}d ago</span><span>today</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:var(--muted);margin-top:3px;"><span>${_days}d ago</span><span style="color:var(--muted);">last active ${esc(lastAct)}</span></div>
     </div>
     ${opsHtml}${recentHtml}${connsHtml}
-    <div style="padding:0.5rem 1rem;font-size:0.65rem;color:var(--muted);border-top:1px solid var(--border2);">Registered ${created}</div>
+    <div style="padding:0.4rem 1rem;font-size:0.62rem;color:var(--muted);border-top:1px solid var(--border2);">Registered ${created}</div>
     <div style="padding:0.75rem 1rem;display:flex;gap:0.5rem;border-top:1px solid var(--border2);position:sticky;bottom:0;background:var(--surface);">
-      <button id="dp-copy" style="flex:1;padding:0.4rem;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:0.68rem;cursor:pointer;">📋 Copy DID</button>
-      <a href="dashboard.html" style="flex:1;padding:0.4rem;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:0.68rem;text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center;">📊 Audit log</a>
+      <a href="${profileUrl}" style="flex:1;padding:0.45rem;background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:0.7rem;text-decoration:none;text-align:center;font-weight:500;">👤 Profile</a>
+      <a href="${msgUrl}" style="flex:1;padding:0.45rem;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:0.7rem;text-decoration:none;text-align:center;">💬 Message</a>
+      <button id="dp-copy" style="flex:0 0 auto;padding:0.45rem 0.6rem;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:0.7rem;cursor:pointer;">📋</button>
     </div>`;
 
   _authFetch(`/agents/${encodeURIComponent(node.did)}/trust-score`)
@@ -873,7 +882,12 @@ function renderDetailPanel(node) {
   document.getElementById("dp-copy")?.addEventListener("click",()=>{
     navigator.clipboard.writeText(node.did).catch(()=>{});
     const btn=document.getElementById("dp-copy");
-    if(btn){btn.textContent="✓ Copied";setTimeout(()=>{if(btn)btn.textContent="📋 Copy DID";},1500);}
+    if(btn){btn.textContent="✓";setTimeout(()=>{if(btn)btn.textContent="📋";},1500);}
+  });
+  document.getElementById("dp-did")?.addEventListener("click",()=>{
+    navigator.clipboard.writeText(node.did).catch(()=>{});
+    const el=document.getElementById("dp-did");
+    if(el){const orig=el.style.color;el.style.color="#10b981";setTimeout(()=>{if(el)el.style.color=orig;},1000);}
   });
   panel.querySelectorAll(".conn-row[data-did]").forEach(row=>{
     row.addEventListener("click",()=>{
@@ -1028,7 +1042,9 @@ async function loadNetwork() {
     return {
       did, name:ag?.name||(did.length>14?did.slice(-12):did), icon,
       color: isExternal?"#f59e0b":color,
-      tags:ag?.tags||[], external:isExternal,
+      tags:ag?.metadata?.tags||[], caps:ag?.capabilities||[],
+      description:ag?.metadata?.description||"",
+      external:isExternal,
       x:0, y:0, vx:0, vy:0, r,
     };
   });
