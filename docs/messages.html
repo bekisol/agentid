@@ -2065,9 +2065,10 @@ function _icCard(d, idx) {
   const lastStr  = lastAt  ? lastAt.toLocaleString(undefined,  { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
   const firstStr = firstAt ? firstAt.toLocaleString(undefined, { month:"short", day:"numeric", year:"numeric" }) : "";
 
+  const _dealTypeLabel = d.deal_type === "service" ? "Service Agreement" : d.deal_type === "collaboration" ? "Collaboration" : (d.deal_type || "sale");
   const priceHtml = hasPrice
     ? `<div class="ic-deal-row">💰 $${Number(d.deal_price).toLocaleString()} ${esc(d.deal_currency||"USD")} &nbsp;·&nbsp; <span style="font-family:'JetBrains Mono',monospace;">${esc(d.deal_ref)}</span> &nbsp;<span style="background:#dcfce7;color:#15803d;font-size:0.58rem;padding:0.05rem 0.28rem;border-radius:10px;font-weight:700;">signed</span></div>`
-    : (hasDeal ? `<div class="ic-deal-row">🤝 ${esc(d.deal_ref)} &nbsp;<span style="background:#dcfce7;color:#15803d;font-size:0.58rem;padding:0.05rem 0.28rem;border-radius:10px;font-weight:700;">signed</span></div>` : "");
+    : (hasDeal ? `<div class="ic-deal-row">📋 ${esc(_dealTypeLabel)} &nbsp;·&nbsp; <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;">${esc(d.deal_ref)}</span> &nbsp;<span style="background:#dcfce7;color:#15803d;font-size:0.58rem;padding:0.05rem 0.28rem;border-radius:10px;font-weight:700;">signed</span></div>` : "");
 
   return `<div class="ic${hasDeal ? " has-deal" : ""}" onclick="openInteraction(${idx})">
     <div class="ic-top">
@@ -2175,20 +2176,23 @@ function _renderInteractionModal(d, deal, msgs) {
   const _sellerBodyClean = _stripSig(deal?.seller_body);
   const _buyerBodyClean  = _stripSig(deal?.buyer_body);
 
+  const _modalDealTypeLabel = d.deal_type === "service" ? "Service Agreement" : d.deal_type === "collaboration" ? "Collaboration" : (d.deal_type || "sale");
   const dealHtml = hasDeal ? `
     <div style="background:${hasPrice?"var(--green-bg)":"var(--blue-light)"};border:1px solid ${hasPrice?"#86efac":"#bfdbfe"};border-radius:8px;padding:0.7rem 0.9rem;">
       <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.35rem;">
-        ${hasPrice ? `<span style="font-size:1.5rem;font-weight:800;color:var(--green);letter-spacing:-0.02em;">$${Number(d.deal_price).toLocaleString()} ${esc(d.deal_currency||"USD")}</span>` : ""}
-        <span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:20px;background:#dcfce7;color:#15803d;">✓ SIGNED DEAL</span>
+        ${hasPrice
+          ? `<span style="font-size:1.5rem;font-weight:800;color:var(--green);letter-spacing:-0.02em;">$${Number(d.deal_price).toLocaleString()} ${esc(d.deal_currency||"USD")}</span>`
+          : `<span style="font-size:1.1rem;font-weight:800;color:#1d4ed8;letter-spacing:-0.01em;">📋 ${esc(_modalDealTypeLabel)}</span>`}
+        <span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:20px;background:#dcfce7;color:#15803d;">✓ SIGNED</span>
         <span style="font-family:'JetBrains Mono',monospace;font-size:0.66rem;color:var(--muted);">${esc(d.deal_ref)}</span>
         <span style="font-size:0.65rem;color:var(--muted);">· ${d.deal_finalized_at ? new Date(d.deal_finalized_at).toLocaleString() : ""}</span>
       </div>
       ${_dealDescClean ? `<div style="font-size:0.8rem;color:var(--text-2);font-style:italic;margin-bottom:0.35rem;">${esc(_dealDescClean)}</div>` : ""}
       ${_sellerBodyClean ? `
-        <div style="font-size:0.63rem;font-weight:700;color:var(--muted);margin-bottom:0.1rem;">Proposal / Offer</div>
+        <div style="font-size:0.63rem;font-weight:700;color:var(--muted);margin-bottom:0.1rem;">${hasPrice ? "Proposal / Offer" : "Terms Proposed"}</div>
         <div style="font-size:0.69rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;white-space:pre-wrap;word-break:break-all;max-height:100px;overflow-y:auto;color:var(--text-2);margin-bottom:0.3rem;">${esc(_sellerBodyClean)}</div>` : ""}
       ${_buyerBodyClean ? `
-        <div style="font-size:0.63rem;font-weight:700;color:var(--muted);margin-bottom:0.1rem;">Acceptance</div>
+        <div style="font-size:0.63rem;font-weight:700;color:var(--muted);margin-bottom:0.1rem;">${hasPrice ? "Acceptance" : "Agreed"}</div>
         <div style="font-size:0.69rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;white-space:pre-wrap;word-break:break-all;max-height:100px;overflow-y:auto;color:var(--text-2);">${esc(_buyerBodyClean)}</div>` : ""}
     </div>` : "";
 
@@ -2291,7 +2295,11 @@ table{width:100%;border-collapse:collapse;font-size:0.84rem;}
 td{padding:0.32rem 0.45rem;border-bottom:1px solid #f5f3f0;vertical-align:top;}
 .mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:0.7rem;word-break:break-all;}
 .deal-box{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:0.8rem 0.95rem;margin-bottom:1.25rem;}
+.deal-box.service{background:#eff6ff;border-color:#bfdbfe;}
 .deal-amount{font-size:2rem;font-weight:800;color:#059669;letter-spacing:-0.03em;}
+.deal-type-label{font-size:1.2rem;font-weight:800;color:#1d4ed8;letter-spacing:-0.01em;margin-bottom:0.4rem;}
+.deal-body-lbl{font-size:0.68rem;font-weight:700;color:#78716c;margin-top:0.6rem;margin-bottom:0.2rem;}
+.deal-body-text{font-size:0.82rem;white-space:pre-wrap;word-break:break-word;background:#f9f7f4;border:1px solid #e5e2db;border-radius:5px;padding:0.45rem 0.6rem;}
 .sec{margin-bottom:1.25rem;}
 .msg-row{background:#f9f7f4;border:1px solid #e5e2db;border-radius:6px;padding:0.55rem 0.75rem;margin-bottom:0.45rem;}
 .msg-hdr{font-size:0.7rem;font-weight:700;color:#78716c;margin-bottom:0.22rem;}
@@ -2321,13 +2329,25 @@ td{padding:0.32rem 0.45rem;border-bottom:1px solid #f5f3f0;vertical-align:top;}
   <tr><td class="lbl">Started</td><td>${h(d.first_at ? new Date(d.first_at).toLocaleString() : "—")}</td></tr>
   <tr><td class="lbl">Last Activity</td><td>${h(d.last_at ? new Date(d.last_at).toLocaleString() : "—")}</td></tr>
 </table></div>
-${hasDeal ? `<div class="deal-box"><div class="sec-title" style="color:#15803d;border-color:#86efac;">✓ Signed Deal</div>
-  ${hasPrice ? `<div class="deal-amount">$${Number(d.deal_price).toLocaleString()} ${h(d.deal_currency||"USD")}</div>` : ""}
+${hasDeal ? (() => {
+    const _dlDealTypeLabel = d.deal_type === "service" ? "Service Agreement" : d.deal_type === "collaboration" ? "Collaboration" : (d.deal_type || "sale");
+    const _dlStripSig = s => (s||"").replace(/---\s*✓ Signed[\s\S]*$/, "").trim();
+    const _dlSellerBody = _dlStripSig(deal?.seller_body);
+    const _dlBuyerBody  = _dlStripSig(deal?.buyer_body);
+    const _dlDesc = d.deal_desc && !["re: your message","message from agent","re: message from agent",""].includes((d.deal_desc||"").toLowerCase().trim()) ? d.deal_desc : null;
+    return `<div class="deal-box${hasPrice?"":' service'}">
+  <div class="sec-title" style="color:${hasPrice?"#15803d":"#1d4ed8"};border-color:${hasPrice?"#86efac":"#bfdbfe"};">✓ Signed Deal</div>
+  ${hasPrice ? `<div class="deal-amount">$${Number(d.deal_price).toLocaleString()} ${h(d.deal_currency||"USD")}</div>` : `<div class="deal-type-label">📋 ${h(_dlDealTypeLabel)}</div>`}
+  ${_dlDesc ? `<div style="font-style:italic;color:#57534e;margin-bottom:0.4rem;font-size:0.84rem;">${h(_dlDesc)}</div>` : ""}
   <table style="margin-top:0.5rem;">
     <tr><td class="lbl">Deal Ref</td><td class="mono">${h(d.deal_ref)}</td></tr>
     <tr><td class="lbl">Type</td><td>${h(d.deal_type||"sale")}</td></tr>
     <tr><td class="lbl">Finalized</td><td>${h(d.deal_finalized_at ? new Date(d.deal_finalized_at).toLocaleString() : "—")}</td></tr>
-  </table></div>` : ""}
+  </table>
+  ${_dlSellerBody ? `<div class="deal-body-lbl">${hasPrice ? "Proposal / Offer" : "Terms Proposed"}</div><div class="deal-body-text">${h(_dlSellerBody)}</div>` : ""}
+  ${_dlBuyerBody  ? `<div class="deal-body-lbl">${hasPrice ? "Acceptance" : "Agreed"}</div><div class="deal-body-text">${h(_dlBuyerBody)}</div>` : ""}
+</div>`;
+  })() : ""}
 <div class="sec"><div class="sec-title">Message Thread</div>
   ${msgsHtml || "<em style='color:#a8a29e'>No messages available</em>"}
 </div>
