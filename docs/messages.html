@@ -558,6 +558,10 @@ document.addEventListener("DOMContentLoaded", () => {
           <span id="chat-bar-file-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2);"></span>
           <button onclick="_clearGroupFile()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.9rem;padding:0.1rem 0.25rem;border-radius:4px;">✕</button>
         </div>
+        <div id="chat-bar-from-wrap" style="display:none;align-items:center;gap:0.4rem;font-size:0.72rem;color:var(--muted);">
+          <span style="flex-shrink:0;">Send as:</span>
+          <select id="group-from-select" style="flex:1;font-size:0.75rem;padding:0.2rem 0.4rem;border:1px solid var(--border-dark);border-radius:6px;background:var(--surface2);color:var(--text);outline:none;cursor:pointer;"></select>
+        </div>
         <div style="display:flex;gap:0.5rem;align-items:flex-end;">
           <label title="Attach file" style="cursor:pointer;display:flex;align-items:center;color:var(--muted);font-size:1.1rem;flex-shrink:0;padding:0.3rem;" id="chat-bar-attach-btn">
             📎<input type="file" id="chat-bar-file-input" style="display:none;" onchange="_onGroupFileSelected(this)" />
@@ -2454,6 +2458,21 @@ function _renderGroupReplyBox(roomId, members) {
     return;
   }
 
+  // Show "Send as" selector when user has multiple agents in the room
+  const fromWrap = document.getElementById("chat-bar-from-wrap");
+  const fromSel  = document.getElementById("group-from-select");
+  if (fromWrap && fromSel) {
+    if (myActiveMembers.length > 1) {
+      fromSel.innerHTML = myActiveMembers.map(m => {
+        const name = _agents.find(a => a.did === m.did)?.name || m.did.slice(-12);
+        return `<option value="${esc(m.did)}">${esc(name)}</option>`;
+      }).join("");
+      fromWrap.style.display = "flex";
+    } else {
+      fromWrap.style.display = "none";
+    }
+  }
+
   chatBar.style.display = "flex";
   const input = document.getElementById("group-chat-input");
   const btn   = document.getElementById("group-chat-send-btn");
@@ -2465,7 +2484,11 @@ function _renderGroupReplyBox(roomId, members) {
   btn.parentNode.replaceChild(newBtn, btn);
   input.parentNode.replaceChild(newInput, input);
 
-  const doSend = () => _sendGroupMessage(roomId, myActiveMembers[0].did, newInput);
+  const getFromDid = () => {
+    const sel = document.getElementById("group-from-select");
+    return (sel && sel.value) ? sel.value : myActiveMembers[0].did;
+  };
+  const doSend = () => _sendGroupMessage(roomId, getFromDid(), newInput);
   newBtn.addEventListener("click", doSend);
   newInput.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); }
