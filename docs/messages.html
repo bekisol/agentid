@@ -150,6 +150,24 @@
     .pubkey-toggle { font-size:0.65rem; color:var(--accent); cursor:pointer; user-select:none; margin-top:0.2rem; display:inline-block; }
     .pubkey-box { margin-top:0.25rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.35rem 0.5rem; font-size:0.6rem; font-family:"JetBrains Mono",monospace; word-break:break-all; color:var(--muted); max-width:340px; }
 
+    /* ── Capability badge (#4) ── */
+    .caps-bar { display:flex; flex-wrap:wrap; gap:0.25rem; margin-top:0.3rem; }
+    .cap-chip { font-size:0.58rem; padding:0.08rem 0.38rem; border-radius:20px; border:1px solid rgba(255,255,255,0.18); color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.08); white-space:nowrap; }
+    .cap-chip.verified { border-color:rgba(74,222,128,0.5); color:#4ade80; background:rgba(74,222,128,0.08); }
+    .bubble-row.received .cap-chip { border-color:var(--border); color:var(--muted); background:var(--surface2); }
+    .bubble-row.received .cap-chip.verified { border-color:var(--green); color:var(--green); background:var(--green-bg); }
+
+    /* ── Negotiation message types (#3) ── */
+    .neg-banner { display:flex; align-items:center; gap:0.4rem; font-size:0.68rem; font-weight:700; margin-bottom:0.3rem; padding:0.2rem 0.5rem; border-radius:6px; }
+    .neg-proposal { background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3); }
+    .neg-counter  { background:rgba(234,179,8,0.12);  color:#fde047; border:1px solid rgba(234,179,8,0.3); }
+    .neg-accept   { background:rgba(16,185,129,0.12); color:#6ee7b7; border:1px solid rgba(16,185,129,0.3); }
+    .neg-reject   { background:rgba(239,68,68,0.12);  color:#fca5a5; border:1px solid rgba(239,68,68,0.3); }
+    .bubble-row.received .neg-proposal { background:rgba(59,130,246,0.07);  color:#3b82f6; }
+    .bubble-row.received .neg-counter  { background:rgba(234,179,8,0.07);   color:#d97706; }
+    .bubble-row.received .neg-accept   { background:rgba(16,185,129,0.07);  color:#059669; }
+    .bubble-row.received .neg-reject   { background:rgba(239,68,68,0.07);   color:#dc2626; }
+
     /* ── Signature block ── */
     .sig-block { margin-top:0.4rem; border-radius:6px; border:1px solid rgba(74,222,128,0.3); font-size:0.68rem; overflow:hidden; display:inline-flex; flex-direction:column; max-width:100%; }
     .sig-header { display:flex; align-items:center; gap:0.4rem; padding:0.2rem 0.5rem; background:rgba(0,0,0,0.18); cursor:pointer; user-select:none; }
@@ -1211,7 +1229,7 @@ function renderFeed() {
         <div class="bubble-avatar">${avatarLetter}</div>
         <div class="bubble-col">
           <div class="bubble-name">${esc(senderLabel)}${newTag}${agentTag}${a2aTag}</div>
-          <div class="bubble${autoTag}">${subjectHtml}${_renderMsgBody(m.body, idx, m.file_ref)}</div>
+          <div class="bubble${autoTag}">${subjectHtml}${_renderMsgBody(m.body, idx, m.file_ref, m.msg_type, m.sender_caps)}</div>
           <div class="bubble-time">${timeStr}${m.is_auto_reply ? " · auto-reply" : ""}${pkHtml}</div>
         </div>
       </div>`;
@@ -1221,13 +1239,41 @@ function renderFeed() {
   if (atBottom) scroll.scrollTop = scroll.scrollHeight;
 }
 
-function _renderMsgBody(body, idx, fileRef) {
+function _renderNegBanner(msgType) {
+  const map = {
+    proposal: ['neg-proposal', '📋 Proposal'],
+    counter:  ['neg-counter',  '↩ Counter-Proposal'],
+    accept:   ['neg-accept',   '✓ Accepted'],
+    reject:   ['neg-reject',   '✗ Rejected'],
+  };
+  const entry = map[msgType];
+  if (!entry) return '';
+  return `<div class="neg-banner ${entry[0]}">${entry[1]}</div>`;
+}
+
+function _renderCapsBar(senderCaps) {
+  if (!senderCaps || !Array.isArray(senderCaps.caps) || !senderCaps.caps.length) return '';
+  const vClass = senderCaps.verified ? ' verified' : '';
+  const chips = senderCaps.caps.slice(0, 5).map(c =>
+    `<span class="cap-chip${vClass}">${esc(c)}</span>`
+  ).join('');
+  return `<div class="caps-bar">${chips}</div>`;
+}
+
+function _renderMsgBody(body, idx, fileRef, msgType, senderCaps) {
   const fileHtml = fileRef ? _renderFileChip(fileRef) : '';
-  if (!body) return fileHtml;
+  const negHtml  = (msgType && msgType !== 'message') ? _renderNegBanner(msgType) : '';
+  const capsHtml = senderCaps ? _renderCapsBar(senderCaps) : '';
+  if (!body) return negHtml + fileHtml + capsHtml;
   const sig = _parseSignedBody(body);
-  if (!sig) return esc(body) + fileHtml;
-  const mainText = sig.payload && sig.payload.body ? sig.payload.body : '';
-  return (mainText ? esc(mainText) + '\n' : '') + _renderSigBlock(sig, idx) + fileHtml;
+  let mainHtml;
+  if (!sig) {
+    mainHtml = esc(body);
+  } else {
+    const mainText = sig.payload && sig.payload.body ? sig.payload.body : '';
+    mainHtml = (mainText ? esc(mainText) + '\n' : '') + _renderSigBlock(sig, idx);
+  }
+  return negHtml + mainHtml + fileHtml + capsHtml;
 }
 
 function _renderFileChip(f) {
@@ -2406,7 +2452,7 @@ function _renderGroupMsg(m, idx) {
     <div class="bubble-avatar">${esc(senderName.slice(0, 1).toUpperCase())}</div>
     <div class="bubble-col">
       <div class="bubble-name">${esc(senderName)}</div>
-      <div class="bubble">${_renderMsgBody(m.body, "g" + idx, m.file_ref)}</div>
+      <div class="bubble">${_renderMsgBody(m.body, "g" + idx, m.file_ref, m.msg_type, m.sender_caps)}</div>
       <div style="font-size:0.65rem;color:var(--muted);margin-top:0.15rem;padding:0 0.5rem">${relativeTime(m.sent_at)}</div>
     </div>
   </div>`;
