@@ -2373,9 +2373,12 @@ function _renderGroupMsg(m, idx) {
   </div>`;
 }
 
+let _groupPollAddId = null; // exposed so optimistic sends can register IDs before the next poll tick
+
 function _startGroupPoll(roomId, initialIds) {
   _stopGroupPoll();
   let _knownIds = new Set(Array.isArray(initialIds) ? initialIds : []);
+  _groupPollAddId = (id) => _knownIds.add(id);
   _groupPollTimer = setInterval(async () => {
     if (_activeRoomId !== roomId) { _stopGroupPoll(); return; }
     try {
@@ -2413,6 +2416,7 @@ function _startGroupPoll(roomId, initialIds) {
 
 function _stopGroupPoll() {
   if (_groupPollTimer) { clearInterval(_groupPollTimer); _groupPollTimer = null; }
+  _groupPollAddId = null;
 }
 
 // Accept a pending invite
@@ -2481,9 +2485,10 @@ async function _sendGroupMessage(roomId, fromDid, inputEl) {
       body: JSON.stringify({ from_did: fromDid, body: body || `[File: ${fileRef?.name}]`, file_ref: fileRef }),
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
-    // Optimistically append to DOM — do NOT call showGroupView which would race with the live poll
+    // Optimistically append to DOM — register ID first so the poll won't re-append it
     const data = await r.json();
     if (data && data.id) {
+      if (_groupPollAddId) _groupPollAddId(data.id);
       const inner = document.querySelector("#group-msgs-container .group-msg-list");
       if (inner) {
         const idx = inner.querySelectorAll(".bubble-row").length;
