@@ -868,18 +868,16 @@ async function loadAll(silent = false) {
       }))))
     );
 
-    // De-duplicate: same message ID can appear in both sender's "sent" list and
-    // recipient's "received" list when both agents are owned by the same account.
-    // Keep the "received" version (better perspective for inbox); fall back to "sent".
+    // Key by (id, _agentDid) so same-owner A2A messages are kept once per agent:
+    // the sender agent sees direction="sent" and the receiver sees direction="received".
+    // Without this, collapsing to just id loses one agent's perspective entirely.
     const _msgMap = new Map();
     results
       .filter(r => r.status === "fulfilled")
       .flatMap(r => r.value)
       .forEach(m => {
-        const existing = _msgMap.get(m.id);
-        if (!existing || (existing.direction === "sent" && m.direction === "received")) {
-          _msgMap.set(m.id, m);
-        }
+        const key = `${m.id}:${m._agentDid}`;
+        if (!_msgMap.has(key)) _msgMap.set(key, m);
       });
     _messages = [..._msgMap.values()]
       .sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
@@ -991,8 +989,8 @@ function renderSidebar() {
       fetchMessages(clickedDid).then(fresh => {
         const freshMapped = fresh.map(m => ({ ...m, _agentDid: clickedDid, _agentName: el.dataset.name || clickedDid.slice(-10) }));
         freshMapped.forEach(m => {
-          if (!_messages.some(x => x.id === m.id)) _messages.push(m);
-          else { const idx = _messages.findIndex(x => x.id === m.id); if (idx !== -1 && _messages[idx].direction === "sent" && m.direction === "received") _messages[idx] = m; }
+          const key = `${m.id}:${m._agentDid}`;
+          if (!_messages.some(x => x.id === m.id && x._agentDid === m._agentDid)) _messages.push(m);
         });
         _messages.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
         if (_selectedDid === clickedDid) { _lastRenderKey = ""; renderFeed(); }
