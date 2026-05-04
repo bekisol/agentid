@@ -6,7 +6,7 @@
   <title>AgentID — Agent Profile</title>
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
-             script-src 'self';
+             script-src 'self' 'unsafe-inline';
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src https://fonts.gstatic.com;
              connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
@@ -29,6 +29,7 @@
       --muted:        #78716C;
       --accent:       #C2410C;
       --accent-light: #FFF7ED;
+      --accent-border:#FDBA74;
       --green:        #059669;
       --green-bg:     #ECFDF5;
       --red:          #DC2626;
@@ -37,6 +38,29 @@
       --yellow-bg:    #FFFBEB;
       --blue:         #2563EB;
       --blue-bg:      #EFF6FF;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:           #0f1117;
+        --surface:      #1a1d27;
+        --surface2:     #242736;
+        --border:       #2e3147;
+        --border-dark:  #3d4166;
+        --text:         #e8eaf6;
+        --text-2:       #9ea3c0;
+        --muted:        #6b7196;
+        --accent:       #f97316;
+        --accent-light: #1c1208;
+        --accent-border:#7c3508;
+        --green:        #34d399;
+        --green-bg:     #052e1c;
+        --red:          #f87171;
+        --red-bg:       #2d1010;
+        --yellow:       #fbbf24;
+        --yellow-bg:    #1c1505;
+        --blue:         #60a5fa;
+        --blue-bg:      #0d1f3c;
+      }
     }
 
     body {
