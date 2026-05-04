@@ -1212,10 +1212,13 @@ function renderFeed() {
       ? (m._agentName || "You")
       : (m.sender_name || (m.from_did ? m.from_did.slice(-10) : "Unknown"));
     const avatarLetter = senderLabel.charAt(0).toUpperCase();
-    // Distinguish "sent to another agent" subjects from normal subjects
-    const isDmToOther = m.direction === 'sent' && m.to_did && m.to_did !== _currentDid;
+    // For sent agent-to-agent messages: sender_name holds the recipient name (JOIN is on to_did)
+    const recipientName = isAgentToAgent ? (m.sender_name || (m.to_did ? m.to_did.split(":").pop().slice(-14) : "")) : "";
+    const toLabel = isAgentToAgent
+      ? `<div style="font-size:0.62rem;color:rgba(255,255,255,0.7);margin-bottom:0.2rem;font-weight:500;">→ To: ${esc(recipientName)}</div>`
+      : "";
     const subjectHtml = m.subject
-      ? `<div class="bubble-subject"${isDmToOther ? ' title="Sent to '+esc(m.to_did)+'"' : ''}>${esc(m.subject)}${isDmToOther ? ' <span style="font-size:0.6rem;opacity:0.6">→ '+esc((m.to_did||'').split(':').pop().slice(-10))+'</span>' : ''}</div>`
+      ? `<div class="bubble-subject" title="${esc(m.to_did || '')}">${esc(m.subject)}</div>`
       : "";
     const autoTag      = m.is_auto_reply ? ' auto-reply' : '';
     const newTag       = (!m.read && !isSent) ? '<span class="tag-new">NEW</span>' : "";
@@ -1233,7 +1236,7 @@ function renderFeed() {
         <div class="bubble-avatar">${avatarLetter}</div>
         <div class="bubble-col">
           <div class="bubble-name">${esc(senderLabel)}${newTag}${agentTag}${a2aTag}</div>
-          <div class="bubble${autoTag}">${subjectHtml}${_renderMsgBody(m.body, idx, m.file_ref, m.msg_type, m.sender_caps)}</div>
+          <div class="bubble${autoTag}">${toLabel}${subjectHtml}${_renderMsgBody(m.body, idx, m.file_ref, m.msg_type, m.sender_caps)}</div>
           <div class="bubble-time">${timeStr}${m.is_auto_reply ? " · auto-reply" : ""}${pkHtml}</div>
         </div>
       </div>`;
