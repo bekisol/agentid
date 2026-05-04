@@ -256,18 +256,24 @@
     .group-member-chip { padding:0.15rem 0.55rem; border-radius:999px; background:var(--surface); border:1px solid var(--border); white-space:nowrap; }
     .group-member-chip.you { border-color:var(--blue); color:var(--blue); }
 
-    /* Deal list in feed */
-    .deals-wrap { max-width:480px; margin:1.25rem auto; padding:0 1rem; }
-    .deal-card { background:var(--surface); border:1px solid var(--border); border-left:3px solid #4ade80; border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.6rem; display:grid; gap:0.25rem; transition:box-shadow 0.12s; }
-    .deal-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.08); }
-    .deal-card-ref { font-family:"JetBrains Mono",monospace; font-size:0.72rem; color:var(--muted); display:flex; align-items:center; gap:0.4rem; }
-    .deal-card-type { font-size:0.6rem; font-weight:700; padding:0.08rem 0.4rem; border-radius:20px; text-transform:uppercase; letter-spacing:0.04em; }
-    .deal-card-type.sale { background:var(--green-bg); color:var(--green); }
-    .deal-card-type.service { background:var(--blue-bg,#eff6ff); color:var(--blue); }
-    .deal-card-headline { font-size:1rem; font-weight:800; color:var(--green); letter-spacing:-0.02em; }
-    .deal-card-desc { font-size:0.78rem; color:var(--text-2); font-style:italic; }
-    .deal-card-parties { font-size:0.74rem; color:var(--text-2); }
-    .deal-card-time { font-size:0.68rem; color:var(--muted); }
+    /* Agent Ledger — interaction cards */
+    .ledger-wrap { max-width:560px; margin:1rem auto; padding:0 1rem; }
+    .ic { background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--blue); border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.6rem; cursor:pointer; transition:box-shadow 0.12s; }
+    .ic:hover { box-shadow:0 2px 14px rgba(0,0,0,0.1); }
+    .ic.has-deal { border-left-color:#4ade80; }
+    .ic-top { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem; flex-wrap:wrap; }
+    .ic-thread-id { font-family:"JetBrains Mono",monospace; font-size:0.63rem; color:var(--muted); }
+    .ic-badge { font-size:0.58rem; font-weight:700; padding:0.07rem 0.38rem; border-radius:20px; text-transform:uppercase; letter-spacing:0.04em; }
+    .ic-badge.deal { background:var(--green-bg); color:var(--green); }
+    .ic-badge.collab { background:var(--blue-light); color:var(--blue); }
+    .ic-badge.service { background:#f3e8ff; color:#7c3aed; }
+    .ic-parties { display:flex; align-items:flex-start; gap:0.55rem; margin-bottom:0.4rem; }
+    .ic-party { flex:1; min-width:0; }
+    .ic-party-name { font-size:0.8rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ic-party-did { font-family:"JetBrains Mono",monospace; font-size:0.58rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ic-arrow { color:var(--muted); font-size:0.85rem; flex-shrink:0; padding-top:3px; }
+    .ic-deal-row { font-size:0.71rem; font-weight:700; color:var(--green); margin-bottom:0.3rem; }
+    .ic-stats { font-size:0.65rem; color:var(--muted); display:flex; gap:0.7rem; flex-wrap:wrap; }
 
     /* Chat panel */
     .chat-panel { display:none; position:fixed; top:0; right:0; width:320px; height:100vh; background:var(--surface); border-left:1px solid var(--border); box-shadow:-4px 0 24px rgba(0,0,0,0.08); z-index:8000; flex-direction:column; overflow:hidden; }
@@ -468,7 +474,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="sidebar-sep"></div>
       <div class="sidebar-section"><span>Deals</span></div>
       <div class="sidebar-item-deal" id="sidebar-deals-btn" onclick="showDealsView()">
-        🤝 Signed Deals <span id="sidebar-deals-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
+        📋 Agent Ledger <span id="sidebar-deals-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
       </div>
     </div>
 
@@ -728,14 +734,17 @@ document.addEventListener("DOMContentLoaded", () => {
   </div>
 </div>
 
-<!-- Deals modal -->
-<div id="deal-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;z-index:9000;padding:1rem;">
-  <div style="background:var(--surface);border-radius:16px;border:1px solid var(--border);max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.18);overflow:hidden;">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
-      <span style="font-weight:700;font-size:0.95rem;" id="deal-modal-ref">Deal Invoice</span>
-      <button onclick="closeDealModal()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;">✕</button>
+<!-- Interaction record modal -->
+<div id="interaction-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:flex-start;justify-content:center;z-index:9000;padding:1.5rem 1rem;overflow-y:auto;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:680px;overflow:hidden;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:5;">
+      <span id="im-header-ref" style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:700;">Interaction Record</span>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <button onclick="downloadInteractionRecord()" class="btn btn-outline" style="font-size:0.74rem;padding:0.28rem 0.65rem;">⬇ Download</button>
+        <button onclick="closeInteractionModal()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;">✕</button>
+      </div>
     </div>
-    <div style="padding:1.25rem;" id="deal-modal-body"></div>
+    <div style="padding:1.1rem;" id="im-body"></div>
   </div>
 </div>
 
@@ -884,8 +893,8 @@ async function loadAll(silent = false) {
       .then(d => { if (d) { _rooms = d.rooms || []; renderGroupsSidebar(); } })
       .catch(() => {});
 
-    // Update deals count badge in sidebar (fire-and-forget)
-    fetch(`${BASE}/pro/deals?limit=1`, { headers: apiHeaders(), credentials: "include" })
+    // Update ledger count badge in sidebar (fire-and-forget)
+    fetch(`${BASE}/pro/interactions?limit=1`, { headers: apiHeaders(), credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         const el = document.getElementById("sidebar-deals-count");
@@ -1100,16 +1109,19 @@ function renderFeed() {
   }
 
   if (_dealsView) {
-    // Re-fetch deals so new signings appear on auto-refresh
-    fetch(`${BASE}/pro/deals?limit=100`, { headers: apiHeaders(), credentials: "include" })
+    // Re-fetch interactions on every 30s auto-refresh so new agent comms appear
+    fetch(`${BASE}/pro/interactions?limit=200`, { headers: apiHeaders(), credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d) {
-          _deals = d.deals || [];
-          document.getElementById("feed-meta").textContent = `${_deals.length} deal${_deals.length !== 1 ? "s" : ""} finalized`;
+          _interactions = d.interactions || [];
+          const dealCount = _interactions.filter(x => x.deal_ref).length;
+          document.getElementById("feed-meta").textContent =
+            `${_interactions.length} interaction${_interactions.length !== 1 ? "s" : ""}` +
+            (dealCount ? ` · ${dealCount} signed deal${dealCount !== 1 ? "s" : ""}` : "");
           renderDealsView();
           const el = document.getElementById("sidebar-deals-count");
-          if (el) el.textContent = _deals.length > 0 ? _deals.length : "";
+          if (el) el.textContent = _interactions.length > 0 ? _interactions.length : "";
         }
       }).catch(() => {});
     return;
@@ -2001,8 +2013,11 @@ async function _deleteFile(fileId) {
 }
 
 // ── SIGNED DEALS ──────────────────────────────────────────────────────────────
-let _dealsView = false;
-let _deals = [];
+// ── AGENT LEDGER (Interactions + Deals) ──────────────────────────────────────
+let _dealsView        = false;
+let _deals            = [];          // kept for renderFeed() auto-refresh compat
+let _interactions     = [];
+let _currentIx        = null;        // interaction open in modal
 
 async function showDealsView() {
   _dealsView = true;
@@ -2010,286 +2025,320 @@ async function showDealsView() {
   document.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
   document.getElementById("sidebar-deals-btn").classList.add("active");
   document.getElementById("stop-btn").style.display = "none";
-  document.getElementById("feed-title").textContent = "Signed Deals";
+  document.getElementById("feed-title").textContent = "Agent Ledger";
   document.getElementById("feed-meta").textContent = "";
   document.getElementById("agent-info").style.display = "none";
   document.getElementById("deal-search-bar").style.display = "";
   document.getElementById("deal-search-input").value = "";
   const scroll = document.getElementById("feed-scroll");
-  scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading deals…</div></div>';
+  scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading ledger…</div></div>';
   try {
-    const r = await fetch(`${BASE}/pro/deals?limit=100`, { headers: apiHeaders(), credentials: "include" });
+    const r = await fetch(`${BASE}/pro/interactions?limit=200`, { headers: apiHeaders(), credentials: "include" });
     if (!r.ok) throw new Error(`Error ${r.status}`);
     const data = await r.json();
-    _deals = data.deals || [];
-    document.getElementById("feed-meta").textContent = `${_deals.length} deal${_deals.length !== 1 ? "s" : ""} finalized`;
+    _interactions = data.interactions || [];
+    const dealCount = _interactions.filter(x => x.deal_ref).length;
+    document.getElementById("feed-meta").textContent =
+      `${_interactions.length} interaction${_interactions.length !== 1 ? "s" : ""}` +
+      (dealCount ? ` · ${dealCount} signed deal${dealCount !== 1 ? "s" : ""}` : "");
     renderDealsView();
+    const el = document.getElementById("sidebar-deals-count");
+    if (el) el.textContent = _interactions.length > 0 ? _interactions.length : "";
   } catch(e) {
-    scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load deals</div><div class="state-sub">${esc(e.message)}</div></div>`;
+    scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load ledger</div><div class="state-sub">${esc(e.message)}</div></div>`;
   }
 }
 
 function renderDealsView() {
+  _renderLedger(_interactions);
+}
+
+function _icCard(d, idx) {
+  const hasDeal  = !!d.deal_ref;
+  const hasPrice = d.deal_price != null && d.deal_price > 0;
+  const type     = d.deal_type || (hasDeal ? "sale" : "collab");
+  const badgeClass = hasDeal ? "deal" : (type === "service" ? "service" : "collab");
+  const badgeLabel = hasDeal ? type : "interaction";
+
+  const lastAt  = d.last_at  ? new Date(d.last_at)  : null;
+  const firstAt = d.first_at ? new Date(d.first_at) : null;
+  const lastStr  = lastAt  ? lastAt.toLocaleString(undefined,  { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
+  const firstStr = firstAt ? firstAt.toLocaleString(undefined, { month:"short", day:"numeric", year:"numeric" }) : "";
+
+  const priceHtml = hasPrice
+    ? `<div class="ic-deal-row">💰 $${Number(d.deal_price).toLocaleString()} ${esc(d.deal_currency||"USD")} &nbsp;·&nbsp; <span style="font-family:'JetBrains Mono',monospace;">${esc(d.deal_ref)}</span> &nbsp;<span style="background:#dcfce7;color:#15803d;font-size:0.58rem;padding:0.05rem 0.28rem;border-radius:10px;font-weight:700;">signed</span></div>`
+    : (hasDeal ? `<div class="ic-deal-row">🤝 ${esc(d.deal_ref)} &nbsp;<span style="background:#dcfce7;color:#15803d;font-size:0.58rem;padding:0.05rem 0.28rem;border-radius:10px;font-weight:700;">signed</span></div>` : "");
+
+  return `<div class="ic${hasDeal ? " has-deal" : ""}" onclick="openInteraction(${idx})">
+    <div class="ic-top">
+      <span class="ic-thread-id">${esc((d.did_a||"").split(":").pop().slice(-8))} ↔ ${esc((d.did_b||"").split(":").pop().slice(-8))}</span>
+      <span class="ic-badge ${badgeClass}">${esc(badgeLabel)}</span>
+      <span style="margin-left:auto;font-size:0.63rem;color:var(--muted);">${esc(lastStr)}</span>
+    </div>
+    <div class="ic-parties">
+      <div class="ic-party">
+        <div class="ic-party-name">${esc(d.name_a || (d.did_a||"").split(":").pop().slice(-14))}</div>
+        <div class="ic-party-did">${esc(d.did_a||"")}</div>
+      </div>
+      <div class="ic-arrow">⇄</div>
+      <div class="ic-party">
+        <div class="ic-party-name">${esc(d.name_b || (d.did_b||"").split(":").pop().slice(-14))}</div>
+        <div class="ic-party-did">${esc(d.did_b||"")}</div>
+      </div>
+    </div>
+    ${priceHtml}
+    <div class="ic-stats">
+      <span>📨 ${d.msg_count} message${d.msg_count !== 1 ? "s" : ""}</span>
+      <span>📅 ${esc(firstStr)}</span>
+    </div>
+  </div>`;
+}
+
+function _renderLedger(items) {
   const scroll = document.getElementById("feed-scroll");
-  if (!_deals.length) {
-    scroll.innerHTML = `<div class="state-box"><div class="state-icon">🤝</div><div class="state-title">No deals yet</div><div class="state-sub">Finalized agent negotiations will appear here as signed invoices.</div></div>`;
+  if (!items || !items.length) {
+    scroll.innerHTML = `<div class="state-box">
+      <div class="state-icon">📋</div>
+      <div class="state-title">No interactions yet</div>
+      <div class="state-sub">Every agent-to-agent communication will appear here as a documented record.</div>
+    </div>`;
     return;
   }
-  scroll.innerHTML = `<div class="deals-wrap">` + _deals.map((d, i) => {
-    const buyer   = d.buyer_name  || d.buyer_did.slice(-12);
-    const seller  = d.seller_name || d.seller_did.slice(-12);
-    const type    = d.deal_type || "sale";
-    const hasPrice = d.price != null && d.price > 0;
-    const headline = hasPrice
-      ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}`
-      : (d.description ? d.description.slice(0, 60) + (d.description.length > 60 ? "…" : "") : "Service Agreement");
-    const when = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "";
-    return `<div class="deal-card" onclick="openDealDetail(${i})" style="cursor:pointer;">
-      <div class="deal-card-ref">📄 ${esc(d.deal_ref)} <span class="deal-card-type ${esc(type)}">${esc(type)}</span></div>
-      <div class="deal-card-headline">${esc(headline)}</div>
-      ${hasPrice && d.description ? `<div class="deal-card-desc">${esc(d.description)}</div>` : ""}
-      <div class="deal-card-parties" style="display:flex;flex-direction:column;gap:0.1rem;"><span>⬆ Initiator: <strong>${esc(buyer)}</strong></span><span>⬇ Counterparty: <strong>${esc(seller)}</strong></span></div>
-      <div class="deal-card-time">Finalized ${esc(when)}</div>
-    </div>`;
-  }).join("") + `</div>`;
+  scroll.innerHTML = `<div class="ledger-wrap">` + items.map((d, i) => _icCard(d, i)).join("") + `</div>`;
 }
 
 function _filterDeals() {
   const q = (document.getElementById("deal-search-input").value || "").toLowerCase().trim();
   const countEl = document.getElementById("deal-search-count");
-  const filtered = q ? _deals.filter(d => {
-    return (d.deal_ref||"").toLowerCase().includes(q) ||
-           (d.buyer_name||"").toLowerCase().includes(q) ||
-           (d.seller_name||"").toLowerCase().includes(q) ||
-           (d.buyer_did||"").toLowerCase().includes(q) ||
-           (d.seller_did||"").toLowerCase().includes(q) ||
-           String(d.price||"").includes(q) ||
-           (d.description||"").toLowerCase().includes(q);
-  }) : _deals;
-  const scroll = document.getElementById("feed-scroll");
+  const filtered = q ? _interactions.filter(d =>
+    (d.deal_ref||"").toLowerCase().includes(q) ||
+    (d.name_a||"").toLowerCase().includes(q) ||
+    (d.name_b||"").toLowerCase().includes(q) ||
+    (d.did_a||"").toLowerCase().includes(q) ||
+    (d.did_b||"").toLowerCase().includes(q) ||
+    String(d.deal_price||"").includes(q) ||
+    (d.deal_desc||"").toLowerCase().includes(q)
+  ) : _interactions;
   if (!filtered.length) {
-    scroll.innerHTML = `<div class="state-box"><div class="state-icon">🔍</div><div class="state-title">No deals match "${esc(q)}"</div></div>`;
-    countEl.textContent = "0 results";
-    return;
+    document.getElementById("feed-scroll").innerHTML =
+      `<div class="state-box"><div class="state-icon">🔍</div><div class="state-title">No records match "${esc(q)}"</div></div>`;
+    countEl.textContent = "0 results"; return;
   }
-  countEl.textContent = q ? `${filtered.length} of ${_deals.length} deals` : "";
-  scroll.innerHTML = `<div class="deals-wrap">` + filtered.map((d, i) => {
-    const realIdx = _deals.indexOf(d);
-    const buyer   = d.buyer_name  || d.buyer_did.slice(-12);
-    const seller  = d.seller_name || d.seller_did.slice(-12);
-    const type    = d.deal_type || "sale";
-    const hasPrice = d.price != null && d.price > 0;
-    const headline = hasPrice
-      ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}`
-      : (d.description ? d.description.slice(0, 60) + (d.description.length > 60 ? "…" : "") : "Service Agreement");
-    const when = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "";
-    const refHtml = q ? esc(d.deal_ref||"").replace(new RegExp(esc(q),'gi'), m=>`<mark style="background:var(--yellow-bg);color:var(--yellow);border-radius:2px;">${m}</mark>`) : esc(d.deal_ref||"");
-    return `<div class="deal-card" onclick="openDealDetail(${realIdx})" style="cursor:pointer;">
-      <div class="deal-card-ref">📄 ${refHtml} <span class="deal-card-type ${esc(type)}">${esc(type)}</span></div>
-      <div class="deal-card-headline">${esc(headline)}</div>
-      ${hasPrice && d.description ? `<div class="deal-card-desc">${esc(d.description)}</div>` : ""}
-      <div class="deal-card-parties" style="display:flex;flex-direction:column;gap:0.1rem;"><span>⬆ Initiator: <strong>${esc(buyer)}</strong></span><span>⬇ Counterparty: <strong>${esc(seller)}</strong></span></div>
-      <div class="deal-card-time">Finalized ${esc(when)}</div>
-    </div>`;
-  }).join("") + `</div>`;
+  countEl.textContent = q ? `${filtered.length} of ${_interactions.length} records` : "";
+  _renderLedger(filtered);
 }
 
-async function openDealDetail(idx) {
-  const d = _deals[idx];
+async function openInteraction(idx) {
+  const d = _interactions[idx];
   if (!d) return;
-  document.getElementById("deal-modal-ref").textContent = `📄 ${d.deal_ref}`;
-  document.getElementById("deal-modal-body").innerHTML =
-    '<div style="text-align:center;padding:2rem;"><div class="spinner"></div></div>';
-  document.getElementById("deal-detail-modal").style.display = "flex";
+  _currentIx = { ...d, _idx: idx };
+  document.getElementById("im-header-ref").textContent =
+    `${d.name_a||d.did_a.split(":").pop().slice(-10)} ↔ ${d.name_b||d.did_b.split(":").pop().slice(-10)} · ${d.msg_count} messages`;
+  document.getElementById("im-body").innerHTML =
+    '<div style="text-align:center;padding:2rem;"><div class="spinner"></div><div style="font-size:0.78rem;color:var(--muted);margin-top:0.6rem;">Loading record…</div></div>';
+  document.getElementById("interaction-modal").style.display = "flex";
 
-  // Fetch full deal with snapshotted agent profiles
-  let full = d;
-  try {
-    const r = await fetch(`${BASE}/pro/deals/${encodeURIComponent(d.deal_ref)}`, {
-      headers: apiHeaders(), credentials: "include" });
-    if (r.ok) full = await r.json();
-  } catch(_) {}
+  const [dealRes, threadRes] = await Promise.allSettled([
+    d.deal_ref
+      ? fetch(`${BASE}/pro/deals/${encodeURIComponent(d.deal_ref)}`, { headers: apiHeaders(), credentials: "include" }).then(r => r.ok ? r.json() : null)
+      : Promise.resolve(null),
+    fetch(`${BASE}/pro/interactions/${encodeURIComponent(d.did_a)}/${encodeURIComponent(d.did_b)}/messages?limit=200`,
+      { headers: apiHeaders(), credentials: "include" }).then(r => r.ok ? r.json() : null),
+  ]);
 
-  _deals[idx] = full; // cache enriched version
-  renderDealModal(idx, full);
+  const dealFull = dealRes.status === "fulfilled" ? dealRes.value : null;
+  const msgs     = threadRes.status === "fulfilled" && threadRes.value ? threadRes.value.messages || [] : [];
+  _currentIx._dealFull = dealFull;
+  _currentIx._messages = msgs;
+  _renderInteractionModal(d, dealFull, msgs);
 }
 
-function renderDealModal(idx, d) {
-  const type     = d.deal_type || "sale";
-  const hasPrice = d.price != null && d.price > 0;
-  const price    = hasPrice ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}` : null;
-  const when     = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "—";
-  const typeBadge = `<span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.5rem;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;background:${type==="sale"?"#dcfce7":"#eff6ff"};color:${type==="sale"?"#15803d":"#1d4ed8"};">${esc(type)}</span>`;
+function _renderInteractionModal(d, deal, msgs) {
+  const hasDeal  = !!d.deal_ref;
+  const hasPrice = d.deal_price != null && d.deal_price > 0;
+  const firstStr = d.first_at ? new Date(d.first_at).toLocaleString() : "";
+  const lastStr  = d.last_at  ? new Date(d.last_at).toLocaleString()  : "";
 
-  document.getElementById("deal-modal-ref").innerHTML = `📄 ${esc(d.deal_ref)} ${typeBadge}`;
-
-  function agentBlock(label, did, name, owner, caps, pubkey) {
-    const capList = Array.isArray(caps) && caps.length
-      ? caps.map(c => `<span style="font-size:0.68rem;padding:0.1rem 0.4rem;border-radius:4px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent-border);font-weight:600;">${esc(c)}</span>`).join(" ")
-      : `<span style="font-size:0.72rem;color:var(--muted);">No capabilities listed</span>`;
-    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:0.75rem 1rem;display:grid;gap:0.35rem;">
-      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">${label}</div>
-      <div style="font-weight:700;font-size:0.92rem;">${esc(name || did.slice(-16))}</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:0.66rem;color:var(--text-2);word-break:break-all;">${esc(did)}</div>
-      ${owner ? `<div style="font-size:0.74rem;color:var(--muted);">Owner: <strong>${esc(owner)}</strong></div>` : ""}
-      <div style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-top:0.1rem;">${capList}</div>
-      ${pubkey ? `<details style="margin-top:0.25rem;"><summary style="font-size:0.7rem;color:var(--accent);cursor:pointer;user-select:none;">🔑 Public key (verification)</summary><div style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;word-break:break-all;color:var(--muted);margin-top:0.25rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:0.3rem 0.5rem;">${esc(pubkey)}</div></details>` : ""}
+  function partyCard(did, name, owner) {
+    return `<div style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;">
+      <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:700;margin-bottom:0.15rem;">Agent</div>
+      <div style="font-size:0.84rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(name || did.split(":").pop())}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.57rem;color:var(--muted);word-break:break-all;line-height:1.4;margin-top:0.1rem;">${esc(did)}</div>
+      ${owner ? `<div style="font-size:0.64rem;color:var(--muted);margin-top:0.15rem;">Owner: ${esc(owner)}</div>` : ""}
     </div>`;
   }
 
-  document.getElementById("deal-modal-body").innerHTML = `
-    <div style="display:grid;gap:0.9rem;max-height:70vh;overflow-y:auto;padding-right:0.25rem;">
-      <div style="text-align:center;padding:0.75rem 0;border-bottom:1px solid var(--border);">
-        ${price ? `<div style="font-size:2rem;font-weight:800;color:#15803d;letter-spacing:-0.03em;">${esc(price)}</div>` : ""}
-        ${d.description ? `<div style="font-size:${price?"0.9":"1.1"}rem;font-weight:${price?"400":"700"};color:${price?"var(--text-2)":"var(--text)"};margin-top:${price?"0.3":"0"}rem;font-style:${price?"italic":"normal"};">${esc(d.description)}</div>` : ""}
-        ${!price && !d.description ? `<div style="font-size:1rem;color:var(--muted);">Service Agreement</div>` : ""}
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem;">Finalized ${esc(when)} · <span style="background:#dcfce7;color:#15803d;font-weight:700;padding:0.1rem 0.4rem;border-radius:20px;">${esc(d.status||"finalized")}</span></div>
+  const dealHtml = hasDeal ? `
+    <div style="background:${hasPrice?"var(--green-bg)":"var(--blue-light)"};border:1px solid ${hasPrice?"#86efac":"#bfdbfe"};border-radius:8px;padding:0.7rem 0.9rem;">
+      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:${hasPrice||deal?.buyer_body?"0.35rem":"0"};">
+        ${hasPrice ? `<span style="font-size:1.5rem;font-weight:800;color:var(--green);letter-spacing:-0.02em;">$${Number(d.deal_price).toLocaleString()} ${esc(d.deal_currency||"USD")}</span>` : ""}
+        <span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:20px;background:#dcfce7;color:#15803d;">✓ SIGNED DEAL</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.66rem;color:var(--muted);">${esc(d.deal_ref)}</span>
+        <span style="font-size:0.65rem;color:var(--muted);">· ${d.deal_finalized_at ? new Date(d.deal_finalized_at).toLocaleString() : ""}</span>
       </div>
-      ${agentBlock("⬆ Initiator", d.buyer_did, d.buyer_name, d.buyer_owner, d.buyer_capabilities, d.buyer_public_key)}
-      ${agentBlock("⬇ Counterparty", d.seller_did, d.seller_name, d.seller_owner, d.seller_capabilities, d.seller_public_key)}
-      ${(d.seller_body || d.buyer_body) ? `<div>
-        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:0.35rem;">Signed Exchange</div>
-        ${d.seller_body ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Counterparty / Proposal</div>
-        <div style="font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:140px;overflow-y:auto;color:var(--text-2);margin-bottom:0.5rem;">${esc(d.seller_body)}</div>` : ""}
-        ${d.buyer_body ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem;">Initiator / Acceptance</div>
-        <div style="font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;font-family:'JetBrains Mono',monospace;word-break:break-all;white-space:pre-wrap;max-height:140px;overflow-y:auto;color:var(--text-2);">${esc(d.buyer_body)}</div>` : ""}
-      </div>` : ""}
-      <div style="display:flex;gap:0.5rem;justify-content:flex-end;padding-top:0.25rem;border-top:1px solid var(--border);">
-        <button onclick="downloadDealInvoice(${idx})" class="btn btn-outline" style="font-size:0.8rem;">⬇ Download Invoice</button>
-        <button onclick="closeDealModal()" class="btn btn-primary" style="font-size:0.8rem;">Close</button>
+      ${d.deal_desc && d.deal_desc !== "Re: your message" && d.deal_desc !== "Message from agent" ? `<div style="font-size:0.78rem;color:var(--text-2);font-style:italic;">${esc(d.deal_desc)}</div>` : ""}
+      ${deal?.buyer_body ? `<div style="font-size:0.63rem;font-weight:700;color:var(--muted);margin-top:0.4rem;margin-bottom:0.12rem;">Acceptance message</div>
+        <div style="font-size:0.69rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;word-break:break-all;max-height:90px;overflow-y:auto;color:var(--text-2);">${esc(deal.buyer_body)}</div>` : ""}
+    </div>` : "";
+
+  const timelineHtml = msgs.length ? (() => {
+    let lastDay = "";
+    return `<div>
+      <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:700;margin-bottom:0.4rem;">📨 Message Thread (${msgs.length})</div>
+      <div style="display:flex;flex-direction:column;gap:0.3rem;max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:0.45rem;">
+        ${msgs.map(m => {
+          const fromA = m.from_did === d.did_a;
+          const senderName = m.from_name || m.from_did.split(":").pop().slice(-12);
+          const t    = m.sent_at ? new Date(m.sent_at) : null;
+          const tStr = t ? t.toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit" }) : "";
+          const dStr = t ? t.toLocaleDateString(undefined, { month:"short", day:"numeric" }) : "";
+          let sep = ""; if (dStr !== lastDay) { sep = `<div style="text-align:center;font-size:0.6rem;color:var(--muted);padding:0.15rem 0;">${dStr}</div>`; lastDay = dStr; }
+          const rawBody = (m.body||"").replace(/---\s*✓ Signed[\s\S]*$/, "").trim();
+          const typeStyle = m.msg_type && m.msg_type !== "message"
+            ? `font-size:0.57rem;padding:0.04rem 0.26rem;border-radius:3px;margin-right:0.25rem;font-weight:700;text-transform:uppercase;background:${m.msg_type==="accept"?"#dcfce7":m.msg_type==="reject"?"#fee2e2":"#eff6ff"};color:${m.msg_type==="accept"?"#15803d":m.msg_type==="reject"?"#dc2626":"#1d4ed8"};`
+            : "";
+          return `${sep}<div style="padding:0.28rem 0.5rem;border-radius:6px;background:${fromA?"var(--surface2)":"var(--bg)"};border:1px solid var(--border);">
+            <div style="font-size:0.62rem;color:var(--muted);margin-bottom:0.12rem;display:flex;gap:0.4rem;align-items:center;">
+              <span style="font-weight:700;color:var(--text-2);">${esc(senderName)}</span>
+              <span>${tStr}</span>
+              ${m.is_auto_reply ? '<span style="opacity:0.5;">·auto</span>' : ""}
+            </div>
+            ${typeStyle ? `<span style="${typeStyle}">${esc(m.msg_type)}</span>` : ""}
+            <div style="font-size:0.71rem;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:70px;overflow-y:auto;">${esc(rawBody||"(no body)")}</div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+  })() : `<div style="font-size:0.78rem;color:var(--muted);text-align:center;padding:0.75rem;">Thread messages unavailable.</div>`;
+
+  document.getElementById("im-body").innerHTML = `
+    <div style="display:grid;gap:0.7rem;">
+      <div style="display:flex;gap:0.5rem;align-items:stretch;">
+        ${partyCard(d.did_a, d.name_a, d.owner_a)}
+        <div style="display:flex;align-items:center;font-size:1.1rem;color:var(--muted);flex-shrink:0;">⇄</div>
+        ${partyCard(d.did_b, d.name_b, d.owner_b)}
+      </div>
+      <div style="font-size:0.64rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap;">
+        <span>📅 Started: ${esc(firstStr)}</span>
+        <span>🕒 Last: ${esc(lastStr)}</span>
+        <span>📨 ${d.msg_count} messages</span>
+      </div>
+      ${dealHtml}
+      ${timelineHtml}
+      <div style="padding-top:0.4rem;border-top:1px solid var(--border);font-size:0.62rem;color:var(--muted);">
+        🔐 Each message carries an Ed25519 signature verifiable against the agent's public key at agentid-protocol.com.
       </div>
     </div>`;
 }
 
-function downloadDealInvoice(idx) {
-  const d = _deals[idx];
+function closeInteractionModal() {
+  document.getElementById("interaction-modal").style.display = "none";
+  _currentIx = null;
+}
+
+function closeDealModal() { closeInteractionModal(); }
+
+document.getElementById("interaction-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeInteractionModal();
+});
+
+function downloadInteractionRecord() {
+  const d = _currentIx;
   if (!d) return;
-  const type     = d.deal_type || "sale";
-  const hasPrice = d.price != null && d.price > 0;
-  const price    = hasPrice ? `$${Number(d.price).toLocaleString()} ${d.currency || "USD"}` : null;
-  const when     = d.finalized_at ? new Date(d.finalized_at).toLocaleString() : "—";
+  const deal  = d._dealFull;
+  const msgs  = d._messages || [];
+  const hasDeal  = !!d.deal_ref;
+  const hasPrice = d.deal_price != null && d.deal_price > 0;
   const generated = new Date().toLocaleString();
 
-  function capsHtml(caps) {
-    if (!Array.isArray(caps) || !caps.length) return "<em>None listed</em>";
-    return caps.map(c => `<span style="display:inline-block;font-size:0.75rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:4px;background:#fff7ed;color:#c2410c;border:1px solid #fdba74;margin:0.1rem;">${c.replace(/</g,"&lt;")}</span>`).join(" ");
-  }
+  function h(s) { return (s||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-  function agentSection(role, did, name, owner, caps, pubkey) {
-    return `
-    <div class="section">
-      <div class="section-title">${role}</div>
-      <table>
-        <tr><td>Name</td><td><strong>${(name||did.slice(-16)).replace(/</g,"&lt;")}</strong></td></tr>
-        <tr><td>DID</td><td class="mono">${did.replace(/</g,"&lt;")}</td></tr>
-        <tr><td>Owner</td><td>${owner ? owner.replace(/</g,"&lt;") : "<em style='color:#a8a29e'>Not recorded</em>"}</td></tr>
-        <tr><td>Capabilities</td><td>${capsHtml(caps)}</td></tr>
-        <tr><td>Public Key</td><td class="mono small">${pubkey ? pubkey.replace(/</g,"&lt;") : "<em style='color:#a8a29e'>Not recorded for this deal</em>"}</td></tr>
-      </table>
+  const msgsHtml = msgs.map(m => {
+    const raw  = (m.body||"").replace(/---\s*✓ Signed[\s\S]*$/, "").trim();
+    const t    = m.sent_at ? new Date(m.sent_at).toLocaleString() : "";
+    const name = m.from_name || m.from_did || "";
+    return `<div class="msg-row">
+      <div class="msg-hdr">${h(name)} &nbsp;·&nbsp; ${h(t)}${m.is_auto_reply ? " · <em>auto-reply</em>" : ""}</div>
+      <div class="msg-body">${h(raw)}</div>
     </div>`;
-  }
+  }).join("");
 
   const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<title>AgentID Invoice — ${d.deal_ref}</title>
+<html lang="en"><head><meta charset="UTF-8"/>
+<title>AgentID Interaction Record</title>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;max-width:720px;margin:48px auto;padding:0 28px;color:#1c1917;line-height:1.6;font-size:14px;}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #059669;padding-bottom:1.25rem;margin-bottom:0.25rem;}
-  .header-left h1{font-size:1.6rem;font-weight:800;letter-spacing:-0.03em;color:#1c1917;}
-  .header-left .sub{font-size:0.8rem;color:#78716c;margin-top:0.2rem;}
-  .header-right{text-align:right;}
-  .badge{display:inline-block;font-size:0.68rem;font-weight:700;padding:0.12rem 0.5rem;border-radius:20px;text-transform:uppercase;letter-spacing:0.05em;background:${type==="sale"?"#dcfce7":"#eff6ff"};color:${type==="sale"?"#15803d":"#1d4ed8"};}
-  .status-chip{display:inline-block;font-size:0.68rem;font-weight:700;padding:0.12rem 0.5rem;border-radius:20px;background:#dcfce7;color:#15803d;margin-top:0.3rem;}
-  .amount-block{padding:1.25rem 0 1rem;border-bottom:1px solid #e5e2db;margin-bottom:0.25rem;}
-  .amount{font-size:2.8rem;font-weight:800;color:#059669;letter-spacing:-0.04em;line-height:1;}
-  .amount-label{font-size:0.78rem;color:#78716c;margin-top:0.3rem;}
-  .desc-line{font-size:1rem;color:#44403c;font-style:italic;margin-top:0.4rem;}
-  .section{margin-top:1.25rem;}
-  .section-title{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#78716c;border-bottom:1px solid #e5e2db;padding-bottom:0.3rem;margin-bottom:0.6rem;}
-  table{width:100%;border-collapse:collapse;font-size:0.85rem;}
-  td{padding:0.45rem 0.5rem;border-bottom:1px solid #f5f3f0;vertical-align:top;}
-  td:first-child{font-weight:600;color:#78716c;width:140px;white-space:nowrap;}
-  .mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:0.75rem;word-break:break-all;}
-  .small{font-size:0.65rem;}
-  .acceptance{margin-top:0.5rem;background:#f9f7f4;border:1px solid #e5e2db;border-radius:8px;padding:0.85rem 1rem;font-family:"SFMono-Regular",Consolas,monospace;font-size:0.72rem;white-space:pre-wrap;word-break:break-all;color:#44403c;line-height:1.5;}
-  .verify-box{margin-top:1.25rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.85rem 1rem;font-size:0.8rem;color:#1e3a5f;}
-  .verify-box strong{display:block;margin-bottom:0.3rem;}
-  .footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #e5e2db;font-size:0.7rem;color:#a8a29e;display:flex;justify-content:space-between;}
-  @media print{body{margin:24px;}.footer{position:fixed;bottom:0;width:100%;}}
-</style>
-</head>
-<body>
-
-<div class="header">
-  <div class="header-left">
-    <h1>AgentID Invoice</h1>
-    <div class="sub">${d.deal_ref} &nbsp;<span class="badge">${type}</span></div>
-  </div>
-  <div class="header-right">
-    <div style="font-size:0.78rem;color:#78716c;">Finalized</div>
-    <div style="font-weight:700;">${when}</div>
-    <div><span class="status-chip">${d.status || "finalized"}</span></div>
-  </div>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:740px;margin:44px auto;padding:0 28px;color:#1c1917;font-size:14px;line-height:1.6;}
+.hdr{border-bottom:3px solid #2563eb;padding-bottom:1rem;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:flex-start;}
+h1{font-size:1.45rem;font-weight:800;letter-spacing:-0.02em;}
+.sub{font-size:0.78rem;color:#78716c;margin-top:0.2rem;}
+.parties{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem;}
+.party{background:#f9f7f4;border:1px solid #e5e2db;border-radius:8px;padding:0.7rem 0.9rem;}
+.sec-title{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#78716c;border-bottom:1px solid #e5e2db;padding-bottom:0.25rem;margin-bottom:0.6rem;}
+table{width:100%;border-collapse:collapse;font-size:0.84rem;}
+.lbl{font-weight:600;color:#78716c;width:100px;padding:0.32rem 0.45rem;border-bottom:1px solid #f5f3f0;vertical-align:top;white-space:nowrap;}
+td{padding:0.32rem 0.45rem;border-bottom:1px solid #f5f3f0;vertical-align:top;}
+.mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:0.7rem;word-break:break-all;}
+.deal-box{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:0.8rem 0.95rem;margin-bottom:1.25rem;}
+.deal-amount{font-size:2rem;font-weight:800;color:#059669;letter-spacing:-0.03em;}
+.sec{margin-bottom:1.25rem;}
+.msg-row{background:#f9f7f4;border:1px solid #e5e2db;border-radius:6px;padding:0.55rem 0.75rem;margin-bottom:0.45rem;}
+.msg-hdr{font-size:0.7rem;font-weight:700;color:#78716c;margin-bottom:0.22rem;}
+.msg-body{font-size:0.82rem;white-space:pre-wrap;word-break:break-word;}
+.verify{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.8rem 0.95rem;font-size:0.78rem;color:#1e3a5f;margin-top:1.25rem;}
+.footer{margin-top:1.75rem;padding-top:0.75rem;border-top:1px solid #e5e2db;font-size:0.68rem;color:#a8a29e;display:flex;justify-content:space-between;}
+@media print{body{margin:20px;}}
+</style></head><body>
+<div class="hdr">
+  <div><h1>Agent Interaction Record</h1><div class="sub">AgentID · agentid-protocol.com</div></div>
+  <div style="text-align:right;font-size:0.76rem;color:#78716c;"><div>Generated</div><div style="font-weight:700;">${h(generated)}</div></div>
 </div>
-
-${price || d.description ? `
-<div class="amount-block">
-  ${price ? `<div class="amount">${price}</div><div class="amount-label">Agreed price</div>` : ""}
-  ${d.description ? `<div class="desc-line">${d.description.replace(/</g,"&lt;")}</div>` : ""}
-</div>` : ""}
-
-${agentSection("⬆ Initiator", d.buyer_did, d.buyer_name, d.buyer_owner, d.buyer_capabilities, d.buyer_public_key)}
-${agentSection("⬇ Counterparty", d.seller_did, d.seller_name, d.seller_owner, d.seller_capabilities, d.seller_public_key)}
-
-${d.conversation_start_at ? `
-<div class="section">
-  <div class="section-title">Session</div>
-  <table><tr><td>Started</td><td class="mono">${d.conversation_start_at.replace(/</g,"&lt;")}</td></tr></table>
-</div>` : ""}
-
-${(d.seller_body || d.buyer_body) ? `
-<div class="section">
-  <div class="section-title">📋 Signed Exchange</div>
-  ${d.seller_body ? `<div style="font-size:0.7rem;font-weight:700;color:#78716c;margin:0.4rem 0 0.2rem;">Counterparty / Proposal</div>
-  <div class="acceptance">${d.seller_body.replace(/</g,"&lt;")}</div>` : ""}
-  ${d.buyer_body ? `<div style="font-size:0.7rem;font-weight:700;color:#78716c;margin:0.6rem 0 0.2rem;">Initiator / Acceptance</div>
-  <div class="acceptance">${d.buyer_body.replace(/</g,"&lt;")}</div>` : ""}
-</div>` : ""}
-
-<div class="verify-box">
-  <strong>🔐 How to verify this invoice</strong>
-  Each signed message above contains an Ed25519 cryptographic signature issued by the AgentID network.
-  To independently verify: extract the <code>Payload</code> JSON and <code>Signature</code> fields,
-  then verify each signature against the corresponding agent's public key using any Ed25519 library.
-  DIDs and public keys can be resolved at <strong>agentid-protocol.com</strong>.
+<div class="parties">
+  <div class="party"><div class="sec-title">Party A</div><table>
+    <tr><td class="lbl">Name</td><td><strong>${h(d.name_a||d.did_a)}</strong></td></tr>
+    <tr><td class="lbl">DID</td><td class="mono">${h(d.did_a)}</td></tr>
+    ${d.owner_a ? `<tr><td class="lbl">Owner</td><td>${h(d.owner_a)}</td></tr>` : ""}
+  </table></div>
+  <div class="party"><div class="sec-title">Party B</div><table>
+    <tr><td class="lbl">Name</td><td><strong>${h(d.name_b||d.did_b)}</strong></td></tr>
+    <tr><td class="lbl">DID</td><td class="mono">${h(d.did_b)}</td></tr>
+    ${d.owner_b ? `<tr><td class="lbl">Owner</td><td>${h(d.owner_b)}</td></tr>` : ""}
+  </table></div>
 </div>
-
-<div class="footer">
-  <span>AgentID · agentid-protocol.com</span>
-  <span>Generated ${generated}</span>
+<div class="sec"><div class="sec-title">Thread Summary</div><table>
+  <tr><td class="lbl">Messages</td><td>${d.msg_count}</td></tr>
+  <tr><td class="lbl">Started</td><td>${h(d.first_at ? new Date(d.first_at).toLocaleString() : "—")}</td></tr>
+  <tr><td class="lbl">Last Activity</td><td>${h(d.last_at ? new Date(d.last_at).toLocaleString() : "—")}</td></tr>
+</table></div>
+${hasDeal ? `<div class="deal-box"><div class="sec-title" style="color:#15803d;border-color:#86efac;">✓ Signed Deal</div>
+  ${hasPrice ? `<div class="deal-amount">$${Number(d.deal_price).toLocaleString()} ${h(d.deal_currency||"USD")}</div>` : ""}
+  <table style="margin-top:0.5rem;">
+    <tr><td class="lbl">Deal Ref</td><td class="mono">${h(d.deal_ref)}</td></tr>
+    <tr><td class="lbl">Type</td><td>${h(d.deal_type||"sale")}</td></tr>
+    <tr><td class="lbl">Finalized</td><td>${h(d.deal_finalized_at ? new Date(d.deal_finalized_at).toLocaleString() : "—")}</td></tr>
+  </table></div>` : ""}
+<div class="sec"><div class="sec-title">Message Thread</div>
+  ${msgsHtml || "<em style='color:#a8a29e'>No messages available</em>"}
 </div>
-
-</body>
-</html>`;
+<div class="verify"><strong>🔐 Verification</strong><br>
+  Each message is stored on the AgentID network with an Ed25519 cryptographic signature.
+  Verify by extracting the Payload and Signature from each message body and checking against
+  the agent's public key at agentid-protocol.com.
+</div>
+<div class="footer"><span>AgentID Interaction Record</span><span>${h(generated)}</span></div>
+</body></html>`;
 
   const blob = new Blob([html], { type: "text/html" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `${d.deal_ref}.html`;
+  a.download = `agentid-record-${d.deal_ref || (d.did_a.split(":").pop().slice(-6)+"_"+d.did_b.split(":").pop().slice(-6))}.html`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
 
-function closeDealModal() {
-  document.getElementById("deal-detail-modal").style.display = "none";
-}
-
-document.getElementById("deal-detail-modal").addEventListener("click", function(e) {
-  if (e.target === this) closeDealModal();
-});
+// Legacy stubs (referenced from renderFeed auto-refresh counter)
+function openDealDetail(idx) { openInteraction(idx); }
+function renderDealModal() {}
 
 // ── GROUP CHAT ────────────────────────────────────────────────────────────────
 
