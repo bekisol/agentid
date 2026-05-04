@@ -23,7 +23,7 @@
       --border: #E5E2DB; --border-dark: #C9C5BC;
       --text: #1C1917; --text-2: #44403C; --muted: #78716C;
       --accent: #C2410C; --accent-light: #FFF7ED; --accent-border: #FDBA74;
-      --blue: #2563eb; --blue-dark: #1d4ed8; --blue-light: #eff6ff;
+      --blue: #4f86e8; --blue-dark: #3b72d4; --blue-light: #eff6ff;
       --sent-bg: #5C8EC4; --sent-bg-dark: #4A76A8;
       --green: #059669; --green-bg: #ECFDF5;
       --red: #DC2626; --red-bg: #FEF2F2;
@@ -151,15 +151,25 @@
     .pubkey-box { margin-top:0.25rem; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:0.35rem 0.5rem; font-size:0.6rem; font-family:"JetBrains Mono",monospace; word-break:break-all; color:var(--muted); max-width:340px; }
 
     /* ── Signature block ── */
-    .sig-block { margin-top:0.4rem; border-radius:6px; border:1px solid rgba(74,222,128,0.25); font-size:0.68rem; overflow:hidden; }
-    .sig-header { display:flex; align-items:center; gap:0.4rem; padding:0.22rem 0.55rem; background:rgba(74,222,128,0.07); }
+    .sig-block { margin-top:0.4rem; border-radius:6px; border:1px solid rgba(74,222,128,0.3); font-size:0.68rem; overflow:hidden; display:inline-flex; flex-direction:column; max-width:100%; }
+    .sig-header { display:flex; align-items:center; gap:0.4rem; padding:0.2rem 0.5rem; background:rgba(0,0,0,0.18); cursor:pointer; user-select:none; }
+    .sig-header:hover { background:rgba(0,0,0,0.26); }
+    .bubble-row.received .sig-header { background:rgba(0,0,0,0.05); }
+    .bubble-row.received .sig-header:hover { background:rgba(0,0,0,0.09); }
     .sig-badge { font-size:0.62rem; font-weight:700; color:#4ade80; letter-spacing:0.03em; flex-shrink:0; }
-    .sig-meta { font-family:"JetBrains Mono",monospace; font-size:0.6rem; opacity:0.6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
-    .sig-details { padding:0.3rem 0.55rem 0.35rem; display:flex; flex-direction:column; gap:0.15rem; background:rgba(0,0,0,0.1); }
+    .sig-did-short { font-family:"JetBrains Mono",monospace; font-size:0.6rem; color:rgba(255,255,255,0.6); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
+    .bubble-row.received .sig-did-short { color:var(--muted); }
+    .sig-chevron { font-size:0.55rem; color:rgba(255,255,255,0.4); margin-left:0.2rem; flex-shrink:0; transition:transform .15s; }
+    .bubble-row.received .sig-chevron { color:var(--muted); }
+    .sig-block.open .sig-chevron { transform:rotate(180deg); }
+    .sig-details { padding:0.3rem 0.55rem 0.35rem; display:none; flex-direction:column; gap:0.15rem; background:rgba(0,0,0,0.18); }
+    .sig-block.open .sig-details { display:flex; }
     .bubble-row.received .sig-details { background:rgba(0,0,0,0.04); }
     .sig-row { display:flex; gap:0.35rem; align-items:baseline; flex-wrap:wrap; }
-    .sig-row-label { font-size:0.58rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; opacity:0.5; flex-shrink:0; min-width:32px; }
-    .sig-row-val { font-family:"JetBrains Mono",monospace; font-size:0.6rem; word-break:break-all; opacity:0.7; }
+    .sig-row-label { font-size:0.58rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:rgba(255,255,255,0.45); flex-shrink:0; min-width:32px; }
+    .bubble-row.received .sig-row-label { color:var(--muted); }
+    .sig-row-val { font-family:"JetBrains Mono",monospace; font-size:0.6rem; word-break:break-all; color:rgba(255,255,255,0.8); }
+    .bubble-row.received .sig-row-val { color:var(--text-2); }
 
     /* Empty / loading states */
     .state-box { text-align:center; padding:4rem 2rem; color:var(--muted); }
@@ -1338,13 +1348,20 @@ function _parseSignedBody(body) {
   return result;
 }
 
+function _toggleSigBlock(idx) {
+  const el = document.getElementById('sigb-' + idx);
+  if (el) el.classList.toggle('open');
+}
+
 function _renderSigBlock(sig, idx) {
   const time = sig.payload && sig.payload.timestamp ? new Date(sig.payload.timestamp*1000).toLocaleString() : '';
   const nonce = sig.payload ? (sig.payload.nonce || '') : '';
+  const didShort = sig.did ? sig.did.slice(-20) : '';
   return `<div class="sig-block" id="sigb-${idx}">
-    <div class="sig-header">
+    <div class="sig-header" onclick="_toggleSigBlock(${idx})">
       <span class="sig-badge">✓ Signed by AgentID</span>
-      <span class="sig-meta">${esc(sig.did)}</span>
+      <span class="sig-did-short" title="${esc(sig.did)}">…${esc(didShort)}</span>
+      <span class="sig-chevron">▾</span>
     </div>
     <div class="sig-details">
       ${time ? `<div class="sig-row"><span class="sig-row-label">Time</span><span class="sig-row-val">${time}</span></div>` : ''}
