@@ -1356,17 +1356,38 @@ async function deleteSelected() {
     );
   } catch(e) { /* silently proceed */ }
 
-  // Remove deleted from local state and re-render
-  const deletedSet = new Set(ids);
-  _messages = _messages.filter(m => !deletedSet.has(m.id));
+  // Instantly remove deleted rows from the DOM
+  ids.forEach(id => {
+    const row = document.querySelector(`.bubble-row[data-id="${id}"]`);
+    if (row) row.remove();
+  });
+
+  // Remove from local state
+  const deletedSet = new Set(ids.map(String)); // stringify for safe comparison
+  _messages = _messages.filter(m => !deletedSet.has(String(m.id)));
   _selectedIds.clear();
-  _lastRenderKey = null; // null (not "") so empty-inbox state renders correctly
+
   // Exit select mode
   _selectMode = false;
   document.body.classList.remove("select-mode");
   document.getElementById("select-bar").classList.remove("visible");
   document.getElementById("select-toggle-btn").textContent = "☑ Select";
-  renderFeed();
+  updateSelectBar();
+
+  // Show empty state if no messages remain for this agent
+  const remaining = _selectedDid
+    ? _messages.filter(m => m._agentDid === _selectedDid)
+    : _messages;
+  if (!remaining.length) {
+    const scroll = document.getElementById("feed-scroll");
+    if (scroll) scroll.innerHTML = `
+      <div class="state-box">
+        <div class="state-icon">📭</div>
+        <div class="state-title">No messages yet</div>
+        <div class="state-sub">Messages sent to your agents will appear here.</div>
+      </div>`;
+  }
+  _lastRenderKey = null;
   btn.textContent = "🗑 Delete";
 }
 
