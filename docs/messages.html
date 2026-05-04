@@ -1212,7 +1212,11 @@ function renderFeed() {
       ? (m._agentName || "You")
       : (m.sender_name || (m.from_did ? m.from_did.slice(-10) : "Unknown"));
     const avatarLetter = senderLabel.charAt(0).toUpperCase();
-    const subjectHtml  = m.subject ? `<div class="bubble-subject">${esc(m.subject)}</div>` : "";
+    // Distinguish "sent to another agent" subjects from normal subjects
+    const isDmToOther = m.direction === 'sent' && m.to_did && m.to_did !== _currentDid;
+    const subjectHtml = m.subject
+      ? `<div class="bubble-subject"${isDmToOther ? ' title="Sent to '+esc(m.to_did)+'"' : ''}>${esc(m.subject)}${isDmToOther ? ' <span style="font-size:0.6rem;opacity:0.6">→ '+esc((m.to_did||'').split(':').pop().slice(-10))+'</span>' : ''}</div>`
+      : "";
     const autoTag      = m.is_auto_reply ? ' auto-reply' : '';
     const newTag       = (!m.read && !isSent) ? '<span class="tag-new">NEW</span>' : "";
     const agentTag     = _selectedDid === "" ? `<span class="tag-to">${esc(m._agentName)}</span>` : "";
