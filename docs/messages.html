@@ -2122,12 +2122,23 @@ function renderGroupsSidebar() {
     const badge = hasPending
       ? `<span class="group-badge invite">Invite</span>`
       : `<span class="group-badge count">${r.active_members}</span>`;
+    const removeLabel = r.is_owner ? "Delete group" : "Leave group";
     return `<div class="sidebar-item-group${active ? " active" : ""}${hasPending ? " pending" : ""}"
-              data-room-id="${r.id}" onclick="showGroupView(${r.id})">
+              data-room-id="${r.id}" onclick="showGroupView(${r.id})" style="position:relative">
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">👥 ${esc(r.name)}</span>
       ${badge}
+      <span title="${removeLabel}" onclick="event.stopPropagation();openLeaveModal(${r.id})"
+        style="margin-left:0.25rem;opacity:0;font-size:0.8rem;color:var(--muted);cursor:pointer;transition:opacity 0.15s"
+        class="group-remove-btn">✕</span>
     </div>`;
   }).join('');
+  // Show × on hover
+  el.querySelectorAll(".sidebar-item-group").forEach(item => {
+    const btn = item.querySelector(".group-remove-btn");
+    if (!btn) return;
+    item.addEventListener("mouseenter", () => btn.style.opacity = "0.7");
+    item.addEventListener("mouseleave", () => btn.style.opacity = "0");
+  });
 }
 
 // Load and display a group room thread
@@ -2155,9 +2166,11 @@ async function showGroupView(roomId) {
   // Header action buttons
   const headerRight = document.getElementById("header-right-actions");
   if (headerRight) {
+    const _isOwner = room ? room.is_owner : false;
+    const _leaveLabel = _isOwner ? "🗑 Delete" : "Leave";
     headerRight.innerHTML = `
       <button class="btn btn-outline" style="font-size:0.78rem" onclick="openInviteModal(${roomId})">＋ Invite</button>
-      <button class="btn btn-outline" style="font-size:0.78rem;color:var(--red);border-color:var(--red)" onclick="openLeaveModal(${roomId})">Leave</button>
+      <button class="btn btn-outline" style="font-size:0.78rem;color:var(--red);border-color:var(--red)" onclick="openLeaveModal(${roomId})">${_leaveLabel}</button>
     `;
   }
 
@@ -2473,25 +2486,50 @@ document.getElementById("invite-modal").addEventListener("click", function(e) {
 
 async function openLeaveModal(roomId) {
   const room = _rooms.find(r => r.id === roomId);
-  // Find my active agents in the room
-  let myActiveInRoom = [];
+  const name = room ? room.name : `Room ${roomId}`;
+  const isOwner = room ? room.is_owner : false;
+
+  // Fetch current membership state
+  let detail = null;
   try {
     const r = await fetch(`${BASE}/pro/chat/rooms/${roomId}`, { headers: apiHeaders(), credentials: "include" });
-    if (r.ok) {
-      const d = await r.json();
-      myActiveInRoom = (d.members || []).filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
-    }
+    if (r.ok) detail = await r.json();
   } catch(_) {}
 
-  if (!myActiveInRoom.length) { alert("None of your agents are active in this room."); return; }
+  const members = detail ? (detail.members || []) : [];
+  const myActiveInRoom = members.filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
+  const myAnyInRoom   = members.filter(m => m.status !== "left"   && _agents.some(a => a.did === m.did));
 
-  const name = room ? room.name : `Room ${roomId}`;
-  const confirmed = confirm(`Leave "${name}"?\n\nThis will remove ${myActiveInRoom.map(m => m.did.slice(-12)).join(", ")} from the group. Your message history will be preserved for other members.`);
-  if (!confirmed) return;
+  const _doCleanup = async () => {
+    _rooms = _rooms.filter(r => r.id !== roomId);
+    renderGroupsSidebar();
+    if (_activeRoomId === roomId) {
+      _activeRoomId = null; _stopGroupPoll(); _selectedDid = "";
+      loadAll(true);
+    }
+  };
 
-  // Leave with all active agents
+  // Owner: offer to delete the entire room
+  if (isOwner) {
+    if (!confirm(`Delete "${name}"?\n\nThis permanently removes the room and all its messages for everyone.`)) return;
+    try {
+      await fetch(`${BASE}/pro/chat/rooms/${roomId}`, { method: "DELETE", headers: apiHeaders(), credentials: "include" });
+    } catch(_) {}
+    await _doCleanup();
+    return;
+  }
+
+  // Non-owner with no active/invited agents — just remove from sidebar silently
+  if (!myAnyInRoom.length) {
+    await _doCleanup();
+    return;
+  }
+
+  const agentLabels = myAnyInRoom.map(m => _agents.find(a => a.did === m.did)?.name || m.did.slice(-12)).join(", ");
+  if (!confirm(`Leave "${name}"?\n\nThis will remove ${agentLabels} from the group.`)) return;
+
   try {
-    await Promise.all(myActiveInRoom.map(m =>
+    await Promise.all(myAnyInRoom.map(m =>
       fetch(`${BASE}/pro/chat/rooms/${roomId}/leave`, {
         method: "POST",
         headers: apiHeaders(),
@@ -2499,16 +2537,11 @@ async function openLeaveModal(roomId) {
         body: JSON.stringify({ did: m.did }),
       })
     ));
-    // Refresh rooms list and return to main view
-    const roomsRes = await fetch(`${BASE}/pro/chat/rooms`, { headers: apiHeaders(), credentials: "include" });
-    if (roomsRes.ok) { const d = await roomsRes.json(); _rooms = d.rooms || []; renderGroupsSidebar(); }
-    _activeRoomId = null;
-    _stopGroupPoll();
-    _selectedDid = "";
-    loadAll(true);
   } catch(e) {
     alert("Could not leave group: " + e.message);
+    return;
   }
+  await _doCleanup();
 }
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
