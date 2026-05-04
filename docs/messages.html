@@ -268,6 +268,53 @@
       .sidebar { width:100%; height:auto; max-height:44px; overflow:hidden; border-right:none; border-bottom:1px solid var(--border); }
       .sidebar.open { max-height:220px; }
     }
+    /* ── Group command panel ── */
+    .gcmd-panel {
+      width: 0; flex-shrink: 0; overflow: hidden;
+      background: var(--surface); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      transition: width 0.22s ease;
+    }
+    .gcmd-panel.open { width: 300px; }
+    .gcmd-header {
+      padding: 0.65rem 1rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0; background: var(--surface2);
+    }
+    .gcmd-header-title { font-weight: 700; font-size: 0.85rem; white-space: nowrap; }
+    .gcmd-close-btn { background: none; border: none; font-size: 1rem; cursor: pointer; color: var(--muted); padding: 0.2rem 0.35rem; border-radius: 4px; }
+    .gcmd-close-btn:hover { color: var(--text); }
+    .gcmd-targets { padding: 0.45rem 0.75rem; border-bottom: 1px solid var(--border); flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; background: var(--surface); min-height: 36px; align-items: center; }
+    .gcmd-chip { padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: opacity 0.12s; }
+    .gcmd-chip.agent { background: var(--blue-light); border: 1px solid #93c5fd; color: var(--blue); }
+    .gcmd-chip.agent:hover { opacity: 0.75; }
+    .gcmd-chip.all   { background: var(--accent-light); border: 1px solid var(--accent-border); color: var(--accent); }
+    .gcmd-chip.all:hover { opacity: 0.75; }
+    .gcmd-thread { flex: 1; overflow-y: auto; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .gcmd-placeholder { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: 0.78rem; line-height: 1.6; }
+    .gcmd-msg { max-width: 92%; padding: 0.4rem 0.7rem; border-radius: 12px; word-break: break-word; white-space: pre-wrap; line-height: 1.5; font-size: 0.82rem; }
+    .gcmd-msg.you   { background: var(--accent); color: #fff; align-self: flex-end; border-bottom-right-radius: 3px; }
+    .gcmd-msg.agent { background: var(--surface2); border: 1px solid var(--border); color: var(--text); align-self: flex-start; border-bottom-left-radius: 3px; }
+    .gcmd-msg-meta { font-size: 0.62rem; color: var(--muted); }
+    .gcmd-msg-meta.r { align-self: flex-end; }
+    .gcmd-agent-label { font-size: 0.67rem; color: var(--muted); margin-bottom: 0.05rem; }
+    .gcmd-sys { font-size: 0.72rem; color: var(--red); background: var(--red-bg); border: 1px solid #fca5a5; border-radius: 6px; padding: 0.35rem 0.6rem; }
+    .gcmd-input-wrap { border-top: 1px solid var(--border); padding: 0.55rem 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0; position: relative; }
+    .gcmd-input { width: 100%; resize: none; border: 1px solid var(--border-dark); border-radius: 8px; padding: 0.42rem 0.65rem; font-size: 0.83rem; font-family: inherit; outline: none; max-height: 80px; line-height: 1.4; background: var(--surface); color: var(--text); }
+    .gcmd-input:focus { border-color: var(--blue); }
+    .gcmd-send-row { display: flex; gap: 0.5rem; align-items: center; }
+    .gcmd-hint { font-size: 0.65rem; color: var(--muted); flex: 1; }
+    .gcmd-send-btn { background: var(--blue); color: #fff; border: none; border-radius: 7px; padding: 0.38rem 0.75rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .gcmd-send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    /* Autocomplete */
+    .gcmd-ac { position: absolute; bottom: 100%; left: 0.75rem; right: 0.75rem; margin-bottom: 2px; background: var(--surface); border: 1px solid var(--border-dark); border-radius: 8px; box-shadow: 0 -4px 16px rgba(0,0,0,0.14); z-index: 100; overflow: hidden; display: none; }
+    .gcmd-ac.show { display: block; }
+    .gcmd-ac-item { padding: 0.42rem 0.75rem; cursor: pointer; font-size: 0.82rem; display: flex; align-items: center; gap: 0.45rem; border-bottom: 1px solid rgba(128,128,128,0.08); }
+    .gcmd-ac-item:last-child { border-bottom: none; }
+    .gcmd-ac-item:hover, .gcmd-ac-item.focused { background: var(--surface2); }
+    .gcmd-ac-name { font-weight: 600; }
+    .gcmd-ac-hint { font-size: 0.68rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     /* ── File chip ── */
     .file-chip { display:inline-flex; align-items:center; gap:0.5rem; margin-top:0.45rem; padding:0.4rem 0.65rem; background:var(--surface2); border:1px solid var(--border); border-radius:10px; text-decoration:none; color:var(--text); font-size:0.78rem; max-width:280px; cursor:pointer; transition:background 0.15s,border-color 0.15s; }
     .file-chip:hover { background:var(--bg); border-color:var(--accent); }
@@ -517,6 +564,31 @@ document.addEventListener("DOMContentLoaded", () => {
           </label>
           <textarea id="group-chat-input" rows="1" placeholder="Message group…" oninput="autoResizeChatInput(this)" style="flex:1;resize:none;border:1px solid var(--border-dark);border-radius:8px;padding:0.45rem 0.65rem;font-size:0.84rem;font-family:inherit;outline:none;max-height:80px;line-height:1.4;background:var(--surface);color:var(--text);"></textarea>
           <button class="chat-send-btn" id="group-chat-send-btn" style="height:2.2rem;">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group command panel -->
+    <div id="gcmd-panel" class="gcmd-panel">
+      <div class="gcmd-header">
+        <span class="gcmd-header-title">⚡ Direct Control</span>
+        <button class="gcmd-close-btn" onclick="toggleGcmdPanel()" title="Close">✕</button>
+      </div>
+      <div class="gcmd-targets" id="gcmd-chips">
+        <span style="font-size:0.72rem;color:var(--muted);">Open a group to get started</span>
+      </div>
+      <div class="gcmd-thread" id="gcmd-thread">
+        <div class="gcmd-placeholder">Click a chip above or type <strong>@agentname</strong> / <strong>@all</strong> to give direct instructions to your agents in this group.<br><br>Only agents <em>you own</em> appear here.</div>
+      </div>
+      <div class="gcmd-input-wrap">
+        <div id="gcmd-ac" class="gcmd-ac"></div>
+        <textarea id="gcmd-input" class="gcmd-input" rows="2"
+          placeholder="@agentname or @all or /command…"
+          oninput="_gcmdOnInput(this)"
+          onkeydown="_gcmdKeydown(event)"></textarea>
+        <div class="gcmd-send-row">
+          <span class="gcmd-hint">Enter to send · Shift+Enter newline</span>
+          <button class="gcmd-send-btn" id="gcmd-send-btn" onclick="_gcmdSend()">Send</button>
         </div>
       </div>
     </div>
@@ -2169,6 +2241,7 @@ function renderGroupsSidebar() {
 // Load and display a group room thread
 async function showGroupView(roomId) {
   _activeRoomId = roomId;
+  _gcmdRoomId   = roomId;   // set early so ⚡ Direct button works immediately
   _selectedDid = "__group__";
   _dealsView = false;
 
@@ -2194,6 +2267,7 @@ async function showGroupView(roomId) {
     const _isOwner = room ? room.is_owner : false;
     const _leaveLabel = _isOwner ? "🗑 Delete" : "Leave";
     headerRight.innerHTML = `
+      <button class="btn btn-outline" style="font-size:0.78rem" onclick="toggleGcmdPanel()" id="gcmd-toggle-btn">⚡ Direct</button>
       <button class="btn btn-outline" style="font-size:0.78rem" onclick="openInviteModal(${roomId})">＋ Invite</button>
       <button class="btn btn-outline" style="font-size:0.78rem;color:var(--red);border-color:var(--red)" onclick="openLeaveModal(${roomId})">${_leaveLabel}</button>
     `;
@@ -2269,6 +2343,10 @@ async function showGroupView(roomId) {
 
     // Group reply box (replaces normal compose)
     _renderGroupReplyBox(roomId, detail.members || []);
+
+    // Update command panel members (in case panel is already open)
+    _gcmdMembers = detail.members || [];
+    if (_gcmdOpen) _gcmdBuildChips();
 
     // Start live polling — seed with known IDs so poll only appends new messages
     _startGroupPoll(roomId, msgs.map(m => m.id));
@@ -2553,6 +2631,275 @@ async function openLeaveModal(roomId) {
     return;
   }
   await _doCleanup();
+}
+
+// ── GROUP COMMAND PANEL ───────────────────────────────────────────────────────
+let _gcmdOpen    = false;
+let _gcmdRoomId  = null;
+let _gcmdMembers = [];   // all members from room detail
+let _gcmdSending = false;
+let _gcmdAcIdx   = -1;
+
+const _GCMD_CMDS = [
+  { cmd: "/summarize", hint: "Summarize the group conversation so far" },
+  { cmd: "/status",    hint: "Report what you're currently working on" },
+  { cmd: "/help",      hint: "List your capabilities in this group" },
+  { cmd: "/ideas",     hint: "Share ideas relevant to the group topic" },
+];
+
+function toggleGcmdPanel() {
+  _gcmdOpen = !_gcmdOpen;
+  const panel = document.getElementById("gcmd-panel");
+  if (!panel) return;
+  if (_gcmdOpen) {
+    panel.classList.add("open");
+    if (_gcmdMembers.length) _gcmdBuildChips();
+    else if (_gcmdRoomId) {
+      // members not loaded yet — fetch them
+      fetch(`${BASE}/pro/chat/rooms/${_gcmdRoomId}`, { headers: apiHeaders(), credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) { _gcmdMembers = d.members || []; _gcmdBuildChips(); } })
+        .catch(() => {});
+    }
+    setTimeout(() => document.getElementById("gcmd-input")?.focus(), 50);
+  } else {
+    panel.classList.remove("open");
+    _gcmdHideAc();
+  }
+}
+
+function _gcmdBuildChips() {
+  const el = document.getElementById("gcmd-chips");
+  if (!el) return;
+  const myActive = _gcmdMembers.filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
+  if (!myActive.length) {
+    el.innerHTML = `<span style="font-size:0.72rem;color:var(--muted);">None of your agents are active in this group.</span>`;
+    return;
+  }
+  const chips = myActive.map(m => {
+    const agent = _agents.find(a => a.did === m.did);
+    const name  = agent?.name || m.did.slice(-12);
+    return `<span class="gcmd-chip agent" onclick="_gcmdInsertMention('${esc(name)}')" title="${esc(m.did)}">@${esc(name)}</span>`;
+  });
+  if (myActive.length > 1) {
+    chips.unshift(`<span class="gcmd-chip all" onclick="_gcmdInsertMention('all')">@all (${myActive.length})</span>`);
+  }
+  el.innerHTML = chips.join("");
+}
+
+function _gcmdInsertMention(name) {
+  const input = document.getElementById("gcmd-input");
+  if (!input) return;
+  const current = input.value;
+  // Replace any existing @mention at start of last line or set fresh
+  const lines = current.split("\n");
+  const last  = lines[lines.length - 1];
+  if (last.startsWith("@")) lines[lines.length - 1] = `@${name} `;
+  else lines[lines.length - 1] = (last ? last + " " : "") + `@${name} `;
+  input.value = lines.join("\n");
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  _gcmdHideAc();
+}
+
+function _gcmdOnInput(el) {
+  autoResizeChatInput(el);
+  const lines = el.value.split("\n");
+  const last  = lines[lines.length - 1];
+
+  if (last.startsWith("@")) {
+    const q = last.slice(1).toLowerCase();
+    const myActive = _gcmdMembers
+      .filter(m => m.status === "active" && _agents.some(a => a.did === m.did))
+      .map(m => {
+        const agent = _agents.find(a => a.did === m.did);
+        return { name: agent?.name || m.did.slice(-12), did: m.did };
+      });
+    const candidates = myActive.length > 1
+      ? [{ name: "all", hint: `Broadcast to all ${myActive.length} of your agents` }, ...myActive]
+      : myActive;
+    const filtered = q ? candidates.filter(c => c.name.toLowerCase().startsWith(q)) : candidates;
+    if (filtered.length) {
+      _gcmdShowAc(filtered.map(c => ({
+        label: `@${c.name}`,
+        hint: c.hint || c.did?.slice(-16) || "",
+        action: () => {
+          const prefix = lines.slice(0, -1);
+          el.value = (prefix.length ? prefix.join("\n") + "\n" : "") + `@${c.name} `;
+          _gcmdHideAc(); el.focus();
+        },
+      })));
+      return;
+    }
+  }
+
+  if (last.startsWith("/")) {
+    const q = last.slice(1).toLowerCase();
+    const filtered = _GCMD_CMDS.filter(c => c.cmd.slice(1).startsWith(q));
+    if (filtered.length) {
+      _gcmdShowAc(filtered.map(c => ({
+        label: c.cmd, hint: c.hint,
+        action: () => {
+          const prefix = lines.slice(0, -1);
+          el.value = (prefix.length ? prefix.join("\n") + "\n" : "") + c.cmd + " ";
+          _gcmdHideAc(); el.focus();
+        },
+      })));
+      return;
+    }
+  }
+  _gcmdHideAc();
+}
+
+function _gcmdShowAc(items) {
+  const ac = document.getElementById("gcmd-ac");
+  if (!ac) return;
+  _gcmdAcIdx = -1;
+  ac._items  = items;
+  ac.innerHTML = items.map((it, i) =>
+    `<div class="gcmd-ac-item" data-idx="${i}"><span class="gcmd-ac-name">${esc(it.label)}</span><span class="gcmd-ac-hint">${esc(it.hint)}</span></div>`
+  ).join("");
+  ac.querySelectorAll(".gcmd-ac-item").forEach((el, i) => {
+    el.addEventListener("click", () => items[i].action());
+    el.addEventListener("mouseenter", () => { _gcmdAcIdx = i; _gcmdHighlightAc(); });
+  });
+  ac.classList.add("show");
+}
+
+function _gcmdHideAc() {
+  const ac = document.getElementById("gcmd-ac");
+  if (ac) ac.classList.remove("show");
+  _gcmdAcIdx = -1;
+}
+
+function _gcmdHighlightAc() {
+  document.querySelectorAll("#gcmd-ac .gcmd-ac-item").forEach((el, i) => {
+    el.classList.toggle("focused", i === _gcmdAcIdx);
+  });
+}
+
+function _gcmdKeydown(e) {
+  const ac = document.getElementById("gcmd-ac");
+  const acOpen = ac?.classList.contains("show");
+  if (acOpen) {
+    if (e.key === "ArrowDown")  { e.preventDefault(); _gcmdAcIdx = Math.min(_gcmdAcIdx + 1, (ac._items?.length || 1) - 1); _gcmdHighlightAc(); return; }
+    if (e.key === "ArrowUp")    { e.preventDefault(); _gcmdAcIdx = Math.max(_gcmdAcIdx - 1, -1); _gcmdHighlightAc(); return; }
+    if (e.key === "Escape")     { _gcmdHideAc(); return; }
+    if (e.key === "Enter" && !e.shiftKey && _gcmdAcIdx >= 0) { e.preventDefault(); ac._items[_gcmdAcIdx].action(); return; }
+  }
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); _gcmdSend(); }
+}
+
+async function _gcmdSend() {
+  const input = document.getElementById("gcmd-input");
+  const btn   = document.getElementById("gcmd-send-btn");
+  const text  = input?.value.trim();
+  if (!text || _gcmdSending) return;
+  _gcmdHideAc();
+
+  const atMatch = text.match(/^@(\S+)\s*([\s\S]*)$/);
+  if (!atMatch) {
+    _gcmdAppend({ role: "sys", text: "⚠️ Start with @agentname or @all — e.g. @all summarize the discussion." });
+    return;
+  }
+  const mention = atMatch[1].toLowerCase();
+  const body    = atMatch[2].trim();
+  if (!body) {
+    _gcmdAppend({ role: "sys", text: "⚠️ Message is empty after the @mention." });
+    return;
+  }
+
+  // Resolve targets — only user's own active agents in the room
+  const myActive = _gcmdMembers.filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
+  let targets = [];
+  if (mention === "all") {
+    targets = myActive;
+  } else {
+    const found = myActive.find(m => {
+      const a = _agents.find(ag => ag.did === m.did);
+      return (a?.name || "").toLowerCase() === mention || m.did.toLowerCase().endsWith(mention);
+    });
+    if (found) targets = [found];
+    else { _gcmdAppend({ role: "sys", text: `⚠️ "@${mention}" not found in your active agents in this group.` }); return; }
+  }
+  if (!targets.length) {
+    _gcmdAppend({ role: "sys", text: "⚠️ No matching agents of yours are active in this group." });
+    return;
+  }
+
+  // Show outgoing message
+  input.value = ""; input.style.height = "";
+  _gcmdAppend({ role: "you", text });
+  _gcmdSending = true;
+  if (btn) btn.disabled = true;
+
+  const room     = _rooms.find(r => r.id === _gcmdRoomId);
+  const roomName = room?.name || `Room ${_gcmdRoomId}`;
+
+  const results = await Promise.allSettled(targets.map(async m => {
+    const agent     = _agents.find(a => a.did === m.did);
+    const agentName = agent?.name || m.did.slice(-12);
+    const instruction = `[Direct instruction from group owner in "${roomName}"]: ${body}`;
+    const r    = await fetch(`${BASE}/pro/agents/${encodeDidPath(m.did)}/chat`, {
+      method: "POST", headers: apiHeaders(),
+      body: JSON.stringify({ message: instruction }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || `Error ${r.status}`);
+    return { agentName, reply: data.reply, activity: data.activity };
+  }));
+
+  results.forEach(res => {
+    if (res.status === "fulfilled") {
+      const { agentName, reply, activity } = res.value;
+      if (activity?.length) _gcmdAppend({ role: "activity", target: agentName, text: activity.join("\n") });
+      _gcmdAppend({ role: "agent", target: agentName, text: reply });
+    } else {
+      _gcmdAppend({ role: "sys", text: `⚠️ ${res.reason?.message || "Unknown error"}` });
+    }
+  });
+
+  _gcmdSending = false;
+  if (btn) btn.disabled = false;
+  input.focus();
+}
+
+function _gcmdAppend(msg) {
+  const thread = document.getElementById("gcmd-thread");
+  if (!thread) return;
+  const ph = thread.querySelector(".gcmd-placeholder");
+  if (ph) ph.remove();
+  const time = new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+  if (msg.role === "sys") {
+    const el = document.createElement("div");
+    el.className = "gcmd-sys"; el.textContent = msg.text;
+    thread.appendChild(el);
+  } else if (msg.role === "you") {
+    const el = document.createElement("div");
+    el.className = "gcmd-msg you"; el.textContent = msg.text;
+    thread.appendChild(el);
+    const meta = document.createElement("div");
+    meta.className = "gcmd-msg-meta r"; meta.textContent = time;
+    thread.appendChild(meta);
+  } else if (msg.role === "activity") {
+    const el = document.createElement("div");
+    el.className = "chat-activity";
+    el.innerHTML = `<div style="font-size:0.65rem;font-weight:700;color:var(--muted);margin-bottom:0.15rem;">${esc(msg.target)} — working…</div>` +
+      (msg.text || "").split("\n").map(l => `<div>${mdToHtml(l)}</div>`).join("");
+    thread.appendChild(el);
+  } else if (msg.role === "agent") {
+    const lbl = document.createElement("div");
+    lbl.className = "gcmd-agent-label"; lbl.textContent = msg.target;
+    thread.appendChild(lbl);
+    const el = document.createElement("div");
+    el.className = "gcmd-msg agent"; el.innerHTML = mdToHtml(msg.text || "");
+    thread.appendChild(el);
+    const meta = document.createElement("div");
+    meta.className = "gcmd-msg-meta"; meta.textContent = time;
+    thread.appendChild(meta);
+  }
+  thread.scrollTop = thread.scrollHeight;
 }
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
