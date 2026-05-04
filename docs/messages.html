@@ -2290,6 +2290,10 @@ async function showGroupView(roomId) {
     const detail = await detailRes.json();
     const msgsData = await msgsRes.json();
 
+    // Build did→name map for all room members (covers agents not in _agents list)
+    _groupMemberNames = {};
+    (detail.members || []).forEach(m => { if (m.name) _groupMemberNames[m.did] = m.name; });
+
     // Check for pending invites for MY agents
     const myPending = (detail.members || []).filter(m => m.status === "invited");
 
@@ -2361,7 +2365,7 @@ function _renderGroupMsg(m, idx) {
     return `<div style="text-align:center;font-size:0.72rem;color:var(--muted);padding:0.15rem 0;white-space:pre-wrap">${esc(m.body)}</div>`;
   }
   const isMe = _agents.some(a => a.did === m.from_did);
-  const senderName = _agents.find(a => a.did === m.from_did)?.name || m.from_did.slice(-12);
+  const senderName = _agents.find(a => a.did === m.from_did)?.name || _groupMemberNames[m.from_did] || m.from_did.slice(-12);
   const dir = isMe ? "sent" : "received";
   return `<div class="bubble-row ${dir}" data-gid="${m.id}">
     <div class="bubble-avatar">${esc(senderName.slice(0, 1).toUpperCase())}</div>
@@ -2374,6 +2378,7 @@ function _renderGroupMsg(m, idx) {
 }
 
 let _groupPollAddId = null; // exposed so optimistic sends can register IDs before the next poll tick
+let _groupMemberNames = {}; // did → name for non-owned agents in the current group room
 
 function _startGroupPoll(roomId, initialIds) {
   _stopGroupPoll();
@@ -2417,6 +2422,7 @@ function _startGroupPoll(roomId, initialIds) {
 function _stopGroupPoll() {
   if (_groupPollTimer) { clearInterval(_groupPollTimer); _groupPollTimer = null; }
   _groupPollAddId = null;
+  _groupMemberNames = {};
 }
 
 // Accept a pending invite
