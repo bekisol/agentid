@@ -2254,51 +2254,50 @@ async function showGroupView(roomId) {
 
     // Render messages
     const msgs = msgsData.messages || [];
-    let msgsHtml = "";
-    if (!msgs.length) {
-      msgsHtml = `<div class="state-box"><div class="state-icon">👥</div><div class="state-title">No messages yet</div><div class="state-sub">Be the first to send a message.</div></div>`;
-    } else {
-      msgsHtml = `<div style="padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.5rem;">` +
-        msgs.map((m, idx) => {
-          // System events (invites, joins) render as centered pills
-          if (m.from_did === "system") {
-            return `<div style="text-align:center;font-size:0.72rem;color:var(--muted);padding:0.15rem 0;white-space:pre-wrap">${esc(m.body)}</div>`;
-          }
-          const isMe = _agents.some(a => a.did === m.from_did);
-          const senderName = _agents.find(a => a.did === m.from_did)?.name || m.from_did.slice(-12);
-          const dir = isMe ? "sent" : "received";
-          return `
-            <div class="bubble-row ${dir}">
-              <div class="bubble-avatar">${esc(senderName.slice(0, 1).toUpperCase())}</div>
-              <div class="bubble-col">
-                <div class="bubble-name">${esc(senderName)}</div>
-                <div class="bubble">${_renderMsgBody(m.body, "g" + idx, m.file_ref)}</div>
-                <div style="font-size:0.65rem;color:var(--muted);margin-top:0.15rem;padding:0 0.5rem">${relativeTime(m.sent_at)}</div>
-              </div>
-            </div>`;
-        }).join("") + `</div>`;
-    }
+    const innerHtml = msgs.length
+      ? msgs.map((m, i) => _renderGroupMsg(m, i)).join("")
+      : `<div class="state-box"><div class="state-icon">👥</div><div class="state-title">No messages yet</div><div class="state-sub">Be the first to send a message.</div></div>`;
 
     scroll.innerHTML = `
       <div class="group-member-list">${chips || '<span style="color:var(--muted)">No active members</span>'}</div>
       ${pendingHtml}
-      <div id="group-msgs-container">${msgsHtml}</div>
+      <div id="group-msgs-container">
+        <div class="group-msg-list" style="padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.5rem;">${innerHtml}</div>
+      </div>
     `;
+    scroll.scrollTop = scroll.scrollHeight;
 
     // Group reply box (replaces normal compose)
     _renderGroupReplyBox(roomId, detail.members || []);
 
-    // Start live polling for new messages
-    _startGroupPoll(roomId, msgs.length);
+    // Start live polling — seed with known IDs so poll only appends new messages
+    _startGroupPoll(roomId, msgs.map(m => m.id));
 
   } catch(e) {
     scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load room</div><div class="state-sub">${esc(e.message)}</div></div>`;
   }
 }
 
-function _startGroupPoll(roomId, initialCount) {
+function _renderGroupMsg(m, idx) {
+  if (m.from_did === "system") {
+    return `<div style="text-align:center;font-size:0.72rem;color:var(--muted);padding:0.15rem 0;white-space:pre-wrap">${esc(m.body)}</div>`;
+  }
+  const isMe = _agents.some(a => a.did === m.from_did);
+  const senderName = _agents.find(a => a.did === m.from_did)?.name || m.from_did.slice(-12);
+  const dir = isMe ? "sent" : "received";
+  return `<div class="bubble-row ${dir}" data-gid="${m.id}">
+    <div class="bubble-avatar">${esc(senderName.slice(0, 1).toUpperCase())}</div>
+    <div class="bubble-col">
+      <div class="bubble-name">${esc(senderName)}</div>
+      <div class="bubble">${_renderMsgBody(m.body, "g" + idx, m.file_ref)}</div>
+      <div style="font-size:0.65rem;color:var(--muted);margin-top:0.15rem;padding:0 0.5rem">${relativeTime(m.sent_at)}</div>
+    </div>
+  </div>`;
+}
+
+function _startGroupPoll(roomId, initialIds) {
   _stopGroupPoll();
-  let _knownCount = initialCount;
+  let _knownIds = new Set(Array.isArray(initialIds) ? initialIds : []);
   _groupPollTimer = setInterval(async () => {
     if (_activeRoomId !== roomId) { _stopGroupPoll(); return; }
     try {
@@ -2308,43 +2307,30 @@ function _startGroupPoll(roomId, initialCount) {
       if (!r.ok) return;
       const data = await r.json();
       const msgs = data.messages || [];
-      if (msgs.length === _knownCount) return;
-      _knownCount = msgs.length;
 
-      // Re-render only the messages container (not the whole view)
+      // Find truly new messages (not yet rendered)
+      const newMsgs = msgs.filter(m => !_knownIds.has(m.id));
+      if (!newMsgs.length) return;
+      newMsgs.forEach(m => _knownIds.add(m.id));
+
       const container = document.getElementById("group-msgs-container");
       if (!container) return;
-      let msgsHtml = "";
-      if (!msgs.length) {
-        msgsHtml = `<div class="state-box"><div class="state-icon">👥</div><div class="state-title">No messages yet</div><div class="state-sub">Be the first to send a message.</div></div>`;
-      } else {
-        msgsHtml = `<div style="padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.5rem;">` +
-          msgs.map((m, idx) => {
-            if (m.from_did === "system") {
-              return `<div style="text-align:center;font-size:0.72rem;color:var(--muted);padding:0.15rem 0;white-space:pre-wrap">${esc(m.body)}</div>`;
-            }
-            const isMe = _agents.some(a => a.did === m.from_did);
-            const senderName = _agents.find(a => a.did === m.from_did)?.name || m.from_did.slice(-12);
-            const dir = isMe ? "sent" : "received";
-            return `
-              <div class="bubble-row ${dir}">
-                <div class="bubble-avatar">${esc(senderName.slice(0, 1).toUpperCase())}</div>
-                <div class="bubble-col">
-                  <div class="bubble-name">${esc(senderName)}</div>
-                  <div class="bubble">${_renderMsgBody(m.body, "g" + idx, m.file_ref)}</div>
-                  <div style="font-size:0.65rem;color:var(--muted);margin-top:0.15rem;padding:0 0.5rem">${relativeTime(m.sent_at)}</div>
-                </div>
-              </div>`;
-          }).join("") + `</div>`;
+
+      // Append only new rows — never replace existing ones (prevents flicker)
+      const inner = container.querySelector(".group-msg-list");
+      if (inner) {
+        newMsgs.forEach((m, i) => {
+          inner.insertAdjacentHTML("beforeend", _renderGroupMsg(m, msgs.length - newMsgs.length + i));
+        });
       }
-      container.innerHTML = msgsHtml;
+
       // Scroll to bottom if user is near the bottom
       const scroll = document.getElementById("feed-scroll");
-      if (scroll && (scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120)) {
+      if (scroll && (scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 150)) {
         scroll.scrollTop = scroll.scrollHeight;
       }
     } catch(_) {}
-  }, 5000);
+  }, 3000);
 }
 
 function _stopGroupPoll() {
