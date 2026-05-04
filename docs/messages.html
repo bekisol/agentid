@@ -2465,7 +2465,7 @@ function _renderGroupReplyBox(roomId, members) {
 async function _sendGroupMessage(roomId, fromDid, inputEl) {
   const body = inputEl ? inputEl.value.trim() : "";
   if (!body && !_groupPendingFile) return;
-  if (inputEl) inputEl.value = "";
+  if (inputEl) { inputEl.value = ""; inputEl.style.height = ""; }
   try {
     let fileRef = null;
     if (_groupPendingFile) {
@@ -2481,7 +2481,17 @@ async function _sendGroupMessage(roomId, fromDid, inputEl) {
       body: JSON.stringify({ from_did: fromDid, body: body || `[File: ${fileRef?.name}]`, file_ref: fileRef }),
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
-    showGroupView(roomId);
+    // Optimistically append to DOM — do NOT call showGroupView which would race with the live poll
+    const data = await r.json();
+    if (data && data.id) {
+      const inner = document.querySelector("#group-msgs-container .group-msg-list");
+      if (inner) {
+        const idx = inner.querySelectorAll(".bubble-row").length;
+        inner.insertAdjacentHTML("beforeend", _renderGroupMsg(data, idx));
+        const scroll = document.getElementById("feed-scroll");
+        if (scroll) scroll.scrollTop = scroll.scrollHeight;
+      }
+    }
   } catch(e) {
     alert("Send failed: " + e.message);
   }
@@ -2797,30 +2807,48 @@ async function _gcmdSend() {
   if (!text || _gcmdSending) return;
   _gcmdHideAc();
 
-  const atMatch = text.match(/^@(\S+)\s*([\s\S]*)$/);
-  if (!atMatch) {
+  if (!text.startsWith("@")) {
     _gcmdAppend({ role: "sys", text: "⚠️ Start with @agentname or @all — e.g. @all summarize the discussion." });
     return;
   }
-  const mention = atMatch[1].toLowerCase();
-  const body    = atMatch[2].trim();
+
+  const afterAt = text.slice(1); // everything after the @
+  const myActive = _gcmdMembers.filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
+
+  let targets = [];
+  let body    = "";
+
+  // Handle @all
+  if (/^all(\s|$)/i.test(afterAt)) {
+    targets = myActive;
+    body    = afterAt.replace(/^all\s*/i, "").trim();
+  } else {
+    // Greedy name match — try longest agent names first so "Agent 102" beats "Agent 1"
+    const namedMembers = myActive.map(m => {
+      const a = _agents.find(ag => ag.did === m.did);
+      return { name: a?.name || "", did: m.did, m };
+    }).filter(x => x.name).sort((a, b) => b.name.length - a.name.length);
+
+    let matched = null;
+    for (const n of namedMembers) {
+      const nLow = n.name.toLowerCase();
+      const aLow = afterAt.toLowerCase();
+      if (aLow.startsWith(nLow) && (afterAt.length === nLow.length || afterAt[nLow.length] === " ")) {
+        matched = n;
+        body    = afterAt.slice(n.name.length).trim();
+        break;
+      }
+    }
+    if (!matched) {
+      _gcmdAppend({ role: "sys", text: "⚠️ Agent not found in your active agents in this group. Use a chip above to insert the exact name." });
+      return;
+    }
+    targets = [matched.m];
+  }
+
   if (!body) {
     _gcmdAppend({ role: "sys", text: "⚠️ Message is empty after the @mention." });
     return;
-  }
-
-  // Resolve targets — only user's own active agents in the room
-  const myActive = _gcmdMembers.filter(m => m.status === "active" && _agents.some(a => a.did === m.did));
-  let targets = [];
-  if (mention === "all") {
-    targets = myActive;
-  } else {
-    const found = myActive.find(m => {
-      const a = _agents.find(ag => ag.did === m.did);
-      return (a?.name || "").toLowerCase() === mention || m.did.toLowerCase().endsWith(mention);
-    });
-    if (found) targets = [found];
-    else { _gcmdAppend({ role: "sys", text: `⚠️ "@${mention}" not found in your active agents in this group.` }); return; }
   }
   if (!targets.length) {
     _gcmdAppend({ role: "sys", text: "⚠️ No matching agents of yours are active in this group." });
