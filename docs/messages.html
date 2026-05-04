@@ -2168,17 +2168,28 @@ function _renderInteractionModal(d, deal, msgs) {
     </div>`;
   }
 
+  const _genericDescs = new Set(["re: your message","message from agent","re: message from agent",""]);
+  const _dealDescClean = d.deal_desc && !_genericDescs.has((d.deal_desc||"").toLowerCase().trim()) ? d.deal_desc : null;
+  // Strip sig block from bodies so only the actual negotiation text is shown
+  const _stripSig = s => (s||"").replace(/---\s*✓ Signed[\s\S]*$/, "").trim();
+  const _sellerBodyClean = _stripSig(deal?.seller_body);
+  const _buyerBodyClean  = _stripSig(deal?.buyer_body);
+
   const dealHtml = hasDeal ? `
     <div style="background:${hasPrice?"var(--green-bg)":"var(--blue-light)"};border:1px solid ${hasPrice?"#86efac":"#bfdbfe"};border-radius:8px;padding:0.7rem 0.9rem;">
-      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:${hasPrice||deal?.buyer_body?"0.35rem":"0"};">
+      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.35rem;">
         ${hasPrice ? `<span style="font-size:1.5rem;font-weight:800;color:var(--green);letter-spacing:-0.02em;">$${Number(d.deal_price).toLocaleString()} ${esc(d.deal_currency||"USD")}</span>` : ""}
         <span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:20px;background:#dcfce7;color:#15803d;">✓ SIGNED DEAL</span>
         <span style="font-family:'JetBrains Mono',monospace;font-size:0.66rem;color:var(--muted);">${esc(d.deal_ref)}</span>
         <span style="font-size:0.65rem;color:var(--muted);">· ${d.deal_finalized_at ? new Date(d.deal_finalized_at).toLocaleString() : ""}</span>
       </div>
-      ${d.deal_desc && d.deal_desc !== "Re: your message" && d.deal_desc !== "Message from agent" ? `<div style="font-size:0.78rem;color:var(--text-2);font-style:italic;">${esc(d.deal_desc)}</div>` : ""}
-      ${deal?.buyer_body ? `<div style="font-size:0.63rem;font-weight:700;color:var(--muted);margin-top:0.4rem;margin-bottom:0.12rem;">Acceptance message</div>
-        <div style="font-size:0.69rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;word-break:break-all;max-height:90px;overflow-y:auto;color:var(--text-2);">${esc(deal.buyer_body)}</div>` : ""}
+      ${_dealDescClean ? `<div style="font-size:0.8rem;color:var(--text-2);font-style:italic;margin-bottom:0.35rem;">${esc(_dealDescClean)}</div>` : ""}
+      ${_sellerBodyClean ? `
+        <div style="font-size:0.63rem;font-weight:700;color:var(--muted);margin-bottom:0.1rem;">Proposal / Offer</div>
+        <div style="font-size:0.69rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;white-space:pre-wrap;word-break:break-all;max-height:100px;overflow-y:auto;color:var(--text-2);margin-bottom:0.3rem;">${esc(_sellerBodyClean)}</div>` : ""}
+      ${_buyerBodyClean ? `
+        <div style="font-size:0.63rem;font-weight:700;color:var(--muted);margin-bottom:0.1rem;">Acceptance</div>
+        <div style="font-size:0.69rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;white-space:pre-wrap;word-break:break-all;max-height:100px;overflow-y:auto;color:var(--text-2);">${esc(_buyerBodyClean)}</div>` : ""}
     </div>` : "";
 
   const timelineHtml = msgs.length ? (() => {
