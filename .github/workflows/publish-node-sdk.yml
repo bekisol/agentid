@@ -1,0 +1,36 @@
+name: Publish Node SDK to npm
+
+on:
+  push:
+    tags:
+      - 'sdk-node-v*'   # git tag sdk-node-v0.1.0 && git push --tags
+
+jobs:
+  publish:
+    name: Build and publish @agentid/sdk
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: |
+          cd sdk/typescript
+          npm ci
+
+      - name: Build
+        run: |
+          cd sdk/typescript
+          npm run build
+
+      - name: Publish to npm
+        run: |
+          cd sdk/typescript
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

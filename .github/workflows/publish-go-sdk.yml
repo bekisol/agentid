@@ -1,0 +1,34 @@
+name: Tag Go SDK for pkg.go.dev
+
+on:
+  push:
+    tags:
+      - 'sdk-go-v*'   # git tag sdk-go-v0.1.0 && git push --tags
+                       # pkg.go.dev auto-indexes once the repo is public
+
+jobs:
+  verify:
+    name: Verify Go SDK builds cleanly
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Verify module
+        run: |
+          cd sdk/go
+          go mod tidy
+          go build ./...
+          go vet ./...
+
+      - name: Trigger pkg.go.dev index
+        # Poke the proxy to force immediate indexing (optional — usually auto-indexes within minutes)
+        run: |
+          TAG=${GITHUB_REF#refs/tags/sdk-go-}
+          MODULE="github.com/bekisol/agentid/sdk/go"
+          curl -s "https://proxy.golang.org/${MODULE}/@v/${TAG}.info" || true
+          curl -s "https://sum.golang.org/lookup/${MODULE}@${TAG}" || true
