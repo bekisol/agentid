@@ -1,5 +1,5 @@
 {
-  "name": "agentid-protocol",
+  "name": "@vikhulus/agentid-protocol",
   "version": "0.2.1",
   "description": "Identity, discovery, and trust for AI agents — TypeScript SDK",
   "main": "dist/index.js",

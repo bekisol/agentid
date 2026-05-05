@@ -3,11 +3,11 @@ name: Publish Node SDK to npm
 on:
   push:
     tags:
-      - 'sdk-node-v*'   # git tag sdk-node-v0.1.1 && git push --tags
+      - 'sdk-node-v*'   # git tag sdk-node-v0.2.1 && git push --tags
 
 jobs:
   publish:
-    name: Build and publish agentid-protocol (npm)
+    name: Build and publish @vikhulus/agentid-protocol
     runs-on: ubuntu-latest
 
     steps:
@@ -28,14 +28,9 @@ jobs:
           cd sdk/typescript
           npm run build
 
-      - name: Verify npm auth
-        run: npm whoami
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish to npm
         run: |
           cd sdk/typescript
-          npm publish
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
