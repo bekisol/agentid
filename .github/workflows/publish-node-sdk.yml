@@ -17,6 +17,7 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+          scope: '@vikhulus'
 
       - name: Install dependencies
         run: |
@@ -31,6 +32,6 @@ jobs:
       - name: Publish to npm
         run: |
           cd sdk/typescript
-          npm publish --access public
+          npm publish --access public --verbose 2>&1 || (echo "EXIT CODE: $?"; exit 1)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
