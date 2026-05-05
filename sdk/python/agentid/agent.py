@@ -213,6 +213,116 @@ class Agent:
             signed_message["signature"],
         )
 
+    # ── capability contracts ──────────────────────────────────────────────────
+
+    def sign_capability_contract(
+        self,
+        capability: str,
+        version: str = "1.0",
+        description: str = "",
+        input_schema: dict = None,
+        output_schema: dict = None,
+        sla: dict = None,
+        pricing: dict = None,
+        remedies: dict = None,
+    ) -> dict:
+        """
+        Build and cryptographically sign a Capability Contract.
+
+        The signature covers the canonical contract body (JSON, sorted keys,
+        no spaces) using this agent's Ed25519 private key.
+
+        Returns a dict ready to pass to ``publish_capability_contract()``.
+
+        Example::
+
+            contract = agent.sign_capability_contract(
+                capability="web-search",
+                description="Search the web and return structured results.",
+                input_schema={"type": "string", "description": "search query"},
+                output_schema={"type": "array", "items": {"type": "object"}},
+                sla={"max_latency_seconds": 5, "availability_target": 0.99},
+                pricing={"model": "per_call", "price_usd": 0.001},
+                remedies={"on_sla_breach": "refund"},
+            )
+
+        """
+        if self._private_key is None:
+            raise RuntimeError("No private key — agent was loaded read-only")
+
+        body = {
+            "did": self.did,
+            "capability": capability,
+            "version": version,
+            "description": description or "",
+            "input_schema": input_schema or {},
+            "output_schema": output_schema or {},
+            "sla": sla or {},
+            "pricing": pricing or {"model": "free"},
+            "remedies": remedies or {},
+        }
+
+        # Sign the canonical body (sort_keys, no spaces — matches server verification
+        # in capability_contracts._verify_contract_signature)
+        signature = crypto_sign(self._private_key, body)
+
+        return {
+            **body,
+            "signature": signature,
+            "signed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+    def publish_capability_contract(
+        self,
+        capability: str,
+        version: str = "1.0",
+        description: str = "",
+        input_schema: dict = None,
+        output_schema: dict = None,
+        sla: dict = None,
+        pricing: dict = None,
+        remedies: dict = None,
+        registry_url: str = None,
+        registry_path: str = None,
+    ) -> dict:
+        """
+        Sign and publish a Capability Contract to the registry.
+
+        Requires an HTTP registry (``registry_url``). The contract is signed
+        with this agent's private key before being sent.
+
+        Returns the server response dict with the registered contract.
+
+        Example::
+
+            result = agent.publish_capability_contract(
+                capability="web-search",
+                sla={"max_latency_seconds": 5, "availability_target": 0.99},
+                pricing={"model": "per_call", "price_usd": 0.001},
+                registry_url="https://api.agentid-protocol.com",
+            )
+            print(result["contract"]["id"])
+
+        """
+        contract = self.sign_capability_contract(
+            capability=capability,
+            version=version,
+            description=description,
+            input_schema=input_schema,
+            output_schema=output_schema,
+            sla=sla,
+            pricing=pricing,
+            remedies=remedies,
+        )
+
+        reg = _registry(registry_path, registry_url)
+        if not isinstance(reg, HTTPRegistry):
+            raise RuntimeError(
+                "publish_capability_contract() requires an HTTP registry. "
+                "Pass registry_url='https://api.agentid-protocol.com'"
+            )
+        return reg.publish_capability_contract(self.did, contract)
+
     # ── repr ──────────────────────────────────────────────────────────────────
 
     def __repr__(self) -> str:

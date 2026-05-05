@@ -118,6 +118,34 @@ class HTTPRegistry:
         response.raise_for_status()
         return response.json()["valid"]
 
+    def publish_capability_contract(self, did: str, contract: dict) -> dict:
+        """
+        POST a signed Capability Contract to the registry.
+
+        Args:
+            did:      The agent DID (must be owned by the API key used).
+            contract: Contract dict with capability, version, input_schema,
+                      output_schema, sla, pricing, remedies, signature, signed_at.
+
+        Returns:
+            The server response dict with the registered contract.
+
+        Raises:
+            httpx.HTTPStatusError on 4xx/5xx responses.
+        """
+        response = self._client.post(
+            f"{self.base_url}/agents/{did}/capability-contracts",
+            json=contract,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_capability_contracts(self, did: str) -> list[dict]:
+        """Fetch all active Capability Contracts for a DID (public)."""
+        response = self._client.get(f"{self.base_url}/agents/{did}/capability-contracts")
+        response.raise_for_status()
+        return response.json().get("contracts", [])
+
     def ping(self) -> bool:
         try:
             response = self._client.get(f"{self.base_url}/health")
