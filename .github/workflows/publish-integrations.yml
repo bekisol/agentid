@@ -1,0 +1,115 @@
+name: Publish Framework Integrations to PyPI
+
+on:
+  push:
+    tags:
+      - 'integrations-v*'   # git tag integrations-v0.1.0 && git push --tags
+
+jobs:
+  publish-langchain:
+    name: Publish langchain-agentid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build
+        run: |
+          cd integrations/langchain-agentid
+          python -m build
+
+      - name: Check dist
+        run: twine check integrations/langchain-agentid/dist/*
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload integrations/langchain-agentid/dist/*
+
+  publish-autogen:
+    name: Publish autogen-agentid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build
+        run: |
+          cd integrations/autogen-agentid
+          python -m build
+
+      - name: Check dist
+        run: twine check integrations/autogen-agentid/dist/*
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload integrations/autogen-agentid/dist/*
+
+  publish-crewai:
+    name: Publish crewai-agentid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build
+        run: |
+          cd integrations/crewai-agentid
+          python -m build
+
+      - name: Check dist
+        run: twine check integrations/crewai-agentid/dist/*
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload integrations/crewai-agentid/dist/*
+
+  publish-llamaindex:
+    name: Publish llamaindex-agentid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build
+        run: |
+          cd integrations/llamaindex-agentid
+          python -m build
+
+      - name: Check dist
+        run: twine check integrations/llamaindex-agentid/dist/*
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload integrations/llamaindex-agentid/dist/*
