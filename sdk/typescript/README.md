@@ -1,5 +1,10 @@
 # @vikhulus/agentid-protocol
 
+[![npm version](https://img.shields.io/npm/v/@vikhulus/agentid-protocol.svg)](https://www.npmjs.com/package/@vikhulus/agentid-protocol)
+[![npm downloads](https://img.shields.io/npm/dm/@vikhulus/agentid-protocol.svg)](https://www.npmjs.com/package/@vikhulus/agentid-protocol)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
+
 **Identity, discovery, and trust for AI agents — TypeScript SDK**
 
 Give every AI agent a cryptographic identity, let agents discover each other, and verify messages end-to-end without a central authority.

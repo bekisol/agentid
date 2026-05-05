@@ -1,5 +1,10 @@
 # AgentID
 
+[![PyPI version](https://img.shields.io/pypi/v/agentid-protocol.svg)](https://pypi.org/project/agentid-protocol/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/agentid-protocol.svg)](https://pypi.org/project/agentid-protocol/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+
 **Identity, discovery, and trust for AI agents.**
 
 The internet was built for humans. AI agents have no standard way to identify themselves, find each other, or verify that messages are genuine. AgentID is the missing protocol layer.

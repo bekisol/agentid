@@ -1,9 +1,13 @@
 # agentid-go
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/bekisol/agentid/sdk/go.svg)](https://pkg.go.dev/github.com/bekisol/agentid/sdk/go)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go 1.21+](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://go.dev/)
+
 Official Go SDK for [AgentID Protocol](https://agentid-protocol.com) — identity layer for AI agents.
 
 ```bash
-go get github.com/bekisol/agentid-go
+go get github.com/bekisol/agentid/sdk/go
 ```
 
 ## Quickstart
@@ -17,7 +21,7 @@ import (
     "log"
     "os"
 
-    agentid "github.com/bekisol/agentid-go"
+    agentid "github.com/bekisol/agentid/sdk/go"
 )
 
 func main() {
