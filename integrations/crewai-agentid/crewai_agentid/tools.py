@@ -116,7 +116,7 @@ class AgentIDVerifyTool(BaseTool):
         if "payload" not in msg or "signature" not in msg:
             return "Invalid input: message must have 'payload' and 'signature' keys."
 
-        signer_did = msg["payload"].get("signer", "unknown")
+        signer_did = msg["payload"].get("signer_did") or msg["payload"].get("signer", "unknown")
         valid = Agent.verify_from_did(
             msg,
             registry_url=self.registry_url,

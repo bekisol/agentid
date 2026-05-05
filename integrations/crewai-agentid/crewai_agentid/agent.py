@@ -47,10 +47,11 @@ def create_agentid_crew_agent(
     backstory: str,
     capabilities: list[str],
     owner: str,
+    did: Optional[str] = None,
     registry_url: Optional[str] = None,
     registry_path: Optional[str] = None,
     **crewai_kwargs: Any,
-) -> "AgentIDCrewAgent":
+) -> "CrewAgentWithID":
     """
     Create a CrewAI Agent with a verifiable AgentID identity.
 
@@ -86,15 +87,26 @@ def create_agentid_crew_agent(
     from crewai import Agent
     from agentid import Agent as AgentIDAgent
 
-    agentid = AgentIDAgent.create(
-        name=role.lower().replace(" ", "-"),
-        capabilities=capabilities,
-        owner=owner,
-        registry_url=registry_url,
-        registry_path=registry_path,
-    )
-    logger.info("[AgentID] Crew agent '%s' registered: %s", role, agentid.did)
+    if did:
+        agentid = AgentIDAgent.load(
+            did,
+            registry_url=registry_url,
+            registry_path=registry_path,
+        )
+        logger.info("[AgentID] Crew agent '%s' loaded existing identity: %s", role, agentid.did)
+    else:
+        agentid = AgentIDAgent.create(
+            name=role.lower().replace(" ", "-"),
+            capabilities=capabilities,
+            owner=owner,
+            registry_url=registry_url,
+            registry_path=registry_path,
+        )
+        logger.info("[AgentID] Crew agent '%s' created new identity: %s  (save this DID!)", role, agentid.did)
 
+    # CrewAI's Agent is a frozen Pydantic model — we can't subclass it cleanly.
+    # CrewAgentWithID is a thin wrapper: pass wrapper.crew_agent to Crew(agents=[...]).
+    # The agentid identity and signing live on the wrapper itself.
     crew_agent = Agent(
         role=role,
         goal=goal,

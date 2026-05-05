@@ -60,24 +60,36 @@ class AgentIDMixin:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         capabilities: list[str] = kwargs.pop("agentid_capabilities", [])
         owner: str = kwargs.pop("agentid_owner", "unknown")
+        did: Optional[str] = kwargs.pop("agentid_did", None)
         registry_url: Optional[str] = kwargs.pop("agentid_registry_url", None)
         registry_path: Optional[str] = kwargs.pop("agentid_registry_path", None)
+
+        # Extract name BEFORE super().__init__ consumes args
+        agent_name: str = args[0] if args else kwargs.get("name", "agent")
 
         super().__init__(*args, **kwargs)
 
         from agentid import Agent
 
-        agent_name = kwargs.get("name") or (args[0] if args else "agent")
-        self._agentid = Agent.create(
-            name=agent_name,
-            capabilities=capabilities,
-            owner=owner,
-            registry_url=registry_url,
-            registry_path=registry_path,
-        )
+        if did:
+            self._agentid = Agent.load(
+                did,
+                registry_url=registry_url,
+                registry_path=registry_path,
+            )
+            logger.info("[AgentID] %s loaded existing identity: %s", agent_name, self._agentid.did)
+        else:
+            self._agentid = Agent.create(
+                name=agent_name,
+                capabilities=capabilities,
+                owner=owner,
+                registry_url=registry_url,
+                registry_path=registry_path,
+            )
+            logger.info("[AgentID] %s created new identity: %s  (save this DID!)", agent_name, self._agentid.did)
+
         self._agentid_registry_url = registry_url
         self._agentid_registry_path = registry_path
-        logger.info("[AgentID] %s registered: %s", agent_name, self._agentid.did)
 
     @property
     def agentid_did(self) -> str:
@@ -139,6 +151,7 @@ def create_agentid_agent(
     name: str,
     capabilities: list[str],
     owner: str,
+    did: Optional[str] = None,
     registry_url: Optional[str] = None,
     registry_path: Optional[str] = None,
     **autogen_kwargs: Any,
@@ -169,6 +182,7 @@ def create_agentid_agent(
         name,
         agentid_capabilities=capabilities,
         agentid_owner=owner,
+        agentid_did=did,
         agentid_registry_url=registry_url,
         agentid_registry_path=registry_path,
         **autogen_kwargs,
