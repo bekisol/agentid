@@ -20,7 +20,7 @@
 
 // ── Agent ─────────────────────────────────────────────────────────────────────
 export { Agent, createAgent } from "./agent.js";
-export type { SignedMessage, CreateAgentOptions } from "./agent.js";
+export type { SignedMessage, CreateAgentOptions, CapabilityContractOptions, SignedContract } from "./agent.js";
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 export { RegistryClient } from "./registry.js";

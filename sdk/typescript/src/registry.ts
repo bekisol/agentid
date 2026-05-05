@@ -224,6 +224,104 @@ export class RegistryClient {
   }
 
   /**
+   * Publish a signed Capability Contract for an agent you own.
+   *
+   * @param did - The agent DID (must be owned by the API key)
+   * @param contract - Signed contract from agent.signCapabilityContract()
+   * @returns Server response including the registered contract
+   */
+  async publishCapabilityContract(
+    did: string,
+    contract: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    const res = await this.request(
+      `/agents/${encodeURIComponent(did)}/capability-contracts`,
+      { method: "POST", body: JSON.stringify(contract) }
+    );
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Failed to publish capability contract (${res.status}): ${body}`);
+    }
+    return res.json();
+  }
+
+  /**
+   * List all active Capability Contracts for a DID (public, no auth required).
+   *
+   * @param did - The agent DID to look up
+   * @returns Array of active contracts
+   */
+  async getCapabilityContracts(did: string): Promise<Record<string, unknown>[]> {
+    const res = await this.request(
+      `/agents/${encodeURIComponent(did)}/capability-contracts`
+    );
+    if (res.status === 404) {
+      throw new Error(`Agent not found: ${did}`);
+    }
+    if (!res.ok) {
+      throw new Error(`Failed to fetch capability contracts (${res.status})`);
+    }
+    const data = await res.json() as { contracts?: unknown[] };
+    return (data.contracts ?? []) as Record<string, unknown>[];
+  }
+
+  /**
+   * Get the latest active Capability Contract for a specific capability (public).
+   *
+   * @param did - The agent DID
+   * @param capability - The capability name, e.g. "web-search"
+   * @returns The latest active contract
+   */
+  async getCapabilityContract(did: string, capability: string): Promise<Record<string, unknown>> {
+    const res = await this.request(
+      `/agents/${encodeURIComponent(did)}/capability-contracts/${encodeURIComponent(capability)}`
+    );
+    if (res.status === 404) {
+      throw new Error(`No contract found for capability '${capability}' on ${did}`);
+    }
+    if (!res.ok) {
+      throw new Error(`Failed to fetch capability contract (${res.status})`);
+    }
+    return res.json();
+  }
+
+  /**
+   * Search Capability Contracts across all public agents.
+   *
+   * @param opts - Search filters
+   * @returns Matching contracts with agent names
+   */
+  async searchCapabilityContracts(opts: {
+    capability?: string;
+    pricing_model?: string;
+    max_latency_ms?: number;
+    availability_min?: number;
+    signed_only?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ results: Record<string, unknown>[]; total: number }> {
+    const qs = new URLSearchParams();
+    if (opts.capability)       qs.set("capability",       opts.capability);
+    if (opts.pricing_model)    qs.set("pricing_model",    opts.pricing_model);
+    if (opts.max_latency_ms !== undefined) qs.set("max_latency_ms", String(opts.max_latency_ms));
+    if (opts.availability_min !== undefined) qs.set("availability_min", String(opts.availability_min));
+    if (opts.signed_only)      qs.set("signed_only",      "true");
+    if (opts.limit)            qs.set("limit",            String(opts.limit));
+    if (opts.offset)           qs.set("offset",           String(opts.offset));
+
+    const query = qs.toString();
+    const res = await this.request(`/capability-contracts/search${query ? "?" + query : ""}`);
+    if (!res.ok) {
+      throw new Error(`Capability contract search failed (${res.status})`);
+    }
+    const data = await res.json() as { results?: unknown[]; total?: number };
+    return {
+      results: (data.results ?? []) as Record<string, unknown>[],
+      total: (data.total ?? 0) as number,
+    };
+  }
+
+  /**
    * Check whether the registry server is reachable.
    * Returns true if the health endpoint responds with 200.
    */

@@ -38,6 +38,41 @@ export interface CreateAgentOptions {
   registry?: RegistryClient;
 }
 
+/** Options for building and signing a Capability Contract. */
+export interface CapabilityContractOptions {
+  /** Lowercase kebab-case capability name, e.g. "web-search". */
+  capability: string;
+  /** Semver string, e.g. "1.0" or "2.1.0". Defaults to "1.0". */
+  version?: string;
+  /** Human-readable description of what this capability does. */
+  description?: string;
+  /** JSON schema describing the input this capability accepts. */
+  input_schema?: Record<string, unknown>;
+  /** JSON schema describing the output this capability returns. */
+  output_schema?: Record<string, unknown>;
+  /** SLA commitments: max_latency_seconds, availability_target. */
+  sla?: Record<string, unknown>;
+  /** Pricing: { model: "free"|"per_call"|"subscription", price_usd? } */
+  pricing?: Record<string, unknown>;
+  /** Remedies for failures: { on_sla_breach, on_hallucination, ... } */
+  remedies?: Record<string, unknown>;
+}
+
+/** A signed Capability Contract ready for submission to the registry. */
+export interface SignedContract extends Record<string, unknown> {
+  did: string;
+  capability: string;
+  version: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown>;
+  sla: Record<string, unknown>;
+  pricing: Record<string, unknown>;
+  remedies: Record<string, unknown>;
+  signature: string;
+  signed_at: string;
+}
+
 // ── Agent ─────────────────────────────────────────────────────────────────────
 
 export class Agent {
@@ -233,6 +268,70 @@ export class Agent {
     }
     // Return a copy to prevent external mutation.
     return new Uint8Array(this._privateKey);
+  }
+
+  // ── Capability Contracts ─────────────────────────────────────────────────
+
+  /**
+   * Build and cryptographically sign a Capability Contract.
+   *
+   * The signature covers the canonical contract body (JSON with sorted keys,
+   * no spaces) using this agent's Ed25519 private key — matches server-side
+   * verification in capability_contracts._verify_contract_signature().
+   *
+   * @example
+   * const contract = await agent.signCapabilityContract({
+   *   capability: 'web-search',
+   *   sla: { max_latency_seconds: 5, availability_target: 0.99 },
+   *   pricing: { model: 'per_call', price_usd: 0.001 },
+   *   remedies: { on_sla_breach: 'refund' },
+   * });
+   */
+  async signCapabilityContract(opts: CapabilityContractOptions): Promise<SignedContract> {
+    if (!this._privateKey) {
+      throw new Error("No private key — agent was loaded read-only");
+    }
+    const body: Record<string, unknown> = {
+      did:           this.did,
+      capability:    opts.capability,
+      version:       opts.version ?? "1.0",
+      description:   opts.description ?? "",
+      input_schema:  opts.input_schema ?? {},
+      output_schema: opts.output_schema ?? {},
+      sla:           opts.sla ?? {},
+      pricing:       opts.pricing ?? { model: "free" },
+      remedies:      opts.remedies ?? {},
+    };
+    const signature = await cryptoSign(this._privateKey, body);
+    return {
+      ...body,
+      signature,
+      signed_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+    } as SignedContract;
+  }
+
+  /**
+   * Sign and publish a Capability Contract to the registry in one call.
+   *
+   * Requires the agent to have been created with a registry.
+   *
+   * @example
+   * const result = await agent.publishCapabilityContract({
+   *   capability: 'web-search',
+   *   sla: { max_latency_seconds: 5, availability_target: 0.99 },
+   *   pricing: { model: 'per_call', price_usd: 0.001 },
+   * });
+   * console.log(result.contract.id);
+   */
+  async publishCapabilityContract(opts: CapabilityContractOptions): Promise<Record<string, unknown>> {
+    if (!this._registry) {
+      throw new Error(
+        "publishCapabilityContract() requires a registry. " +
+        "Pass registry when creating the agent."
+      );
+    }
+    const contract = await this.signCapabilityContract(opts);
+    return this._registry.publishCapabilityContract(this.did, contract);
   }
 
   // ── Repr ──────────────────────────────────────────────────────────────────

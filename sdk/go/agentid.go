@@ -60,11 +60,12 @@ type Client struct {
 	http            *http.Client
 	owner, tier     string
 
-	Agents     *AgentsResource
-	Audit      *AuditResource
-	Anomalies  *AnomaliesResource
-	Benchmarks *BenchmarksResource
-	Webhooks   *WebhooksResource
+	Agents              *AgentsResource
+	Audit               *AuditResource
+	Anomalies           *AnomaliesResource
+	Benchmarks          *BenchmarksResource
+	Webhooks            *WebhooksResource
+	CapabilityContracts *CapabilityContractsResource
 }
 
 func NewClient(opts Options) (*Client, error) {
@@ -78,11 +79,12 @@ func NewClient(opts Options) (*Client, error) {
 	hc := opts.HTTP
 	if hc == nil { hc = &http.Client{Timeout: timeout} }
 	c := &Client{apiKey: key, baseURL: base, http: hc}
-	c.Agents     = &AgentsResource{c: c}
-	c.Audit      = &AuditResource{c: c}
-	c.Anomalies  = &AnomaliesResource{c: c}
-	c.Benchmarks = &BenchmarksResource{c: c}
-	c.Webhooks   = &WebhooksResource{c: c}
+	c.Agents              = &AgentsResource{c: c}
+	c.Audit               = &AuditResource{c: c}
+	c.Anomalies           = &AnomaliesResource{c: c}
+	c.Benchmarks          = &BenchmarksResource{c: c}
+	c.Webhooks            = &WebhooksResource{c: c}
+	c.CapabilityContracts = &CapabilityContractsResource{c: c}
 	return c, nil
 }
 
@@ -462,4 +464,177 @@ func orEmpty(s []string) []string {
 func orEmptyMap(m map[string]any) map[string]any {
 	if m == nil { return map[string]any{} }
 	return m
+}
+
+// ── Capability Contracts ──────────────────────────────────────────────────────
+
+// CapabilityContractsResource provides methods for managing signed Capability
+// Contracts — machine-readable, cryptographically signed commitments that
+// specify what an agent can do, its SLA, pricing, and remedies on failure.
+type CapabilityContractsResource struct{ c *Client }
+
+// CapabilityContractParams holds the fields needed to create a contract.
+type CapabilityContractParams struct {
+	Capability   string         // required — e.g. "web-search"
+	Version      string         // defaults to "1.0"
+	Description  string
+	InputSchema  map[string]any // JSON schema for the input
+	OutputSchema map[string]any // JSON schema for the output
+	SLA          map[string]any // e.g. {"max_latency_seconds": 5, "availability_target": 0.99}
+	Pricing      map[string]any // e.g. {"model": "per_call", "price_usd": 0.001}
+	Remedies     map[string]any // e.g. {"on_sla_breach": "refund"}
+}
+
+// CapabilityContract is the server representation of a registered contract.
+type CapabilityContract struct {
+	ID           int64          `json:"id"`
+	DID          string         `json:"did"`
+	Capability   string         `json:"capability"`
+	Version      string         `json:"version"`
+	Description  string         `json:"description"`
+	InputSchema  map[string]any `json:"input_schema"`
+	OutputSchema map[string]any `json:"output_schema"`
+	SLA          map[string]any `json:"sla"`
+	Pricing      map[string]any `json:"pricing"`
+	Remedies     map[string]any `json:"remedies"`
+	Signature    string         `json:"signature"`
+	SignedAt     string         `json:"signed_at"`
+	IsActive     bool           `json:"is_active"`
+	CreatedAt    string         `json:"created_at"`
+	ContractURL  string         `json:"contract_url"`
+}
+
+// Sign builds the canonical contract body and signs it with the agent's
+// Ed25519 private key. Returns a map ready to POST to the registry.
+//
+// The canonical form (sort_keys, no spaces) matches the server's verification
+// in capability_contracts._verify_contract_signature().
+func (r *CapabilityContractsResource) Sign(agent *Agent, p CapabilityContractParams) (map[string]any, error) {
+	if agent.PrivateKeyB64 == "" {
+		return nil, errors.New("agent has no private key — was it loaded from a remote fetch?")
+	}
+	if p.Version == "" { p.Version = "1.0" }
+
+	body := map[string]any{
+		"did":           agent.DID,
+		"capability":    p.Capability,
+		"version":       p.Version,
+		"description":   p.Description,
+		"input_schema":  orEmptyMap(p.InputSchema),
+		"output_schema": orEmptyMap(p.OutputSchema),
+		"sla":           orEmptyMap(p.SLA),
+		"pricing":       func() map[string]any {
+			if p.Pricing == nil { return map[string]any{"model": "free"} }
+			return p.Pricing
+		}(),
+		"remedies": orEmptyMap(p.Remedies),
+	}
+
+	priv, err := base64.StdEncoding.DecodeString(agent.PrivateKeyB64)
+	if err != nil { return nil, fmt.Errorf("decode private key: %w", err) }
+	if len(priv) == ed25519.SeedSize { priv = ed25519.NewKeyFromSeed(priv) }
+
+	canonical, err := canonicalJSON(body)
+	if err != nil { return nil, err }
+	sig := ed25519.Sign(priv, canonical)
+
+	result := clone(body)
+	result["signature"] = base64.StdEncoding.EncodeToString(sig)
+	result["signed_at"] = time.Now().UTC().Format(time.RFC3339)
+	return result, nil
+}
+
+// Publish signs a contract and POSTs it to the registry in one call.
+//
+//	contract, err := client.CapabilityContracts.Publish(ctx, agent, CapabilityContractParams{
+//	    Capability: "web-search",
+//	    SLA:        map[string]any{"max_latency_seconds": 5, "availability_target": 0.99},
+//	    Pricing:    map[string]any{"model": "per_call", "price_usd": 0.001},
+//	    Remedies:   map[string]any{"on_sla_breach": "refund"},
+//	})
+func (r *CapabilityContractsResource) Publish(
+	ctx context.Context, agent *Agent, p CapabilityContractParams,
+) (*CapabilityContract, error) {
+	body, err := r.Sign(agent, p)
+	if err != nil { return nil, err }
+
+	data, err := r.c.request(ctx, "POST",
+		"/agents/"+agent.DID+"/capability-contracts", body)
+	if err != nil { return nil, err }
+
+	var resp struct{ Contract *CapabilityContract `json:"contract"` }
+	if err := json.Unmarshal(data, &resp); err != nil { return nil, err }
+	return resp.Contract, nil
+}
+
+// List fetches all active Capability Contracts for a DID (public, no auth needed).
+func (r *CapabilityContractsResource) List(
+	ctx context.Context, did string,
+) ([]CapabilityContract, error) {
+	data, err := r.c.request(ctx, "GET",
+		"/agents/"+did+"/capability-contracts", nil)
+	if err != nil { return nil, err }
+
+	var resp struct{ Contracts []CapabilityContract `json:"contracts"` }
+	if err := json.Unmarshal(data, &resp); err != nil { return nil, err }
+	return resp.Contracts, nil
+}
+
+// Get fetches the latest active contract for a specific capability (public).
+func (r *CapabilityContractsResource) Get(
+	ctx context.Context, did, capability string,
+) (*CapabilityContract, error) {
+	data, err := r.c.request(ctx, "GET",
+		"/agents/"+did+"/capability-contracts/"+capability, nil)
+	if err != nil { return nil, err }
+
+	var out CapabilityContract
+	if err := json.Unmarshal(data, &out); err != nil { return nil, err }
+	return &out, nil
+}
+
+// Deactivate soft-deletes a contract. Pass an empty version to deactivate all versions.
+func (r *CapabilityContractsResource) Deactivate(
+	ctx context.Context, did, capability, version string,
+) error {
+	path := "/agents/" + did + "/capability-contracts/" + capability
+	if version != "" { path += "?version=" + version }
+	_, err := r.c.request(ctx, "DELETE", path, nil)
+	return err
+}
+
+// ContractSearchOptions filters for SearchContracts.
+type ContractSearchOptions struct {
+	Capability       string
+	PricingModel     string  // free | per_call | subscription | tiered
+	MaxLatencyMS     float64 // 0 = no filter
+	AvailabilityMin  float64 // 0 = no filter
+	SignedOnly        bool
+	Limit             int
+	Offset            int
+}
+
+// Search finds Capability Contracts across all public agents.
+func (r *CapabilityContractsResource) Search(
+	ctx context.Context, opts ContractSearchOptions,
+) ([]CapabilityContract, int, error) {
+	q := fmt.Sprintf("/capability-contracts/search?limit=%d&offset=%d",
+		func() int { if opts.Limit <= 0 { return 50 }; return opts.Limit }(),
+		opts.Offset,
+	)
+	if opts.Capability    != "" { q += "&capability="    + opts.Capability }
+	if opts.PricingModel  != "" { q += "&pricing_model=" + opts.PricingModel }
+	if opts.MaxLatencyMS  > 0   { q += fmt.Sprintf("&max_latency_ms=%g",    opts.MaxLatencyMS) }
+	if opts.AvailabilityMin > 0 { q += fmt.Sprintf("&availability_min=%g",  opts.AvailabilityMin) }
+	if opts.SignedOnly          { q += "&signed_only=true" }
+
+	data, err := r.c.request(ctx, "GET", q, nil)
+	if err != nil { return nil, 0, err }
+
+	var resp struct {
+		Results []CapabilityContract `json:"results"`
+		Total   int                  `json:"total"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil { return nil, 0, err }
+	return resp.Results, resp.Total, nil
 }
