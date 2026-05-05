@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish:
-    name: Build and publish @agentid/sdk
+    name: Build and publish agentid-protocol (npm)
     runs-on: ubuntu-latest
 
     steps:
@@ -31,6 +31,6 @@ jobs:
       - name: Publish to npm
         run: |
           cd sdk/typescript
-          npm publish --access public
+          npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
