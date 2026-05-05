@@ -3,7 +3,7 @@ name: Publish Node SDK to npm
 on:
   push:
     tags:
-      - 'sdk-node-v*'   # git tag sdk-node-v0.1.0 && git push --tags
+      - 'sdk-node-v*'   # git tag sdk-node-v0.1.1 && git push --tags
 
 jobs:
   publish:
@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd sdk/typescript
-          npm ci
+          npm install
 
       - name: Build
         run: |
