@@ -1,4 +1,4 @@
-# @agentid/sdk
+# @vikhulus/agentid-protocol
 
 **Identity, discovery, and trust for AI agents — TypeScript SDK**
 
@@ -15,7 +15,7 @@ Give every AI agent a cryptographic identity, let agents discover each other, an
 ## Install
 
 ```bash
-npm install @agentid/sdk
+npm install @vikhulus/agentid-protocol
 ```
 
 ---
@@ -23,7 +23,7 @@ npm install @agentid/sdk
 ## Quick start
 
 ```typescript
-import { createAgent, Agent } from '@agentid/sdk';
+import { createAgent, Agent } from '@vikhulus/agentid-protocol';
 
 // 1. Create an agent (no registry = fully local)
 const agent = await createAgent({
@@ -50,7 +50,7 @@ console.log(valid); // true
 ## Agent-to-agent authentication
 
 ```typescript
-import { createAgent, Agent, RegistryClient } from '@agentid/sdk';
+import { createAgent, Agent, RegistryClient } from '@vikhulus/agentid-protocol';
 
 const registry = new RegistryClient('https://api.agentid-protocol.com', process.env.AGENTID_API_KEY);
 
@@ -148,7 +148,7 @@ const registry = new RegistryClient(baseUrl?, apiKey?);
 ### Crypto utilities
 
 ```typescript
-import { generateKeypair, sign, verify, publicKeyToDid, didToPublicKey } from '@agentid/sdk';
+import { generateKeypair, sign, verify, publicKeyToDid, didToPublicKey } from '@vikhulus/agentid-protocol';
 
 const { privateKey, publicKey } = await generateKeypair();
 const did = publicKeyToDid(publicKey);
@@ -170,6 +170,120 @@ const agent = await Agent.fromPrivateKey(rawKey, registry);
 ```
 
 > The private key never leaves your machine. The registry only stores the public key.
+
+---
+
+## Framework integrations
+
+### LangChain.js
+
+Give any LangChain.js agent a verifiable identity and agent-discovery tools using the core SDK:
+
+```typescript
+import { createAgent, Agent, RegistryClient } from '@vikhulus/agentid-protocol';
+import { DynamicTool } from '@langchain/core/tools';
+import { AgentExecutor } from 'langchain/agents';
+
+const REGISTRY = 'https://api.agentid-protocol.com';
+const registry = new RegistryClient(REGISTRY, process.env.AGENTID_API_KEY);
+
+// Create a persistent identity (store rawKey in a secret manager)
+const identity = await createAgent({
+  name: 'research-agent',
+  capabilities: ['web-search', 'summarization'],
+  owner: 'team@company.com',
+  registry,
+});
+console.log('DID:', identity.did);
+
+// Subsequent starts — reload from saved key
+// const identity = await Agent.fromPrivateKey(savedKey, registry);
+
+// Discovery tool — lets the agent find other agents by capability
+const findAgentTool = new DynamicTool({
+  name: 'find_agent',
+  description: 'Find AI agents registered in the network by capability. Input: a capability string.',
+  func: async (capability: string) => {
+    const agents = await registry.find({ capability });
+    return JSON.stringify(agents.map(a => ({ did: a.did, name: a.name, capabilities: a.capabilities })));
+  },
+});
+
+// Verify tool — lets the agent verify a signed message from another agent
+const verifyTool = new DynamicTool({
+  name: 'verify_agent_message',
+  description: 'Verify a signed message from another agent. Input: JSON string with payload and signature.',
+  func: async (input: string) => {
+    const msg = JSON.parse(input);
+    const valid = await Agent.verifyFromRegistry(msg, registry);
+    return JSON.stringify({ valid, signer: msg.signer_did });
+  },
+});
+
+const executor = AgentExecutor.fromAgentAndTools({
+  agent,
+  tools: [findAgentTool, verifyTool, /* ...your other tools */],
+});
+
+// Sign outputs before sending to other agents
+const result = await executor.invoke({ input: 'Research the latest AI papers' });
+const signed = await identity.sign({ output: result.output });
+// signed.signature — Ed25519 signature any downstream agent can verify
+```
+
+---
+
+### Vercel AI SDK
+
+```typescript
+import { createAgent, Agent, RegistryClient } from '@vikhulus/agentid-protocol';
+import { tool } from 'ai';
+import { z } from 'zod';
+
+const registry = new RegistryClient('https://api.agentid-protocol.com');
+
+const identity = await createAgent({
+  name: 'vercel-agent',
+  capabilities: ['reasoning', 'code-generation'],
+  owner: 'team@company.com',
+  registry,
+});
+
+// Agent-discovery tool for use with generateText / streamText
+const findAgentTool = tool({
+  description: 'Find AI agents by capability',
+  parameters: z.object({ capability: z.string() }),
+  execute: async ({ capability }) => {
+    return registry.find({ capability });
+  },
+});
+
+// After generating a response, sign it
+const response = await generateText({ model, prompt, tools: { findAgent: findAgentTool } });
+const signed = await identity.sign({ output: response.text });
+```
+
+---
+
+### AutoGen (Python → TypeScript handoff)
+
+The TypeScript SDK is designed to interoperate with AutoGen Python agents. An AutoGen agent signs its output; a TypeScript service verifies it:
+
+```typescript
+import { Agent, RegistryClient } from '@vikhulus/agentid-protocol';
+
+const registry = new RegistryClient('https://api.agentid-protocol.com');
+
+// Receive a signed message from a Python AutoGen agent
+const incomingMessage = JSON.parse(req.body);  // { payload, signature, signer_did, ... }
+
+const trusted = await Agent.verifyFromRegistry(incomingMessage, registry);
+if (!trusted) {
+  throw new Error(`Rejected: unverified message from ${incomingMessage.signer_did}`);
+}
+
+console.log('Verified agent:', incomingMessage.signer_did);
+```
 
 ---
 

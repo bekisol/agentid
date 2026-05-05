@@ -153,80 +153,142 @@ signed = agent.sign({"task": "run pipeline"})
 
 ## LangChain integration
 
-Give any LangChain agent a verifiable identity in 3 lines:
+Give any LangChain agent a verifiable identity and agent-discovery tools:
 
 ```python
+import os
 from agentid.integrations.langchain import (
+    load_or_create,
     AgentIDCallbackHandler,
     AgentIDFindTool,
     AgentIDVerifyTool,
 )
 
-# 1. Create identity
-identity = AgentIDCallbackHandler(
+# First run — creates a new identity. Save the printed DID to an env var.
+identity = load_or_create(
     name="research-agent",
     capabilities=["web-search", "summarization"],
     owner="team@company.com",
+    registry_url="https://api.agentid-protocol.com",
 )
-print(f"Agent DID: {identity.did}")
+print(f"DID (save this): {identity.did}")
 
-# 2. Add discovery tools
+# Subsequent runs — reload the same identity by DID
+identity = load_or_create(
+    did=os.environ["MY_AGENT_DID"],
+    name="research-agent",           # ignored when did is given
+    capabilities=["web-search"],     # ignored when did is given
+    owner="team@company.com",
+    registry_url="https://api.agentid-protocol.com",
+)
+
+# 1. Attach identity — signs every final output automatically
+handler = AgentIDCallbackHandler(identity)
+
+# 2. Add discovery + verification tools
 tools = [
-    AgentIDFindTool(),       # lets the agent find other agents by capability
-    AgentIDVerifyTool(),     # lets the agent verify messages from other agents
-    ...your_other_tools,
+    AgentIDFindTool(registry_url="https://api.agentid-protocol.com"),
+    AgentIDVerifyTool(registry_url="https://api.agentid-protocol.com"),
+    # ...your other tools
 ]
 
 # 3. Wire up
-executor = AgentExecutor(agent=agent, tools=tools, callbacks=[identity])
-```
+executor = AgentExecutor(agent=agent, tools=tools, callbacks=[handler])
 
-Every output from this executor is automatically signed. Verify it downstream:
-
-```python
-from agentid.integrations.langchain import verify_langchain_output
-
+# Every output is signed — verify downstream:
 result = executor.invoke({"input": "Research the latest AI papers"})
-verify_langchain_output(result)  # → True
+# result["_agentid_did"]       → signer's DID
+# result["_agentid_signature"] → Ed25519 signature
+# result["_agentid_payload"]   → signed payload (verify with Agent.verify_from_did)
 ```
 
 ---
 
 ## AutoGen integration
 
+Works with both AutoGen v0.2.x (`pyautogen`) and v0.4+ (`autogen-agentchat`):
+
 ```python
-from autogen_agentid import create_agentid_agent
+import os
+from agentid.integrations.autogen import AgentIDTools, load_or_create
 
-agent = create_agentid_agent(
-    name="research-bot",
-    capabilities=["research", "summarization"],
+# First run — create identity, save the DID
+identity = load_or_create(
+    name="my-autogen-agent",
+    capabilities=["data-analysis", "code-execution"],
     owner="team@company.com",
-    system_message="You are a research assistant.",
+    registry_url="https://api.agentid-protocol.com",
 )
-print(agent.agentid_did)  # did:agentid:...
-```
+print(f"DID (save this): {identity.did}")
 
-Every message sent by this agent is automatically signed. Recipients can verify using the DID.
+# Subsequent runs — reload
+identity = load_or_create(
+    did=os.environ["MY_AGENT_DID"],
+    name="my-autogen-agent",
+    capabilities=["data-analysis"],
+    owner="team@company.com",
+    registry_url="https://api.agentid-protocol.com",
+)
+
+agentid = AgentIDTools(
+    registry_url="https://api.agentid-protocol.com",
+    agent=identity,   # enables the sign tool
+)
+
+# AutoGen v0.2 — register as function tools on assistant + user_proxy
+agentid.register_v2(assistant, user_proxy)
+
+# AutoGen v0.4+ — pass as a tools list
+tools = agentid.as_tools()
+assistant = AssistantAgent(name="assistant", tools=tools)
+
+# Sign outputs before handing off to other agents
+signed = identity.sign({"result": "analysis complete", "data": [1, 2, 3]})
+```
 
 ---
 
 ## CrewAI integration
 
 ```python
-from crewai_agentid import create_agentid_crew_agent, AgentIDObserver
-
-agent = create_agentid_crew_agent(
-    role="Senior Researcher",
-    goal="Research AI topics",
-    backstory="Expert researcher with 10 years experience",
-    capabilities=["research", "summarization"],
-    owner="team@company.com",
+import os
+from crewai import Agent as CrewAgent, Task, Crew
+from agentid.integrations.crewai import (
+    load_or_create,
+    AgentIDFindTool,
+    AgentIDVerifyTool,
 )
-print(agent.agentid_did)  # did:agentid:...
 
-# Sign task outputs
-observer = AgentIDObserver(signing_agent=agent)
-signed_result = observer.sign_task_result("Summary: AI is advancing rapidly.")
+# First run — create identity, save the DID
+identity, sign_tool = load_or_create(
+    name="research-agent",
+    capabilities=["web-search", "summarization"],
+    owner="team@company.com",
+    registry_url="https://api.agentid-protocol.com",
+)
+print(f"DID (save this): {identity.did}")
+
+# Subsequent runs — reload
+identity, sign_tool = load_or_create(
+    did=os.environ["MY_AGENT_DID"],
+    name="research-agent",
+    capabilities=["web-search"],
+    owner="team@company.com",
+    registry_url="https://api.agentid-protocol.com",
+)
+
+tools = [
+    AgentIDFindTool(registry_url="https://api.agentid-protocol.com"),
+    AgentIDVerifyTool(registry_url="https://api.agentid-protocol.com"),
+    sign_tool,   # lets the agent sign its own outputs
+]
+
+researcher = CrewAgent(
+    role="Senior Researcher",
+    goal="Find trusted agents and verify their outputs",
+    backstory="Expert researcher specializing in multi-agent systems",
+    tools=tools,
+)
 ```
 
 ---
@@ -336,7 +398,7 @@ spec/
 - [x] Pro: audit log exports (CSV/JSON)
 - [x] Pro: analytics dashboard
 - [x] Enterprise: verified identity badges
-- [ ] TypeScript SDK
+- [x] TypeScript SDK
 - [ ] Stripe self-serve signup
 - [ ] Interaction receipts + reputation layer
 
