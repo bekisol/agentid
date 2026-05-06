@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentid-protocol"
-version = "0.1.6"
-description = "Identity, discovery, and trust for AI agents"
+version = "0.2.0"
+description = "Identity, discovery, trust, and runtime for AI agents"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Vikhulus", email = "hello@vikhulus.com" }]
@@ -27,15 +27,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+dev     = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+runtime = []           # runtime uses only core deps (httpx already required)
 langchain = ["langchain-core>=0.2"]
-crewai = ["crewai>=0.28"]
+crewai  = ["crewai>=0.28"]
 autogen = ["autogen-agentchat>=0.4"]
-all = ["langchain-core>=0.2", "crewai>=0.28", "autogen-agentchat>=0.4"]
+all     = ["langchain-core>=0.2", "crewai>=0.28", "autogen-agentchat>=0.4"]
+
+[project.scripts]
+agentid-runtime = "agentid.runtime.__main__:main"
 
 [project.urls]
 Homepage = "https://agentid.dev"
 Repository = "https://github.com/bekisol/agentid"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
 where = ["."]
