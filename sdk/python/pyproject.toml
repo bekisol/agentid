@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentid-protocol"
-version = "0.2.0"
+version = "0.3.0"
 description = "Identity, discovery, trust, and runtime for AI agents"
 readme = "README.md"
 license = { text = "MIT" }
@@ -29,6 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 dev     = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 runtime = []           # runtime uses only core deps (httpx already required)
+brain   = []           # brain uses only core deps (httpx already required)
 langchain = ["langchain-core>=0.2"]
 crewai  = ["crewai>=0.28"]
 autogen = ["autogen-agentchat>=0.4"]

@@ -17,7 +17,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_BASE_URL = "https://agentid.dev"
+DEFAULT_BASE_URL = "https://api.agentid-protocol.com"
 DEFAULT_POLL_TIMEOUT = 30  # seconds
 
 
@@ -30,7 +30,7 @@ class AsyncAgentIDClient:
     api_key : str
         Your AgentID API key (sent as x-api-key header).
     base_url : str
-        Base URL of the AgentID server. Defaults to https://agentid.dev.
+        Base URL of the AgentID server. Defaults to https://api.agentid-protocol.com.
     poll_timeout : int
         How long (seconds) to wait on each long-poll request.
     """
@@ -181,15 +181,15 @@ class AsyncAgentIDClient:
             Server response body (typically includes the new message id).
         """
         client = self._check_client()
+        # Endpoint: POST /agents/{to_did}/messages
         payload: dict[str, Any] = {
             "from_did": from_did,
-            "to_did": to_did,
             "body": body,
             "content_type": content_type,
         }
         if metadata:
             payload.update(metadata)
 
-        resp = await client.post("/messages", json=payload)
+        resp = await client.post(f"/agents/{to_did}/messages", json=payload)
         resp.raise_for_status()
         return resp.json()

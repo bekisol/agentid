@@ -137,7 +137,7 @@ class AgentRuntime:
         Async or sync callable: ``fn(message, ctx) -> str | None``.
         Return a string to auto-reply, return None to suppress auto-reply.
     base_url : str
-        AgentID server URL. Defaults to https://agentid.dev.
+        AgentID server URL. Defaults to https://api.agentid-protocol.com.
     poll_timeout : int
         Seconds per long-poll request. Default 30.
     concurrency : int
@@ -149,7 +149,7 @@ class AgentRuntime:
         did: str,
         api_key: str,
         handler: Handler,
-        base_url: str = "https://agentid.dev",
+        base_url: str = "https://api.agentid-protocol.com",
         poll_timeout: int = 30,
         concurrency: int = 4,
     ) -> None:
@@ -295,3 +295,61 @@ class AgentRuntime:
             logger.info(
                 "[runtime] stopped — processed %d messages", self.messages_processed
             )
+
+    async def run_webhook(
+        self,
+        webhook_url: str,
+        port: int = 9000,
+        secret: Optional[str] = None,
+    ) -> None:
+        """
+        Start in webhook mode: register *webhook_url* with the AgentID server,
+        listen for inbound HTTP POSTs, and dispatch each message to the handler.
+
+        Parameters
+        ----------
+        webhook_url : str
+            The public URL the AgentID server will POST to, e.g.
+            ``https://myapp.railway.app/webhook`` or an ngrok URL for local dev.
+        port : int
+            Local port to bind the HTTP listener to. Default 9000.
+        secret : str | None
+            Optional HMAC-SHA256 secret. When set, the server signs each
+            request and this runtime verifies the signature before dispatching.
+        """
+        from .webhook import WebhookServer, deregister_webhook, register_webhook
+
+        self._semaphore = asyncio.Semaphore(self._concurrency)
+        loop = asyncio.get_event_loop()
+
+        def _handle_signal() -> None:
+            logger.info("[runtime] shutdown signal received — stopping")
+            self.stop()
+
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, _handle_signal)
+            except (NotImplementedError, RuntimeError):
+                pass
+
+        server = WebhookServer(port=port, runtime=self, secret=secret)
+        server.start(loop)
+
+        logger.info("[runtime] webhook mode — did=%s url=%s", self.did, webhook_url)
+
+        async with self._client:
+            # Register the URL with AgentID
+            await register_webhook(self._client, self.did, webhook_url, secret)
+            try:
+                await server.drain_forever(self._stop_event)
+            finally:
+                # Best-effort deregister on shutdown
+                try:
+                    await deregister_webhook(self._client, self.did)
+                except Exception as exc:
+                    logger.warning("[runtime] failed to deregister webhook: %s", exc)
+                server.stop()
+                logger.info(
+                    "[runtime] webhook stopped — processed %d messages",
+                    self.messages_processed,
+                )

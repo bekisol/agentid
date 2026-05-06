@@ -6,7 +6,7 @@ Supports loading from a TOML file:
     [agent]
     did      = "did:agentid:abc123"
     api_key  = "ak_..."
-    base_url = "https://agentid.dev"   # optional
+    base_url = "https://api.agentid-protocol.com"   # optional
 
     [runtime]
     poll_timeout = 30     # optional
@@ -41,7 +41,7 @@ class AgentConfig:
 
     did: str
     api_key: str
-    base_url: str = "https://agentid.dev"
+    base_url: str = "https://api.agentid-protocol.com"
 
 
 # ── RuntimeConfig ─────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ class RuntimeConfig:
         api_key = os.environ.get("AGENTID_API_KEY") or agent_data.get("api_key", "")
         base_url = (
             os.environ.get("AGENTID_BASE_URL")
-            or agent_data.get("base_url", "https://agentid.dev")
+            or agent_data.get("base_url", "https://api.agentid-protocol.com")
         )
 
         if not did:
@@ -147,7 +147,7 @@ class RuntimeConfig:
           AGENTID_API_KEY   — API key
 
         Optional:
-          AGENTID_BASE_URL      — server URL (default https://agentid.dev)
+          AGENTID_BASE_URL      — server URL (default https://api.agentid-protocol.com)
           AGENTID_POLL_TIMEOUT  — seconds (default 30)
           AGENTID_CONCURRENCY   — int (default 4)
           AGENTID_HEALTH_PORT   — int (if set, starts health endpoint)
@@ -165,7 +165,7 @@ class RuntimeConfig:
             agent=AgentConfig(
                 did=did,
                 api_key=api_key,
-                base_url=os.environ.get("AGENTID_BASE_URL", "https://agentid.dev"),
+                base_url=os.environ.get("AGENTID_BASE_URL", "https://api.agentid-protocol.com"),
             ),
             poll_timeout=int(os.environ.get("AGENTID_POLL_TIMEOUT", 30)),
             concurrency=int(os.environ.get("AGENTID_CONCURRENCY", 4)),

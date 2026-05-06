@@ -27,11 +27,13 @@ Run from CLI:
 from .client import AsyncAgentIDClient
 from .handlers import echo_handler, keyword_router, logged, static_reply
 from .runtime import AgentRuntime, MessageContext
+from .webhook import WebhookServer
 
 __all__ = [
     "AgentRuntime",
     "MessageContext",
     "AsyncAgentIDClient",
+    "WebhookServer",
     "echo_handler",
     "static_reply",
     "keyword_router",
