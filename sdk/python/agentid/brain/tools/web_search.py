@@ -15,7 +15,7 @@ Provider priority
 3. DuckDuckGo (no key)                   — free fallback, topic summaries only.
 
 Recommended: pass no api_key and use the platform's built-in search MCP
-endpoint (POST /mcp/search) via MCPSession.http() — zero setup for users.
+endpoint (POST /api/search) via MCPSession.http() — zero setup for users.
 """
 
 from __future__ import annotations

@@ -67,7 +67,7 @@ OPENAI_KEY    = os.getenv("OPENAI_API_KEY",  "")
 BASE_URL      = "https://api.agentid-protocol.com"
 
 # Tavily Search MCP — served by agentid-pro, no per-user key needed
-SEARCH_MCP_URL = f"{BASE_URL}/mcp/search"
+SEARCH_MCP_URL = f"{BASE_URL}/api/search"
 
 # ── Pick provider ─────────────────────────────────────────────────────────────
 def _build_provider():
