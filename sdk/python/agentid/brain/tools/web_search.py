@@ -1,13 +1,21 @@
 """
 WebSearchTool — search the web for current information.
 
-Primary:  Brave Search API (free tier: 2,000 queries/month)
-          Get a free key at https://api.search.brave.com/
+Provider priority
+-----------------
+1. Tavily  (api_key starts with "tvly-")  — purpose-built for AI agents.
+           Returns a direct answer + clean extracted content per source.
+           Free tier: 1,000 queries/month. $1/1,000 after that.
+           Get a key at https://app.tavily.com/
 
-Fallback: DuckDuckGo Instant Answer API (no key, topic summaries only)
+2. Brave   (any other non-empty api_key)  — independent search index.
+           Free tier: 2,000 queries/month. $3/1,000 after that.
+           Get a key at https://api.search.brave.com/
 
-The LLM uses this to research any domain — oil prices, OPEC news, earnings,
-geopolitical events, competitor activity — without pre-built connectors.
+3. DuckDuckGo (no key)                   — free fallback, topic summaries only.
+
+Recommended: pass no api_key and use the platform's built-in search MCP
+endpoint (POST /mcp/search) via MCPSession.http() — zero setup for users.
 """
 
 from __future__ import annotations
@@ -23,30 +31,25 @@ logger = logging.getLogger(__name__)
 
 class WebSearchTool(Tool):
     """
-    Search the web and return titles, URLs, and descriptions of top results.
+    Search the web and return current results.
+
+    Automatically selects Tavily, Brave, or DuckDuckGo based on the key format.
 
     Parameters
     ----------
     api_key : str
-        Brave Search API key. If empty, falls back to DuckDuckGo (limited).
+        Tavily key (tvly-...) or Brave key (BSA-...).
+        Leave empty to use DuckDuckGo fallback.
     max_results : int
-        Default number of results to return. LLM can request 1–10 per call.
-
-    Example
-    -------
-        # With Brave (recommended)
-        WebSearchTool(api_key="BSA...")
-
-        # Without key (fallback, topic summaries only)
-        WebSearchTool()
+        Default number of results. LLM can request 1–10 per call.
     """
 
     name = "web_search"
     description = (
         "Search the web for current, real-time information on any topic. "
-        "Use this to look up news, prices, events, company data, market conditions, "
-        "regulatory changes, or any information you don't already know. "
-        "Returns titles, URLs, and descriptions of the top results."
+        "Use this to look up news, prices, events, company data, market "
+        "conditions, regulatory changes, or any information you don't already "
+        "know. Returns a direct answer plus the top sources with clean content."
     )
     parameters = {
         "type": "object",
@@ -72,12 +75,58 @@ class WebSearchTool(Tool):
 
     async def run(self, query: str, num_results: int | None = None) -> str:
         n = min(max(1, num_results or self.max_results), 10)
+
         if self.api_key:
             try:
-                return await self._brave(query, n)
+                if self.api_key.startswith("tvly-"):
+                    return await self._tavily(query, n)
+                else:
+                    return await self._brave(query, n)
             except Exception as exc:
-                logger.warning("[brain/web_search] Brave failed (%s), falling back to DDG", exc)
+                logger.warning("[brain/web_search] Search failed (%s), falling back to DDG", exc)
+
         return await self._ddg(query, n)
+
+    # ── Tavily (recommended for AI agents) ────────────────────────────────────
+
+    async def _tavily(self, query: str, n: int) -> str:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key":             self.api_key,
+                    "query":               query,
+                    "max_results":         n,
+                    "search_depth":        "basic",
+                    "include_answer":      True,
+                    "include_raw_content": False,
+                    "include_images":      False,
+                },
+            )
+
+        if not resp.is_success:
+            raise RuntimeError(f"Tavily {resp.status_code}: {resp.text[:100]}")
+
+        data    = resp.json()
+        answer  = data.get("answer", "")
+        results = data.get("results", [])
+
+        if not results and not answer:
+            return f"No results found for: {query}"
+
+        lines = [f"Search: {query}\n"]
+        if answer:
+            lines.append(f"Answer: {answer}\n")
+        if results:
+            lines.append("Sources:")
+            for r in results:
+                title   = r.get("title", "")
+                url     = r.get("url", "")
+                content = r.get("content", "")[:300]
+                score   = r.get("score", 0)
+                lines.append(f"\n• {title} (relevance {score:.2f})\n  {url}\n  {content}")
+
+        return "\n".join(lines)
 
     # ── Brave Search ───────────────────────────────────────────────────────────
 
@@ -122,9 +171,7 @@ class WebSearchTool(Tool):
                         "no_html": "1",
                         "skip_disambig": "1",
                     },
-                    headers={
-                        "User-Agent": "agentid-brain/0.3 (+https://agentid-protocol.com)"
-                    },
+                    headers={"User-Agent": "agentid-brain/0.5 (+https://agentid-protocol.com)"},
                 )
             data = resp.json()
         except Exception as exc:
@@ -148,7 +195,7 @@ class WebSearchTool(Tool):
             for t in topics[:n]:
                 if isinstance(t, dict) and t.get("Text"):
                     text = t["Text"][:150]
-                    url = t.get("FirstURL", "")
+                    url  = t.get("FirstURL", "")
                     parts.append(f"  • {text}")
                     if url:
                         parts.append(f"    {url}")
@@ -156,8 +203,8 @@ class WebSearchTool(Tool):
         if not parts:
             return (
                 f"Limited results for: '{query}'.\n"
-                f"For full web search, provide a Brave Search API key "
-                f"(free at https://api.search.brave.com/) to WebSearchTool."
+                f"For full web search, use WebSearchTool(api_key='tvly-...') "
+                f"with a Tavily key (free at https://app.tavily.com/)."
             )
 
         return "\n".join(parts)
