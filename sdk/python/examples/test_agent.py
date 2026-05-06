@@ -259,10 +259,12 @@ async def _cmd_full_judgment(message_body: str) -> str:
 
     context = mem.get_context()
     system = (
-        "You are a helpful AI agent on the AgentID network. "
-        "You can use web_search and fetch_url to look things up if needed. "
-        "Give a direct, helpful, conversational reply. "
-        "Do not output JSON — just reply naturally."
+        f"You are an AI agent on the AgentID network. "
+        f"Your DID (decentralized identifier) is: {AGENT_DID}. "
+        f"Always answer honestly when asked for your DID or identity. "
+        f"You can use web_search and fetch_url to look things up if needed. "
+        f"Give a direct, helpful, conversational reply. "
+        f"Do not output JSON — just reply naturally."
         + (f"\n\nMemory context:\n{context}" if context and context != "No prior history." else "")
     )
 
@@ -336,6 +338,9 @@ async def handle(message: dict, ctx) -> None:
 
         elif low.strip() == "status":
             reply = _cmd_status()
+
+        elif any(kw in low for kw in ("your did", "what's your did", "whats your did", "who are you", "your identifier", "your id")):
+            reply = f"My DID is: {AGENT_DID}"
 
         else:
             # Full judgment cycle — the real thing
