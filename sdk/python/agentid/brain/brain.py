@@ -176,6 +176,7 @@ class AgentBrain:
         )
         self._perceptions: list[Perception] = []
         self._triggers: list[Trigger] = []
+        self._mcp_sessions: list = []   # MCPSession instances managed by this brain
 
     # ── fluent configuration ───────────────────────────────────────────────────
 
@@ -196,6 +197,79 @@ class AgentBrain:
         Returns *self* for chaining.
         """
         self._triggers.append(trigger)
+        return self
+
+    async def add_mcp_server(
+        self,
+        command: str,
+        args: list[str] | None = None,
+        env: dict | None = None,
+        *,
+        url: str | None = None,
+        headers: dict | None = None,
+    ) -> "AgentBrain":
+        """
+        Connect to an MCP server and add all its tools to the brain.
+
+        The session stays alive for the brain's lifetime and is closed
+        automatically when the brain stops.
+
+        Parameters
+        ----------
+        command : str
+            Executable for stdio transport (e.g. "npx", "uvx", "python").
+            Ignored when *url* is provided.
+        args : list[str]
+            Arguments for the stdio command
+            (e.g. ["-y", "@modelcontextprotocol/server-brave-search"]).
+        env : dict | None
+            Extra environment variables for the subprocess
+            (e.g. {"BRAVE_API_KEY": "BSA..."}).
+        url : str | None
+            If provided, connect via HTTP instead of stdio.
+        headers : dict | None
+            Extra HTTP headers for the HTTP transport.
+
+        Returns
+        -------
+        AgentBrain
+            *self*, so calls can be chained with await:
+            ``await brain.add_mcp_server(...).add_trigger(...)``
+            (returns self after await, so chaining works normally after).
+
+        Example
+        -------
+            brain = AgentBrain(...)
+            await brain.add_mcp_server(
+                "npx", ["-y", "@modelcontextprotocol/server-brave-search"],
+                env={"BRAVE_API_KEY": "BSA..."},
+            )
+            await brain.add_mcp_server(
+                "npx", ["-y", "@modelcontextprotocol/server-github"],
+                env={"GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."},
+            )
+            await brain.run()
+        """
+        from .tools.mcp import MCPSession
+
+        if url:
+            session = MCPSession.http(url, headers)
+        else:
+            session = MCPSession.stdio(command, args or [], env)
+
+        await session.connect()
+        tools = await session.tools()
+
+        for tool in tools:
+            self._judgment.add_tool(tool)
+
+        self._mcp_sessions.append(session)
+        logger.info(
+            "[brain] MCP server connected: %s — %d tool(s) added: %s",
+            session,
+            len(tools),
+            [t.name for t in tools],
+        )
         return self
 
     # ── core think cycle ───────────────────────────────────────────────────────
@@ -314,6 +388,12 @@ class AgentBrain:
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            # Close all MCP server sessions
+            for session in self._mcp_sessions:
+                try:
+                    await session.close()
+                except Exception as exc:
+                    logger.warning("[brain] MCP session close error: %s", exc)
             logger.info("[brain] stopped")
 
     def stop(self) -> None:

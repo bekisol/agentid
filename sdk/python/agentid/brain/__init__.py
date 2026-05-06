@@ -61,6 +61,7 @@ from .providers.gemini import GeminiProvider
 from .tools.base import Tool
 from .tools.web_search import WebSearchTool
 from .tools.fetch_url import FetchURLTool
+from .tools.mcp import MCPSession, MCPProxyTool
 
 __all__ = [
     # Core
@@ -77,6 +78,8 @@ __all__ = [
     "Tool",
     "WebSearchTool",
     "FetchURLTool",
+    "MCPSession",
+    "MCPProxyTool",
     # Perception
     "Perception",
     "PerceptionData",

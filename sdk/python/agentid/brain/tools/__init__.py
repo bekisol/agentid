@@ -41,5 +41,6 @@ Subclass Tool and implement name, description, parameters, and run():
 from .base import Tool
 from .web_search import WebSearchTool
 from .fetch_url import FetchURLTool
+from .mcp import MCPSession, MCPProxyTool
 
-__all__ = ["Tool", "WebSearchTool", "FetchURLTool"]
+__all__ = ["Tool", "WebSearchTool", "FetchURLTool", "MCPSession", "MCPProxyTool"]

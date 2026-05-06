@@ -132,6 +132,18 @@ class JudgmentEngine:
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
+    def add_tool(self, tool: Tool) -> None:
+        """
+        Register an additional tool at runtime.
+
+        Used by AgentBrain.add_mcp_server() to inject MCP tools after
+        the engine is created. Safe to call before or during run().
+        """
+        if not any(t.name == tool.name for t in self._tools):
+            self._tools.append(tool)
+        self._registry[tool.name] = tool
+        logger.debug("[brain/engine] tool registered: %s", tool.name)
+
     async def judge(
         self,
         mission: str,
