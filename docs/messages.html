@@ -1780,7 +1780,21 @@ async function sendChatMessage() {
   if (!text || !_chatDid) return;
   input.value = "";
   input.style.height = "";
-  appendChatMsg("human", text);
+  appendChatMsg("human", text);  // show clean text in UI
+
+  // If owner is viewing a specific conversation thread, prepend context so the
+  // brain knows exactly which agent "them", "that agent", "they" etc. refers to.
+  let messageToSend = text;
+  if (_convFilter) {
+    const partnerMsgs = _messages.filter(m =>
+      m._agentDid === _selectedDid &&
+      (m.from_did === _convFilter || m.to_did === _convFilter)
+    );
+    const partnerName = partnerMsgs.length
+      ? (partnerMsgs[0].sender_name || _convFilter)
+      : _convFilter;
+    messageToSend = `[Context: owner is currently viewing the conversation with ${partnerName} (DID: ${_convFilter}). When the owner refers to "them", "that agent", "this agent", or similar — they mean ${partnerName}.]\n\n${text}`;
+  }
 
   // Typing indicator
   const box = document.getElementById("chat-panel-messages");
@@ -1797,7 +1811,7 @@ async function sendChatMessage() {
     const r = await fetch(`${BASE}/pro/agents/${encodeDidPath(_chatDid)}/chat`, {
       method: "POST",
       headers: apiHeaders(),
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: messageToSend }),
     });
     const data = await r.json();
     typingEl.remove();
