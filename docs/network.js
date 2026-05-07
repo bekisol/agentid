@@ -978,7 +978,7 @@ function renderDetailPanel(node){
   <div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);position:relative;">
     <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.45rem;">
       <div style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);">Trust Dimensions</div>
-      ${!hasDims?'<span style="margin-left:auto;font-size:0.56rem;font-weight:700;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:1px 6px;">PRO</span>':""}
+      ${!hasDims?'<span style="margin-left:auto;font-size:0.56rem;font-weight:700;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:1px 6px;">PRO · ENTERPRISE</span>':""}
     </div>
     <div style="display:flex;flex-direction:column;gap:0.28rem;${!hasDims?"filter:blur(3px);opacity:0.45;pointer-events:none;user-select:none;":""}" aria-hidden="${!hasDims}">
       ${dimDefs.map(d=>{
@@ -997,7 +997,7 @@ function renderDetailPanel(node){
     </div>
     ${!hasDims?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.35rem;border-radius:0;">
       <span style="font-size:1.1rem;">🔒</span>
-      <a href="https://agentid-protocol.com/pro" target="_blank" style="font-size:0.68rem;font-weight:700;color:#f59e0b;text-decoration:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:4px 12px;">Unlock with Pro →</a>
+      <a href="https://agentid-protocol.com/pro" target="_blank" style="font-size:0.68rem;font-weight:700;color:#f59e0b;text-decoration:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:4px 12px;">Unlock with Pro or Enterprise →</a>
     </div>`:""}
   </div>
 
