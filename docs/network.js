@@ -561,6 +561,17 @@ function enterEgoMode(centerNode){
   stopSimulation();
   _net._panMoved=false;
 
+  // On the very first ego entry (from full-graph view), snapshot all node
+  // positions so we can restore them exactly when the user exits ego mode.
+  // We do NOT re-save when switching ego centres — the saved snapshot should
+  // always reflect the last full-graph layout, not an ego sub-layout.
+  if(!_net.egoMode){
+    _net._savedPositions={};
+    for(const n of _net.allNodes){
+      _net._savedPositions[n.did]={x:n.x,y:n.y};
+    }
+  }
+
   const c=_net.canvas;if(!c)return;
   const dpr=window.devicePixelRatio||1;
   const W=c.width/dpr,H=c.height/dpr;
@@ -634,6 +645,18 @@ function exitEgoMode(){
   stopSimulation();
   _net.egoMode=false;_net.selected=null;
   _net.nodes=_net.allNodes;_net.edges=_net.allEdges;
+
+  // Restore the pre-ego positions that were snapshotted in enterEgoMode.
+  // Without this the shared node objects keep their ego-layout coordinates
+  // (center at 0,0, neighbours on ring) and the full graph looks frozen/stuck.
+  if(_net._savedPositions){
+    for(const n of _net.allNodes){
+      const s=_net._savedPositions[n.did];
+      if(s){n.x=s.x;n.y=s.y;n.vx=0;n.vy=0;}
+    }
+    _net._savedPositions=null;
+  }
+
   renderDetailPanel(null);renderSidebar();
   fitView();updatePill();draw();
 }
