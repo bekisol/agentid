@@ -2419,6 +2419,396 @@
       font-size: 0.7rem;
       margin-left: 0.35rem;
     }
+
+    /* ── Premium toggle switches ── */
+    .pref-toggle-track {
+      display: inline-block;
+      width: 38px;
+      height: 22px;
+      background: var(--border-dark);
+      border-radius: 999px;
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .pref-toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .pref-toggle input:checked + .pref-toggle-track {
+      background: var(--accent);
+    }
+    .pref-toggle input:checked + .pref-toggle-track::after {
+      transform: translateX(16px);
+      box-shadow: 0 1px 4px rgba(194,65,12,0.3);
+    }
+
+    /* Toggle in dark mode */
+    html[data-theme="dark"] .pref-toggle-track {
+      background: var(--border-dark);
+    }
+    html[data-theme="dark"] .pref-toggle input:checked + .pref-toggle-track {
+      background: var(--accent);
+    }
+    html[data-theme="dark"] .pref-toggle-track::after {
+      background: #d4d4d4;
+    }
+
+    /* ── Modal: scrollbar ── */
+    .modal-body::-webkit-scrollbar { width: 4px; }
+    .modal-body::-webkit-scrollbar-track { background: transparent; }
+    .modal-body::-webkit-scrollbar-thumb {
+      background: var(--border-dark);
+      border-radius: 999px;
+    }
+
+    /* ── Modal sections: cleaner separation ── */
+    .modal-section {
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-section:last-child { border-bottom: none; }
+    .modal-section-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 0.85rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       PREMIUM OVERRIDES — elevate every surface to production-grade
+       ═══════════════════════════════════════════════════════════════ */
+
+    /* ── Scrollbar: thin, elegant, barely there ── */
+    .dash-main::-webkit-scrollbar { width: 4px; }
+    .dash-main::-webkit-scrollbar-track { background: transparent; }
+    .dash-main::-webkit-scrollbar-thumb {
+      background: var(--border-dark);
+      border-radius: 999px;
+    }
+    .dash-main::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    .dash-sidebar::-webkit-scrollbar { width: 3px; }
+    .dash-sidebar::-webkit-scrollbar-track { background: transparent; }
+    .dash-sidebar::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 999px;
+    }
+
+    /* ── Main content area ── */
+    .dash-main {
+      padding: 1.75rem 2.25rem;
+      scroll-behavior: smooth;
+    }
+
+    /* ── Dashboard header ── */
+    .dash-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+    .dash-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ── Sidebar: wider and more refined ── */
+    .dash-sidebar {
+      width: 224px;
+      background: var(--surface);
+    }
+
+    /* Section labels: tighter, more refined */
+    .dsb-section-label {
+      font-size: 0.59rem;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 0.8rem 1rem 0.2rem;
+      opacity: 0.8;
+    }
+
+    /* Nav items: pill-style active state */
+    .dsb-item {
+      border-radius: 7px;
+      margin: 1px 8px;
+      padding: 0.42rem 0.75rem;
+      font-size: 0.82rem;
+      border-left: none;
+      transition: background 0.12s, color 0.12s, opacity 0.12s;
+    }
+    .dsb-item:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+    .dsb-item.active {
+      color: var(--accent);
+      background: var(--accent-light);
+      border-left: none;
+      font-weight: 600;
+    }
+    html[data-theme="dark"] .dsb-item.active,
+    @media (prefers-color-scheme: dark) .dsb-item.active {
+      background: rgba(238, 125, 74, 0.12);
+    }
+    .dsb-item svg { opacity: 0.55; transition: opacity 0.12s; }
+    .dsb-item:hover svg { opacity: 0.8; }
+    .dsb-item.active svg { opacity: 1; }
+
+    .dsb-divider {
+      margin: 0.3rem 1rem;
+      opacity: 0.6;
+    }
+
+    /* Sidebar footer: user info block */
+    .dsb-footer {
+      border-top: 1px solid var(--border);
+      padding: 0.85rem 1rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    /* ── Stats cards: premium with accent gradient top line ── */
+    .stats-grid {
+      gap: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.2rem 1rem;
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-border));
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .stat-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+      transform: translateY(-1px);
+      border-color: var(--border-dark);
+    }
+    .stat-card:hover::before { opacity: 1; }
+
+    .stat-label {
+      font-size: 0.67rem;
+      letter-spacing: 0.1em;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.45rem;
+    }
+    .stat-value {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    /* ── Cards: elevation and hover lift ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+    .card:hover {
+      box-shadow: 0 4px 14px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+      border-color: var(--border-dark);
+    }
+    .card-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+    }
+
+    /* ── Content sections: smooth entrance ── */
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .dash-header       { animation: fadeSlideUp 0.28s ease both; }
+    .stats-grid        { animation: fadeSlideUp 0.32s 0.06s ease both; }
+    .two-col           { animation: fadeSlideUp 0.32s 0.12s ease both; }
+    #section-activity  { animation: fadeSlideUp 0.32s 0.18s ease both; }
+    #section-anomalies { animation: fadeSlideUp 0.32s 0.22s ease both; }
+    #section-agents    { animation: fadeSlideUp 0.32s 0.26s ease both; }
+
+    /* ── Nav bar: slightly more premium ── */
+    nav {
+      background: var(--surface);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-mark {
+      background: linear-gradient(135deg, var(--accent) 0%, #f97316 100%);
+      border-radius: 7px;
+      box-shadow: 0 2px 6px rgba(194,65,12,0.3);
+    }
+    .btn {
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .btn-primary {
+      background: var(--accent);
+      box-shadow: 0 2px 6px rgba(194,65,12,0.25);
+      transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+    }
+    .btn-primary:hover {
+      background: #b64514;
+      box-shadow: 0 4px 12px rgba(194,65,12,0.35);
+      transform: translateY(-1px);
+    }
+    .btn-primary:active { transform: translateY(0); }
+
+    /* ── Tier badge: sharper ── */
+    .tier-badge {
+      font-size: 0.68rem;
+      letter-spacing: 0.09em;
+      font-weight: 700;
+      padding: 0.28rem 0.7rem;
+      border-radius: 999px;
+    }
+    .tier-enterprise {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      box-shadow: 0 1px 4px rgba(217,119,6,0.2);
+    }
+    .tier-pro {
+      background: linear-gradient(135deg, var(--accent-light) 0%, #ffedd5 100%);
+    }
+
+    /* ── Activity rows: more breathing room ── */
+    .activity-row {
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .activity-row:last-child { border-bottom: none; }
+
+    /* ── Tables: tighter and crisper ── */
+    .audit-log-table th {
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--surface2);
+      padding: 0.5rem 0.85rem;
+    }
+    .audit-log-table td {
+      padding: 0.5rem 0.85rem;
+    }
+    .audit-log-table tbody tr:hover {
+      background: var(--surface2);
+    }
+
+    /* ── Operation pills: tighter ── */
+    .op-pill {
+      padding: 0.12rem 0.45rem;
+      font-size: 0.65rem;
+      border-radius: 5px;
+      font-weight: 700;
+    }
+
+    /* ── Dark mode glass cards ── */
+    html[data-theme="dark"] .card,
+    html[data-theme="dark"] .stat-card {
+      background: rgba(255,255,255,0.03);
+      border-color: rgba(255,255,255,0.06);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    html[data-theme="dark"] .card:hover,
+    html[data-theme="dark"] .stat-card:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.1);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    html[data-theme="dark"] nav {
+      background: rgba(23,24,28,0.85);
+    }
+    html[data-theme="dark"] .dash-sidebar {
+      background: rgba(23,24,28,0.7);
+    }
+    html[data-theme="dark"] .logo-mark {
+      box-shadow: 0 2px 8px rgba(238,125,74,0.4);
+    }
+
+    /* ── Two-col gap ── */
+    .two-col {
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Tier lock overlay: cleaner ── */
+    .tier-lock-overlay {
+      border-radius: 10px;
+    }
+
+    /* ── First-run hero: more visual weight ── */
+    #first-run-hero {
+      border-radius: 16px;
+      padding: 1.75rem 2rem;
+    }
+
+    /* ── Verified banner: more rounded ── */
+    .verified-banner {
+      border-radius: 14px;
+    }
+
+    /* ── Bottom of page: more breathing room ── */
+    #dashboard-content > *:last-child {
+      margin-bottom: 2rem;
+    }
+
+    /* ── Compact mode (preference toggle) ── */
+    body.pref-compact .card { padding: 0.7rem 0.9rem; }
+    body.pref-compact .stat-card { padding: 0.7rem 0.9rem; }
+    body.pref-compact .dash-main { padding: 1.1rem 1.5rem; }
+    body.pref-compact .stats-grid { gap: 0.55rem; margin-bottom: 0.8rem; }
+    body.pref-compact .two-col { gap: 0.65rem; margin-bottom: 0.65rem; }
+    body.pref-compact .stat-value { font-size: 1.55rem; }
+
+    /* ── Disable animations (preference toggle) ── */
+    body.pref-no-animate .dash-header,
+    body.pref-no-animate .stats-grid,
+    body.pref-no-animate .two-col,
+    body.pref-no-animate #section-activity,
+    body.pref-no-animate #section-anomalies,
+    body.pref-no-animate #section-agents {
+      animation: none;
+    }
+    body.pref-no-animate .card,
+    body.pref-no-animate .stat-card {
+      transition: box-shadow 0.1s, border-color 0.1s;
+    }
   </style>
 </head>
 <body>
@@ -2765,6 +3155,7 @@ curl https://api.agentid-protocol.com/agents \
 
       <div class="modal-tabs">
         <div class="modal-tab active" data-tab="account">Account</div>
+        <div class="modal-tab" data-tab="preferences">Preferences</div>
         <div class="modal-tab" data-tab="api-keys">API Keys</div>
         <div class="modal-tab" data-tab="team-keys" data-min-tier="pro">Team Keys</div>
         <div class="modal-tab" data-tab="key-rotation" data-min-tier="pro">Key Rotation</div>
@@ -2872,6 +3263,155 @@ curl https://api.agentid-protocol.com/agents \
               </div>
               <button class="btn btn-outline" id="delete-account-btn" style="font-size:0.75rem;padding:0.25rem 0.7rem;color:var(--red);border-color:var(--red);">Delete account</button>
             </div>
+          </div>
+
+        </div>
+
+        <!-- ── PREFERENCES TAB ── -->
+        <div class="modal-panel" id="tab-preferences">
+
+          <!-- Display -->
+          <div class="modal-section">
+            <div class="modal-section-title">Display</div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Theme</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Colour scheme for the dashboard</div>
+              </div>
+              <div style="display:flex;gap:0.35rem;">
+                <button class="btn btn-outline theme-opt-btn" data-theme-val="light" style="font-size:0.75rem;padding:0.25rem 0.7rem;">☀ Light</button>
+                <button class="btn btn-outline theme-opt-btn" data-theme-val="dark"  style="font-size:0.75rem;padding:0.25rem 0.7rem;">☾ Dark</button>
+                <button class="btn btn-outline theme-opt-btn" data-theme-val="auto"  style="font-size:0.75rem;padding:0.25rem 0.7rem;">Auto</button>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Compact mode</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Tighter card padding for more content density</div>
+              </div>
+              <label class="pref-toggle" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" id="pref-compact-mode" style="display:none;" />
+                <span class="pref-toggle-track" data-pref="compact-mode"></span>
+              </label>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Animate cards on load</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Fade-slide entrance when dashboard refreshes</div>
+              </div>
+              <label class="pref-toggle" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" id="pref-animate-cards" checked style="display:none;" />
+                <span class="pref-toggle-track" data-pref="animate-cards"></span>
+              </label>
+            </div>
+
+          </div>
+
+          <!-- Dashboard behaviour -->
+          <div class="modal-section">
+            <div class="modal-section-title">Dashboard behaviour</div>
+
+            <div style="margin-bottom:0.85rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                <div>
+                  <div style="font-size:0.84rem;font-weight:500;">Auto-refresh interval</div>
+                  <div style="font-size:0.75rem;color:var(--muted);">How often the dashboard auto-reloads data</div>
+                </div>
+                <select id="pref-refresh-interval" class="settings-input" style="width:auto;font-size:0.8rem;padding:0.3rem 0.6rem;">
+                  <option value="0">Manual only</option>
+                  <option value="30">Every 30 s</option>
+                  <option value="60" selected>Every 60 s</option>
+                  <option value="300">Every 5 min</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Default agent visibility</div>
+                <div style="font-size:0.75rem;color:var(--muted);">New agents are created as public or private</div>
+              </div>
+              <select id="pref-default-visibility" class="settings-input" style="width:auto;font-size:0.8rem;padding:0.3rem 0.6rem;">
+                <option value="public" selected>Public</option>
+                <option value="private">Private</option>
+              </select>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Show activity sparklines</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Mini trend chart on stat cards</div>
+              </div>
+              <label class="pref-toggle" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" id="pref-sparklines" checked style="display:none;" />
+                <span class="pref-toggle-track" data-pref="sparklines"></span>
+              </label>
+            </div>
+
+          </div>
+
+          <!-- Notifications -->
+          <div class="modal-section">
+            <div class="modal-section-title">Notifications</div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Browser notifications</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Show a system notification for new messages</div>
+              </div>
+              <label class="pref-toggle" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" id="pref-browser-notifs" style="display:none;" />
+                <span class="pref-toggle-track" data-pref="browser-notifs"></span>
+              </label>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Sound on new message</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Play a subtle chime when a message arrives</div>
+              </div>
+              <label class="pref-toggle" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" id="pref-sound-notifs" style="display:none;" />
+                <span class="pref-toggle-track" data-pref="sound-notifs"></span>
+              </label>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Anomaly alerts</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Highlight new security anomalies with a banner</div>
+              </div>
+              <label class="pref-toggle" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" id="pref-anomaly-alert" checked style="display:none;" />
+                <span class="pref-toggle-track" data-pref="anomaly-alert"></span>
+              </label>
+            </div>
+
+          </div>
+
+          <!-- Privacy -->
+          <div class="modal-section">
+            <div class="modal-section-title">Privacy & Data</div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Remember last section</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Restore scroll position when you return to the dashboard</div>
+              </div>
+              <label class="pref-toggle" style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" id="pref-remember-section" checked style="display:none;" />
+                <span class="pref-toggle-track" data-pref="remember-section"></span>
+              </label>
+            </div>
+
+          </div>
+
+          <div style="margin-top:0.5rem;display:flex;align-items:center;justify-content:space-between;">
+            <button class="btn btn-outline" id="pref-reset-btn" style="font-size:0.8rem;color:var(--muted);">Reset to defaults</button>
+            <button class="btn btn-primary" id="pref-save-btn" style="font-size:0.82rem;">Save preferences</button>
           </div>
 
         </div>
@@ -3942,7 +4482,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260504-1"></script>
+<script src="dashboard.js?v=20260507-1"></script>
 
 </body>
 </html>

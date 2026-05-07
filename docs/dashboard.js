@@ -742,6 +742,47 @@ async function loadDashboard() {
   document.getElementById("stat-events").textContent = auditEvents.toLocaleString();
   document.getElementById("stat-active").textContent = totalActivity.toLocaleString();
   document.getElementById("stat-discovery").textContent = "…";
+
+  // ── Premium stat card sparklines / trend chips ──────────────────────────────
+  // Build a 7-day activity sparkline using the activity_last_7d data
+  const act7 = (data.activity_last_7d || []);
+  if (act7.length > 0) {
+    // Sum operations per day (activity is {date, operation, count})
+    const dayTotals = {};
+    act7.forEach(r => { dayTotals[r.date] = (dayTotals[r.date] || 0) + Number(r.count); });
+    const days = Object.keys(dayTotals).sort();
+    const vals = days.map(d => dayTotals[d]);
+    const max  = Math.max(...vals, 1);
+
+    // Inject mini sparkline SVG into the "Active This Week" stat card
+    const activeCard = document.getElementById("stat-active")?.closest(".stat-card");
+    if (activeCard) {
+      const w = 60, h = 20;
+      const pts = vals.map((v, i) => {
+        const x = i / Math.max(vals.length - 1, 1) * w;
+        const y = h - (v / max) * h;
+        return `${x},${y}`;
+      }).join(" ");
+      const svg = `<svg width="${w}" height="${h}" style="display:block;margin-top:0.35rem;opacity:0.6;" viewBox="0 0 ${w} ${h}" fill="none">
+        <polyline points="${pts}" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+      const sub = activeCard.querySelector(".stat-sub");
+      if (sub) sub.insertAdjacentHTML("afterend", svg);
+    }
+  }
+
+  // Trend indicator (this week vs prior estimate) — visual chip only
+  const _trendChip = (el, value, compareVal) => {
+    if (!el || value === 0) return;
+    const pct = compareVal > 0 ? Math.round(((value - compareVal) / compareVal) * 100) : 0;
+    if (Math.abs(pct) < 2) return;  // skip tiny noise
+    const up = pct > 0;
+    const chip = document.createElement("span");
+    chip.style.cssText = `font-size:0.65rem;font-weight:700;padding:0.1rem 0.4rem;border-radius:999px;margin-left:0.4rem;vertical-align:middle;
+      ${up ? "background:#dcfce7;color:#166534;" : "background:#fee2e2;color:#991b1b;"}`;
+    chip.textContent = `${up ? "↑" : "↓"}${Math.abs(pct)}%`;
+    el.appendChild(chip);
+  };
   // Note: stat-caps was replaced by stat-discovery in the HTML
 
   // Usage meter
@@ -4793,6 +4834,7 @@ function openSettings() {
   // Always reload account info when modal opens
   _loadAccountInfo();
   _loadAccountKeys();
+  _initPreferencesPanel();
 }
 
 // ── ACCOUNT-SCOPED API KEYS (Settings → API Keys tab) ─────────────────────────
@@ -4916,6 +4958,124 @@ function _switchSettingsTab(tab) {
   if (tab === "key-rotation") _loadRotationAgentList();
   if (tab === "webhooks") { _initWebhookEventGrid(); _loadWebhooks(); }
   if (tab === "sandbox") _loadSandboxStatus();
+  if (tab === "preferences") _initPreferencesPanel();
+}
+
+// ── Preferences panel ─────────────────────────────────────────────────────────
+
+const PREF_DEFAULTS = {
+  "compact-mode":      false,
+  "animate-cards":     true,
+  "sparklines":        true,
+  "browser-notifs":    false,
+  "sound-notifs":      false,
+  "anomaly-alert":     true,
+  "remember-section":  true,
+  "refresh-interval":  "60",
+  "default-visibility":"public",
+};
+
+function _loadPrefs() {
+  try { return JSON.parse(localStorage.getItem("agentid_prefs") || "{}"); }
+  catch { return {}; }
+}
+
+function _savePrefs(prefs) {
+  localStorage.setItem("agentid_prefs", JSON.stringify(prefs));
+}
+
+function _getPref(key) {
+  const prefs = _loadPrefs();
+  return key in prefs ? prefs[key] : PREF_DEFAULTS[key];
+}
+
+function _applyPrefs() {
+  // Compact mode
+  document.body.classList.toggle("pref-compact", _getPref("compact-mode"));
+  // Animation
+  document.body.classList.toggle("pref-no-animate", !_getPref("animate-cards"));
+  // Auto-refresh (restart on next load — stored in memory for current session)
+  const interval = parseInt(_getPref("refresh-interval")) || 0;
+  if (window._prefRefreshTimer) clearInterval(window._prefRefreshTimer);
+  if (interval > 0 && typeof refreshDashboard === "function") {
+    window._prefRefreshTimer = setInterval(() => {
+      try { refreshDashboard(); } catch (e) {}
+    }, interval * 1000);
+  }
+}
+
+let _prefsInited = false;
+function _initPreferencesPanel() {
+  const panel = document.getElementById("tab-preferences");
+  if (!panel) return;
+
+  const prefs = _loadPrefs();
+
+  // Sync toggle switches
+  panel.querySelectorAll(".pref-toggle-track").forEach(track => {
+    const key = track.dataset.pref;
+    if (!key) return;
+    const input = document.getElementById(`pref-${key}`);
+    if (!input) return;
+    const val = key in prefs ? prefs[key] : PREF_DEFAULTS[key];
+    input.checked = !!val;
+
+    if (!_prefsInited) {
+      input.addEventListener("change", () => {
+        const p = _loadPrefs();
+        p[key] = input.checked;
+        _savePrefs(p);
+        _applyPrefs();
+        // Browser notification permission
+        if (key === "browser-notifs" && input.checked && "Notification" in window) {
+          Notification.requestPermission();
+        }
+      });
+    }
+  });
+
+  // Sync selects
+  const refreshSel = document.getElementById("pref-refresh-interval");
+  const visSel     = document.getElementById("pref-default-visibility");
+  if (refreshSel) {
+    refreshSel.value = _getPref("refresh-interval") || "60";
+    if (!_prefsInited) {
+      refreshSel.addEventListener("change", () => {
+        const p = _loadPrefs(); p["refresh-interval"] = refreshSel.value; _savePrefs(p); _applyPrefs();
+      });
+    }
+  }
+  if (visSel) {
+    visSel.value = _getPref("default-visibility") || "public";
+    if (!_prefsInited) {
+      visSel.addEventListener("change", () => {
+        const p = _loadPrefs(); p["default-visibility"] = visSel.value; _savePrefs(p);
+      });
+    }
+  }
+
+  // Save & reset
+  if (!_prefsInited) {
+    const saveBtn  = document.getElementById("pref-save-btn");
+    const resetBtn = document.getElementById("pref-reset-btn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        _applyPrefs();
+        saveBtn.textContent = "Saved ✓";
+        saveBtn.style.background = "var(--green)";
+        setTimeout(() => { saveBtn.textContent = "Save preferences"; saveBtn.style.background = ""; }, 1800);
+      });
+    }
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        localStorage.removeItem("agentid_prefs");
+        _initPreferencesPanel();
+        _applyPrefs();
+      });
+    }
+  }
+
+  _prefsInited = true;
 }
 
 // ── Trust Score Fleet Widget ─────────────────────────────────────────────────
@@ -5221,6 +5381,9 @@ async function _openTrustScorePanel(did, name, score, level) {
 document.addEventListener("DOMContentLoaded", () => {
   _initSigningPager();   // one-time — survives every table redraw
   _initSigningSearch();  // one-time — survives every table redraw
+
+  // Apply saved preferences immediately (before first render)
+  _applyPrefs();
 
   _initTheme();
   _initKeyboardShortcuts();
@@ -6374,8 +6537,29 @@ function _sidebarUpdateUser() {
   const email = sessionStorage.getItem('agentid_owner') ||
                 sessionStorage.getItem('agentid_email') || '';
   const tier  = (typeof CURRENT_TIER !== 'undefined' && CURRENT_TIER) ? CURRENT_TIER : '';
-  footer.innerHTML = (email ? `<div style="font-weight:600;color:var(--text-2);margin-bottom:0.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(email)}">${esc(email)}</div>` : '') +
-    (tier ? `<div style="text-transform:capitalize;">${esc(tier)} plan</div>` : '');
+
+  // Avatar initials
+  const initials = email ? email.slice(0, 2).toUpperCase() : '?';
+
+  // Tier chip color
+  const tierChipStyle = tier === 'enterprise'
+    ? 'background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;'
+    : tier === 'pro'
+    ? 'background:var(--accent-light);color:var(--accent);border:1px solid var(--accent-border);'
+    : 'background:var(--surface2);color:var(--muted);border:1px solid var(--border);';
+
+  footer.innerHTML = `
+    <div style="display:flex;align-items:center;gap:0.65rem;">
+      <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#f97316);color:#fff;
+                  display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;flex-shrink:0;
+                  box-shadow:0 2px 6px rgba(194,65,12,0.25);">${esc(initials)}</div>
+      <div style="flex:1;min-width:0;">
+        ${email ? `<div style="font-size:0.75rem;font-weight:600;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(email)}">${esc(email)}</div>` : ''}
+        ${tier ? `<div style="margin-top:0.2rem;">
+          <span style="font-size:0.62rem;font-weight:700;padding:0.12rem 0.5rem;border-radius:999px;text-transform:capitalize;${tierChipStyle}">${esc(tier)}</span>
+        </div>` : ''}
+      </div>
+    </div>`;
 }
 
 // Visible banner shown on the login screen when a previously-authenticated
