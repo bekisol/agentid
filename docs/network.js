@@ -477,7 +477,8 @@ function setupEvents(canvas){
 
   canvas.addEventListener("mousedown",e=>{
     const{x,y}=pos(e),hit=hitNode(x,y);
-    if(hit){_net.drag={node:hit,moved:false};canvas.style.cursor="grabbing";}
+    // sx0/sy0 = screen coords at press time; used to enforce 6 px drag threshold
+    if(hit){_net.drag={node:hit,moved:false,sx0:x,sy0:y};canvas.style.cursor="grabbing";}
     else{_net.pan={x0:x,y0:y,tx0:_net.tx,ty0:_net.ty};canvas.style.cursor="grabbing";}
   });
 
@@ -486,11 +487,17 @@ function setupEvents(canvas){
     const rect=_net.canvas.getBoundingClientRect();
     const sx=e.clientX-rect.left,sy=e.clientY-rect.top;
     if(_net.drag){
-      const[wx,wy]=s2w(sx,sy);
-      _net.drag.node.x=wx;_net.drag.node.y=wy;_net.drag.moved=true;
-      // Wake physics briefly so graph reacts to dragged node
-      if(_net.alpha<0.3)_net.alpha=0.3;
-      if(!_net.rafId)startSimulation(0.3);
+      // Only commit to a drag once the mouse moves more than 6 px from the press point.
+      // Without this threshold ANY sub-pixel tremor sets moved=true and swallows the click.
+      const ddx=sx-_net.drag.sx0,ddy=sy-_net.drag.sy0;
+      if(!_net.drag.moved&&ddx*ddx+ddy*ddy>36)_net.drag.moved=true;
+      if(_net.drag.moved){
+        const[wx,wy]=s2w(sx,sy);
+        _net.drag.node.x=wx;_net.drag.node.y=wy;
+        // Wake physics briefly so graph reacts to dragged node
+        if(_net.alpha<0.3)_net.alpha=0.3;
+        if(!_net.rafId)startSimulation(0.3);
+      }
     }else if(_net.pan){
       const dx=sx-_net.pan.x0,dy=sy-_net.pan.y0;
       if(Math.abs(dx)>4||Math.abs(dy)>4)_net._panMoved=true;
@@ -519,15 +526,18 @@ function setupEvents(canvas){
   canvas.addEventListener("touchstart",e=>{
     if(e.touches.length!==1)return;
     const{x,y}=pos(e),hit=hitNode(x,y);
-    if(hit)_net.drag={node:hit,moved:false};
+    if(hit)_net.drag={node:hit,moved:false,sx0:x,sy0:y};
     else _net.pan={x0:x,y0:y,tx0:_net.tx,ty0:_net.ty};
     e.preventDefault();
   },{passive:false});
   canvas.addEventListener("touchmove",e=>{
     if(e.touches.length!==1)return;
     const{x,y}=pos(e);
-    if(_net.drag){const[wx,wy]=s2w(x,y);_net.drag.node.x=wx;_net.drag.node.y=wy;_net.drag.moved=true;}
-    else if(_net.pan){_net.tx=_net.pan.tx0+(x-_net.pan.x0);_net.ty=_net.pan.ty0+(y-_net.pan.y0);}
+    if(_net.drag){
+      const ddx=x-_net.drag.sx0,ddy=y-_net.drag.sy0;
+      if(!_net.drag.moved&&ddx*ddx+ddy*ddy>100)_net.drag.moved=true; // 10 px for finger
+      if(_net.drag.moved){const[wx,wy]=s2w(x,y);_net.drag.node.x=wx;_net.drag.node.y=wy;}
+    }else if(_net.pan){_net.tx=_net.pan.tx0+(x-_net.pan.x0);_net.ty=_net.pan.ty0+(y-_net.pan.y0);}
     draw();e.preventDefault();
   },{passive:false});
   canvas.addEventListener("touchend",()=>{
@@ -540,6 +550,12 @@ function setupEvents(canvas){
 function selectNode(node){_net.selected=node.did;enterEgoMode(node);}
 
 function enterEgoMode(centerNode){
+  // Cancel any running simulation so we start with a clean slate.
+  // Without this the old RAF loop can fire between now and startSimulation(),
+  // operating on the new node set with stale physics state.
+  stopSimulation();
+  _net._panMoved=false; // clear stale pan flag that could swallow the next click
+
   const c=_net.canvas;if(!c)return;
   const dpr=window.devicePixelRatio||1;
   const W=c.width/dpr,H=c.height/dpr;
