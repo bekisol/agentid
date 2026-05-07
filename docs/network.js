@@ -509,12 +509,19 @@ function setupEvents(canvas){
   });
 
   window.addEventListener("mouseup",()=>{
-    if(_net.drag&&!_net.drag.moved&&_net.drag.node)selectNode(_net.drag.node);
+    if(_net.drag&&!_net.drag.moved&&_net.drag.node){
+      selectNode(_net.drag.node);
+      // selectNode→enterEgoMode repositions all nodes, so the canvas "click"
+      // event (which fires right after mouseup) will call hitNode at the OLD
+      // screen position and get null → exitEgoMode.  Suppress that click.
+      _net._suppressNextClick=true;
+    }
     _net.drag=null;_net.pan=null;
     if(_net.canvas)_net.canvas.style.cursor="grab";
   });
 
   canvas.addEventListener("click",e=>{
+    if(_net._suppressNextClick){_net._suppressNextClick=false;return;}
     if(_net._panMoved){_net._panMoved=false;return;}
     const{x,y}=pos(e);
     if(!hitNode(x,y)){
