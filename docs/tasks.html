@@ -312,7 +312,12 @@
 
 <script>
 const BASE    = "https://api.agentid-protocol.com";
-let apiKey    = localStorage.getItem("agentid_key") || sessionStorage.getItem("agentid_key") || "";
+// Mirror dashboard's storage convention:
+//   sessionStorage "agentid_key"          — tab-scoped (set by dashboard on same-tab navigation)
+//   localStorage   "agentid_persisted_key" — cross-tab / cross-restart ("Stay signed in")
+let apiKey = sessionStorage.getItem("agentid_key")
+          || localStorage.getItem("agentid_persisted_key")
+          || "";
 let _agents   = [];
 let _fromDid  = "";
 let _taskPage = 1;
@@ -336,9 +341,12 @@ function relTime(iso) {
 }
 
 async function call(path, opts = {}) {
+  const hdrs = { "Content-Type": "application/json", ...(opts.headers||{}) };
+  if (apiKey) hdrs["x-api-key"] = apiKey; // omit empty string so session cookie is used
   const r = await fetch(BASE + path, {
     ...opts,
-    headers: { "x-api-key": apiKey, "Content-Type": "application/json", ...(opts.headers||{}) },
+    credentials: "include", // send session cookie for Google OAuth users
+    headers: hdrs,
   });
   if (r.status === 401) { signOut(); throw new Error("Unauthorized"); }
   const data = await r.json();
@@ -349,18 +357,21 @@ async function call(path, opts = {}) {
 // ── auth ──────────────────────────────────────────────────────────────────────
 function signOut() {
   apiKey = "";
-  localStorage.removeItem("agentid_key");
+  localStorage.removeItem("agentid_persisted_key");
   sessionStorage.removeItem("agentid_key");
   document.getElementById("app").style.display = "none";
   document.getElementById("auth-wall").style.display = "flex";
 }
 
 async function tryApiKey(key) {
-  const r = await fetch(`${BASE}/auth/me`, { headers: { "x-api-key": key } });
+  const r = await fetch(`${BASE}/auth/me`, { credentials: "include", headers: { "x-api-key": key } });
   if (!r.ok) return false;
   const me = await r.json();
   apiKey = key;
-  localStorage.setItem("agentid_key", key);
+  // Store under the same keys the dashboard uses so navigating between pages
+  // doesn't require re-authentication.
+  sessionStorage.setItem("agentid_key", key);
+  localStorage.setItem("agentid_persisted_key", key);
   const userEl = document.getElementById("topbar-user");
   if (userEl) userEl.textContent = me.email || me.owner || "";
   return true;
@@ -643,7 +654,9 @@ async function discoverAgents() {
 <!-- Auth wall inline handler (runs before DOMContentLoaded for fast key check) -->
 <script>
 (function() {
-  const stored = localStorage.getItem("agentid_key") || sessionStorage.getItem("agentid_key");
+  // Must match the storage keys the dashboard uses.
+  const stored = sessionStorage.getItem("agentid_key")
+              || localStorage.getItem("agentid_persisted_key");
   if (!stored) {
     document.getElementById("auth-wall").style.display = "flex";
   }
