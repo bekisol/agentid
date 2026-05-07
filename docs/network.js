@@ -641,9 +641,20 @@ function enterEgoMode(centerNode){
 
   const dpr2=window.devicePixelRatio||1;
   const W2=c.width/dpr2,H2=c.height/dpr2;
-  _net.tx=W2/2;_net.ty=H2/2;
-  fitView();
-  startSimulation(1);
+
+  if(wasInEgoMode){
+    // New centre is at world (0,0) after the translation above.
+    // tx=W/2, ty=H/2 puts (0,0) at screen centre — don't fitView() or it
+    // will shift the camera to the bounding-box centroid and move B off-centre.
+    // Use low alpha so physics only resolves overlaps, not a full re-layout.
+    _net.tx=W2/2;_net.ty=H2/2;
+    startSimulation(0.35);
+  }else{
+    // Fresh entry from global view: centre everything properly.
+    _net.tx=W2/2;_net.ty=H2/2;
+    fitView();
+    startSimulation(1);
+  }
 }
 
 function exitEgoMode(){
