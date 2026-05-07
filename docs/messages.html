@@ -1179,6 +1179,11 @@ function renderFeed() {
   }
   _refreshStopButton();
 
+  // Group view is self-contained: showGroupView() owns feed-scroll and
+  // _startGroupPoll() keeps it live. renderFeed() must never touch it
+  // while a room is active — that's what causes the 30s flicker.
+  if (_selectedDid === "__group__" || _activeRoomId !== null) return;
+
   if (_dealsView) {
     // Re-fetch interactions on every 30s auto-refresh so new agent comms appear
     fetch(`${BASE}/pro/interactions?limit=200`, { headers: apiHeaders(), credentials: "include" })
