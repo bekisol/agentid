@@ -551,14 +551,18 @@ function selectNode(node){_net.selected=node.did;enterEgoMode(node);}
 
 function enterEgoMode(centerNode){
   // Cancel any running simulation so we start with a clean slate.
-  // Without this the old RAF loop can fire between now and startSimulation(),
-  // operating on the new node set with stale physics state.
   stopSimulation();
-  _net._panMoved=false; // clear stale pan flag that could swallow the next click
+  _net._panMoved=false;
 
   const c=_net.canvas;if(!c)return;
   const dpr=window.devicePixelRatio||1;
   const W=c.width/dpr,H=c.height/dpr;
+
+  // Snapshot which nodes are already positioned (visible in the current ego subgraph).
+  // When re-centring within ego mode we'll translate these instead of hard-resetting them.
+  const wasInEgoMode=_net.egoMode;
+  const prevPositioned=new Set(_net.nodes.map(n=>n.did));
+  const newCenterX=centerNode.x,newCenterY=centerNode.y; // current world pos before reset
 
   const neighbourDids=new Set();
   for(const e of Object.values(_edgeMap)){
@@ -608,7 +612,29 @@ function enterEgoMode(centerNode){
     }
   }
 
-  computeEgoLayout(centerNode,neighbours,W,H);
+  if(wasInEgoMode){
+    // ── Smooth re-centre: slide existing nodes so the clicked node lands at (0,0).
+    // Previously-visible nodes keep their relative positions (no jarring swap).
+    // Brand-new nodes (not in the previous subgraph) are placed on the perimeter.
+    const ox=newCenterX,oy=newCenterY;
+    _net.nodes.forEach(n=>{
+      if(prevPositioned.has(n.did)){
+        n.x-=ox;n.y-=oy;n.vx=0;n.vy=0;
+      }
+    });
+    centerNode.x=0;centerNode.y=0;centerNode.vx=0;centerNode.vy=0;
+    const R=Math.min(W,H)*0.32;
+    const brand=_net.nodes.filter(n=>!prevPositioned.has(n.did));
+    brand.forEach((n,i)=>{
+      const angle=(2*Math.PI*i/Math.max(1,brand.length))-Math.PI/2;
+      n.x=R*Math.cos(angle)+ox*0; // place on ring (already translated; ox offset gone)
+      n.y=R*Math.sin(angle);
+      n.vx=(Math.random()-0.5)*2;n.vy=(Math.random()-0.5)*2;
+    });
+  }else{
+    // ── Fresh entry from global view: reset everything to ring layout.
+    computeEgoLayout(centerNode,neighbours,W,H);
+  }
   renderDetailPanel(centerNode);
   renderSidebar();
   updatePill();
