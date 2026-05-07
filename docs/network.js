@@ -4,9 +4,9 @@ const BASE = "https://api.agentid-protocol.com";
 // ─────────────────────────────────────────────────────────────────────────────
 // NETWORK MAP — Force-Directed Physics + Rich Detail Panel
 // ─────────────────────────────────────────────────────────────────────────────
-// Physics model (Barnes-Hut inspired, O(n log n) approx):
-//   • Repulsion: every pair of nodes repels each other (charge simulation)
-//   • Spring:    connected nodes attract via Hooke's law
+// Physics model — Barnes-Hut O(n log n):
+//   • Repulsion: Barnes-Hut quadtree approximation (theta=0.9) — O(n log n)
+//   • Spring:    connected nodes attract via Hooke's law — O(edges)
 //   • Gravity:   weak pull toward canvas centre prevents drift
 //   • Damping:   velocity decays each frame; simulation "cools" to steady state
 //   • Alpha:     global heat scalar — starts at 1, decays to 0 (stops simulation)
@@ -15,7 +15,7 @@ const BASE = "https://api.agentid-protocol.com";
 // LOD:      zoom < 0.18 → cluster bubbles | zoom < 0.40 → no labels | zoom ≥ 0.40 → full
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NODE_CAP    = 400;
+const NODE_CAP    = 800;
 const CLUSTER_ZOOM = 0.18;
 const LABEL_ZOOM   = 0.40;
 
@@ -139,6 +139,50 @@ function animateTo(tx2,ty2,z2){
   requestAnimationFrame(step);
 }
 
+// ── Barnes-Hut quadtree for O(n log n) repulsion ──────────────────────────
+const BH_THETA=0.9; // lower = more accurate, higher = faster
+
+function _bhCell(x,y,w,h){
+  return{x,y,w,h,mass:0,cmx:0,cmy:0,leaf:null,ch:[null,null,null,null]};
+}
+function _bhPlace(cell,n){
+  const hw=cell.w/2,hh=cell.h/2;
+  const qx=n.x>=cell.x+hw?1:0,qy=n.y>=cell.y+hh?1:0,qi=qx+qy*2;
+  if(!cell.ch[qi])cell.ch[qi]=_bhCell(cell.x+qx*hw,cell.y+qy*hh,hw,hh);
+  _bhInsert(cell.ch[qi],n);
+}
+function _bhInsert(cell,n){
+  if(cell.mass===0){cell.mass=1;cell.cmx=n.x;cell.cmy=n.y;cell.leaf=n;return;}
+  if(cell.leaf!==null){const lf=cell.leaf;cell.leaf=null;_bhPlace(cell,lf);}
+  cell.cmx=(cell.cmx*cell.mass+n.x)/(cell.mass+1);
+  cell.cmy=(cell.cmy*cell.mass+n.y)/(cell.mass+1);
+  cell.mass++;
+  _bhPlace(cell,n);
+}
+function _bhForce(n,cell,rep,alpha){
+  if(!cell||cell.mass===0)return;
+  if(cell.leaf===n)return;
+  const dx=cell.cmx-n.x,dy=cell.cmy-n.y;
+  const d2=dx*dx+dy*dy+0.01,d=Math.sqrt(d2);
+  if(cell.leaf!==null||cell.w/d<BH_THETA){
+    const f=rep*alpha*cell.mass/d2;
+    n.vx-=f*dx/d;n.vy-=f*dy/d;
+    return;
+  }
+  for(const c of cell.ch)if(c)_bhForce(n,c,rep,alpha);
+}
+function _bhBuild(nodes){
+  let x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
+  for(const n of nodes){
+    if(n.x<x1)x1=n.x;if(n.y<y1)y1=n.y;
+    if(n.x>x2)x2=n.x;if(n.y>y2)y2=n.y;
+  }
+  x1-=1;y1-=1;const sz=Math.max(x2-x1+2,y2-y1+2);
+  const root=_bhCell(x1,y1,sz,sz);
+  for(const n of nodes)_bhInsert(root,n);
+  return root;
+}
+
 // ── Physics simulation ─────────────────────────────────────────────────────
 function physTick(){
   const nodes=_net.nodes,edges=_net.edges;
@@ -149,17 +193,11 @@ function physTick(){
   const drag=_net.drag?.node;
   const center=_net.egoMode?nodes.find(n=>n.did===_net.selected):null;
 
-  // Repulsion (O(n²) — node cap keeps this tractable)
-  for(let i=0;i<nodes.length;i++){
-    for(let j=i+1;j<nodes.length;j++){
-      const a=nodes[i],b=nodes[j];
-      const dx=b.x-a.x,dy=b.y-a.y;
-      const d2=dx*dx+dy*dy+1,d=Math.sqrt(d2);
-      const f=PHY.REPULSION*alpha/d2;
-      const fx=f*dx/d,fy=f*dy/d;
-      if(a!==center&&a!==drag){a.vx-=fx;a.vy-=fy;}
-      if(b!==center&&b!==drag){b.vx+=fx;b.vy+=fy;}
-    }
+  // Repulsion — Barnes-Hut O(n log n)
+  const bh=_bhBuild(nodes);
+  for(const n of nodes){
+    if(n===center||n===drag)continue;
+    _bhForce(n,bh,PHY.REPULSION,alpha);
   }
 
   // Springs (edges)
@@ -179,17 +217,18 @@ function physTick(){
     n.vy-=n.y*PHY.GRAVITY*alpha;
   }
 
-  // Collision resolution
+  // Collision resolution — d² early exit avoids sqrt for non-overlapping pairs
   for(let i=0;i<nodes.length;i++){
+    const a=nodes[i];
     for(let j=i+1;j<nodes.length;j++){
-      const a=nodes[i],b=nodes[j];
-      const dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1;
+      const b=nodes[j];
+      const dx=b.x-a.x,dy=b.y-a.y;
       const minD=(a.r+b.r)*1.6+6;
-      if(d<minD){
-        const push=(minD-d)/2/d;
-        if(a!==center&&a!==drag){a.x-=dx*push;a.y-=dy*push;}
-        if(b!==center&&b!==drag){b.x+=dx*push;b.y+=dy*push;}
-      }
+      if(dx*dx+dy*dy>=minD*minD)continue;
+      const d=Math.sqrt(dx*dx+dy*dy)||1;
+      const push=(minD-d)/2/d;
+      if(a!==center&&a!==drag){a.x-=dx*push;a.y-=dy*push;}
+      if(b!==center&&b!==drag){b.x+=dx*push;b.y+=dy*push;}
     }
   }
 
