@@ -558,12 +558,6 @@ function enterEgoMode(centerNode){
   const dpr=window.devicePixelRatio||1;
   const W=c.width/dpr,H=c.height/dpr;
 
-  // Snapshot which nodes are already positioned (visible in the current ego subgraph).
-  // When re-centring within ego mode we'll translate these instead of hard-resetting them.
-  const wasInEgoMode=_net.egoMode;
-  const prevPositioned=new Set(_net.nodes.map(n=>n.did));
-  const newCenterX=centerNode.x,newCenterY=centerNode.y; // current world pos before reset
-
   const neighbourDids=new Set();
   for(const e of Object.values(_edgeMap)){
     if(e.src===centerNode.did)neighbourDids.add(e.dst);
@@ -612,49 +606,21 @@ function enterEgoMode(centerNode){
     }
   }
 
-  if(wasInEgoMode){
-    // ── Smooth re-centre: slide existing nodes so the clicked node lands at (0,0).
-    // Previously-visible nodes keep their relative positions (no jarring swap).
-    // Brand-new nodes (not in the previous subgraph) are placed on the perimeter.
-    const ox=newCenterX,oy=newCenterY;
-    _net.nodes.forEach(n=>{
-      if(prevPositioned.has(n.did)){
-        n.x-=ox;n.y-=oy;n.vx=0;n.vy=0;
-      }
-    });
-    centerNode.x=0;centerNode.y=0;centerNode.vx=0;centerNode.vy=0;
-    const R=Math.min(W,H)*0.32;
-    const brand=_net.nodes.filter(n=>!prevPositioned.has(n.did));
-    brand.forEach((n,i)=>{
-      const angle=(2*Math.PI*i/Math.max(1,brand.length))-Math.PI/2;
-      n.x=R*Math.cos(angle)+ox*0; // place on ring (already translated; ox offset gone)
-      n.y=R*Math.sin(angle);
-      n.vx=(Math.random()-0.5)*2;n.vy=(Math.random()-0.5)*2;
-    });
-  }else{
-    // ── Fresh entry from global view: reset everything to ring layout.
-    computeEgoLayout(centerNode,neighbours,W,H);
-  }
+  // Always do a fresh ring layout around the new centre.
+  // Preserving old positions (translation approach) creates a stretched,
+  // unbalanced layout because the old positions were optimised for the
+  // previous ego centre. A clean ring is always correct and overlap-free.
+  computeEgoLayout(centerNode,neighbours,W,H);
+
   renderDetailPanel(centerNode);
   renderSidebar();
   updatePill();
 
   const dpr2=window.devicePixelRatio||1;
   const W2=c.width/dpr2,H2=c.height/dpr2;
-
-  if(wasInEgoMode){
-    // New centre is at world (0,0) after the translation above.
-    // tx=W/2, ty=H/2 puts (0,0) at screen centre — don't fitView() or it
-    // will shift the camera to the bounding-box centroid and move B off-centre.
-    // Use low alpha so physics only resolves overlaps, not a full re-layout.
-    _net.tx=W2/2;_net.ty=H2/2;
-    startSimulation(0.35);
-  }else{
-    // Fresh entry from global view: centre everything properly.
-    _net.tx=W2/2;_net.ty=H2/2;
-    fitView();
-    startSimulation(1);
-  }
+  _net.tx=W2/2;_net.ty=H2/2;
+  fitView();
+  startSimulation(1);
 }
 
 function exitEgoMode(){
