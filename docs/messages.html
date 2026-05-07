@@ -983,9 +983,19 @@ function renderSidebar() {
       document.getElementById("sidebar-files-btn").classList.remove("active");
       document.getElementById("deal-search-bar").style.display = "none";
       document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
+      _activeStops = [];  // clear until fetched so button shows Force Stop, not stale state
       renderFeed();
       // Silently refresh this agent's messages so newly-received messages appear immediately
       const clickedDid = el.dataset.did;
+      // Load active stops for this agent and update the header button
+      fetch(`${BASE}/pro/agents/comm-stops`, { headers: apiHeaders(), credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (d && _selectedDid === clickedDid) {
+            _activeStops = (d.stops || []).filter(s => s.did_a === clickedDid || s.did_b === clickedDid);
+            _refreshStopButton();
+          }
+        }).catch(() => {});
       fetchMessages(clickedDid).then(fresh => {
         const freshMapped = fresh.map(m => ({ ...m, _agentDid: clickedDid, _agentName: el.dataset.name || clickedDid.slice(-10) }));
         freshMapped.forEach(m => {
@@ -1095,16 +1105,14 @@ function renderFeed() {
   const headerActions = document.getElementById("header-right-actions");
   if (headerActions) headerActions.innerHTML = "";
 
-  // Show Force Stop + Chat buttons only when a specific agent is selected
-  const stopBtn = document.getElementById("stop-btn");
+  // Show/update Force Stop button + Chat button based on selection and stop state
   const chatBtn = document.getElementById("chat-open-btn");
   if (_selectedDid && _selectedDid !== "__deals__" && _selectedDid !== "__group__") {
-    stopBtn.style.display = "";
     if (chatBtn) chatBtn.style.display = "";
   } else {
-    stopBtn.style.display = "none";
     if (chatBtn) chatBtn.style.display = "none";
   }
+  _refreshStopButton();
 
   if (_dealsView) {
     // Re-fetch interactions on every 30s auto-refresh so new agent comms appear
@@ -1747,6 +1755,33 @@ function autoResizeChatInput(el) {
 // ── FORCE STOP ────────────────────────────────────────────────────────────────
 let _activeStops = [];
 
+function _refreshStopButton() {
+  const btn = document.getElementById("stop-btn");
+  if (!btn) return;
+  const active = _selectedDid && _selectedDid !== "__deals__" && _selectedDid !== "__group__" && _selectedDid !== "__files__";
+  if (!active) { btn.style.display = "none"; return; }
+  btn.style.display = "";
+  if (!_activeStops.length) {
+    btn.className = "btn btn-danger";
+    btn.textContent = "⏹ Force Stop";
+    btn.title = "Stop auto-reply traffic with another agent";
+    btn.onclick = openStopModal;
+  } else if (_activeStops.length === 1) {
+    const s = _activeStops[0];
+    const otherDid  = s.did_a === _selectedDid ? s.did_b : s.did_a;
+    const otherName = (s.did_a === _selectedDid ? (s.name_b || s.did_b) : (s.name_a || s.did_a));
+    btn.className = "btn btn-success";
+    btn.textContent = "▶ Resume";
+    btn.title = `Re-enable auto-reply with ${otherName}`;
+    btn.onclick = () => removeStop(otherDid);
+  } else {
+    btn.className = "btn btn-danger";
+    btn.textContent = `⏹ Stopped (${_activeStops.length})`;
+    btn.title = "Multiple stops active — click to manage";
+    btn.onclick = openStopModal;
+  }
+}
+
 async function openStopModal() {
   const modal   = document.getElementById("stop-modal");
   const errEl   = document.getElementById("stop-error");
@@ -1772,16 +1807,17 @@ async function openStopModal() {
 function renderActiveStops() {
   const wrap  = document.getElementById("stop-active-list");
   const items = document.getElementById("stop-active-items");
-  if (!_activeStops.length) { wrap.style.display = "none"; return; }
+  if (!_activeStops.length) { wrap.style.display = "none"; _refreshStopButton(); return; }
   wrap.style.display = "block";
   items.innerHTML = _activeStops.map(s => {
     const other = s.did_a === _selectedDid ? (s.name_b || s.did_b) : (s.name_a || s.did_a);
     const otherDid = s.did_a === _selectedDid ? s.did_b : s.did_a;
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0.5rem;background:var(--red-bg);border:1px solid #fca5a5;border-radius:6px;margin-bottom:0.3rem;font-size:0.78rem;">
       <span style="font-family:'JetBrains Mono',monospace;color:var(--red);">⏹ ${esc(other)}</span>
-      <button onclick="removeStop('${esc(otherDid)}')" style="background:none;border:none;font-size:0.72rem;color:var(--red);cursor:pointer;font-family:inherit;font-weight:600;">Remove</button>
+      <button onclick="removeStop('${esc(otherDid)}')" style="background:none;border:none;font-size:0.72rem;color:var(--red);cursor:pointer;font-family:inherit;font-weight:600;">Resume</button>
     </div>`;
   }).join("");
+  _refreshStopButton();
 }
 
 function closeStopModal() {
@@ -1812,6 +1848,7 @@ async function submitStop() {
     // Refresh stops list
     _activeStops.push({ did_a: data.did_a, did_b: data.did_b, name_a: null, name_b: null });
     renderActiveStops();
+    _refreshStopButton();
   } catch(e) {
     errEl.textContent = e.message || "Failed to create stop.";
     errEl.style.display = "block";
@@ -1834,9 +1871,9 @@ async function removeStop(otherDid) {
         (s.did_b === didA && s.did_a === otherDid)
       ));
       renderActiveStops();
+      _refreshStopButton();
       const succEl = document.getElementById("stop-success");
-      succEl.textContent = "✓ Stop removed — auto-reply re-enabled.";
-      succEl.style.display = "block";
+      if (succEl) { succEl.textContent = "✓ Stop removed — auto-reply re-enabled."; succEl.style.display = "block"; }
     }
   } catch(_) {}
 }
