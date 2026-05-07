@@ -93,7 +93,8 @@ const _net={
 let _allAgents=[],_allLogs=[],_edgeMap={},_agentStats={};
 let _compromised=new Set(),_compromisedInfo={};
 let _sortBy="interactions",_searchQ="",_days=7;
-let _trustScoreCache={};  // did → {score,level,computed_at}
+let _trustScoreCache={};  // did → {score,level,dimensions}
+let _accountTier=null;    // "free" | "pro" | "enterprise" — fetched once on load
 
 // ── Canvas helpers ─────────────────────────────────────────────────────────
 function s2w(sx,sy){return[(sx-_net.tx)/_net.zoom,(sy-_net.ty)/_net.zoom];}
@@ -873,8 +874,12 @@ function renderDetailPanel(node){
     <text x="45" y="55" text-anchor="middle" fill="#64748b" font-size="7" font-family="Inter,sans-serif" letter-spacing="0.5">${levelLabel}</text>
   </svg>`;
 
-  // ── Pro 6-dimension preview (blurred placeholder) ─────────────────────
+  // ── Pro / Enterprise 6-dimension section ──────────────────────────────
+  const isPaidTier=_accountTier==="pro"||_accountTier==="enterprise";
   const hasDims=ts?.dimensions!=null;
+  // Unlocked when: paid tier (show real data if available, placeholders if not yet built)
+  // Locked when:  free tier or tier not yet fetched
+  const dimsUnlocked=isPaidTier||hasDims;
   const dims=hasDims?ts.dimensions:{
     identity:null,reliability:null,reputation:null,behavioral:null,governance:null,capability:null
   };
@@ -978,9 +983,9 @@ function renderDetailPanel(node){
   <div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);position:relative;">
     <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.45rem;">
       <div style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);">Trust Dimensions</div>
-      ${!hasDims?'<span style="margin-left:auto;font-size:0.56rem;font-weight:700;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:1px 6px;">PRO · ENTERPRISE</span>':""}
+      ${!dimsUnlocked?'<span style="margin-left:auto;font-size:0.56rem;font-weight:700;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:1px 6px;">PRO · ENTERPRISE</span>':""}
     </div>
-    <div style="display:flex;flex-direction:column;gap:0.28rem;${!hasDims?"filter:blur(3px);opacity:0.45;pointer-events:none;user-select:none;":""}" aria-hidden="${!hasDims}">
+    <div style="display:flex;flex-direction:column;gap:0.28rem;${!dimsUnlocked?"filter:blur(3px);opacity:0.45;pointer-events:none;user-select:none;":""}" aria-hidden="${!dimsUnlocked}">
       ${dimDefs.map(d=>{
         const v=dims[d.key];
         const pct=v!=null?Math.round(v):(30+Math.floor(Math.random()*55));
@@ -995,7 +1000,7 @@ function renderDetailPanel(node){
         </div>`;
       }).join("")}
     </div>
-    ${!hasDims?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.35rem;border-radius:0;">
+    ${!dimsUnlocked?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.35rem;border-radius:0;">
       <span style="font-size:1.1rem;">🔒</span>
       <a href="https://agentid-protocol.com/pro" target="_blank" style="font-size:0.68rem;font-weight:700;color:#f59e0b;text-decoration:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:4px 12px;">Unlock with Pro or Enterprise →</a>
     </div>`:""}
@@ -1265,6 +1270,12 @@ document.addEventListener("DOMContentLoaded",async()=>{
     const r=await _authFetch("/auth/me");
     if(!r.ok){window.location.href="dashboard.html";return;}
   }catch(_){window.location.href="dashboard.html";return;}
+
+  // Fetch account tier once — used to gate Pro/Enterprise features in the detail panel
+  _authFetch("/pro/keys/me").then(r=>r.ok?r.json():null).then(d=>{
+    if(d?.tier)_accountTier=d.tier;
+  }).catch(()=>{});
+
   document.body.style.visibility="";
 
   document.getElementById("range-select")?.addEventListener("change",loadNetwork);
