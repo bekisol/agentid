@@ -364,17 +364,19 @@ function signOut() {
 }
 
 async function tryApiKey(key) {
-  const r = await fetch(`${BASE}/auth/me`, { credentials: "include", headers: { "x-api-key": key } });
-  if (!r.ok) return false;
-  const me = await r.json();
-  apiKey = key;
-  // Store under the same keys the dashboard uses so navigating between pages
-  // doesn't require re-authentication.
-  sessionStorage.setItem("agentid_key", key);
-  localStorage.setItem("agentid_persisted_key", key);
-  const userEl = document.getElementById("topbar-user");
-  if (userEl) userEl.textContent = me.email || me.owner || "";
-  return true;
+  try {
+    const r = await fetch(`${BASE}/auth/me`, { credentials: "include", headers: { "x-api-key": key } });
+    if (!r.ok) return false;
+    const me = await r.json();
+    apiKey = key;
+    // Store under the same keys the dashboard uses so navigating between pages
+    // doesn't require re-authentication.
+    sessionStorage.setItem("agentid_key", key);
+    localStorage.setItem("agentid_persisted_key", key);
+    const userEl = document.getElementById("topbar-user");
+    if (userEl) userEl.textContent = me.email || me.owner || "";
+    return true;
+  } catch (_) { return false; }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
