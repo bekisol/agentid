@@ -392,7 +392,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     submitBtn.textContent = "Checking…"; submitBtn.disabled = true;
     if (await tryApiKey(key)) {
       document.getElementById("auth-wall").style.display = "none";
-      document.getElementById("app").style.display = "";
+      document.getElementById("app").style.display = "flex";
       boot();
     } else {
       errEl.textContent = "Invalid API key — check Settings → API Keys.";
@@ -422,7 +422,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const userEl = document.getElementById("topbar-user");
         if (userEl) userEl.textContent = me.email || me.owner || "";
         document.getElementById("auth-wall").style.display = "none";
-        document.getElementById("app").style.display = "";
+        document.getElementById("app").style.display = "flex";
         boot();
         return;
       }
@@ -435,7 +435,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ok = await tryApiKey(apiKey);
   if (!ok) { document.getElementById("auth-wall").style.display = "flex"; return; }
   document.getElementById("auth-wall").style.display = "none";
-  document.getElementById("app").style.display = "";
+  document.getElementById("app").style.display = "flex";
   boot();
 });
 
