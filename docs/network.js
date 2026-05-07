@@ -1070,8 +1070,8 @@ function renderDetailPanel(node){
     <button id="dp-copy" style="flex:0 0 auto;padding:0.48rem 0.55rem;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:7px;color:#94a3b8;font-size:0.68rem;cursor:pointer;" title="Copy DID">📋</button>
   </div>`;
 
-  // Load full trust data (pro endpoint returns dimensions if available)
-  if(!_trustScoreCache[node.did]){
+  // Load full trust data — also re-fetch if prefetch ran but dimensions are missing
+  if(!_trustScoreCache[node.did]||_trustScoreCache[node.did].dimensions===undefined){
     _authFetch(`/agents/${encodeURIComponent(node.did)}/trust-score`)
       .then(r=>r.ok?r.json():null).then(data=>{
         if(data&&typeof data.score==="number"){
@@ -1267,7 +1267,7 @@ async function loadNetwork(){
     _authFetch(`/agents/${encodeURIComponent(ag.did)}/trust-score`)
       .then(r=>r.ok?r.json():null).then(data=>{
         if(data&&typeof data.score==="number"){
-          _trustScoreCache[ag.did]={score:data.score,level:data.level};
+          _trustScoreCache[ag.did]={score:data.score,level:data.level,dimensions:data.dimensions||null};
         }
       }).catch(()=>{});
   });
