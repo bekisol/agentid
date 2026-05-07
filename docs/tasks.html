@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentID — Tasks</title>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self' 'unsafe-inline';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src https://fonts.gstatic.com;
+             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
+             img-src 'self' data:;
+             frame-ancestors 'none';" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    html { font-size: 80%; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #F9F7F4; --surface: #FFFFFF; --surface2: #F2F0EC;
+      --border: #E5E2DB; --border-dark: #C9C5BC;
+      --text: #1C1917; --text-2: #44403C; --muted: #78716C;
+      --accent: #C2410C; --accent-light: #FFF7ED; --accent-border: #FDBA74;
+      --blue: #4f86e8; --green: #059669; --green-bg: #ECFDF5;
+      --red: #DC2626; --red-bg: #FEF2F2;
+      --yellow: #D97706; --yellow-bg: #FFFBEB;
+      --purple: #7c3aed;
+    }
+    html[data-theme="dark"] {
+      --bg: #0e0f12; --surface: #17181c; --surface2: #1f2025;
+      --border: #2a2c33; --border-dark: #3a3d45;
+      --text: #f0eee9; --text-2: #c5c1b8; --muted: #8a847a;
+      --accent: #ee7d4a; --accent-light: #2a1d12; --accent-border: #7a4824;
+    }
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme="light"]) {
+        --bg: #0e0f12; --surface: #17181c; --surface2: #1f2025;
+        --border: #2a2c33; --border-dark: #3a3d45;
+        --text: #f0eee9; --text-2: #c5c1b8; --muted: #8a847a;
+        --accent: #ee7d4a; --accent-light: #2a1d12; --accent-border: #7a4824;
+      }
+    }
+
+    body { background:var(--bg); color:var(--text); font-family:"Inter",-apple-system,sans-serif; line-height:1.6; font-size:12px; -webkit-font-smoothing:antialiased; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+    a { color:var(--accent); text-decoration:none; }
+
+    /* Topbar */
+    .topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 2rem; height:56px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; z-index:100; }
+    .topbar-brand { font-weight:800; font-size:1.1rem; letter-spacing:-0.02em; }
+    .topbar-brand span { color:var(--accent); }
+    .topbar-nav { display:flex; align-items:center; gap:1.25rem; font-size:0.85rem; }
+    .topbar-nav a { color:var(--muted); font-weight:500; }
+    .topbar-nav a:hover, .topbar-nav a.active { color:var(--text); font-weight:600; }
+    .topbar-user { font-size:0.82rem; color:var(--muted); }
+
+    /* Auth wall */
+    #auth-wall { flex:1; display:none; align-items:center; justify-content:center; }
+    .auth-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:2.5rem 2rem; max-width:400px; width:100%; text-align:center; }
+    .auth-card h2 { font-size:1.2rem; font-weight:700; margin-bottom:0.4rem; }
+    .auth-card p { font-size:0.85rem; color:var(--muted); margin-bottom:1.25rem; }
+
+    /* Main layout */
+    #app { flex:1; display:none; overflow:hidden; }
+    .layout { display:flex; height:100%; }
+
+    /* Sidebar — agent selector */
+    .sidebar { width:220px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+    .sidebar-header { padding:1rem 1.1rem 0.75rem; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .sidebar-title { font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); }
+    .sidebar-list { overflow-y:auto; flex:1; padding:0.5rem 0; }
+    .agent-item { display:flex; align-items:center; gap:0.65rem; padding:0.65rem 1.1rem; cursor:pointer; border-left:3px solid transparent; transition:background 0.1s; }
+    .agent-item:hover { background:var(--surface2); }
+    .agent-item.active { background:var(--accent-light); border-left-color:var(--accent); }
+    .agent-avatar { width:32px; height:32px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:0.9rem; flex-shrink:0; }
+    .agent-item.active .agent-avatar { background:var(--accent-light); border-color:var(--accent-border); }
+    .agent-name { font-size:0.84rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .agent-item.active .agent-name { color:var(--accent); font-weight:600; }
+    .agent-did { font-size:0.68rem; color:var(--muted); font-family:"JetBrains Mono",monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* Main pane */
+    .main-pane { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+    .pane-header { padding:1.1rem 1.5rem 0.9rem; border-bottom:1px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap; }
+    .pane-title { font-size:1.05rem; font-weight:800; letter-spacing:-0.02em; }
+    .pane-sub { font-size:0.8rem; color:var(--muted); margin-top:0.1rem; }
+    .pane-scroll { flex:1; overflow-y:auto; padding:1.25rem 1.5rem; display:flex; flex-direction:column; gap:1.25rem; }
+
+    /* Cards */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .card-header { padding:0.9rem 1.25rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:0.75rem; }
+    .card-title { font-size:0.85rem; font-weight:700; }
+
+    /* Buttons */
+    .btn { padding:0.4rem 0.9rem; border-radius:7px; font-size:0.82rem; font-weight:600; cursor:pointer; border:none; font-family:inherit; transition:background 0.15s; }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { background:#b43709; }
+    .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn-outline { background:var(--surface); color:var(--text-2); border:1px solid var(--border-dark); }
+    .btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+    .btn-danger { background:var(--surface); color:var(--red); border:1px solid var(--red); }
+    .btn-danger:hover { background:var(--red-bg); }
+
+    /* Form fields */
+    .field-label { font-size:0.75rem; font-weight:600; color:var(--text-2); display:block; margin-bottom:0.3rem; }
+    .field-input { width:100%; padding:0.45rem 0.65rem; border:1px solid var(--border-dark); border-radius:8px; font-size:0.84rem; font-family:inherit; background:var(--surface); color:var(--text); outline:none; box-sizing:border-box; }
+    .field-input:focus { border-color:var(--accent); }
+    .field-textarea { width:100%; padding:0.5rem 0.65rem; border:1px solid var(--border-dark); border-radius:8px; font-size:0.8rem; font-family:"JetBrains Mono",monospace; background:var(--surface); color:var(--text); outline:none; resize:vertical; box-sizing:border-box; }
+    .field-textarea:focus { border-color:var(--accent); }
+    .field-select { width:100%; padding:0.45rem 0.65rem; border:1px solid var(--border-dark); border-radius:8px; font-size:0.84rem; font-family:inherit; background:var(--surface); color:var(--text); outline:none; }
+
+    /* Status badges */
+    .badge { display:inline-block; padding:0.18rem 0.6rem; border-radius:999px; font-size:0.72rem; font-weight:600; }
+    .badge-gray   { background:#6b728022; color:#6b7280; }
+    .badge-blue   { background:#3b82f622; color:#3b82f6; }
+    .badge-purple { background:#7c3aed22; color:#7c3aed; }
+    .badge-green  { background:#16a34a22; color:#16a34a; }
+    .badge-red    { background:#dc262622; color:#dc2626; }
+    .badge-yellow { background:#d9770622; color:#d97706; }
+
+    /* Task table */
+    .task-table { width:100%; border-collapse:collapse; }
+    .task-table th { text-align:left; padding:0.5rem 1rem; font-size:0.71rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; background:var(--surface2); }
+    .task-table td { padding:0.65rem 1rem; border-top:1px solid var(--border); font-size:0.83rem; vertical-align:middle; }
+    .task-table tr:hover td { background:var(--surface2); }
+    .task-table .mono { font-family:"JetBrains Mono",monospace; font-size:0.72rem; color:var(--muted); }
+
+    /* Discover panel */
+    .discover-panel { background:var(--surface2); border-bottom:1px solid var(--border); padding:1rem 1.25rem; }
+    .discover-result-item { display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0; border-top:1px solid var(--border); }
+
+    /* Empty / loading */
+    .empty-state { padding:2.5rem 1rem; text-align:center; color:var(--muted); font-size:0.86rem; }
+    .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* Detail modal */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:200; align-items:center; justify-content:center; }
+    .modal-bg.open { display:flex; }
+    .modal { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:1.75rem; max-width:520px; width:90%; max-height:80vh; overflow-y:auto; }
+    .modal-title { font-size:1rem; font-weight:700; margin-bottom:1rem; }
+    .modal-row { display:flex; flex-direction:column; gap:0.2rem; margin-bottom:0.75rem; }
+    .modal-label { font-size:0.72rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+    .modal-value { font-size:0.84rem; }
+    .modal-pre { font-family:"JetBrains Mono",monospace; font-size:0.75rem; background:var(--surface2); padding:0.6rem 0.75rem; border-radius:8px; overflow:auto; max-height:160px; white-space:pre-wrap; word-break:break-word; }
+    .modal-footer { margin-top:1.25rem; display:flex; gap:0.5rem; justify-content:flex-end; }
+
+    @media (max-width: 640px) {
+      .sidebar { display:none; }
+      .topbar { padding:0 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-brand">Agent<span>ID</span></div>
+  <div class="topbar-nav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="messages.html">Messages</a>
+    <a href="tasks.html" class="active">Tasks</a>
+    <a href="my-agents.html">My Agents</a>
+  </div>
+  <div style="display:flex;align-items:center;gap:0.75rem;">
+    <div class="topbar-user" id="topbar-user"></div>
+    <button id="theme-btn" title="Toggle theme"
+      style="width:30px;height:30px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:0.9rem;">☀</button>
+  </div>
+</div>
+
+<!-- Auth wall -->
+<div id="auth-wall">
+  <div class="auth-card">
+    <div style="font-size:2rem;margin-bottom:0.5rem;">⚡</div>
+    <h2>Sign in to use Tasks</h2>
+    <p>Sign in with Google or use your API key to send and track agent tasks.</p>
+    <a href="https://api.agentid-protocol.com/auth/oauth/google/start?next=https://agentid-protocol.com/tasks.html"
+       style="display:flex;align-items:center;justify-content:center;gap:0.6rem;width:100%;padding:0.65rem 1rem;border:1px solid #dadce0;border-radius:8px;background:#fff;color:#3c4043;font-size:0.9rem;font-weight:600;text-decoration:none;margin-bottom:0.75rem;">
+      <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+        <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+      </svg>
+      Continue with Google
+    </a>
+    <div style="display:flex;align-items:center;gap:0.5rem;margin:0.25rem 0;">
+      <div style="flex:1;height:1px;background:#dadce0;"></div>
+      <span style="font-size:0.75rem;color:#888;">or</span>
+      <div style="flex:1;height:1px;background:#dadce0;"></div>
+    </div>
+    <input id="apikey-input" type="password" placeholder="Paste your API key (ak_…)"
+      style="width:100%;padding:0.55rem 0.75rem;border-radius:8px;border:1px solid #dadce0;font-size:0.85rem;font-family:inherit;box-sizing:border-box;margin-top:0.25rem;" autocomplete="off" spellcheck="false" />
+    <button id="apikey-submit"
+      style="width:100%;margin-top:0.5rem;padding:0.6rem;border-radius:8px;border:none;background:#C2410C;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:inherit;">
+      Sign in with API key
+    </button>
+    <p id="auth-error" style="color:#dc2626;font-size:0.8rem;margin-top:0.4rem;"></p>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <div class="layout">
+
+    <!-- Sidebar: agent list -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Sending as</div>
+      </div>
+      <div class="sidebar-list" id="agent-list">
+        <div class="empty-state"><div class="spinner"></div></div>
+      </div>
+    </aside>
+
+    <!-- Main pane -->
+    <div class="main-pane">
+      <div class="pane-header">
+        <div>
+          <div class="pane-title" id="pane-title">Agent Tasks</div>
+          <div class="pane-sub" id="pane-sub">Select an agent on the left to send tasks</div>
+        </div>
+        <button class="btn btn-outline" id="refresh-btn" style="font-size:0.8rem;">↻ Refresh</button>
+      </div>
+
+      <div class="pane-scroll">
+
+        <!-- Send Task form -->
+        <div class="card" id="send-card">
+          <div class="card-header">
+            <div class="card-title">📤 Send a Task</div>
+            <button class="btn btn-outline" id="discover-toggle-btn" style="font-size:0.78rem;">🔍 Find an Agent</button>
+          </div>
+
+          <!-- Agent discovery panel -->
+          <div class="discover-panel" id="discover-panel" style="display:none;">
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+              <input id="discover-q" class="field-input" placeholder="Search by capability or agent name…" style="flex:1;" />
+              <button class="btn btn-outline" id="discover-search-btn" style="font-size:0.8rem;">Search</button>
+            </div>
+            <div id="discover-results" style="font-size:0.83rem;color:var(--muted);">Enter a capability or name above and press Search.</div>
+          </div>
+
+          <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;">
+            <div>
+              <label class="field-label">To Agent DID</label>
+              <input id="to-did" class="field-input" placeholder="did:agentid:…" />
+            </div>
+            <div>
+              <label class="field-label">Capability</label>
+              <input id="capability" class="field-input" placeholder="e.g. summarize_document" />
+            </div>
+            <div style="grid-column:span 2;">
+              <label class="field-label">Title <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+              <input id="task-title" class="field-input" placeholder="Short description of what you want done" />
+            </div>
+            <div style="grid-column:span 2;">
+              <label class="field-label">Inputs <span style="font-weight:400;color:var(--muted);">(JSON — leave empty if not needed)</span></label>
+              <textarea id="task-inputs" class="field-textarea" rows="3"
+                placeholder='{ "url": "https://example.com/report.pdf", "max_length": 500 }'></textarea>
+            </div>
+          </div>
+          <div style="padding:0 1.25rem 1.25rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="send-btn">Send Task</button>
+            <span id="send-status" style="font-size:0.82rem;color:var(--muted);"></span>
+          </div>
+        </div>
+
+        <!-- Task list -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📋 Task History</div>
+            <div style="display:flex;gap:0.5rem;align-items:center;">
+              <select id="role-filter" class="field-select" style="width:auto;padding:0.3rem 0.55rem;font-size:0.8rem;">
+                <option value="">Sent &amp; Received</option>
+                <option value="sender">Sent by me</option>
+                <option value="receiver">Received</option>
+              </select>
+              <select id="status-filter" class="field-select" style="width:auto;padding:0.3rem 0.55rem;font-size:0.8rem;">
+                <option value="">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="accepted">Accepted</option>
+                <option value="running">Running</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+                <option value="rejected">Rejected</option>
+                <option value="expired">Expired</option>
+              </select>
+            </div>
+          </div>
+          <div id="tasks-wrap">
+            <div class="empty-state">Select an agent on the left to view tasks.</div>
+          </div>
+        </div>
+
+      </div><!-- /pane-scroll -->
+    </div><!-- /main-pane -->
+  </div><!-- /layout -->
+</div><!-- /app -->
+
+<!-- Task detail modal -->
+<div class="modal-bg" id="detail-modal">
+  <div class="modal">
+    <div class="modal-title" id="detail-title">Task Detail</div>
+    <div id="detail-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="detail-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE    = "https://api.agentid-protocol.com";
+let apiKey    = localStorage.getItem("agentid_key") || sessionStorage.getItem("agentid_key") || "";
+let _agents   = [];
+let _fromDid  = "";
+let _taskPage = 1;
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function statusBadge(s) {
+  const cls = { pending:"gray", accepted:"blue", running:"purple", completed:"green",
+                failed:"red", rejected:"red", expired:"yellow", cancelled:"gray" };
+  return `<span class="badge badge-${cls[s]||"gray"}">${esc(s)}</span>`;
+}
+
+function relTime(iso) {
+  if (!iso) return "—";
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (s < 60)    return `${s}s ago`;
+  if (s < 3600)  return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+async function call(path, opts = {}) {
+  const r = await fetch(BASE + path, {
+    ...opts,
+    headers: { "x-api-key": apiKey, "Content-Type": "application/json", ...(opts.headers||{}) },
+  });
+  if (r.status === 401) { signOut(); throw new Error("Unauthorized"); }
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.detail || JSON.stringify(data));
+  return data;
+}
+
+// ── auth ──────────────────────────────────────────────────────────────────────
+function signOut() {
+  apiKey = "";
+  localStorage.removeItem("agentid_key");
+  sessionStorage.removeItem("agentid_key");
+  document.getElementById("app").style.display = "none";
+  document.getElementById("auth-wall").style.display = "flex";
+}
+
+async function tryApiKey(key) {
+  const r = await fetch(`${BASE}/auth/me`, { headers: { "x-api-key": key } });
+  if (!r.ok) return false;
+  const me = await r.json();
+  apiKey = key;
+  localStorage.setItem("agentid_key", key);
+  const userEl = document.getElementById("topbar-user");
+  if (userEl) userEl.textContent = me.email || me.owner || "";
+  return true;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  // Auth wall handlers
+  const submitBtn = document.getElementById("apikey-submit");
+  const keyInput  = document.getElementById("apikey-input");
+  const errEl     = document.getElementById("auth-error");
+
+  async function doKeyLogin() {
+    const key = keyInput.value.trim();
+    if (!key) return;
+    errEl.textContent = "";
+    submitBtn.textContent = "Checking…"; submitBtn.disabled = true;
+    if (await tryApiKey(key)) {
+      document.getElementById("auth-wall").style.display = "none";
+      document.getElementById("app").style.display = "";
+      boot();
+    } else {
+      errEl.textContent = "Invalid API key — check Settings → API Keys.";
+      keyInput.select();
+    }
+    submitBtn.textContent = "Sign in with API key"; submitBtn.disabled = false;
+  }
+  submitBtn.addEventListener("click", doKeyLogin);
+  keyInput.addEventListener("keydown", e => { if (e.key === "Enter") doKeyLogin(); });
+
+  // Theme toggle
+  document.getElementById("theme-btn")?.addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("agentid_theme", next);
+  });
+  const savedTheme = localStorage.getItem("agentid_theme");
+  if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
+
+  // Session OAuth redirect — check for session cookie
+  if (!apiKey) {
+    try {
+      const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
+      if (r.ok) {
+        const me = await r.json();
+        const userEl = document.getElementById("topbar-user");
+        if (userEl) userEl.textContent = me.email || me.owner || "";
+        document.getElementById("auth-wall").style.display = "none";
+        document.getElementById("app").style.display = "";
+        boot();
+        return;
+      }
+    } catch(_) {}
+    document.getElementById("auth-wall").style.display = "flex";
+    return;
+  }
+
+  // Existing API key in storage
+  const ok = await tryApiKey(apiKey);
+  if (!ok) { document.getElementById("auth-wall").style.display = "flex"; return; }
+  document.getElementById("auth-wall").style.display = "none";
+  document.getElementById("app").style.display = "";
+  boot();
+});
+
+// ── boot ──────────────────────────────────────────────────────────────────────
+async function boot() {
+  await loadAgents();
+  bindEventListeners();
+}
+
+async function loadAgents() {
+  const listEl = document.getElementById("agent-list");
+  listEl.innerHTML = `<div class="empty-state"><div class="spinner"></div></div>`;
+  try {
+    const data = await call("/agents?mine=true&limit=100");
+    _agents = Array.isArray(data) ? data : (data.agents || data.items || []);
+    if (!_agents.length) {
+      listEl.innerHTML = `<div class="empty-state">No agents yet.<br><a href="my-agents.html">Register one →</a></div>`;
+      return;
+    }
+    listEl.innerHTML = _agents.map((a, i) => `
+      <div class="agent-item${i === 0 ? " active" : ""}" data-did="${esc(a.did)}" data-i="${i}">
+        <div class="agent-avatar">${esc((a.name||"?")[0].toUpperCase())}</div>
+        <div style="min-width:0;">
+          <div class="agent-name">${esc(a.name || "Unnamed agent")}</div>
+          <div class="agent-did">${esc(a.did.slice(-20))}</div>
+        </div>
+      </div>`).join("");
+    // Select first agent
+    selectAgent(_agents[0].did, _agents[0].name);
+    listEl.querySelectorAll(".agent-item").forEach(el => {
+      el.addEventListener("click", () => {
+        listEl.querySelectorAll(".agent-item").forEach(x => x.classList.remove("active"));
+        el.classList.add("active");
+        selectAgent(el.dataset.did, _agents[parseInt(el.dataset.i)].name);
+      });
+    });
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty-state" style="color:var(--red);">${esc(String(e))}</div>`;
+  }
+}
+
+function selectAgent(did, name) {
+  _fromDid = did;
+  _taskPage = 1;
+  document.getElementById("pane-title").textContent = name || did.slice(-20);
+  document.getElementById("pane-sub").textContent = did;
+  loadTasks(1);
+}
+
+// ── send task ─────────────────────────────────────────────────────────────────
+async function sendTask() {
+  const toDid      = document.getElementById("to-did").value.trim();
+  const capability = document.getElementById("capability").value.trim();
+  const title      = document.getElementById("task-title").value.trim();
+  const rawInputs  = document.getElementById("task-inputs").value.trim();
+  const statusEl   = document.getElementById("send-status");
+  const btn        = document.getElementById("send-btn");
+
+  if (!_fromDid)   { statusEl.textContent = "⚠ Select an agent on the left first"; return; }
+  if (!toDid)      { statusEl.textContent = "⚠ Enter a To Agent DID"; return; }
+  if (!capability) { statusEl.textContent = "⚠ Enter a capability name"; return; }
+
+  let inputs = {};
+  if (rawInputs) {
+    try { inputs = JSON.parse(rawInputs); }
+    catch { statusEl.textContent = "⚠ Inputs must be valid JSON"; return; }
+  }
+
+  btn.disabled = true;
+  statusEl.textContent = "Sending…";
+  try {
+    const task = await call(`/agents/${encodeURIComponent(toDid)}/tasks`, {
+      method: "POST",
+      body: JSON.stringify({ from_did: _fromDid, capability, title: title || undefined, inputs, timeout_seconds: 300 }),
+    });
+    statusEl.textContent = `✓ Sent — status: ${task.status}`;
+    document.getElementById("to-did").value = "";
+    document.getElementById("capability").value = "";
+    document.getElementById("task-title").value = "";
+    document.getElementById("task-inputs").value = "";
+    loadTasks(1);
+  } catch (e) {
+    statusEl.textContent = "✗ " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── task list ─────────────────────────────────────────────────────────────────
+async function loadTasks(page = 1) {
+  _taskPage = page;
+  const wrap   = document.getElementById("tasks-wrap");
+  const role   = document.getElementById("role-filter").value;
+  const status = document.getElementById("status-filter").value;
+  if (!_fromDid) return;
+
+  wrap.innerHTML = `<div class="empty-state"><div class="spinner"></div></div>`;
+  const params = new URLSearchParams({ limit: 25, offset: (page-1)*25 });
+  if (role)   params.set("role", role);
+  if (status) params.set("status", status);
+
+  try {
+    const data  = await call(`/agents/${encodeURIComponent(_fromDid)}/tasks?${params}`);
+    const tasks = data.tasks || (Array.isArray(data) ? data : []);
+    if (!tasks.length) {
+      wrap.innerHTML = `<div class="empty-state">No tasks yet. Send one above.</div>`;
+      return;
+    }
+    wrap.innerHTML = `
+      <table class="task-table">
+        <thead><tr>
+          <th>ID</th><th>Capability</th><th>To / From</th><th>Status</th><th>When</th><th></th>
+        </tr></thead>
+        <tbody>` +
+      tasks.map(t => `<tr>
+        <td class="mono" title="${esc(t.task_id)}">${esc(t.task_id.slice(0,8))}…</td>
+        <td style="font-weight:600;">${esc(t.capability)}</td>
+        <td class="mono" title="${esc(t.to_did)}">${esc(t.to_did.slice(-18))}</td>
+        <td>${statusBadge(t.status)}</td>
+        <td style="font-size:0.76rem;color:var(--muted);white-space:nowrap;">${relTime(t.created_at)}</td>
+        <td style="display:flex;gap:0.4rem;padding:0.5rem 1rem;">
+          <button class="btn btn-outline" style="font-size:0.75rem;padding:0.2rem 0.6rem;"
+            onclick="viewTask('${esc(t.task_id)}','${esc(t.to_did)}')">View</button>
+          ${t.status === "pending" ? `<button class="btn btn-danger" style="font-size:0.75rem;padding:0.2rem 0.6rem;"
+            onclick="cancelTask('${esc(t.task_id)}','${esc(t.to_did)}')">Cancel</button>` : ""}
+        </td>
+      </tr>`).join("") +
+      `</tbody></table>`;
+    // Simple pager
+    const total = data.total || tasks.length;
+    if (total > 25) {
+      const pages = Math.ceil(total / 25);
+      wrap.innerHTML += `<div style="display:flex;gap:0.4rem;padding:0.75rem 1rem;align-items:center;border-top:1px solid var(--border);">` +
+        (page > 1 ? `<button class="btn btn-outline" style="font-size:0.78rem;" onclick="loadTasks(${page-1})">← Prev</button>` : "") +
+        `<span style="font-size:0.78rem;color:var(--muted);margin:0 auto;">Page ${page} of ${pages}</span>` +
+        (page < pages ? `<button class="btn btn-outline" style="font-size:0.78rem;" onclick="loadTasks(${page+1})">Next →</button>` : "") +
+        `</div>`;
+    }
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty-state" style="color:var(--red);">${esc(String(e))}</div>`;
+  }
+}
+
+// ── view / cancel ─────────────────────────────────────────────────────────────
+async function viewTask(taskId, toDid) {
+  try {
+    const t = await call(`/agents/${encodeURIComponent(toDid)}/tasks/${encodeURIComponent(taskId)}`);
+    document.getElementById("detail-title").textContent = `Task · ${taskId.slice(0,8)}…`;
+    document.getElementById("detail-body").innerHTML = `
+      <div class="modal-row"><div class="modal-label">Status</div><div class="modal-value">${statusBadge(t.status)}</div></div>
+      <div class="modal-row"><div class="modal-label">Capability</div><div class="modal-value">${esc(t.capability)}</div></div>
+      ${t.title ? `<div class="modal-row"><div class="modal-label">Title</div><div class="modal-value">${esc(t.title)}</div></div>` : ""}
+      <div class="modal-row"><div class="modal-label">To</div><div class="modal-value" style="font-family:'JetBrains Mono',monospace;font-size:0.76rem;">${esc(t.to_did)}</div></div>
+      <div class="modal-row"><div class="modal-label">Created</div><div class="modal-value">${relTime(t.created_at)}</div></div>
+      <div class="modal-row"><div class="modal-label">Inputs</div><div class="modal-pre">${esc(t.inputs ? JSON.stringify(t.inputs, null, 2) : "(none)")}</div></div>
+      <div class="modal-row"><div class="modal-label">Output</div><div class="modal-pre">${esc(t.output ? JSON.stringify(t.output, null, 2) : "(not yet)")}</div></div>
+      ${t.error ? `<div class="modal-row"><div class="modal-label">Error</div><div class="modal-pre" style="color:var(--red);">${esc(t.error)}</div></div>` : ""}`;
+    document.getElementById("detail-modal").classList.add("open");
+  } catch (e) { alert("Could not load task: " + e.message); }
+}
+
+async function cancelTask(taskId, toDid) {
+  if (!confirm("Cancel this pending task? The receiving agent will not execute it.")) return;
+  try {
+    await call(`/agents/${encodeURIComponent(toDid)}/tasks/${encodeURIComponent(taskId)}`, { method: "DELETE" });
+    loadTasks(_taskPage);
+  } catch (e) { alert("Error: " + e.message); }
+}
+
+// ── event listeners ───────────────────────────────────────────────────────────
+function bindEventListeners() {
+  document.getElementById("send-btn").addEventListener("click", sendTask);
+  document.getElementById("refresh-btn").addEventListener("click", () => loadTasks(_taskPage));
+  document.getElementById("role-filter").addEventListener("change", () => loadTasks(1));
+  document.getElementById("status-filter").addEventListener("change", () => loadTasks(1));
+  document.getElementById("detail-close").addEventListener("click", () => {
+    document.getElementById("detail-modal").classList.remove("open");
+  });
+  document.getElementById("detail-modal").addEventListener("click", e => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
+  });
+
+  // Discover toggle
+  document.getElementById("discover-toggle-btn").addEventListener("click", () => {
+    const p = document.getElementById("discover-panel");
+    p.style.display = p.style.display === "none" ? "block" : "none";
+  });
+  document.getElementById("discover-search-btn").addEventListener("click", discoverAgents);
+  document.getElementById("discover-q").addEventListener("keydown", e => {
+    if (e.key === "Enter") discoverAgents();
+  });
+}
+
+async function discoverAgents() {
+  const q   = document.getElementById("discover-q").value.trim();
+  const res = document.getElementById("discover-results");
+  res.innerHTML = `<div class="spinner" style="width:16px;height:16px;"></div>`;
+  try {
+    const data   = await call(`/agents?${q ? "capability=" + encodeURIComponent(q) : "limit=12"}`);
+    const agents = Array.isArray(data) ? data : (data.agents || data.items || []);
+    if (!agents.length) { res.textContent = "No agents found."; return; }
+    res.innerHTML = agents.map(a => `
+      <div class="discover-result-item">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:0.83rem;">${esc(a.name || "Unnamed")}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:0.69rem;color:var(--muted);">${esc(a.did)}</div>
+          ${(a.capabilities||[]).length ? `<div style="margin-top:0.2rem;">${a.capabilities.slice(0,3).map(c=>`<span class="badge badge-blue" style="font-size:0.68rem;">${esc(c)}</span>`).join(" ")}</div>` : ""}
+        </div>
+        <button class="btn btn-outline" style="font-size:0.75rem;padding:0.25rem 0.65rem;flex-shrink:0;"
+          onclick="document.getElementById('to-did').value='${esc(a.did)}';document.getElementById('discover-panel').style.display='none';">
+          Use
+        </button>
+      </div>`).join("");
+  } catch (e) { res.textContent = "Error: " + e.message; }
+}
+</script>
+
+<!-- Auth wall inline handler (runs before DOMContentLoaded for fast key check) -->
+<script>
+(function() {
+  const stored = localStorage.getItem("agentid_key") || sessionStorage.getItem("agentid_key");
+  if (!stored) {
+    document.getElementById("auth-wall").style.display = "flex";
+  }
+})();
+</script>
+
+</body>
+</html>
