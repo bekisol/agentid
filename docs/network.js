@@ -776,7 +776,7 @@ function renderDetailPanel(node){
   const ag=_allAgents.find(a=>a.did===node.did);
   const ts=_trustScoreCache[node.did];
 
-  // Inbound/outbound connections
+  // ── Connections ──────────────────────────────────────────────────────────
   const inbound=[],outbound=[];
   for(const edge of Object.values(_edgeMap)){
     if(edge.src!==node.did&&edge.dst!==node.did)continue;
@@ -789,8 +789,31 @@ function renderDetailPanel(node){
   }
   inbound.sort((a,b)=>b.count-a.count);
   outbound.sort((a,b)=>b.count-a.count);
+  const totalConns=inbound.length+outbound.length;
 
-  // Risk signals — curated, high-signal only
+  // ── Derived metrics ──────────────────────────────────────────────────────
+  const eventsPerDay=_days>0?Math.round((stats.interactions||0)/_days*10)/10:0;
+  const connTrustScores=[...inbound,...outbound].map(c=>c.ots?.score).filter(s=>s!=null);
+  const avgConnTrust=connTrustScores.length?Math.round(connTrustScores.reduce((a,b)=>a+b,0)/connTrustScores.length):null;
+  const highTrustConns=connTrustScores.filter(s=>s>=60).length;
+  const lowTrustConns=connTrustScores.filter(s=>s<60).length;
+
+  // Network role
+  let netRole="isolated",netRoleColor="#64748b",netRoleIcon="◎";
+  if(totalConns>0){
+    const ratio=inbound.length/(totalConns);
+    if(totalConns>=6&&ratio>0.65){netRole="hub";netRoleColor="#f59e0b";netRoleIcon="⬡";}
+    else if(totalConns>=4&&ratio<0.3){netRole="spoke";netRoleColor="#3b82f6";netRoleIcon="↗";}
+    else if(totalConns>=3){netRole="connector";netRoleColor="#10b981";netRoleIcon="⇄";}
+    else{netRole="peripheral";netRoleColor="#64748b";netRoleIcon="◌";}
+  }
+
+  // Operation breakdown
+  const allOpsRaw=Object.entries(stats.ops||{}).sort((a,b)=>b[1]-a[1]);
+  const totalOpsCount=allOpsRaw.reduce((s,[,v])=>s+v,0)||1;
+  const topOps=allOpsRaw.slice(0,4);
+
+  // ── Risk signals ─────────────────────────────────────────────────────────
   const signals=[];
   if(isComp){
     const ci=_compromisedInfo[node.did]||{};
@@ -799,14 +822,14 @@ function renderDetailPanel(node){
     const byName=reporter?(_allAgents.find(a=>a.did===reporter)?.name||reporter.slice(-10)):"";
     signals.push({level:"critical",icon:"🚨",msg:`Compromised${byName?" by "+byName:""}${reason?" — "+reason.slice(0,60):""}`});
   }
-  const allOps=Object.entries(stats.ops||{});
-  if(allOps.length===1&&allOps[0][1]>3)signals.push({level:"warn",icon:"⚠",msg:`Single-op agent: only does '${allOps[0][0].replace(/_/g," ")}'`});
+  if(allOpsRaw.length===1&&allOpsRaw[0][1]>3)signals.push({level:"warn",icon:"⚠",msg:`Single-op agent: only "${allOpsRaw[0][0].replace(/_/g," ")}"`});
   const uniqVer=inbound.filter(c=>c.count===1&&c.topOp.startsWith("verify"));
-  if(uniqVer.length>=5&&uniqVer.length===inbound.length)signals.push({level:"warn",icon:"⚠",msg:`${uniqVer.length} unique one-time verifiers — possible Sybil pattern`});
-  if(outbound.length>0&&inbound.length===0)signals.push({level:"info",icon:"ℹ",msg:"Only initiates connections — never receives"});
-  if(!ts)signals.push({level:"info",icon:"ℹ",msg:"No trust score yet (new or inactive agent)"});
+  if(uniqVer.length>=5&&uniqVer.length===inbound.length)signals.push({level:"warn",icon:"⚠",msg:`${uniqVer.length} unique one-time verifiers — possible Sybil ring`});
+  if(outbound.length>0&&inbound.length===0)signals.push({level:"warn",icon:"⚠",msg:"Only initiates — never receives connections"});
+  if(lowTrustConns>0&&highTrustConns===0&&totalConns>=3)signals.push({level:"warn",icon:"⚠",msg:`All ${totalConns} connections are low-trust (<60)`});
+  if(!ts)signals.push({level:"info",icon:"ℹ",msg:"No trust score yet — new or inactive agent"});
 
-  // Activity sparkline
+  // ── Activity sparkline ───────────────────────────────────────────────────
   const cutoff=Date.now()-_days*86400000;
   const agLogs=_allLogs.filter(ev=>{
     const ts2=ev.timestamp?new Date(ev.timestamp).getTime():0;
@@ -815,147 +838,232 @@ function renderDetailPanel(node){
   const buckets=new Array(_days).fill(0);
   agLogs.forEach(ev=>{
     const ts2=ev.timestamp?new Date(ev.timestamp).getTime():0;
-    const age=Date.now()-ts2;
-    const b=Math.min(_days-1,Math.floor(age/86400000));
+    const b=Math.min(_days-1,Math.floor((Date.now()-ts2)/86400000));
     buckets[_days-1-b]++;
   });
   const maxB=Math.max(1,...buckets);
-  const svgW=270,svgH=36,bW=Math.max(2,Math.floor(svgW/_days)-1);
+  const svgW=262,svgH=34,bW=Math.max(2,Math.floor(svgW/_days)-1);
   const barsHtml=buckets.map((cnt,i)=>{
     const h=cnt===0?2:Math.max(3,Math.round((cnt/maxB)*(svgH-4)));
-    return`<rect x="${i*(bW+1)}" y="${svgH-h}" width="${bW}" height="${h}" rx="1" fill="${cnt===0?"rgba(255,255,255,0.06)":"#3b82f6"}" opacity="${cnt===0?1:0.5+0.5*(cnt/maxB)}"/>`;
+    const col=cnt===0?"rgba(255,255,255,0.05)":"#3b82f6";
+    const op=cnt===0?1:0.45+0.55*(cnt/maxB);
+    return`<rect x="${i*(bW+1)}" y="${svgH-h}" width="${bW}" height="${h}" rx="1" fill="${col}" opacity="${op}"/>`;
   }).join("");
 
-  // Top 3 connections
+  // ── Top connections ──────────────────────────────────────────────────────
   const topConns=[...inbound,...outbound].sort((a,b)=>b.count-a.count).slice(0,5);
-  const caps=(node.caps||ag?.capabilities||[]);
+  const caps=node.caps||ag?.capabilities||[];
   const created=ag?.created_at?new Date(ag.created_at).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—";
   const lastAct=stats.latestTs?relTime(stats.latestTs):"never";
   const profileUrl=`agent.html?did=${encodeURIComponent(node.did)}`;
-  const totalConns=inbound.length+outbound.length;
 
-  // Trust score ring SVG
+  // ── Trust ring SVG ───────────────────────────────────────────────────────
   const scoreVal=ts?.score||0;
   const scoreColor=ts?trustColor(scoreVal):"#475569";
   const levelLabel=ts?trustLevel(scoreVal).toUpperCase():"NO DATA";
-  const circumference=2*Math.PI*26;
-  const filled=ts?(scoreVal/100)*circumference:0;
-  const scoreRingSvg=`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="40" cy="40" r="26" stroke="rgba(255,255,255,0.07)" stroke-width="7"/>
-    <circle cx="40" cy="40" r="26" stroke="${scoreColor}" stroke-width="7"
-      stroke-dasharray="${filled.toFixed(1)} ${(circumference-filled).toFixed(1)}"
-      stroke-dashoffset="${(circumference*0.25).toFixed(1)}"
-      stroke-linecap="round" transform="rotate(-90 40 40)"/>
-    <text x="40" y="37" text-anchor="middle" fill="${scoreColor}" font-size="15" font-weight="800" font-family="Inter,sans-serif">${ts?Math.round(scoreVal):"—"}</text>
-    <text x="40" y="50" text-anchor="middle" fill="#64748b" font-size="7.5" font-family="Inter,sans-serif">${levelLabel}</text>
+  const circ=2*Math.PI*30;
+  const filled=ts?(scoreVal/100)*circ:0;
+  const scoreRingSvg=`<svg width="90" height="90" viewBox="0 0 90 90" fill="none">
+    <circle cx="45" cy="45" r="30" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
+    <circle cx="45" cy="45" r="30" stroke="${scoreColor}" stroke-width="8"
+      stroke-dasharray="${filled.toFixed(1)} ${(circ-filled).toFixed(1)}"
+      stroke-dashoffset="${(circ*0.25).toFixed(1)}"
+      stroke-linecap="round" transform="rotate(-90 45 45)"/>
+    <text x="45" y="42" text-anchor="middle" fill="${scoreColor}" font-size="18" font-weight="800" font-family="Inter,sans-serif">${ts?Math.round(scoreVal):"—"}</text>
+    <text x="45" y="55" text-anchor="middle" fill="#64748b" font-size="7" font-family="Inter,sans-serif" letter-spacing="0.5">${levelLabel}</text>
   </svg>`;
 
+  // ── Pro 6-dimension preview (blurred placeholder) ─────────────────────
+  const hasDims=ts?.dimensions!=null;
+  const dims=hasDims?ts.dimensions:{
+    identity:null,reliability:null,reputation:null,behavioral:null,governance:null,capability:null
+  };
+  const dimDefs=[
+    {key:"identity",   label:"Identity Integrity",    color:"#6366f1"},
+    {key:"reliability",label:"Operational Reliability",color:"#10b981"},
+    {key:"reputation", label:"Network Reputation",     color:"#f59e0b"},
+    {key:"behavioral", label:"Behavioral History",     color:"#3b82f6"},
+    {key:"governance", label:"Governance",             color:"#8b5cf6"},
+    {key:"capability", label:"Capability Trust",       color:"#ec4899"},
+  ];
+
   panel.innerHTML=`
-  <!-- Header -->
+  <!-- ── Header ── -->
   <div class="detail-header">
-    <div class="detail-icon" style="font-size:1.5rem;line-height:1;">${node.icon}</div>
+    <div style="font-size:1.5rem;line-height:1;flex-shrink:0;">${node.icon}</div>
     <div style="min-width:0;flex:1;">
       <div class="detail-name" style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
         ${esc(node.name)}
-        ${isComp?'<span style="font-size:0.62rem;color:#ef4444;background:rgba(239,68,68,0.12);padding:1px 6px;border-radius:10px;border:1px solid rgba(239,68,68,0.25);">⚠ FLAGGED</span>':""}
-        ${node.external?'<span style="font-size:0.62rem;color:#f59e0b;background:rgba(245,158,11,0.1);padding:1px 6px;border-radius:10px;border:1px solid rgba(245,158,11,0.2);">EXT</span>':""}
+        ${isComp?'<span style="font-size:0.6rem;color:#ef4444;background:rgba(239,68,68,0.12);padding:1px 6px;border-radius:10px;border:1px solid rgba(239,68,68,0.25);">⚠ FLAGGED</span>':""}
+        ${node.external?'<span style="font-size:0.6rem;color:#f59e0b;background:rgba(245,158,11,0.1);padding:1px 6px;border-radius:10px;border:1px solid rgba(245,158,11,0.2);">EXT</span>':""}
       </div>
       <div class="detail-did" id="dp-did" style="cursor:pointer;transition:color 0.15s;" title="Click to copy DID">${esc(node.did)}</div>
     </div>
     <button class="detail-close" id="dp-close">✕</button>
   </div>
 
-  <!-- Trust score hero -->
-  <div style="display:flex;align-items:center;gap:0.85rem;padding:0.85rem 1rem;border-bottom:1px solid var(--border2);">
-    <div id="dp-ring">${scoreRingSvg}</div>
+  <!-- ── Trust hero ── -->
+  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1rem 0.7rem;border-bottom:1px solid var(--border2);">
+    <div id="dp-ring" style="flex-shrink:0;">${scoreRingSvg}</div>
     <div style="flex:1;min-width:0;">
-      <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:0.35rem;">Trust Score</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
-        <div style="text-align:center;background:rgba(255,255,255,0.03);border-radius:7px;padding:0.4rem;">
-          <div style="font-size:1rem;font-weight:700;">${stats.interactions||0}</div>
-          <div style="font-size:0.58rem;color:var(--muted);">Events</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem;margin-bottom:0.35rem;">
+        <div style="background:rgba(255,255,255,0.04);border-radius:7px;padding:0.38rem 0.5rem;text-align:center;">
+          <div style="font-size:1.05rem;font-weight:800;line-height:1.1;">${(stats.interactions||0).toLocaleString()}</div>
+          <div style="font-size:0.56rem;color:var(--muted);margin-top:1px;">Events</div>
         </div>
-        <div style="text-align:center;background:rgba(255,255,255,0.03);border-radius:7px;padding:0.4rem;">
-          <div style="font-size:1rem;font-weight:700;">${totalConns}</div>
-          <div style="font-size:0.58rem;color:var(--muted);">Connections</div>
+        <div style="background:rgba(255,255,255,0.04);border-radius:7px;padding:0.38rem 0.5rem;text-align:center;">
+          <div style="font-size:1.05rem;font-weight:800;line-height:1.1;">${totalConns}</div>
+          <div style="font-size:0.56rem;color:var(--muted);margin-top:1px;">Connections</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem;">
+        <div style="background:rgba(255,255,255,0.04);border-radius:7px;padding:0.38rem 0.5rem;text-align:center;">
+          <div style="font-size:1.05rem;font-weight:800;line-height:1.1;">${eventsPerDay}</div>
+          <div style="font-size:0.56rem;color:var(--muted);margin-top:1px;">Events/day</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border-radius:7px;padding:0.38rem 0.5rem;text-align:center;">
+          <div style="font-size:1.05rem;font-weight:800;line-height:1.1;color:${avgConnTrust!=null?trustColor(avgConnTrust):"var(--muted)"};">${avgConnTrust!=null?avgConnTrust:"—"}</div>
+          <div style="font-size:0.56rem;color:var(--muted);margin-top:1px;">Avg Conn. Trust</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Risk signals -->
-  ${signals.length?`<div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);display:flex;flex-direction:column;gap:0.35rem;">
+  <!-- ── Risk signals ── -->
+  ${signals.length?`<div style="padding:0.55rem 1rem;border-bottom:1px solid var(--border2);display:flex;flex-direction:column;gap:0.3rem;">
     ${signals.map(s=>{
       const c={critical:"#ef4444",warn:"#f59e0b",info:"#64748b"}[s.level];
-      const bg={critical:"rgba(239,68,68,0.08)",warn:"rgba(245,158,11,0.08)",info:"rgba(100,116,139,0.06)"}[s.level];
-      return`<div style="display:flex;gap:0.5rem;font-size:0.7rem;color:${c};background:${bg};padding:0.3rem 0.5rem;border-radius:6px;align-items:flex-start;">
-        <span>${s.icon}</span><span style="line-height:1.4;">${esc(s.msg)}</span>
+      const bg={critical:"rgba(239,68,68,0.08)",warn:"rgba(245,158,11,0.07)",info:"rgba(100,116,139,0.06)"}[s.level];
+      return`<div style="display:flex;gap:0.4rem;font-size:0.68rem;color:${c};background:${bg};padding:0.28rem 0.45rem;border-radius:5px;align-items:flex-start;border-left:2px solid ${c}55;">
+        <span style="flex-shrink:0;">${s.icon}</span><span style="line-height:1.4;">${esc(s.msg)}</span>
       </div>`;
     }).join("")}
   </div>`:""}
 
-  <!-- Description -->
-  ${(node.description||ag?.metadata?.description)?`<div style="padding:0.55rem 1rem;border-bottom:1px solid var(--border2);font-size:0.73rem;color:var(--muted);line-height:1.5;">${esc((node.description||ag?.metadata?.description).slice(0,200))}</div>`:""}
+  <!-- ── Network role + flow ── -->
+  <div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);">
+    <div style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);margin-bottom:0.45rem;">Network Role</div>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <span style="font-size:0.68rem;font-weight:700;color:${netRoleColor};background:${netRoleColor}18;border:1px solid ${netRoleColor}33;border-radius:20px;padding:2px 10px;flex-shrink:0;">${netRoleIcon} ${netRole.toUpperCase()}</span>
+      <div style="flex:1;display:flex;gap:0.5rem;font-size:0.68rem;">
+        <span style="color:#94a3b8;">← <b style="color:#e2e8f0;">${inbound.length}</b> in</span>
+        <span style="color:#94a3b8;">→ <b style="color:#e2e8f0;">${outbound.length}</b> out</span>
+        ${avgConnTrust!=null&&connTrustScores.length>=2?`<span style="margin-left:auto;font-size:0.63rem;color:var(--muted);">${highTrustConns} high · ${lowTrustConns} low</span>`:""}
+      </div>
+    </div>
+  </div>
 
-  <!-- Capabilities -->
-  ${caps.length?`<div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);">
-    <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:0.45rem;">Capabilities</div>
-    <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
-      ${caps.map(cap=>`<span style="background:rgba(99,102,241,0.12);color:#a5b4fc;border:1px solid rgba(99,102,241,0.25);border-radius:20px;padding:2px 9px;font-size:0.65rem;font-weight:500;">${esc(cap)}</span>`).join("")}
+  <!-- ── Operation breakdown ── -->
+  ${topOps.length?`<div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);">
+    <div style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);margin-bottom:0.45rem;">Operation Profile</div>
+    <div style="display:flex;flex-direction:column;gap:0.3rem;">
+      ${topOps.map(([op,cnt])=>{
+        const pct=Math.round(cnt/totalOpsCount*100);
+        const col=opColor(op);
+        return`<div>
+          <div style="display:flex;justify-content:space-between;font-size:0.63rem;margin-bottom:3px;">
+            <span style="color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68%;">${esc(op.replace(/_/g," "))}</span>
+            <span style="color:var(--muted);flex-shrink:0;">${cnt.toLocaleString()} · ${pct}%</span>
+          </div>
+          <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width 0.4s;"></div>
+          </div>
+        </div>`;
+      }).join("")}
+      ${allOpsRaw.length>4?`<div style="font-size:0.6rem;color:var(--muted);margin-top:2px;">+${allOpsRaw.length-4} more operation types</div>`:""}
     </div>
   </div>`:""}
 
-  <!-- Activity sparkline -->
+  <!-- ── 6-Dimension breakdown (Pro gate) ── -->
+  <div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);position:relative;">
+    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.45rem;">
+      <div style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);">Trust Dimensions</div>
+      ${!hasDims?'<span style="margin-left:auto;font-size:0.56rem;font-weight:700;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:1px 6px;">PRO</span>':""}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.28rem;${!hasDims?"filter:blur(3px);opacity:0.45;pointer-events:none;user-select:none;":""}" aria-hidden="${!hasDims}">
+      ${dimDefs.map(d=>{
+        const v=dims[d.key];
+        const pct=v!=null?Math.round(v):(30+Math.floor(Math.random()*55));
+        return`<div>
+          <div style="display:flex;justify-content:space-between;font-size:0.63rem;margin-bottom:3px;">
+            <span style="color:#94a3b8;">${d.label}</span>
+            <span style="color:${d.color};font-weight:700;">${v!=null?pct:"??"}</span>
+          </div>
+          <div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:${d.color};border-radius:2px;"></div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+    ${!hasDims?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.35rem;border-radius:0;">
+      <span style="font-size:1.1rem;">🔒</span>
+      <a href="https://agentid-protocol.com/pro" target="_blank" style="font-size:0.68rem;font-weight:700;color:#f59e0b;text-decoration:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:4px 12px;">Unlock with Pro →</a>
+    </div>`:""}
+  </div>
+
+  <!-- ── Top connections ── -->
+  ${topConns.length?`<div style="border-bottom:1px solid var(--border2);">
+    <div style="padding:0.55rem 1rem 0.2rem;font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);">Top Connections</div>
+    ${topConns.map(c=>{
+      const isOut=outbound.includes(c);
+      const cts=c.ots;
+      const tcol=cts?trustColor(cts.score):"#475569";
+      return`<div class="conn-row" data-did="${esc(c.node.did)}" style="display:flex;align-items:center;gap:0.55rem;padding:0.45rem 1rem;border-bottom:1px solid rgba(255,255,255,0.03);cursor:pointer;transition:background .12s;">
+        <div style="width:7px;height:7px;border-radius:50%;background:${c.node.color};flex-shrink:0;margin-top:1px;"></div>
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:0.73rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.node.icon)} ${esc(c.node.name)}</div>
+          <div style="font-size:0.6rem;color:${opColor(c.topOp)};margin-top:1px;">${isOut?"→":"←"} ${esc(c.topOp.replace(/_/g," "))}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+          <span style="font-size:0.7rem;font-weight:700;color:#94a3b8;">${c.count.toLocaleString()}</span>
+          ${cts?`<span style="font-size:0.6rem;font-weight:700;color:${tcol};background:${tcol}18;border:1px solid ${tcol}30;border-radius:8px;padding:0 5px;line-height:1.6;">${Math.round(cts.score)}</span>`:'<span style="font-size:0.6rem;color:var(--muted);">—</span>'}
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`:`<div style="padding:0.7rem 1rem;font-size:0.73rem;color:var(--muted);">No connections in this window</div>`}
+
+  <!-- ── Activity sparkline ── -->
   <div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
-      <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);">Activity — last ${_days}d</div>
-      <div style="font-size:0.65rem;color:var(--muted);">last active <span style="color:#94a3b8;">${esc(lastAct)}</span></div>
+      <div style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);">Activity — last ${_days}d</div>
+      <div style="font-size:0.62rem;color:var(--muted);">active <b style="color:#94a3b8;">${esc(lastAct)}</b></div>
     </div>
-    <svg width="${svgW}" height="${svgH}" style="display:block;overflow:visible;">${barsHtml}</svg>
-    <div style="display:flex;justify-content:space-between;font-size:0.55rem;color:rgba(100,116,139,0.5);margin-top:3px;"><span>${_days}d ago</span><span>today</span></div>
+    <svg width="${svgW}" height="${svgH}" style="display:block;">${barsHtml}</svg>
+    <div style="display:flex;justify-content:space-between;font-size:0.53rem;color:rgba(100,116,139,0.45);margin-top:3px;"><span>${_days}d ago</span><span>today</span></div>
   </div>
 
-  <!-- Key connections -->
-  ${topConns.length?`<div style="border-bottom:1px solid var(--border2);">
-    <div style="padding:0.55rem 1rem 0.25rem;font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);">Top Connections</div>
-    ${topConns.map(c=>{
-      const dir=outbound.includes(c)?"→":"←";
-      const cts=c.ots;
-      return`<div class="conn-row" data-did="${esc(c.node.did)}" style="display:flex;align-items:center;gap:0.6rem;padding:0.45rem 1rem;border-bottom:1px solid rgba(255,255,255,0.03);cursor:pointer;transition:background .1s;">
-        <div style="width:8px;height:8px;border-radius:50%;background:${c.node.color};flex-shrink:0;"></div>
-        <div style="min-width:0;flex:1;">
-          <div style="font-size:0.75rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.node.icon)} ${esc(c.node.name)}</div>
-          <div style="font-size:0.62rem;color:${opColor(c.topOp)};margin-top:1px;">${esc(dir)} ${esc(c.topOp.replace(/_/g," "))}</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:0.72rem;font-weight:700;color:var(--muted);">${c.count}</div>
-          ${cts?`<div style="font-size:0.6rem;color:${trustColor(cts.score)};">${Math.round(cts.score)}</div>`:""}
-        </div>
-      </div>`;
-    }).join("")}
-  </div>`:`<div style="padding:0.75rem 1rem;font-size:0.75rem;color:var(--muted);">No connections in this period</div>`}
+  <!-- ── Capabilities ── -->
+  ${caps.length?`<div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);">
+    <div style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);margin-bottom:0.4rem;">Capabilities</div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.28rem;">
+      ${caps.map(cap=>`<span style="background:rgba(99,102,241,0.1);color:#a5b4fc;border:1px solid rgba(99,102,241,0.22);border-radius:20px;padding:2px 9px;font-size:0.63rem;font-weight:500;">${esc(cap)}</span>`).join("")}
+    </div>
+  </div>`:""}
 
-  <!-- Meta -->
-  <div style="padding:0.5rem 1rem;font-size:0.62rem;color:var(--muted);border-top:1px solid var(--border2);">
-    Registered ${created} &nbsp;·&nbsp; ${node.external?"External agent":"Owned agent"}
+  <!-- ── Description ── -->
+  ${(node.description||ag?.metadata?.description)?`<div style="padding:0.5rem 1rem;border-bottom:1px solid var(--border2);font-size:0.71rem;color:var(--muted);line-height:1.55;">${esc((node.description||ag?.metadata?.description).slice(0,200))}</div>`:""}
+
+  <!-- ── Meta ── -->
+  <div style="padding:0.45rem 1rem;font-size:0.6rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.25rem;">
+    <span>Registered ${created}</span>
+    <span>${node.external?"External agent":"Owned agent"}</span>
   </div>
 
-  <!-- Actions -->
-  <div style="padding:0.75rem 1rem;display:flex;gap:0.45rem;border-top:1px solid var(--border2);position:sticky;bottom:0;background:var(--surface);flex-wrap:wrap;">
-    <a href="${profileUrl}" style="flex:1;min-width:80px;padding:0.5rem 0.4rem;background:var(--accent);border-radius:7px;color:#fff;font-size:0.7rem;text-decoration:none;text-align:center;font-weight:600;">👤 Profile</a>
-    <a href="messages.html" style="flex:1;min-width:80px;padding:0.5rem 0.4rem;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:7px;color:#94a3b8;font-size:0.7rem;text-decoration:none;text-align:center;">💬 Message</a>
-    <button id="dp-copy" style="flex:0 0 auto;padding:0.5rem 0.6rem;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:7px;color:#94a3b8;font-size:0.7rem;cursor:pointer;" title="Copy DID">📋</button>
+  <!-- ── Actions ── -->
+  <div style="padding:0.7rem 1rem;display:flex;gap:0.4rem;border-top:1px solid var(--border2);position:sticky;bottom:0;background:var(--surface);">
+    <a href="${profileUrl}" style="flex:1;padding:0.48rem 0.35rem;background:var(--accent);border-radius:7px;color:#fff;font-size:0.68rem;text-decoration:none;text-align:center;font-weight:600;">👤 Profile</a>
+    <a href="messages.html" style="flex:1;padding:0.48rem 0.35rem;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:7px;color:#94a3b8;font-size:0.68rem;text-decoration:none;text-align:center;">💬 Message</a>
+    <button id="dp-copy" style="flex:0 0 auto;padding:0.48rem 0.55rem;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:7px;color:#94a3b8;font-size:0.68rem;cursor:pointer;" title="Copy DID">📋</button>
   </div>`;
 
-  // Load trust score if not cached
+  // Load full trust data (pro endpoint returns dimensions if available)
   if(!_trustScoreCache[node.did]){
     _authFetch(`/agents/${encodeURIComponent(node.did)}/trust-score`)
       .then(r=>r.ok?r.json():null).then(data=>{
         if(data&&typeof data.score==="number"){
-          _trustScoreCache[node.did]={score:data.score,level:data.level};
-          // Re-render panel if this node is still selected
+          _trustScoreCache[node.did]={score:data.score,level:data.level,dimensions:data.dimensions||null};
           if(_net.selected===node.did)renderDetailPanel(node);
-          draw(); // redraw mini trust badges
+          draw();
         }
       }).catch(()=>{});
   }
