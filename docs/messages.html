@@ -715,22 +715,20 @@ document.addEventListener("DOMContentLoaded", () => {
   </div>
 </div>
 
-<!-- Force-Stop modal -->
+<!-- Force-Stop modal — shown only when conversation partner is not already known -->
 <div id="stop-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;z-index:9000;padding:1rem;">
-  <div style="background:var(--surface);border-radius:16px;border:1px solid var(--border);max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.18);overflow:hidden;">
+  <div style="background:var(--surface);border-radius:16px;border:1px solid var(--border);max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.18);overflow:hidden;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
       <span style="font-weight:700;font-size:0.95rem;">⏹ Force Stop Auto-Reply</span>
       <button onclick="closeStopModal()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;">✕</button>
     </div>
     <div style="padding:1.25rem;display:grid;gap:0.85rem;">
-      <p style="font-size:0.83rem;color:var(--text-2);">Stop all auto-reply traffic between two agents. This is reversible — you can re-enable it anytime.</p>
+      <p style="font-size:0.83rem;color:var(--text-2);">Stop all auto-reply traffic between your selected agent and another agent. This is reversible.</p>
+      <!-- hidden inputs used by submitStop() — Agent A is always the selected agent -->
+      <input id="stop-did-a" type="hidden" />
       <div>
-        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">Agent A (your agent)</label>
-        <input id="stop-did-a" type="text" readonly style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--muted);background:var(--surface2);outline:none;" />
-      </div>
-      <div>
-        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">Agent B (counterparty DID)</label>
-        <input id="stop-did-b" type="text" placeholder="did:agentid:…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.82rem;font-family:'JetBrains Mono',monospace;color:var(--text);background:var(--surface);outline:none;" />
+        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">Counterparty agent DID</label>
+        <input id="stop-did-b" type="text" placeholder="did:agentid:…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.82rem;font-family:'JetBrains Mono',monospace;color:var(--text);background:var(--surface);outline:none;box-sizing:border-box;" />
       </div>
       <div id="stop-active-list" style="display:none;">
         <div style="font-size:0.75rem;font-weight:600;color:var(--muted);margin-bottom:0.4rem;">Active stops for this agent:</div>
@@ -1869,6 +1867,30 @@ function _refreshStopButton() {
   const active = _selectedDid && _selectedDid !== "__deals__" && _selectedDid !== "__group__" && _selectedDid !== "__files__";
   if (!active) { btn.style.display = "none"; return; }
   btn.style.display = "";
+  btn.disabled = false;
+
+  // If a specific conversation thread is active, act on that pair directly — no modal
+  if (_convFilter) {
+    const convStop = _activeStops.find(s =>
+      (s.did_a === _selectedDid && s.did_b === _convFilter) ||
+      (s.did_b === _selectedDid && s.did_a === _convFilter)
+    );
+    if (convStop) {
+      const otherName = convStop.did_a === _selectedDid ? (convStop.name_b || _convFilter) : (convStop.name_a || _convFilter);
+      btn.className = "btn btn-success";
+      btn.textContent = "▶ Resume";
+      btn.title = `Re-enable auto-reply with ${otherName}`;
+      btn.onclick = () => removeStop(_convFilter);
+    } else {
+      btn.className = "btn btn-danger";
+      btn.textContent = "⏹ Force Stop";
+      btn.title = "Stop auto-reply traffic with this agent";
+      btn.onclick = stopCurrentConversation;
+    }
+    return;
+  }
+
+  // No conversation filter — fall back to modal-based flow
   if (!_activeStops.length) {
     btn.className = "btn btn-danger";
     btn.textContent = "⏹ Force Stop";
@@ -1888,6 +1910,27 @@ function _refreshStopButton() {
     btn.title = "Multiple stops active — click to manage";
     btn.onclick = openStopModal;
   }
+}
+
+async function stopCurrentConversation() {
+  // Called when _convFilter is set — stops traffic between _selectedDid ↔ _convFilter directly
+  if (!_selectedDid || !_convFilter) { openStopModal(); return; }
+  const btn = document.getElementById("stop-btn");
+  btn.disabled = true; btn.textContent = "Stopping…";
+  try {
+    const r = await fetch(`${BASE}/pro/agents/comm-stop`, {
+      method: "POST",
+      headers: apiHeaders(),
+      credentials: "include",
+      body: JSON.stringify({ did_a: _selectedDid, did_b: _convFilter }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || `Error ${r.status}`);
+    _activeStops.push({ did_a: data.did_a, did_b: data.did_b, name_a: null, name_b: null });
+  } catch(e) {
+    alert("Failed to stop: " + (e.message || "Unknown error"));
+  }
+  _refreshStopButton();
 }
 
 async function openStopModal() {
@@ -1939,7 +1982,7 @@ async function submitStop() {
   const succEl= document.getElementById("stop-success");
   const btn   = document.getElementById("stop-submit-btn");
   errEl.style.display = "none"; succEl.style.display = "none";
-  if (!didA || !didB) { errEl.textContent = "Both agent DIDs are required."; errEl.style.display = "block"; return; }
+  if (!didA || !didB) { errEl.textContent = "Counterparty agent DID is required."; errEl.style.display = "block"; return; }
   if (didA === didB)  { errEl.textContent = "Agent A and Agent B cannot be the same."; errEl.style.display = "block"; return; }
   btn.disabled = true; btn.textContent = "Stopping…";
   try {
