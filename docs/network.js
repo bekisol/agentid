@@ -880,16 +880,25 @@ function renderDetailPanel(node){
   // Unlocked when: paid tier (show real data if available, placeholders if not yet built)
   // Locked when:  free tier or tier not yet fetched
   const dimsUnlocked=isPaidTier||hasDims;
-  const dims=hasDims?ts.dimensions:{
-    identity:null,reliability:null,reputation:null,behavioral:null,governance:null,capability:null
+  // Flatten capability_trust (object→average) so every dim is a number or null
+  const rawDims=hasDims?ts.dimensions:{};
+  const capVals=rawDims.capability_trust?Object.values(rawDims.capability_trust):[];
+  const capAvg=capVals.length?Math.round(capVals.reduce((a,b)=>a+b,0)/capVals.length):null;
+  const dims={
+    identity_integrity:      rawDims.identity_integrity      ??null,
+    operational_reliability: rawDims.operational_reliability ??null,
+    network_reputation:      rawDims.network_reputation      ??null,
+    behavioral_history:      rawDims.behavioral_history      ??null,
+    governance:              rawDims.governance               ??null,
+    capability_trust:        capAvg,
   };
   const dimDefs=[
-    {key:"identity",   label:"Identity Integrity",    color:"#6366f1"},
-    {key:"reliability",label:"Operational Reliability",color:"#10b981"},
-    {key:"reputation", label:"Network Reputation",     color:"#f59e0b"},
-    {key:"behavioral", label:"Behavioral History",     color:"#3b82f6"},
-    {key:"governance", label:"Governance",             color:"#8b5cf6"},
-    {key:"capability", label:"Capability Trust",       color:"#ec4899"},
+    {key:"identity_integrity",      label:"Identity Integrity",     color:"#6366f1"},
+    {key:"operational_reliability", label:"Operational Reliability",color:"#10b981"},
+    {key:"network_reputation",      label:"Network Reputation",     color:"#f59e0b"},
+    {key:"behavioral_history",      label:"Behavioral History",     color:"#3b82f6"},
+    {key:"governance",              label:"Governance",             color:"#8b5cf6"},
+    {key:"capability_trust",        label:"Capability Trust",       color:"#ec4899"},
   ];
 
   panel.innerHTML=`
