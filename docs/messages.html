@@ -1204,6 +1204,24 @@ function renderFeed() {
     ? _messages.filter(m => m._agentDid === _selectedDid)
     : _messages;
 
+  // In the "All agents" view: when two of YOUR own agents exchange messages,
+  // that message appears twice — once as "sent" from A and once as "received"
+  // by B. Deduplicate by keeping only the "sent" copy so the conversation
+  // doesn't appear doubled.
+  if (!_selectedDid || _selectedDid === "") {
+    const ownDids = new Set(_agents.map(a => a.did));
+    // Collect IDs where we have a sent copy between two own agents
+    const sentA2AIds = new Set(
+      msgs
+        .filter(m => m.direction === "sent" && ownDids.has(m.to_did) && ownDids.has(m.from_did || m._agentDid))
+        .map(m => m.id)
+    );
+    msgs = msgs.filter(m => {
+      if (m.direction === "received" && ownDids.has(m.from_did) && sentA2AIds.has(m.id)) return false;
+      return true;
+    });
+  }
+
   // Apply conversation partner filter
   renderConvFilter(msgs);
   if (_convFilter) {
