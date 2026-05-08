@@ -158,6 +158,7 @@
       padding:0.45rem 0.9rem; border-radius:8px; font-size:0.8rem; font-weight:600;
       background:var(--accent); color:#fff; text-decoration:none; border:none; cursor:pointer; }
     .out-file-btn:hover { opacity:0.85; }
+    .out-file-btn:disabled { opacity:0.55; cursor:default; }
 
     @media (max-width: 640px) {
       .sidebar { display:none; }
@@ -348,6 +349,53 @@ let _taskPage = 1;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+// ── authenticated file download ───────────────────────────────────────────────
+async function downloadAgentFile(fileId, fileName, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Downloading…"; }
+  try {
+    // Step 1: get fresh metadata (resolves relative paths + refreshes pre-signed URLs)
+    const meta = await fetch(`${BASE}/pro/files/${fileId}`, {
+      headers: apiKey ? { "x-api-key": apiKey } : {},
+      credentials: "include",
+    }).then(r => r.json());
+
+    let url = meta.url || meta.download_url || "";
+
+    // Normalise: relative URL → absolute (handles legacy stored paths)
+    if (url && url.startsWith("/")) url = BASE + url;
+
+    if (!url) throw new Error("No download URL returned");
+
+    // Step 2: if it's a pre-signed R2 URL it works directly; for our own
+    // /download endpoint we need to fetch with auth then create a blob link.
+    if (url.includes("r2.cloudflarestorage.com") || url.includes("amazonaws.com") ||
+        url.includes("X-Amz-") || !url.includes(BASE)) {
+      // External signed URL — open directly
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName; a.style.display = "none";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } else {
+      // Our own /download endpoint — fetch with auth headers, create blob
+      const resp = await fetch(url, {
+        headers: apiKey ? { "x-api-key": apiKey } : {},
+        credentials: "include",
+      });
+      if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl; a.download = fileName; a.style.display = "none";
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(a); }, 5000);
+    }
+    if (btn) { btn.disabled = false; btn.textContent = btn.textContent.replace("⏳ Downloading…", "✅ Downloaded"); }
+    setTimeout(() => { if (btn) { btn.disabled = false; btn.innerHTML = btn.innerHTML.replace("✅ Downloaded","📄 Download " + fileName); } }, 3000);
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "❌ Failed — try again"; }
+    console.error("[downloadAgentFile]", e);
+  }
+}
 
 function statusBadge(s) {
   const cls = { pending:"gray", accepted:"blue", running:"purple", completed:"green",
@@ -619,11 +667,13 @@ function renderOutput(output) {
   if (fileRef && fileRef.file_id) {
     const ext = (fileRef.name || "").split(".").pop().toLowerCase();
     const icon = ext === "pdf" ? "📄" : ext === "xlsx" ? "📊" : ext === "docx" ? "📝" : "📎";
+    const safeId   = esc(fileRef.file_id);
+    const safeName = esc(fileRef.name || "file");
     fileHtml = `<div style="margin-bottom:0.6rem;">
-      <a class="out-file-btn" href="${esc(fileRef.url || `https://api.agentid-protocol.com/pro/files/${fileRef.file_id}`)}" target="_blank" rel="noopener">
-        ${icon} Download ${esc(fileRef.name || "file")}
-      </a>
-      <div style="font-size:0.68rem;color:var(--muted);margin-top:0.3rem;">file_id: ${esc(fileRef.file_id)}</div>
+      <button class="out-file-btn" id="dl-${safeId}" onclick="downloadAgentFile('${safeId}','${safeName}',this)">
+        ${icon} Download ${safeName}
+      </button>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:0.3rem;">file_id: ${safeId}</div>
     </div>`;
   }
 
