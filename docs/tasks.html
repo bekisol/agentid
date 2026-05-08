@@ -154,6 +154,10 @@
     .out-kv { display:grid; grid-template-columns:max-content 1fr; gap:0.25rem 0.75rem; font-size:0.8rem; background:var(--surface2); border-radius:8px; padding:0.6rem 0.75rem; }
     .out-kv-key { color:var(--muted); font-weight:600; white-space:nowrap; }
     .out-kv-val { color:var(--text); word-break:break-word; }
+    .out-file-btn { display:inline-flex; align-items:center; gap:0.4rem; margin-top:0.4rem;
+      padding:0.45rem 0.9rem; border-radius:8px; font-size:0.8rem; font-weight:600;
+      background:var(--accent); color:#fff; text-decoration:none; border:none; cursor:pointer; }
+    .out-file-btn:hover { opacity:0.85; }
 
     @media (max-width: 640px) {
       .sidebar { display:none; }
@@ -609,16 +613,34 @@ function renderOutput(output) {
   if (!output) return `<span style="color:var(--muted);font-size:0.8rem;">(not yet)</span>`;
   if (typeof output === "string") return `<div class="modal-pre">${esc(output)}</div>`;
 
+  // File attachment — show download button prominently
+  const fileRef = output.file || (output.results && output.results.file) || null;
+  let fileHtml = "";
+  if (fileRef && fileRef.file_id) {
+    const ext = (fileRef.name || "").split(".").pop().toLowerCase();
+    const icon = ext === "pdf" ? "📄" : ext === "xlsx" ? "📊" : ext === "docx" ? "📝" : "📎";
+    fileHtml = `<div style="margin-bottom:0.6rem;">
+      <a class="out-file-btn" href="${esc(fileRef.url || `https://api.agentid-protocol.com/pro/files/${fileRef.file_id}`)}" target="_blank" rel="noopener">
+        ${icon} Download ${esc(fileRef.name || "file")}
+      </a>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:0.3rem;">file_id: ${esc(fileRef.file_id)}</div>
+    </div>`;
+  }
+
   // Unwrap single-key wrappers like { results: {...} } or { output: {...} }
   let data = output;
   const keys = Object.keys(data);
   if (keys.length === 1 && typeof data[keys[0]] === "object") data = data[keys[0]];
 
+  // Skip the "file" key so it doesn't appear as a card
+  const dataNoFile = Object.fromEntries(Object.entries(data).filter(([k]) => k !== "file"));
+
   // Find the first array value — render as a card list
-  const arrKey = Object.keys(data).find(k => Array.isArray(data[k]));
+  const arrKey = Object.keys(dataNoFile).find(k => Array.isArray(dataNoFile[k]));
   if (arrKey) {
+    data = dataNoFile;
     const items = data[arrKey];
-    if (items.length === 0) return `<span style="color:var(--muted);font-size:0.8rem;">(empty list)</span>`;
+    if (items.length === 0) return fileHtml || `<span style="color:var(--muted);font-size:0.8rem;">(empty list)</span>`;
     const cards = items.map(item => {
       if (typeof item !== "object") return `<div class="out-item"><div class="out-item-title">${esc(String(item))}</div></div>`;
       // Pick a title field
@@ -641,18 +663,19 @@ function renderOutput(output) {
       html += `</div>`;
       return html;
     }).join("");
-    return `<div class="out-list">${cards}</div>`;
+    return fileHtml + `<div class="out-list">${cards}</div>`;
   }
 
   // Flat object → key-value grid
-  const flat = Object.entries(data).filter(([,v]) => typeof v !== "object");
+  const flat = Object.entries(dataNoFile).filter(([,v]) => typeof v !== "object");
   if (flat.length > 0) {
     const rows = flat.map(([k,v]) => `<div class="out-kv-key">${esc(k)}</div><div class="out-kv-val">${esc(String(v))}</div>`).join("");
-    return `<div class="out-kv">${rows}</div>`;
+    return fileHtml + `<div class="out-kv">${rows}</div>`;
   }
 
-  // Fallback: syntax-highlighted JSON
-  return `<div class="modal-pre">${esc(JSON.stringify(output, null, 2))}</div>`;
+  // Fallback: syntax-highlighted JSON (or just the file button if that's all there is)
+  if (fileHtml && Object.keys(dataNoFile).length === 0) return fileHtml;
+  return fileHtml + `<div class="modal-pre">${esc(JSON.stringify(output, null, 2))}</div>`;
 }
 
 // ── view / cancel ─────────────────────────────────────────────────────────────
