@@ -144,6 +144,16 @@
     .modal-value { font-size:0.84rem; }
     .modal-pre { font-family:"JetBrains Mono",monospace; font-size:0.75rem; background:var(--surface2); padding:0.6rem 0.75rem; border-radius:8px; overflow:auto; max-height:160px; white-space:pre-wrap; word-break:break-word; }
     .modal-footer { margin-top:1.25rem; display:flex; gap:0.5rem; justify-content:flex-end; }
+    /* Rich output renderer */
+    .out-list { display:flex; flex-direction:column; gap:0.5rem; max-height:280px; overflow-y:auto; }
+    .out-item { background:var(--surface2); border-radius:8px; padding:0.6rem 0.75rem; border-left:3px solid var(--accent); }
+    .out-item-title { font-size:0.82rem; font-weight:700; color:var(--text); margin-bottom:0.2rem; }
+    .out-item-desc { font-size:0.78rem; color:var(--text-2); line-height:1.5; }
+    .out-item-source { font-size:0.7rem; color:var(--muted); margin-top:0.25rem; }
+    .out-item-source a { color:var(--accent); text-decoration:underline; }
+    .out-kv { display:grid; grid-template-columns:max-content 1fr; gap:0.25rem 0.75rem; font-size:0.8rem; background:var(--surface2); border-radius:8px; padding:0.6rem 0.75rem; }
+    .out-kv-key { color:var(--muted); font-weight:600; white-space:nowrap; }
+    .out-kv-val { color:var(--text); word-break:break-word; }
 
     @media (max-width: 640px) {
       .sidebar { display:none; }
@@ -594,6 +604,57 @@ async function loadTasks(page = 1) {
   }
 }
 
+// ── output renderer ───────────────────────────────────────────────────────────
+function renderOutput(output) {
+  if (!output) return `<span style="color:var(--muted);font-size:0.8rem;">(not yet)</span>`;
+  if (typeof output === "string") return `<div class="modal-pre">${esc(output)}</div>`;
+
+  // Unwrap single-key wrappers like { results: {...} } or { output: {...} }
+  let data = output;
+  const keys = Object.keys(data);
+  if (keys.length === 1 && typeof data[keys[0]] === "object") data = data[keys[0]];
+
+  // Find the first array value — render as a card list
+  const arrKey = Object.keys(data).find(k => Array.isArray(data[k]));
+  if (arrKey) {
+    const items = data[arrKey];
+    if (items.length === 0) return `<span style="color:var(--muted);font-size:0.8rem;">(empty list)</span>`;
+    const cards = items.map(item => {
+      if (typeof item !== "object") return `<div class="out-item"><div class="out-item-title">${esc(String(item))}</div></div>`;
+      // Pick a title field
+      const titleField = ["trend","title","name","label","topic","item","heading","result","key"].find(f => item[f] && typeof item[f] === "string");
+      const descField = ["description","desc","summary","text","body","detail","content"].find(f => item[f] && typeof item[f] === "string");
+      const srcField = item.source && typeof item.source === "object" ? item.source : null;
+      const urlField = item.url || (srcField && srcField.url) || null;
+      const srcTitle = (srcField && srcField.title) || item.source_title || null;
+
+      let html = `<div class="out-item">`;
+      if (titleField) html += `<div class="out-item-title">${esc(item[titleField])}</div>`;
+      if (descField)  html += `<div class="out-item-desc">${esc(item[descField])}</div>`;
+      if (urlField)   html += `<div class="out-item-source">Source: <a href="${esc(urlField)}" target="_blank" rel="noopener">${esc(srcTitle || urlField)}</a></div>`;
+      // Remaining scalar fields
+      const shown = new Set([titleField, descField, "source", "url", "source_title"]);
+      Object.entries(item).forEach(([k, v]) => {
+        if (!shown.has(k) && typeof v !== "object" && String(v).trim())
+          html += `<div class="out-item-source"><b>${esc(k)}:</b> ${esc(String(v))}</div>`;
+      });
+      html += `</div>`;
+      return html;
+    }).join("");
+    return `<div class="out-list">${cards}</div>`;
+  }
+
+  // Flat object → key-value grid
+  const flat = Object.entries(data).filter(([,v]) => typeof v !== "object");
+  if (flat.length > 0) {
+    const rows = flat.map(([k,v]) => `<div class="out-kv-key">${esc(k)}</div><div class="out-kv-val">${esc(String(v))}</div>`).join("");
+    return `<div class="out-kv">${rows}</div>`;
+  }
+
+  // Fallback: syntax-highlighted JSON
+  return `<div class="modal-pre">${esc(JSON.stringify(output, null, 2))}</div>`;
+}
+
 // ── view / cancel ─────────────────────────────────────────────────────────────
 async function viewTask(taskId, toDid) {
   try {
@@ -606,7 +667,7 @@ async function viewTask(taskId, toDid) {
       <div class="modal-row"><div class="modal-label">To</div><div class="modal-value" style="font-family:'JetBrains Mono',monospace;font-size:0.76rem;">${esc(t.to_did)}</div></div>
       <div class="modal-row"><div class="modal-label">Created</div><div class="modal-value">${relTime(t.created_at)}</div></div>
       <div class="modal-row"><div class="modal-label">Inputs</div><div class="modal-pre">${esc(t.inputs ? JSON.stringify(t.inputs, null, 2) : "(none)")}</div></div>
-      <div class="modal-row"><div class="modal-label">Output</div><div class="modal-pre">${esc(t.output ? JSON.stringify(t.output, null, 2) : "(not yet)")}</div></div>
+      <div class="modal-row"><div class="modal-label">Output</div>${renderOutput(t.output)}</div>
       ${t.error ? `<div class="modal-row"><div class="modal-label">Error</div><div class="modal-pre" style="color:var(--red);">${esc(t.error)}</div></div>` : ""}`;
     document.getElementById("detail-modal").classList.add("open");
   } catch (e) { alert("Could not load task: " + e.message); }
