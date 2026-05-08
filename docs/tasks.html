@@ -260,6 +260,16 @@
               <textarea id="task-inputs" class="field-textarea" rows="3"
                 placeholder='{ "url": "https://example.com/report.pdf", "max_length": 500 }'></textarea>
             </div>
+            <div>
+              <label class="field-label">Timeout</label>
+              <select id="task-timeout" class="field-select">
+                <option value="900">15 min</option>
+                <option value="1800" selected>30 min</option>
+                <option value="3600">1 hour</option>
+                <option value="7200">2 hours</option>
+                <option value="86400">24 hours</option>
+              </select>
+            </div>
           </div>
           <div style="padding:0 1.25rem 1.25rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
             <button class="btn btn-primary" id="send-btn">Send Task</button>
@@ -507,9 +517,10 @@ async function sendTask() {
   btn.disabled = true;
   statusEl.textContent = "Sending…";
   try {
+    const timeout = parseInt(document.getElementById("task-timeout").value) || 1800;
     const task = await call(`/agents/${encodeURIComponent(toDid)}/tasks`, {
       method: "POST",
-      body: JSON.stringify({ from_did: _fromDid, capability, title: title || undefined, inputs, timeout_seconds: 300 }),
+      body: JSON.stringify({ from_did: _fromDid, capability, title: title || undefined, inputs, timeout_seconds: timeout }),
     });
     statusEl.textContent = `✓ Sent — status: ${task.status}`;
     document.getElementById("to-did").value = "";
