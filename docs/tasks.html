@@ -517,6 +517,7 @@ async function sendTask() {
     document.getElementById("task-title").value = "";
     document.getElementById("task-inputs").value = "";
     loadTasks(1);
+    _schedulePoll();
   } catch (e) {
     statusEl.textContent = "✗ " + e.message;
   } finally {
@@ -544,6 +545,9 @@ async function loadTasks(page = 1) {
       wrap.innerHTML = `<div class="empty-state">No tasks yet. Send one above.</div>`;
       return;
     }
+    const hasActive = tasks.some(t => ["pending","accepted","running"].includes(t.status));
+    if (hasActive) _schedulePoll();
+
     wrap.innerHTML = `
       <table class="task-table">
         <thead><tr>
@@ -603,6 +607,25 @@ async function cancelTask(taskId, toDid) {
     await call(`/agents/${encodeURIComponent(toDid)}/tasks/${encodeURIComponent(taskId)}`, { method: "DELETE" });
     loadTasks(_taskPage);
   } catch (e) { alert("Error: " + e.message); }
+}
+
+// ── auto-poll: refresh every 10s while any task is pending/accepted/running ───
+let _pollTimer = null;
+function _schedulePoll() {
+  clearTimeout(_pollTimer);
+  _pollTimer = setTimeout(async () => {
+    if (!_fromDid) return;
+    // Only keep polling if there are active tasks
+    try {
+      const data = await call(`/agents/${encodeURIComponent(_fromDid)}/tasks?limit=25`);
+      const tasks = data.tasks || (Array.isArray(data) ? data : []);
+      const hasActive = tasks.some(t => ["pending","accepted","running"].includes(t.status));
+      if (hasActive) {
+        loadTasks(_taskPage);
+        _schedulePoll();
+      }
+    } catch (_) {}
+  }, 10000);
 }
 
 // ── event listeners ───────────────────────────────────────────────────────────
