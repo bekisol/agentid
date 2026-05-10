@@ -30,7 +30,7 @@ Quick start::
     from llama_index.llms.openai import OpenAI
 
     tools = get_agentid_tools(registry_url="https://api.agentid-protocol.com")
-    agent = ReActAgent.from_tools(tools, llm=OpenAI(model="gpt-4o"), verbose=True)
+    agent = ReActAgent.from_tools(tools, llm=OpenAI(model="gpt-5"), verbose=True)
 
 """
 

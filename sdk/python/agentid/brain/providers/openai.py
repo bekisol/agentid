@@ -5,7 +5,7 @@ A single class covers every OpenAI-compatible endpoint:
 
     Provider   | api_key        | base_url                        | model
     -----------|----------------|---------------------------------|------------------
-    OpenAI     | sk-...         | (default)                       | gpt-4o
+    OpenAI     | sk-...         | (default)                       | gpt-5
     Grok (xAI) | xai-...        | https://api.x.ai/v1             | grok-3
     Mistral    | ...            | https://api.mistral.ai/v1       | mistral-large-latest
     Ollama     | ollama         | http://localhost:11434/v1       | llama3.2
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _DEFAULT_BASE_URL = "https://api.openai.com/v1"
-_DEFAULT_MODEL = "gpt-4o"
+_DEFAULT_MODEL = "gpt-5"
 
 
 class OpenAIProvider(LLMProvider):
@@ -42,7 +42,7 @@ class OpenAIProvider(LLMProvider):
     api_key : str
         API key. Use "ollama" for local Ollama.
     model : str
-        Model name. Default: "gpt-4o".
+        Model name. Default: "gpt-5".
     base_url : str
         Override to point at Grok, Mistral, Ollama, Groq, Together, etc.
 
