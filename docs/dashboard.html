@@ -958,12 +958,23 @@
     }
     @keyframes fade-in { from { opacity:0; } to { opacity:1; } }
 
-    /* The settings page fills the whole viewport */
-    .modal {
-      position: fixed; inset: 0;
+    /*
+     * Settings modal: #settings-modal IS the full-screen flex column.
+     * The inner .modal is just an ordinary flex child (NOT position:fixed)
+     * so that .modal-body can get a real height via flex:1.
+     */
+    #settings-modal {
+      flex-direction: column;
       background: var(--bg);
+    }
+
+    /* Inner wrapper — fills #settings-modal, owns the header+body flex split */
+    .modal {
+      flex: 1;
+      min-height: 0;
       display: flex; flex-direction: column;
       overflow: hidden;
+      background: var(--bg);
     }
 
     /* Top bar */
@@ -988,10 +999,11 @@
     }
     .modal-close:hover { background: var(--surface2); color: var(--text); }
 
-    /* Body = sidebar + content */
+    /* Body = sidebar + content — must fill the remaining height */
     .modal-body {
-      display: flex; flex: 1;
-      min-height: 0;          /* critical: lets flex children size via overflow */
+      display: flex;
+      flex: 1;
+      min-height: 0;   /* allow shrink so overflow works correctly */
       overflow: hidden;
     }
 
@@ -4880,7 +4892,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260510-4"></script>
+<script src="dashboard.js?v=20260510-5"></script>
 
 </body>
 </html>
