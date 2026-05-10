@@ -5136,10 +5136,10 @@ async function _createAccountKey() {
 function closeSettings() {
   document.getElementById("settings-modal").style.display = "none";
   document.body.style.overflow = "";
-  // Clear the settings hash so refresh no longer re-opens the modal
-  if (location.hash.startsWith("#settings")) {
-    history.replaceState(null, "", location.pathname + location.search);
-  }
+  // Restore the active section hash so the URL stays meaningful after close.
+  // If no section is active yet, just clear the settings fragment.
+  const activeNav = document.querySelector(".dsb-item.active[data-nav]")?.dataset.nav;
+  history.replaceState(null, "", activeNav ? "#section-" + activeNav : location.pathname + location.search);
 }
 
 function _switchSettingsTab(tab) {
@@ -6820,12 +6820,34 @@ function _initSidebar() {
   if (main) main.addEventListener('scroll', _sidebarScrollSpy, { passive: true });
   // Populate footer with user info
   _sidebarUpdateUser();
+
+  // Restore section from URL hash on refresh (e.g. #section-analytics)
+  // Settings hash (#settings/...) is handled separately — skip it here.
+  const sectionM = location.hash.match(/^#section-([a-z0-9-]+)$/);
+  if (sectionM && _NAV_SECTIONS.includes(sectionM[1])) {
+    const nav = sectionM[1];
+    // Small delay so content has rendered before we scroll
+    setTimeout(() => {
+      const el = document.getElementById('section-' + nav);
+      if (el && main) {
+        const elTop  = el.getBoundingClientRect().top;
+        const mainTop = main.getBoundingClientRect().top;
+        main.scrollTo({ top: main.scrollTop + elTop - mainTop - 8, behavior: 'smooth' });
+      }
+      _setSidebarActive(nav);
+    }, 600);
+  }
 }
 
 function _setSidebarActive(nav) {
   document.querySelectorAll('.dsb-item[data-nav]').forEach(el => {
     el.classList.toggle('active', el.dataset.nav === nav);
   });
+  // Keep URL hash in sync so a page refresh lands on the same section.
+  // Don't overwrite #settings/... while the settings modal is open.
+  if (!location.hash.startsWith('#settings')) {
+    history.replaceState(null, '', '#section-' + nav);
+  }
 }
 
 function _sidebarScrollSpy() {

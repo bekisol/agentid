@@ -436,7 +436,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const r = await _origFetch(`${BASE}/auth/me`, { headers: { "x-api-key": entered } });
       if (r.ok) {
         apiKey = entered;
-        localStorage.setItem("agentid_key", apiKey);
+        sessionStorage.setItem("agentid_key", apiKey);
+        localStorage.setItem("agentid_persisted_key", apiKey);
         document.getElementById("auth-wall").style.display = "none";
         document.getElementById("app").style.display = "";
         boot();
@@ -763,7 +764,14 @@ document.addEventListener("DOMContentLoaded", () => {
 const BASE = "https://api.agentid-protocol.com";
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
-let apiKey = localStorage.getItem("agentid_key") || "";
+// Storage priority matches dashboard.js:
+//   sessionStorage["agentid_key"]          — tab-scoped (set by dashboard, persists across refresh)
+//   localStorage["agentid_persisted_key"]  — cross-tab / "Stay signed in"
+//   localStorage["agentid_key"]            — legacy fallback
+let apiKey = sessionStorage.getItem("agentid_key")
+          || localStorage.getItem("agentid_persisted_key")
+          || localStorage.getItem("agentid_key")
+          || "";
 
 // Patch global fetch: any request to BASE automatically gets credentials +
 // the API key header so inline fetch() calls don't need to repeat it.
@@ -794,8 +802,13 @@ async function initAuth() {
       boot(); return;
     }
   } catch(_) {}
-  // Nothing worked — clear stale key and show auth wall
-  if (apiKey) { localStorage.removeItem("agentid_key"); apiKey = ""; }
+  // Nothing worked — clear stale keys and show auth wall
+  if (apiKey) {
+    localStorage.removeItem("agentid_key");
+    localStorage.removeItem("agentid_persisted_key");
+    sessionStorage.removeItem("agentid_key");
+    apiKey = "";
+  }
   showAuthWall();
 }
 
