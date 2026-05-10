@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -35,7 +36,16 @@ class Registry:
         os.chmod(self.db_path, 0o600)
 
     def _key_path(self, did: str) -> Path:
-        return self.keys_dir / (did.replace(":", "_") + ".key")
+        # Security fix: sanitize DID to prevent path traversal
+        # (e.g. did:agentid:../../../../tmp/evil → safe filename)
+        safe = re.sub(r"[^a-zA-Z0-9_\-]", "_", did)
+        path = (self.keys_dir / (safe + ".key")).resolve()
+        # Ensure the resolved path stays within the keys directory
+        try:
+            path.relative_to(self.keys_dir.resolve())
+        except ValueError:
+            raise ValueError(f"Path traversal attempt blocked for DID: {did!r}")
+        return path
 
     # ── public API ───────────────────────────────────────────────────────────
 

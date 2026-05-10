@@ -1,4 +1,5 @@
 import re
+import secrets
 import time
 import uuid
 from datetime import datetime, timezone
@@ -9,7 +10,7 @@ _DID_RE = re.compile(r'^did:agentid:[1-9A-HJ-NP-Za-km-z]{32,64}$')
 from .crypto import sign as crypto_sign, verify as crypto_verify
 from .identity import (
     generate_keypair, public_key_to_did,
-    public_key_to_b64, b64_to_public_key_bytes,
+    public_key_to_b64, public_key_to_multibase, b64_to_public_key_bytes,
 )
 from .registry import Registry
 from .http_registry import HTTPRegistry
@@ -21,9 +22,15 @@ class AgentDocument:
     name: str
     capabilities: list[str]
     owner: str
-    public_key: str          # base64-encoded ed25519 public key
+    public_key: str          # base64-encoded ed25519 public key (primary / backward-compat)
     created_at: str
     metadata: dict = field(default_factory=dict)
+    verification_methods: list[dict] = field(default_factory=list)
+    # verification_methods format (W3C DID Core):
+    # [{"id": "did:agentid:xxx#key-1",
+    #   "type": "Ed25519VerificationKey2020",
+    #   "controller": "did:agentid:xxx",
+    #   "publicKeyMultibase": "z<base58-encoded-key>"}]
 
 
 def _registry(registry_path: str = None, registry_url: str = None):
@@ -66,15 +73,27 @@ class Agent:
     ) -> "Agent":
         private_bytes, public_bytes = generate_keypair()
         did = public_key_to_did(public_bytes)
+        pub_b64 = public_key_to_b64(public_bytes)
+
+        # W3C DID Core verificationMethod array — supports key rotation without DID change.
+        # publicKeyMultibase MUST be multibase base58btc: "z" + base58btc(0xED01 + raw_key_bytes).
+        # Using bare base64 here is incorrect and will fail external DID resolvers.
+        verification_methods = [{
+            "id":                 f"{did}#key-1",
+            "type":               "Ed25519VerificationKey2020",
+            "controller":         did,
+            "publicKeyMultibase": public_key_to_multibase(public_bytes),
+        }]
 
         document = AgentDocument(
             did=did,
             name=name,
             capabilities=capabilities,
             owner=owner,
-            public_key=public_key_to_b64(public_bytes),
+            public_key=pub_b64,
             created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             metadata=metadata or {},
+            verification_methods=verification_methods,
         )
 
         _registry(registry_path, registry_url).register(document, private_bytes)
@@ -90,14 +109,42 @@ class Agent:
         reg = _registry(registry_path, registry_url)
         data = reg.get(did)
         if data is None:
-            raise KeyError(f"Agent not found: {did}")
+            raise KeyError(
+                f"Agent not found: {did}. "
+                "Check that the DID is correct and that this registry contains it. "
+                "If using a remote registry, verify AGENTID_REGISTRY_URL or pass registry_url= explicitly."
+            )
+        # AgentDocument may not have verification_methods in older registry data — default to []
+        if "verification_methods" not in data:
+            data["verification_methods"] = []
+
+        # Re-derive publicKeyMultibase from the authoritative public_key field.
+        # Older records stored bare base64 here instead of multibase (z-prefixed base58btc).
+        # Correct on read so that any consumer gets a valid DID document regardless of
+        # when the agent was created.
+        if data["verification_methods"] and data.get("public_key"):
+            from .identity import public_key_to_multibase, b64_to_public_key_bytes as _b64b
+            try:
+                correct_multibase = public_key_to_multibase(_b64b(data["public_key"]))
+                for vm in data["verification_methods"]:
+                    if vm.get("publicKeyMultibase", "").startswith("z"):
+                        pass  # already correct multibase
+                    else:
+                        vm["publicKeyMultibase"] = correct_multibase
+            except Exception:
+                pass  # non-fatal — best effort migration
+
         document = AgentDocument(**data)
 
         # Fix #9 — verify DID is cryptographically bound to the stored public key
         from .identity import b64_to_public_key_bytes, public_key_to_did
         expected_did = public_key_to_did(b64_to_public_key_bytes(document.public_key))
         if document.did != expected_did:
-            raise ValueError(f"Registry corruption: DID {did} doesn't match stored public key")
+            raise ValueError(
+                f"DID mismatch: registry says {document.did!r} but the stored public key "
+                f"derives {expected_did!r}. The key file may be for a different agent, or "
+                "the registry record has been tampered with."
+            )
 
         private_key_bytes = reg.load_private_key(did)
         return cls(document, private_key_bytes)
@@ -130,17 +177,21 @@ class Agent:
 
     def sign(self, payload: dict) -> dict:
         if self._private_key is None:
-            raise RuntimeError("No private key — agent was loaded read-only")
+            raise RuntimeError(
+                "This agent has no private key. "
+                "Load with Agent.load(did, key_path=...) to load an existing agent, "
+                "or use Agent.create() to generate a new agent with a fresh key."
+            )
 
         signed_payload = {
             **payload,
             "signer": self.did,
-            "timestamp": time.time(),
+            "timestamp": int(time.time()),   # Unix seconds — matches TypeScript/Go
             "nonce": str(uuid.uuid4()),
         }
         return {
-            "payload": signed_payload,
-            "signature": crypto_sign(self._private_key, signed_payload),
+            "payload":   signed_payload,
+            "signature": crypto_sign(self._private_key, signed_payload),  # envelope dict
         }
 
     def verify_message(self, signed_message: dict, max_age_seconds: int = 300) -> bool:
@@ -248,8 +299,13 @@ class Agent:
 
         """
         if self._private_key is None:
-            raise RuntimeError("No private key — agent was loaded read-only")
+            raise RuntimeError(
+                "This agent has no private key. "
+                "Load with Agent.load(did, key_path=...) to load an existing agent, "
+                "or use Agent.create() to generate a new agent with a fresh key."
+            )
 
+        issued_at = int(time.time())
         body = {
             "did": self.did,
             "capability": capability,
@@ -260,6 +316,8 @@ class Agent:
             "sla": sla or {},
             "pricing": pricing or {"model": "free"},
             "remedies": remedies or {},
+            "nonce": secrets.token_hex(16),    # replay protection (v0.6+)
+            "issued_at": issued_at,            # staleness check on server
         }
 
         # Sign the canonical body (sort_keys, no spaces — matches server verification

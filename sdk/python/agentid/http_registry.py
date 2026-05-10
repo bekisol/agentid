@@ -6,6 +6,7 @@ the public agent document.
 """
 
 import os
+import re
 import time
 import uuid
 from dataclasses import asdict
@@ -30,7 +31,16 @@ class HTTPRegistry:
     # ── private key storage (always local, never sent to server) ─────────────
 
     def _key_path(self, did: str) -> Path:
-        return self.keys_dir / (did.replace(":", "_") + ".key")
+        # Security fix: sanitize DID to prevent path traversal
+        # (e.g. did:agentid:../../../../tmp/evil → safe filename)
+        safe = re.sub(r"[^a-zA-Z0-9_\-]", "_", did)
+        path = (self.keys_dir / (safe + ".key")).resolve()
+        # Ensure the resolved path stays within the keys directory
+        try:
+            path.relative_to(self.keys_dir.resolve())
+        except ValueError:
+            raise ValueError(f"Path traversal attempt blocked for DID: {did!r}")
+        return path
 
     def _save_private_key(self, did: str, private_key_bytes: bytes):
         key_file = self._key_path(did)
@@ -47,6 +57,19 @@ class HTTPRegistry:
 
     # ── remote operations ─────────────────────────────────────────────────────
 
+    def _raise_with_context(self, response, action: str):
+        """Re-raise an HTTP error with a developer-friendly message."""
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            raise RuntimeError(
+                f"Registry at {self.base_url!r} returned HTTP {status} while {action}. "
+                "Check that the URL is correct, the server is reachable, and "
+                "AGENTID_REGISTRY_URL is set correctly (or pass registry_url= explicitly). "
+                f"Raw error: {exc}"
+            ) from exc
+
     def register(self, document, private_key_bytes: bytes):
         from agentid.crypto import sign as crypto_sign
 
@@ -58,19 +81,26 @@ class HTTPRegistry:
 
         response = self._client.post(f"{self.base_url}/agents", json=body)
         if response.status_code == 409:
-            raise ValueError(f"Agent already registered: {document.did}")
-        response.raise_for_status()
+            raise ValueError(
+                f"Agent already registered: {document.did}. "
+                "Use Agent.load() to load the existing agent, or choose a different identity."
+            )
+        self._raise_with_context(response, f"registering agent {document.did!r}")
         self._save_private_key(document.did, private_key_bytes)
 
     def get(self, did: str) -> Optional[dict]:
         response = self._client.get(f"{self.base_url}/agents/{did}")
         if response.status_code == 404:
             return None
-        response.raise_for_status()
+        self._raise_with_context(response, f"fetching agent {did!r}")
         # Fix #14 — validate content-type
         ct = response.headers.get("content-type", "")
         if "application/json" not in ct:
-            raise ValueError(f"Unexpected content-type from registry: {ct}")
+            raise ValueError(
+                f"Registry at {self.base_url!r} returned unexpected content-type {ct!r} "
+                f"while fetching agent {did!r}. Expected 'application/json'. "
+                "Check that the registry URL points to an AgentID-compatible server."
+            )
         return response.json()
 
     def search(self, capability: str = None, owner: str = None, name: str = None) -> list[dict]:
@@ -82,7 +112,7 @@ class HTTPRegistry:
         if name:
             params["name"] = name
         response = self._client.get(f"{self.base_url}/agents", params=params)
-        response.raise_for_status()
+        self._raise_with_context(response, "searching agents")
         return response.json()
 
     def deregister(self, did: str, private_key_bytes: bytes):
@@ -102,7 +132,7 @@ class HTTPRegistry:
             f"{self.base_url}/agents/{did}",
             json={"payload": payload, "signature": signature},
         )
-        response.raise_for_status()
+        self._raise_with_context(response, f"deregistering agent {did!r}")
 
     def verify_signature(self, did: str, payload: dict, signature: str,
                          verifier_did: str = None) -> bool:
@@ -115,7 +145,7 @@ class HTTPRegistry:
         )
         if response.status_code == 404:
             return False
-        response.raise_for_status()
+        self._raise_with_context(response, f"verifying signature for {did!r}")
         return response.json()["valid"]
 
     def publish_capability_contract(self, did: str, contract: dict) -> dict:
@@ -131,19 +161,19 @@ class HTTPRegistry:
             The server response dict with the registered contract.
 
         Raises:
-            httpx.HTTPStatusError on 4xx/5xx responses.
+            RuntimeError on 4xx/5xx responses (with actionable message).
         """
         response = self._client.post(
             f"{self.base_url}/agents/{did}/capability-contracts",
             json=contract,
         )
-        response.raise_for_status()
+        self._raise_with_context(response, f"publishing capability contract for {did!r}")
         return response.json()
 
     def get_capability_contracts(self, did: str) -> list[dict]:
         """Fetch all active Capability Contracts for a DID (public)."""
         response = self._client.get(f"{self.base_url}/agents/{did}/capability-contracts")
-        response.raise_for_status()
+        self._raise_with_context(response, f"fetching capability contracts for {did!r}")
         return response.json().get("contracts", [])
 
     def ping(self) -> bool:
