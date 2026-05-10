@@ -3160,6 +3160,8 @@ curl https://api.agentid-protocol.com/agents \
         <div class="modal-tab" data-tab="team-keys" data-min-tier="pro">Team Keys</div>
         <div class="modal-tab" data-tab="key-rotation" data-min-tier="pro">Key Rotation</div>
         <div class="modal-tab" data-tab="webhooks" data-min-tier="pro">Webhooks</div>
+        <div class="modal-tab" data-tab="footprint" data-min-tier="pro">Footprint</div>
+        <div class="modal-tab" data-tab="enterprise-settings" data-min-tier="enterprise">Enterprise</div>
         <div class="modal-tab" data-tab="sandbox" data-min-tier="pro">Sandbox</div>
       </div>
 
@@ -3244,12 +3246,20 @@ curl https://api.agentid-protocol.com/agents \
             <hr class="settings-divider" style="margin:0.6rem 0;" />
 
             <!-- Sign out everywhere -->
-            <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
               <div>
                 <div style="font-size:0.84rem;font-weight:500;">Sessions</div>
                 <div style="font-size:0.75rem;color:var(--muted);">Sign out of every device and browser</div>
               </div>
               <button class="btn btn-outline" id="signout-all-btn" style="font-size:0.75rem;padding:0.25rem 0.7rem;color:var(--red);border-color:var(--red);">Sign out everywhere</button>
+            </div>
+
+            <!-- Session history (Pro) -->
+            <div id="session-history-wrap" data-min-tier="pro" data-lock-feature="Session history" style="margin-top:0.5rem;">
+              <div style="font-size:0.84rem;font-weight:500;margin-bottom:0.4rem;">Active & recent sessions</div>
+              <div id="session-history-list" style="max-height:200px;overflow-y:auto;font-size:0.78rem;display:flex;flex-direction:column;gap:0.35rem;">
+                <div style="color:var(--muted);font-size:0.77rem;">Loading…</div>
+              </div>
             </div>
           </div>
 
@@ -3701,6 +3711,219 @@ curl https://api.agentid-protocol.com/agents \
             Sandbox agents use the <code style="background:var(--surface2);padding:0.1rem 0.3rem;border-radius:3px;">did:sandbox:</code> prefix and are completely
             isolated from production. You can reset the sandbox at any time without affecting real agents.
           </p>
+        </div>
+
+        <!-- ── FOOTPRINT TAB ── -->
+        <div class="modal-panel" id="tab-footprint" data-min-tier="pro" data-lock-feature="Account footprint">
+
+          <!-- Summary bar -->
+          <div id="fp-summary-bar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:0.5rem;margin-bottom:1rem;">
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+              <div id="fp-total-events" style="font-size:1.1rem;font-weight:700;color:var(--accent);">—</div>
+              <div style="font-size:0.7rem;color:var(--muted);">Total events</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+              <div id="fp-active-sessions" style="font-size:1.1rem;font-weight:700;color:var(--green);">—</div>
+              <div style="font-size:0.7rem;color:var(--muted);">Active sessions</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+              <div id="fp-total-requests" style="font-size:1.1rem;font-weight:700;">—</div>
+              <div style="font-size:0.7rem;color:var(--muted);">API requests</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+              <div id="fp-wh-rate" style="font-size:1.1rem;font-weight:700;">—</div>
+              <div style="font-size:0.7rem;color:var(--muted);">Webhook 7d rate</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+              <div id="fp-open-complaints" style="font-size:1.1rem;font-weight:700;color:var(--red);">—</div>
+              <div style="font-size:0.7rem;color:var(--muted);">Open complaints</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+              <div id="fp-violations" style="font-size:1.1rem;font-weight:700;color:var(--orange,#f97316);">—</div>
+              <div style="font-size:0.7rem;color:var(--muted);">Violations 30d</div>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center;">
+            <select id="fp-cat-filter" style="font-size:0.78rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);">
+              <option value="">All categories</option>
+              <option value="auth">auth</option>
+              <option value="agent">agent</option>
+              <option value="verify">verify</option>
+              <option value="sign">sign</option>
+              <option value="message">message</option>
+              <option value="task">task</option>
+              <option value="contract">contract</option>
+              <option value="invocation">invocation</option>
+              <option value="complaint">complaint</option>
+              <option value="attestation">attestation</option>
+              <option value="webhook">webhook</option>
+              <option value="trust">trust</option>
+              <option value="mcp">mcp</option>
+              <option value="violation">violation</option>
+            </select>
+            <input id="fp-did-filter" placeholder="Filter by DID…" style="font-size:0.78rem;padding:0.3rem 0.6rem;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);flex:1;min-width:140px;" />
+            <input id="fp-from-filter" type="date" style="font-size:0.78rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);" />
+            <input id="fp-to-filter" type="date" style="font-size:0.78rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);" />
+            <button class="btn-sm" id="fp-load-btn" style="font-size:0.78rem;">Load</button>
+            <button class="btn-sm btn-outline" id="fp-export-json-btn" style="font-size:0.78rem;">↓ JSON</button>
+            <button class="btn-sm btn-outline" id="fp-export-csv-btn" style="font-size:0.78rem;">↓ CSV</button>
+          </div>
+
+          <!-- Timeline table -->
+          <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;max-height:340px;overflow-y:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:0.76rem;">
+              <thead style="position:sticky;top:0;background:var(--surface2);z-index:1;">
+                <tr>
+                  <th style="padding:0.4rem 0.6rem;text-align:left;font-weight:600;color:var(--text-2);white-space:nowrap;border-bottom:1px solid var(--border);">Time</th>
+                  <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Category</th>
+                  <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Operation</th>
+                  <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Agent / DID</th>
+                  <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Status</th>
+                  <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">IP</th>
+                  <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Detail</th>
+                </tr>
+              </thead>
+              <tbody id="fp-timeline-body">
+                <tr><td colspan="7" style="padding:1rem;text-align:center;color:var(--muted);">Use the filters above and click Load to view your footprint.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.6rem;">
+            <span id="fp-count-label" style="font-size:0.75rem;color:var(--muted);"></span>
+            <div style="display:flex;gap:0.4rem;">
+              <button class="btn-sm btn-outline" id="fp-prev-btn" disabled style="font-size:0.75rem;">← Prev</button>
+              <button class="btn-sm btn-outline" id="fp-next-btn" disabled style="font-size:0.75rem;">Next →</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── ENTERPRISE SETTINGS TAB ── -->
+        <div class="modal-panel" id="tab-enterprise-settings" data-min-tier="enterprise" data-lock-feature="Enterprise settings">
+
+          <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
+            Fine-grained controls for your account. Changes apply immediately to all API keys and agents under this account.
+          </p>
+
+          <!-- Trust Alerts -->
+          <div class="modal-section">
+            <div class="modal-section-title">Trust Alerts</div>
+
+            <div style="margin-bottom:0.85rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.25rem;">
+                <div style="font-size:0.84rem;font-weight:500;">Minimum trust threshold</div>
+                <span id="ent-trust-min-val" style="font-size:0.82rem;font-weight:700;color:var(--accent);">0.60</span>
+              </div>
+              <input type="range" id="ent-trust-min" min="0" max="1" step="0.05" value="0.6"
+                style="width:100%;accent-color:var(--accent);" />
+              <div style="font-size:0.72rem;color:var(--muted);">Alert when any agent's trust score drops below this level (0 = never alert)</div>
+            </div>
+
+            <div style="margin-bottom:0.85rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.25rem;">
+                <div style="font-size:0.84rem;font-weight:500;">Trust drop alert sensitivity</div>
+                <span id="ent-trust-drop-val" style="font-size:0.82rem;font-weight:700;">10 pts</span>
+              </div>
+              <input type="range" id="ent-trust-drop" min="1" max="50" step="1" value="10"
+                style="width:100%;accent-color:var(--accent);" />
+              <div style="font-size:0.72rem;color:var(--muted);">Minimum score drop (in points) before a trust-drop alert fires</div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:0.6rem;">
+              <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+                <div>
+                  <div style="font-size:0.84rem;font-weight:500;">Alert on complaints</div>
+                  <div style="font-size:0.72rem;color:var(--muted);">Notify when a complaint is filed against any of your agents</div>
+                </div>
+                <label class="pref-toggle"><input type="checkbox" id="ent-notify-complaint" checked style="display:none;" /><span class="pref-toggle-track"></span></label>
+              </label>
+              <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+                <div>
+                  <div style="font-size:0.84rem;font-weight:500;">Alert on trust drops</div>
+                  <div style="font-size:0.72rem;color:var(--muted);">Notify when a trust score drops significantly (uses sensitivity above)</div>
+                </div>
+                <label class="pref-toggle"><input type="checkbox" id="ent-notify-trust-drop" checked style="display:none;" /><span class="pref-toggle-track"></span></label>
+              </label>
+              <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+                <div>
+                  <div style="font-size:0.84rem;font-weight:500;">Alert on scope violations</div>
+                  <div style="font-size:0.72rem;color:var(--muted);">Notify when POLP enforcement blocks an agent action</div>
+                </div>
+                <label class="pref-toggle"><input type="checkbox" id="ent-notify-violation" checked style="display:none;" /><span class="pref-toggle-track"></span></label>
+              </label>
+            </div>
+          </div>
+
+          <!-- Agent Defaults -->
+          <div class="modal-section">
+            <div class="modal-section-title">Agent Defaults</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Default agent visibility</div>
+                <div style="font-size:0.72rem;color:var(--muted);">Applied to every newly registered agent unless overridden at registration time</div>
+              </div>
+              <select id="ent-default-visibility" style="font-size:0.8rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Data & Retention -->
+          <div class="modal-section">
+            <div class="modal-section-title">Data & Retention</div>
+
+            <div style="margin-bottom:0.85rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.25rem;">
+                <div style="font-size:0.84rem;font-weight:500;">Audit log retention</div>
+                <span id="ent-retention-val" style="font-size:0.82rem;font-weight:700;">365 days</span>
+              </div>
+              <input type="range" id="ent-retention" min="30" max="3650" step="30" value="365"
+                style="width:100%;accent-color:var(--accent);" />
+              <div style="font-size:0.72rem;color:var(--muted);">Events older than this are purged from the audit log (30 days – 10 years)</div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Export format</div>
+                <div style="font-size:0.72rem;color:var(--muted);">Preferred format for data export downloads</div>
+              </div>
+              <select id="ent-export-format" style="font-size:0.8rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);">
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="modal-section">
+            <div class="modal-section-title">Security</div>
+            <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Require MFA for sub-key operations</div>
+                <div style="font-size:0.72rem;color:var(--muted);">Any team key with admin scope must re-authenticate before executing destructive operations</div>
+              </div>
+              <label class="pref-toggle"><input type="checkbox" id="ent-mfa-required" style="display:none;" /><span class="pref-toggle-track"></span></label>
+            </label>
+          </div>
+
+          <!-- API Key Usage -->
+          <div class="modal-section">
+            <div class="modal-section-title">API Key Usage</div>
+            <div id="ent-key-usage-list" style="font-size:0.78rem;display:flex;flex-direction:column;gap:0.4rem;max-height:180px;overflow-y:auto;">
+              <div style="color:var(--muted);">Loading…</div>
+            </div>
+          </div>
+
+          <div style="margin-top:0.75rem;display:flex;align-items:center;justify-content:flex-end;gap:0.75rem;">
+            <span id="ent-save-status" style="font-size:0.78rem;color:var(--muted);"></span>
+            <button class="btn btn-primary" id="ent-save-btn" style="font-size:0.82rem;">Save enterprise settings</button>
+          </div>
+
         </div>
 
       </div><!-- /modal-body -->
@@ -4482,7 +4705,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260507-1"></script>
+<script src="dashboard.js?v=20260510-1"></script>
 
 </body>
 </html>

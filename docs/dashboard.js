@@ -4835,6 +4835,7 @@ function openSettings() {
   _loadAccountInfo();
   _loadAccountKeys();
   _initPreferencesPanel();
+  _loadSessionHistory();
 }
 
 // ── ACCOUNT-SCOPED API KEYS (Settings → API Keys tab) ─────────────────────────
@@ -6581,3 +6582,279 @@ function _showSessionExpiredBanner(detail) {
       ${esc(detail).slice(0, 140)}
     </div>`;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTERPRISE FOOTPRINT TAB
+// ═══════════════════════════════════════════════════════════════════════════
+
+const _fp = {
+  page: 1,
+  limit: 50,
+  hasMore: false,
+  total: 0,
+};
+
+const _FP_CAT_COLORS = {
+  auth: "#6366f1", agent: "#10b981", verify: "#3b82f6", sign: "#8b5cf6",
+  message: "#06b6d4", task: "#f59e0b", contract: "#ec4899", invocation: "#14b8a6",
+  complaint: "#ef4444", attestation: "#84cc16", webhook: "#f97316",
+  trust: "#eab308", mcp: "#a855f7", violation: "#dc2626", export: "#64748b",
+};
+
+function _fpCatBadge(cat) {
+  const col = _FP_CAT_COLORS[cat] || "#64748b";
+  return `<span style="background:${col}22;color:${col};border:1px solid ${col}44;font-size:0.68rem;padding:0.1rem 0.35rem;border-radius:4px;font-weight:600;">${esc(cat)}</span>`;
+}
+
+function _fpStatusBadge(status) {
+  if (!status) return "—";
+  const isOk = ["ok","active","verified","challenge_passed","succeeded"].includes((status||"").toLowerCase());
+  const isErr = ["error","failed","violation","rejected","open","breach"].includes((status||"").toLowerCase());
+  const col = isOk ? "#10b981" : isErr ? "#ef4444" : "#64748b";
+  return `<span style="color:${col};font-weight:600;">${esc(status)}</span>`;
+}
+
+function _fpDetailSummary(detail) {
+  if (!detail || typeof detail !== "object") return "—";
+  const keys = Object.keys(detail).filter(k => detail[k] != null);
+  if (!keys.length) return "—";
+  return keys.slice(0, 3).map(k => `<span style="color:var(--muted);">${esc(k)}:</span> ${esc(String(detail[k]).slice(0,40))}`).join("  ");
+}
+
+async function _fpLoadSummary() {
+  try {
+    const d = await apiFetch("/pro/account/footprint/summary");
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set("fp-total-events",   d.total_audit_events?.toLocaleString() ?? "—");
+    set("fp-active-sessions", d.active_sessions ?? "—");
+    set("fp-total-requests", d.total_api_requests?.toLocaleString() ?? "—");
+    set("fp-wh-rate",        d.webhook_success_rate_7d != null ? d.webhook_success_rate_7d + "%" : "n/a");
+    set("fp-open-complaints", d.open_complaints ?? "0");
+    set("fp-violations",     d.scope_violations_30d ?? "0");
+  } catch(_) { /* silently ignore — pro endpoint, may not be authed */ }
+}
+
+async function _fpLoad() {
+  const body = document.getElementById("fp-timeline-body");
+  if (!body) return;
+  body.innerHTML = `<tr><td colspan="7" style="padding:1rem;text-align:center;"><div class="spinner" style="margin:auto;"></div></td></tr>`;
+
+  const cat    = document.getElementById("fp-cat-filter")?.value || "";
+  const did    = document.getElementById("fp-did-filter")?.value.trim() || "";
+  const fromD  = document.getElementById("fp-from-filter")?.value || "";
+  const toD    = document.getElementById("fp-to-filter")?.value || "";
+
+  const params = new URLSearchParams({ page: _fp.page, limit: _fp.limit });
+  if (cat)   params.set("category", cat);
+  if (did)   params.set("did", did);
+  if (fromD) params.set("from_ts", fromD + "T00:00:00Z");
+  if (toD)   params.set("to_ts",   toD   + "T23:59:59Z");
+
+  try {
+    const d = await apiFetch("/pro/account/footprint?" + params);
+    _fp.total   = d.total;
+    _fp.hasMore = d.has_more;
+
+    const events = d.events || [];
+    if (!events.length) {
+      body.innerHTML = `<tr><td colspan="7" style="padding:1rem;text-align:center;color:var(--muted);">No events found for these filters.</td></tr>`;
+    } else {
+      body.innerHTML = events.map(e => `
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:0.35rem 0.6rem;white-space:nowrap;font-size:0.72rem;color:var(--muted);">${e.ts ? new Date(e.ts).toLocaleString() : "—"}</td>
+          <td style="padding:0.35rem 0.5rem;">${_fpCatBadge(e.category)}</td>
+          <td style="padding:0.35rem 0.5rem;font-size:0.74rem;font-family:monospace;">${esc(e.operation||"—")}</td>
+          <td style="padding:0.35rem 0.5rem;font-size:0.7rem;font-family:monospace;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(e.did||"")}">${e.did ? esc(e.did.slice(0,28)+"…") : "—"}</td>
+          <td style="padding:0.35rem 0.5rem;font-size:0.74rem;">${_fpStatusBadge(e.status)}</td>
+          <td style="padding:0.35rem 0.5rem;font-size:0.7rem;color:var(--muted);">${e.ip ? esc(e.ip) : "—"}</td>
+          <td style="padding:0.35rem 0.5rem;font-size:0.7rem;color:var(--text-2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_fpDetailSummary(e.detail)}</td>
+        </tr>
+      `).join("");
+    }
+
+    const label = document.getElementById("fp-count-label");
+    if (label) label.textContent = `${_fp.total.toLocaleString()} total · page ${_fp.page}`;
+
+    const prev = document.getElementById("fp-prev-btn");
+    const next = document.getElementById("fp-next-btn");
+    if (prev) prev.disabled = _fp.page <= 1;
+    if (next) next.disabled = !_fp.hasMore;
+  } catch(err) {
+    body.innerHTML = `<tr><td colspan="7" style="padding:1rem;text-align:center;color:var(--red);">Error loading footprint: ${esc(String(err))}</td></tr>`;
+  }
+}
+
+function _initFootprintTab() {
+  document.getElementById("fp-load-btn")?.addEventListener("click", () => { _fp.page = 1; _fpLoad(); });
+  document.getElementById("fp-prev-btn")?.addEventListener("click", () => { if (_fp.page > 1) { _fp.page--; _fpLoad(); } });
+  document.getElementById("fp-next-btn")?.addEventListener("click", () => { if (_fp.hasMore) { _fp.page++; _fpLoad(); } });
+
+  document.getElementById("fp-export-json-btn")?.addEventListener("click", () => {
+    window.open(API_BASE + "/pro/account/export?fmt=json&" + _fpExportParams(), "_blank");
+  });
+  document.getElementById("fp-export-csv-btn")?.addEventListener("click", () => {
+    window.open(API_BASE + "/pro/account/export?fmt=csv&" + _fpExportParams(), "_blank");
+  });
+}
+
+function _fpExportParams() {
+  const fromD = document.getElementById("fp-from-filter")?.value || "";
+  const toD   = document.getElementById("fp-to-filter")?.value || "";
+  const p = new URLSearchParams();
+  if (fromD) p.set("from_ts", fromD + "T00:00:00Z");
+  if (toD)   p.set("to_ts",   toD   + "T23:59:59Z");
+  return p.toString();
+}
+
+// Load session history into Account tab
+async function _loadSessionHistory() {
+  const list = document.getElementById("session-history-list");
+  if (!list) return;
+  try {
+    const d = await apiFetch("/pro/account/sessions?limit=10");
+    const sessions = d.sessions || [];
+    if (!sessions.length) {
+      list.innerHTML = '<div style="color:var(--muted);">No sessions recorded.</div>';
+      return;
+    }
+    list.innerHTML = sessions.map(s => {
+      const active = s.active;
+      const dot = active
+        ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:5px;"></span>`
+        : `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);margin-right:5px;"></span>`;
+      const ua = (s.user_agent||"").slice(0, 60);
+      return `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.5rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;">
+        ${dot}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.76rem;font-weight:500;">${esc(s.ip||"unknown ip")}${active?" <em style='color:#10b981;font-style:normal;'>(active)</em>":""}</div>
+          <div style="font-size:0.68rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(ua)}</div>
+        </div>
+        <div style="font-size:0.68rem;color:var(--muted);white-space:nowrap;">${s.created_at ? new Date(s.created_at).toLocaleDateString() : "—"}</div>
+      </div>`;
+    }).join("");
+  } catch(_) { list.innerHTML = '<div style="color:var(--muted);font-size:0.77rem;">Sign in with session auth to view session history.</div>'; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTERPRISE SETTINGS TAB
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function _loadEnterpriseSettings() {
+  try {
+    const d = await apiFetch("/pro/account/settings");
+
+    const slider = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) { el.value = val; el.dispatchEvent(new Event("input")); }
+    };
+    const check = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+    const sel   = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+
+    slider("ent-trust-min",   d.trust_alert_min  ?? 0.6);
+    slider("ent-trust-drop",  d.trust_drop_threshold ?? 10);
+    slider("ent-retention",   d.data_retention_days  ?? 365);
+    check("ent-notify-complaint",  d.notify_on_complaint);
+    check("ent-notify-trust-drop", d.notify_on_trust_drop);
+    check("ent-notify-violation",  d.notify_on_violation);
+    check("ent-mfa-required",      d.mfa_required);
+    sel("ent-default-visibility",  d.default_visibility || "public");
+    sel("ent-export-format",       d.export_format || "json");
+  } catch(_) { /* not enterprise — panel locked */ }
+}
+
+async function _loadKeyUsage() {
+  const list = document.getElementById("ent-key-usage-list");
+  if (!list) return;
+  try {
+    const d = await apiFetch("/pro/account/keys/usage");
+    const keys = d.keys || [];
+    if (!keys.length) { list.innerHTML = '<div style="color:var(--muted);">No API keys.</div>'; return; }
+    list.innerHTML = keys.map(k => `
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0.5rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.78rem;font-weight:600;">${esc(k.label)}</div>
+          <div style="font-size:0.7rem;color:var(--muted);">
+            ${(k.scopes||[]).join(", ")||"no scopes"} ·
+            ${k.tier} tier ·
+            ${k.request_count?.toLocaleString()||"0"} requests
+          </div>
+        </div>
+        <div style="font-size:0.7rem;color:var(--muted);white-space:nowrap;">
+          Last: ${k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : "never"}
+        </div>
+      </div>
+    `).join("");
+  } catch(_) { list.innerHTML = '<div style="color:var(--muted);">Could not load key usage.</div>'; }
+}
+
+async function _saveEnterpriseSettings() {
+  const status = document.getElementById("ent-save-status");
+  const btn    = document.getElementById("ent-save-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+  if (status) status.textContent = "";
+
+  try {
+    const body = {
+      trust_alert_min:      parseFloat(document.getElementById("ent-trust-min")?.value),
+      trust_drop_threshold: parseFloat(document.getElementById("ent-trust-drop")?.value),
+      data_retention_days:  parseInt(document.getElementById("ent-retention")?.value),
+      notify_on_complaint:  document.getElementById("ent-notify-complaint")?.checked,
+      notify_on_trust_drop: document.getElementById("ent-notify-trust-drop")?.checked,
+      notify_on_violation:  document.getElementById("ent-notify-violation")?.checked,
+      mfa_required:         document.getElementById("ent-mfa-required")?.checked,
+      default_visibility:   document.getElementById("ent-default-visibility")?.value,
+      export_format:        document.getElementById("ent-export-format")?.value,
+    };
+    await apiFetch("/pro/account/settings", { method: "PATCH", body: JSON.stringify(body) });
+    if (status) { status.style.color = "var(--green)"; status.textContent = "✓ Saved"; }
+    toast("Enterprise settings saved", "ok");
+  } catch(err) {
+    if (status) { status.style.color = "var(--red)"; status.textContent = "Error: " + String(err).slice(0, 60); }
+    toast("Save failed: " + String(err), "err");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Save enterprise settings"; }
+  }
+}
+
+function _initEnterpriseTab() {
+  // Live-update slider labels
+  document.getElementById("ent-trust-min")?.addEventListener("input", e => {
+    const el = document.getElementById("ent-trust-min-val");
+    if (el) el.textContent = parseFloat(e.target.value).toFixed(2);
+  });
+  document.getElementById("ent-trust-drop")?.addEventListener("input", e => {
+    const el = document.getElementById("ent-trust-drop-val");
+    if (el) el.textContent = e.target.value + " pts";
+  });
+  document.getElementById("ent-retention")?.addEventListener("input", e => {
+    const el = document.getElementById("ent-retention-val");
+    if (el) {
+      const days = parseInt(e.target.value);
+      el.textContent = days >= 365 ? Math.round(days/365*10)/10 + " yr" : days + " days";
+    }
+  });
+  document.getElementById("ent-save-btn")?.addEventListener("click", _saveEnterpriseSettings);
+}
+
+// Hook into the existing tab-switch event so data loads when tabs activate
+(function _patchTabSwitch() {
+  const orig = typeof _switchSettingsTab === "function" ? _switchSettingsTab : null;
+  if (!orig) return;
+  window._switchSettingsTab = function(tab) {
+    orig(tab);
+    if (tab === "footprint") {
+      _fpLoadSummary();
+      // don't auto-load events — wait for the Load button
+    }
+    if (tab === "enterprise-settings") {
+      _loadEnterpriseSettings();
+      _loadKeyUsage();
+    }
+  };
+})();
+
+// Init on DOM ready
+document.addEventListener("DOMContentLoaded", () => {
+  _initFootprintTab();
+  _initEnterpriseTab();
+});

@@ -33,11 +33,9 @@ Items that are known but deferred. Address before a public launch.
 - **File:** `agentid-pro/accounts.py` — `_SESSION_CACHE_TTL`
 
 ### isPro() / dashboard pro sections
-- **Status:** Fix planned, not yet applied
-- **Issue:** `GET /auth/me` returns `users.tier` which defaults to `"free"` even when the user has a pro API key. `isPro()` returns false, so all pro dashboard sections stay on "Loading..." forever for session-auth users.
-- **Fix:** Update `/auth/me` to return the effective best tier across `users.tier` and all `api_keys` owned by that user.
-- **File:** `agentid-pro/accounts.py` — `me()` endpoint (~line 403)
-- **Plan:** `.claude/plans/cryptic-singing-gray.md`
+- **Status:** ✅ Verified shipped — `before-public.md` was stale (2026-05-10)
+- **Verified:** `accounts.py` `me()` endpoint already calls `_sync_tier_from_keys()` and returns `effective_tier` promoted to `pro`/`enterprise` when any owned API key carries that tier. The document was simply out of date; the code was already correct.
+- **File:** `agentid-pro/accounts.py` — `me()` function, `_sync_tier_from_keys()` helper
 
 ---
 
