@@ -7020,10 +7020,10 @@ function _initFootprintTab() {
   document.getElementById("fp-next-btn")?.addEventListener("click", () => { if (_fp.hasMore) { _fp.page++; _fpLoad(); } });
 
   document.getElementById("fp-export-json-btn")?.addEventListener("click", () => {
-    window.open(API_BASE + "/pro/account/export?fmt=json&" + _fpExportParams(), "_blank");
+    window.open(BASE + "/pro/account/export?fmt=json&" + _fpExportParams(), "_blank");
   });
   document.getElementById("fp-export-csv-btn")?.addEventListener("click", () => {
-    window.open(API_BASE + "/pro/account/export?fmt=csv&" + _fpExportParams(), "_blank");
+    window.open(BASE + "/pro/account/export?fmt=csv&" + _fpExportParams(), "_blank");
   });
 
   // Webhook log fail-filter toggle
@@ -7369,7 +7369,7 @@ function _initEuComplianceTab() {
     this.disabled = true; this.textContent = "Generating PDF…";
     try {
       const storedKey = apiKey || sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key");
-      const resp = await fetch(API_BASE + `/pro/compliance/eu-ai-act/report?days=${days}&format=pdf`, {
+      const resp = await fetch(BASE + `/pro/compliance/eu-ai-act/report?days=${days}&format=pdf`, {
         headers: storedKey ? {"x-api-key": storedKey} : {},
       });
       if (!resp.ok) { const t = await resp.text(); throw new Error(t); }
