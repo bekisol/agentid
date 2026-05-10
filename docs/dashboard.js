@@ -5015,7 +5015,7 @@ function _cmdkInit() {
   });
 }
 
-function openSettings() {
+function openSettings(tab) {
   document.getElementById("settings-modal").style.display = "flex";
   document.body.style.overflow = "hidden";
   // Always reload account info when modal opens
@@ -5023,6 +5023,9 @@ function openSettings() {
   _loadAccountKeys();
   _initPreferencesPanel();
   _loadSessionHistory();
+  // Switch to requested tab (or restore default)
+  const targetTab = tab || document.querySelector(".modal-tab.active")?.dataset.tab || "account";
+  _switchSettingsTab(targetTab);
 }
 
 // ── ACCOUNT-SCOPED API KEYS (Settings → API Keys tab) ─────────────────────────
@@ -5133,6 +5136,10 @@ async function _createAccountKey() {
 function closeSettings() {
   document.getElementById("settings-modal").style.display = "none";
   document.body.style.overflow = "";
+  // Clear the settings hash so refresh no longer re-opens the modal
+  if (location.hash.startsWith("#settings")) {
+    history.replaceState(null, "", location.pathname + location.search);
+  }
 }
 
 function _switchSettingsTab(tab) {
@@ -5142,12 +5149,16 @@ function _switchSettingsTab(tab) {
   document.querySelectorAll(".modal-panel").forEach(p =>
     p.classList.toggle("active", p.id === `tab-${tab}`)
   );
+  // Persist tab in URL hash so a refresh reopens the same tab
+  history.replaceState(null, "", `#settings/${tab}`);
   // Lazy-load heavy tabs only when opened
   if (tab === "key-rotation") _loadRotationAgentList();
   if (tab === "webhooks") { _initWebhookEventGrid(); _loadWebhooks(); }
   if (tab === "sandbox") _loadSandboxStatus();
   if (tab === "preferences") _initPreferencesPanel();
   if (tab === "security") { _loadSecuritySessions(); _loadSessionHistory(); }
+  if (tab === "eu-compliance") _euLoadAll();
+  if (tab === "footprint") _initFootprintTab();
 }
 
 // ── Preferences panel ─────────────────────────────────────────────────────────
@@ -5615,6 +5626,23 @@ document.addEventListener("DOMContentLoaded", () => {
       _showAuthError("Could not send reset link — try again shortly.");
     }
   });
+
+  // URL-fragment driven flows: #settings/{tab} — restore settings modal on refresh
+  (function _restoreSettingsFromHash() {
+    const m = location.hash.match(/^#settings(?:\/([a-z0-9-]+))?$/);
+    if (!m) return;
+    const tab = m[1] || "account";
+    // Wait for auth to complete before opening modal
+    const tryOpen = (attempts) => {
+      if (attempts <= 0) return;
+      if (apiKey || sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key")) {
+        openSettings(tab);
+      } else {
+        setTimeout(() => tryOpen(attempts - 1), 300);
+      }
+    };
+    setTimeout(() => tryOpen(10), 500);
+  })();
 
   // URL-fragment driven flows: #reset-password=TOKEN  or  #verify-email=TOKEN
   (function _handleAuthFragment() {
@@ -7298,25 +7326,60 @@ function _initEuComplianceTab() {
     });
   });
 
-  // Report buttons
-  document.getElementById("eu-report-json-btn")?.addEventListener("click", () => {
+  // Report download buttons — must use apiFetch / raw fetch with auth headers
+  // (window.open can't send x-api-key, so downloads fail with 401)
+  document.getElementById("eu-report-json-btn")?.addEventListener("click", async function() {
     const days = document.getElementById("eu-report-days")?.value || "30";
-    window.open(API_BASE + `/pro/compliance/eu-ai-act/report?days=${days}&format=json`, "_blank");
+    this.disabled = true; this.textContent = "Downloading…";
+    try {
+      const data = await apiFetch(`/pro/compliance/eu-ai-act/report?days=${days}&format=json`);
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement("a"), {href: url, download: `eu-compliance-${days}d.json`});
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch(e) { alert("JSON download failed: " + e.message); }
+    this.disabled = false; this.textContent = "↓ JSON report";
   });
-  document.getElementById("eu-report-pdf-btn")?.addEventListener("click", () => {
+
+  document.getElementById("eu-report-pdf-btn")?.addEventListener("click", async function() {
     const days = document.getElementById("eu-report-days")?.value || "30";
-    window.open(API_BASE + `/pro/compliance/eu-ai-act/report?days=${days}&format=pdf`, "_blank");
+    this.disabled = true; this.textContent = "Generating PDF…";
+    try {
+      const storedKey = apiKey || sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key");
+      const resp = await fetch(API_BASE + `/pro/compliance/eu-ai-act/report?days=${days}&format=pdf`, {
+        headers: storedKey ? {"x-api-key": storedKey} : {},
+      });
+      if (!resp.ok) { const t = await resp.text(); throw new Error(t); }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement("a"), {href: url, download: `eu-compliance-${days}d.pdf`});
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch(e) { alert("PDF download failed: " + e.message); }
+    this.disabled = false; this.textContent = "↓ PDF report";
   });
-  document.getElementById("eu-monthly-export-btn")?.addEventListener("click", () => {
+
+  document.getElementById("eu-monthly-export-btn")?.addEventListener("click", async function() {
     const now = new Date();
     const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-    window.open(API_BASE + `/pro/compliance/monthly-export?month=${month}`, "_blank");
+    this.disabled = true; this.textContent = "Downloading…";
+    try {
+      const data = await apiFetch(`/pro/compliance/monthly-export?month=${month}`);
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement("a"), {href: url, download: `eu-monthly-${month}.json`});
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch(e) { alert("Monthly export failed: " + e.message); }
+    this.disabled = false; this.textContent = "↓ Monthly export";
   });
 }
 
 async function _euLoadAll() {
   await _euLoadSummary();
   _euLoadReviewQueue("pending");
+  _euLoadPublishedContracts();
 }
 
 async function _euLoadSummary() {
@@ -7430,18 +7493,36 @@ async function _euLoadReviewQueue(status = "pending") {
   tbody.innerHTML = `<tr><td colspan="7" style="padding:0.75rem;text-align:center;"><div class="spinner" style="margin:auto;"></div></td></tr>`;
   try {
     const d = await apiFetch(`/pro/compliance/eu-ai-act/review-queue?status=${status}&limit=25`);
+
+    // Update filter tab count badges
+    const counts = d.counts || {};
+    const total  = Object.values(counts).reduce((s, n) => s + n, 0);
+    const setCount = (id, n) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (n > 0) { el.textContent = n; el.style.display = ""; }
+      else        { el.style.display = "none"; }
+    };
+    setCount("eu-rq-cnt-pending",  counts.pending  || 0);
+    setCount("eu-rq-cnt-approved", counts.approved || 0);
+    setCount("eu-rq-cnt-rejected", counts.rejected || 0);
+    setCount("eu-rq-cnt-all", total);
+
     const items = d.items || [];
     if (!items.length) {
       tbody.innerHTML = `<tr><td colspan="7" style="padding:1rem;text-align:center;color:var(--muted);">No ${status === "all" ? "" : status + " "}review items.</td></tr>`;
       return;
     }
+
+    const schemaStr = obj => { const k = Object.keys(obj||{}); return k.length ? k.join(", ") : "—"; };
+
     const rows = [];
     items.forEach(item => {
       const statusColor = {pending:"#f59e0b",approved:"#10b981",rejected:"#ef4444",expired:"var(--muted)"}[item.status] || "var(--muted)";
       const isPending = item.status === "pending";
       const agentLabel = esc(item.agent_name || (item.agent_did||"").slice(0,20));
 
-      // Parse payload_summary — may be JSON (contract details) or plain text
+      // Parse payload_summary
       let payload = null;
       let payloadRaw = item.payload_summary || "";
       try { payload = JSON.parse(payloadRaw || "null"); } catch(_) {}
@@ -7460,22 +7541,20 @@ async function _euLoadReviewQueue(status = "pending") {
         <td style="padding:0.35rem 0.5rem;">
           ${isPending ? `
             <div style="display:flex;gap:0.3rem;">
-              <button class="btn-sm eu-review-decide" data-id="${item.id}" data-verdict="approved" style="font-size:0.7rem;padding:0.15rem 0.45rem;background:#10b981;color:#fff;border-color:#10b981;">✓</button>
-              <button class="btn-sm eu-review-decide" data-id="${item.id}" data-verdict="rejected" style="font-size:0.7rem;padding:0.15rem 0.45rem;color:var(--red);border-color:var(--red);">✗</button>
-            </div>` : "—"}
+              <button class="btn-sm eu-approve-btn" data-id="${item.id}" style="font-size:0.7rem;padding:0.15rem 0.45rem;background:#10b981;color:#fff;border-color:#10b981;" title="Approve">✓</button>
+              <button class="btn-sm eu-reject-btn"  data-id="${item.id}" style="font-size:0.7rem;padding:0.15rem 0.45rem;color:var(--red);border-color:var(--red);" title="Reject — will ask for reason">✗</button>
+            </div>`
+          : item.reviewed_by ? `<span style="font-size:0.68rem;color:var(--muted);" title="Reviewed by ${esc(item.reviewed_by)} at ${item.reviewed_at ? new Date(item.reviewed_at).toLocaleString() : ''}">${esc(item.reviewed_by.split("@")[0])}</span>`
+          : "—"}
         </td>
       </tr>`);
 
-      // Expandable detail row (hidden by default)
+      // Expandable detail row
       if (hasPayload) {
-        let detailInner = "";
+        let contractDetail = "";
         if (payload && typeof payload === "object") {
           const p = payload;
-          const schemaStr = obj => {
-            const keys = Object.keys(obj||{});
-            return keys.length ? keys.join(", ") : "—";
-          };
-          detailInner = `
+          contractDetail = `
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1.5rem;font-size:0.76rem;">
               <div>
                 <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Capability</div>
@@ -7511,11 +7590,32 @@ async function _euLoadReviewQueue(status = "pending") {
               </div>` : ""}
             </div>`;
         } else {
-          // Legacy plain-text payload_summary
-          detailInner = `<pre style="font-size:0.73rem;white-space:pre-wrap;word-break:break-word;margin:0;color:var(--text-2);">${esc(payloadRaw)}</pre>`;
+          contractDetail = `<pre style="font-size:0.73rem;white-space:pre-wrap;word-break:break-word;margin:0;color:var(--text-2);">${esc(payloadRaw)}</pre>`;
         }
+
+        // Reviewer info block (shown for resolved items)
+        const reviewerBlock = !isPending && item.reviewed_by ? `
+          <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem 1rem;font-size:0.75rem;">
+            <div>
+              <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.1rem;">Verdict</div>
+              <div style="font-weight:600;color:${item.verdict==="approved"?"#10b981":"#ef4444"};">${esc(item.verdict||"—")}</div>
+            </div>
+            <div>
+              <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.1rem;">Reviewed by</div>
+              <div style="font-family:monospace;font-size:0.72rem;">${esc(item.reviewed_by||"—")}</div>
+            </div>
+            <div>
+              <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.1rem;">Reviewed at</div>
+              <div style="font-size:0.72rem;">${item.reviewed_at ? new Date(item.reviewed_at).toLocaleString() : "—"}</div>
+            </div>
+            ${item.notes ? `<div style="grid-column:1/-1;">
+              <div style="font-size:0.68rem;color:var(--muted);margin-bottom:0.1rem;">Rejection reason</div>
+              <div style="color:var(--red);font-size:0.73rem;">${esc(item.notes)}</div>
+            </div>` : ""}
+          </div>` : "";
+
         rows.push(`<tr class="eu-rq-detail" data-for="${item.id}" style="display:none;background:color-mix(in srgb,var(--accent) 4%,var(--surface));">
-          <td colspan="7" style="padding:0.75rem 1rem 1rem;">${detailInner}</td>
+          <td colspan="7" style="padding:0.75rem 1rem 1rem;">${contractDetail}${reviewerBlock}</td>
         </tr>`);
       }
     });
@@ -7524,7 +7624,7 @@ async function _euLoadReviewQueue(status = "pending") {
     // Wire expand/collapse on clickable rows
     tbody.querySelectorAll(".eu-rq-row[data-id]").forEach(row => {
       row.addEventListener("click", function(e) {
-        if (e.target.closest(".eu-review-decide")) return; // don't expand when clicking approve/reject
+        if (e.target.closest(".eu-approve-btn,.eu-reject-btn")) return;
         const id = this.dataset.id;
         const detail = tbody.querySelector(`.eu-rq-detail[data-for="${id}"]`);
         if (!detail) return;
@@ -7535,27 +7635,126 @@ async function _euLoadReviewQueue(status = "pending") {
       });
     });
 
-    // Wire approve/reject buttons
-    tbody.querySelectorAll(".eu-review-decide").forEach(btn => {
-      btn.addEventListener("click", async function() {
-        const id      = this.dataset.id;
-        const verdict = this.dataset.verdict;
-        this.disabled = true;
+    // Wire approve buttons
+    tbody.querySelectorAll(".eu-approve-btn").forEach(btn => {
+      btn.addEventListener("click", async function(e) {
+        e.stopPropagation();
+        const id = this.dataset.id;
+        this.disabled = true; this.textContent = "…";
         try {
           await apiFetch(`/pro/compliance/eu-ai-act/review/${id}`, {
             method: "PATCH",
-            body: JSON.stringify({ verdict, notes: "" }),
+            body: JSON.stringify({ verdict: "approved", notes: "" }),
           });
           _euLoadReviewQueue(document.querySelector(".eu-rq-filter.active")?.dataset.status || "pending");
           _euLoadSummary();
-        } catch(e) {
-          this.disabled = false;
-          alert("Could not update review: " + e.message);
+          _euLoadPublishedContracts();
+        } catch(err) {
+          this.disabled = false; this.textContent = "✓";
+          alert("Could not approve: " + err.message);
         }
       });
     });
+
+    // Wire reject buttons — show inline reason form
+    tbody.querySelectorAll(".eu-reject-btn").forEach(btn => {
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        _euShowRejectModal(this.dataset.id);
+      });
+    });
+
   } catch(e) {
     tbody.innerHTML = `<tr><td colspan="7" style="padding:0.75rem;text-align:center;color:var(--red);">Could not load review queue.</td></tr>`;
+  }
+}
+
+/** Show rejection reason modal overlay */
+function _euShowRejectModal(reviewId) {
+  // Remove any existing modal
+  document.getElementById("eu-reject-overlay")?.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "eu-reject-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;";
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:min(420px,90vw);box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+      <div style="font-size:0.9rem;font-weight:700;margin-bottom:0.3rem;">Reject Review #${esc(reviewId)}</div>
+      <div style="font-size:0.77rem;color:var(--muted);margin-bottom:1rem;">Please provide a reason for rejection. This will be recorded and shown to the requester.</div>
+      <textarea id="eu-reject-reason" placeholder="Enter rejection reason…" style="width:100%;min-height:90px;resize:vertical;font-size:0.82rem;padding:0.6rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);box-sizing:border-box;"></textarea>
+      <div id="eu-reject-err" style="font-size:0.75rem;color:var(--red);min-height:1.2rem;margin-top:0.25rem;"></div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.75rem;">
+        <button id="eu-reject-cancel" class="btn btn-outline" style="font-size:0.8rem;">Cancel</button>
+        <button id="eu-reject-confirm" class="btn" style="font-size:0.8rem;background:#ef4444;border-color:#ef4444;color:#fff;">Confirm rejection</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+  document.getElementById("eu-reject-cancel").addEventListener("click", close);
+
+  document.getElementById("eu-reject-confirm").addEventListener("click", async function() {
+    const reason = document.getElementById("eu-reject-reason").value.trim();
+    const errEl  = document.getElementById("eu-reject-err");
+    if (!reason) { errEl.textContent = "A reason is required before rejecting."; return; }
+    this.disabled = true; this.textContent = "Rejecting…";
+    try {
+      await apiFetch(`/pro/compliance/eu-ai-act/review/${reviewId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ verdict: "rejected", notes: reason }),
+      });
+      close();
+      _euLoadReviewQueue(document.querySelector(".eu-rq-filter.active")?.dataset.status || "pending");
+      _euLoadSummary();
+      _euLoadPublishedContracts();
+    } catch(err) {
+      this.disabled = false; this.textContent = "Confirm rejection";
+      errEl.textContent = "Error: " + err.message;
+    }
+  });
+}
+
+/** Load published capability contracts table */
+async function _euLoadPublishedContracts() {
+  const tbody = document.getElementById("eu-contracts-body");
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="7" style="padding:0.6rem;text-align:center;"><div class="spinner" style="margin:auto;width:16px;height:16px;"></div></td></tr>`;
+  try {
+    const d = await apiFetch("/pro/compliance/eu-ai-act/published-contracts");
+    const contracts = d.contracts || [];
+    if (!contracts.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:1rem;text-align:center;color:var(--muted);">No capability contracts published yet.</td></tr>`;
+      return;
+    }
+    const contractStatusColor = {
+      challenge_passed:      "#10b981",
+      pending_verification:  "#f59e0b",
+      verified:              "#6366f1",
+      pending_review:        "#f59e0b",
+      inactive:              "var(--muted)",
+    };
+    const reviewColor = { approved:"#10b981", rejected:"#ef4444", pending:"#f59e0b" };
+    tbody.innerHTML = contracts.map(c => {
+      const csc = contractStatusColor[c.status] || "var(--muted)";
+      const rsc = reviewColor[c.review_status] || "var(--muted)";
+      const reviewedBy = c.reviewed_by ? esc(c.reviewed_by) : "—";
+      const reviewBadge = c.review_status
+        ? `<span style="font-size:0.68rem;font-weight:600;color:${rsc};">${esc(c.verdict || c.review_status)}</span>`
+        : `<span style="color:var(--muted);font-size:0.72rem;">none</span>`;
+      const notesTip = c.notes ? ` title="${esc(c.notes)}"` : "";
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.35rem 0.6rem;font-size:0.75rem;font-weight:500;">${esc(c.agent_name||"—")}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.73rem;font-family:monospace;">${esc(c.capability||"—")}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.72rem;color:var(--muted);">${esc(c.version||"1.0")}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.72rem;font-weight:600;color:${csc};">${esc(c.status||"—").replace(/_/g," ")}</td>
+        <td style="padding:0.35rem 0.5rem;"${notesTip}>${reviewBadge}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.72rem;color:var(--muted);font-family:monospace;" title="${reviewedBy}">${c.reviewed_by ? esc(c.reviewed_by.split("@")[0]) : "—"}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.7rem;color:var(--muted);white-space:nowrap;">${c.created_at ? new Date(c.created_at).toLocaleString() : "—"}</td>
+      </tr>`;
+    }).join("");
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:0.6rem;text-align:center;color:var(--red);">Could not load contracts.</td></tr>`;
   }
 }
 
