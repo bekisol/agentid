@@ -5774,16 +5774,89 @@ document.addEventListener("DOMContentLoaded", () => {
     logout();
   });
 
-  // Delete account
+  // Delete account — inline confirmation form
   document.getElementById("delete-account-btn")?.addEventListener("click", () => {
-    const confirmed = prompt(
-      'This permanently deletes your account, all agents, and all data.\n\n' +
-      'Type DELETE to confirm:'
-    );
-    if (confirmed !== "DELETE") return;
-    apiFetch("/auth/delete-account", { method: "DELETE" })
-      .then(() => logout())
-      .catch(e => alert("Could not delete account: " + e.message));
+    // Build inline confirmation panel directly below the button row
+    const existingPanel = document.getElementById("delete-confirm-panel");
+    if (existingPanel) { existingPanel.remove(); return; } // toggle off
+
+    const panel = document.createElement("div");
+    panel.id = "delete-confirm-panel";
+    panel.style.cssText = [
+      "margin-top:1rem",
+      "padding:1rem 1.1rem",
+      "border:1px solid var(--red)",
+      "border-radius:8px",
+      "background:color-mix(in srgb, var(--red) 8%, var(--surface))",
+      "display:flex",
+      "flex-direction:column",
+      "gap:0.75rem",
+    ].join(";");
+
+    panel.innerHTML = `
+      <div style="font-size:0.84rem;font-weight:600;color:var(--red);">Confirm account deletion</div>
+      <div style="font-size:0.78rem;color:var(--text);line-height:1.5;">
+        This permanently deletes your account, all registered agents, all API keys, and all associated data.
+        This action <strong>cannot be undone</strong>.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.35rem;">
+        <label style="font-size:0.75rem;color:var(--muted);">Type <strong style="color:var(--text);">DELETE</strong> to confirm</label>
+        <input id="del-confirm-word" type="text" placeholder="DELETE"
+          style="font-size:0.82rem;padding:0.45rem 0.65rem;border:1px solid var(--border);border-radius:6px;background:var(--input-bg,var(--surface));color:var(--text);width:100%;box-sizing:border-box;" />
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.35rem;">
+        <label style="font-size:0.75rem;color:var(--muted);">Your permanent owner API key (<code style="font-size:0.73rem;">sk-...</code>)</label>
+        <input id="del-confirm-key" type="password" placeholder="sk-..."
+          style="font-size:0.82rem;padding:0.45rem 0.65rem;border:1px solid var(--border);border-radius:6px;background:var(--input-bg,var(--surface));color:var(--text);width:100%;box-sizing:border-box;font-family:monospace;" />
+      </div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+        <button id="del-cancel-btn" class="btn btn-outline" style="font-size:0.78rem;padding:0.3rem 0.75rem;">Cancel</button>
+        <button id="del-submit-btn" class="btn" style="font-size:0.78rem;padding:0.3rem 0.75rem;background:var(--red);color:#fff;border-color:var(--red);">Delete my account</button>
+      </div>
+      <div id="del-error-msg" style="font-size:0.77rem;color:var(--red);display:none;"></div>
+    `;
+
+    // Insert after the button row inside the danger-zone section
+    const btn = document.getElementById("delete-account-btn");
+    btn.closest(".modal-section").appendChild(panel);
+
+    document.getElementById("del-cancel-btn").addEventListener("click", () => panel.remove());
+
+    document.getElementById("del-submit-btn").addEventListener("click", async () => {
+      const word = document.getElementById("del-confirm-word").value.trim();
+      const key  = document.getElementById("del-confirm-key").value.trim();
+      const errEl = document.getElementById("del-error-msg");
+
+      if (word !== "DELETE") {
+        errEl.textContent = "You must type DELETE exactly.";
+        errEl.style.display = "block";
+        return;
+      }
+      if (!key.startsWith("sk-")) {
+        errEl.textContent = "Enter your permanent owner API key (starts with sk-).";
+        errEl.style.display = "block";
+        return;
+      }
+
+      const submitBtn = document.getElementById("del-submit-btn");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Deleting…";
+      errEl.style.display = "none";
+
+      try {
+        await apiFetch("/auth/delete-account", {
+          method: "DELETE",
+          body: JSON.stringify({ confirmation: "DELETE", api_key: key }),
+        });
+        panel.remove();
+        logout();
+      } catch (e) {
+        errEl.textContent = e.message || "Could not delete account. Check your API key.";
+        errEl.style.display = "block";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Delete my account";
+      }
+    });
   });
 
   // Team Keys tab
