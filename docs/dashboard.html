@@ -1009,16 +1009,22 @@
 
     /* ── Left sidebar ────────────────────────────────── */
     .settings-sidebar {
+      display: block;            /* explicit block — children stack vertically */
       width: 220px; min-width: 220px;
       height: 100%;              /* fills .modal-body = 100vh - 54px */
       flex-shrink: 0;
       background: var(--surface);
       border-right: 1px solid var(--border);
-      overflow-y: auto;
+      overflow-x: hidden;        /* never scroll sideways */
+      overflow-y: auto;          /* scroll vertically if needed */
       padding: 0.75rem 0 1rem;
       box-sizing: border-box;
     }
-    .settings-nav-group { padding: 0 0 0.5rem; }
+    .settings-nav-group {
+      display: block;            /* explicit block — tabs stack vertically */
+      width: 100%;
+      padding: 0 0 0.5rem;
+    }
     .settings-nav-group + .settings-nav-group {
       border-top: 1px solid var(--border);
       padding-top: 0.65rem; margin-top: 0.15rem;
@@ -4896,7 +4902,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260510-6"></script>
+<script src="dashboard.js?v=20260510-7"></script>
 
 </body>
 </html>
