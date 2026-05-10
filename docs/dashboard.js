@@ -7435,12 +7435,22 @@ async function _euLoadReviewQueue(status = "pending") {
       tbody.innerHTML = `<tr><td colspan="7" style="padding:1rem;text-align:center;color:var(--muted);">No ${status === "all" ? "" : status + " "}review items.</td></tr>`;
       return;
     }
-    tbody.innerHTML = items.map(item => {
+    const rows = [];
+    items.forEach(item => {
       const statusColor = {pending:"#f59e0b",approved:"#10b981",rejected:"#ef4444",expired:"var(--muted)"}[item.status] || "var(--muted)";
       const isPending = item.status === "pending";
       const agentLabel = esc(item.agent_name || (item.agent_did||"").slice(0,20));
-      return `<tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:0.35rem 0.6rem;font-size:0.72rem;color:var(--muted);">#${item.id}</td>
+
+      // Parse payload_summary — may be JSON (contract details) or plain text
+      let payload = null;
+      try { payload = JSON.parse(item.payload_summary || "null"); } catch(_) {}
+      const hasPayload = payload && typeof payload === "object";
+
+      // Main row
+      rows.push(`<tr class="eu-rq-row" data-id="${item.id}" style="border-bottom:1px solid var(--border);cursor:${hasPayload ? "pointer" : "default"};">
+        <td style="padding:0.35rem 0.6rem;font-size:0.72rem;color:var(--muted);">
+          ${hasPayload ? `<span class="eu-rq-toggle" style="margin-right:0.3rem;font-size:0.65rem;color:var(--accent);">▶</span>` : ""}#${item.id}
+        </td>
         <td style="padding:0.35rem 0.5rem;font-size:0.74rem;font-weight:500;">${agentLabel}</td>
         <td style="padding:0.35rem 0.5rem;font-size:0.73rem;font-family:monospace;">${esc(item.operation||"—")}</td>
         <td style="padding:0.35rem 0.5rem;font-size:0.72rem;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(item.reason||"")}">${esc((item.reason||"—").slice(0,60))}</td>
@@ -7453,8 +7463,70 @@ async function _euLoadReviewQueue(status = "pending") {
               <button class="btn-sm eu-review-decide" data-id="${item.id}" data-verdict="rejected" style="font-size:0.7rem;padding:0.15rem 0.45rem;color:var(--red);border-color:var(--red);">✗</button>
             </div>` : "—"}
         </td>
-      </tr>`;
-    }).join("");
+      </tr>`);
+
+      // Expandable detail row (hidden by default)
+      if (hasPayload) {
+        const p = payload;
+        const schemaStr = obj => {
+          const keys = Object.keys(obj||{});
+          return keys.length ? keys.join(", ") : "—";
+        };
+        rows.push(`<tr class="eu-rq-detail" data-for="${item.id}" style="display:none;background:color-mix(in srgb,var(--accent) 4%,var(--surface));">
+          <td colspan="7" style="padding:0.75rem 1rem 1rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1.5rem;font-size:0.76rem;">
+              <div>
+                <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Capability</div>
+                <div style="font-weight:600;font-family:monospace;">${esc(p.capability||"—")}</div>
+              </div>
+              <div>
+                <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Version · Challenge mode</div>
+                <div>${esc(p.version||"1.0")} · <span style="color:var(--accent);">${esc(p.challenge_mode||"liveness")}</span></div>
+              </div>
+              <div style="grid-column:1/-1;">
+                <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Description</div>
+                <div style="line-height:1.5;color:var(--text-2);">${esc(p.description||"—")}</div>
+              </div>
+              <div>
+                <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">SLA</div>
+                <div style="font-family:monospace;font-size:0.72rem;">${esc(JSON.stringify(p.sla||{}))}</div>
+              </div>
+              <div>
+                <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Pricing</div>
+                <div style="font-family:monospace;font-size:0.72rem;">${esc(JSON.stringify(p.pricing||{}))}</div>
+              </div>
+              <div>
+                <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Input schema fields</div>
+                <div style="font-size:0.72rem;">${esc(schemaStr((p.input_schema||{}).properties))}</div>
+              </div>
+              <div>
+                <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Output schema fields</div>
+                <div style="font-size:0.72rem;">${esc(schemaStr((p.output_schema||{}).properties))}</div>
+              </div>
+              ${(p.example_inputs||[]).length ? `<div style="grid-column:1/-1;">
+                <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Example inputs</div>
+                <pre style="font-size:0.7rem;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:0.4rem 0.6rem;overflow-x:auto;margin:0;">${esc(JSON.stringify(p.example_inputs, null, 2))}</pre>
+              </div>` : ""}
+            </div>
+          </td>
+        </tr>`);
+      }
+    });
+    tbody.innerHTML = rows.join("");
+
+    // Wire expand/collapse on clickable rows
+    tbody.querySelectorAll(".eu-rq-row[data-id]").forEach(row => {
+      row.addEventListener("click", function(e) {
+        if (e.target.closest(".eu-review-decide")) return; // don't expand when clicking approve/reject
+        const id = this.dataset.id;
+        const detail = tbody.querySelector(`.eu-rq-detail[data-for="${id}"]`);
+        if (!detail) return;
+        const toggle = this.querySelector(".eu-rq-toggle");
+        const isOpen = detail.style.display !== "none";
+        detail.style.display = isOpen ? "none" : "table-row";
+        if (toggle) toggle.textContent = isOpen ? "▶" : "▼";
+      });
+    });
 
     // Wire approve/reject buttons
     tbody.querySelectorAll(".eu-review-decide").forEach(btn => {
