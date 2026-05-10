@@ -995,44 +995,56 @@
 
     /* Left sidebar navigation */
     .settings-sidebar {
-      width: 200px; min-width: 200px;
+      width: 220px; min-width: 220px;
       background: var(--surface);
       border-right: 1px solid var(--border);
-      overflow-y: auto; padding: 1rem 0;
+      overflow-y: auto; padding: 0.75rem 0 1rem;
       display: flex; flex-direction: column; gap: 0;
     }
-    .settings-nav-group { padding: 0 0 0.75rem; }
-    .settings-nav-group + .settings-nav-group { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+    .settings-nav-group { padding: 0 0 0.5rem; }
+    .settings-nav-group + .settings-nav-group {
+      border-top: 1px solid var(--border);
+      padding-top: 0.65rem; margin-top: 0.15rem;
+    }
     .settings-nav-section {
-      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em;
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em;
       text-transform: uppercase; color: var(--muted);
-      padding: 0 1rem 0.35rem; margin-bottom: 0.1rem;
+      padding: 0.4rem 1.1rem 0.3rem; margin-bottom: 0.05rem;
     }
     .modal-tab {
-      display: flex; align-items: center; gap: 0.55rem;
+      display: flex; align-items: center; gap: 0.6rem;
       width: 100%; text-align: left;
-      font-size: 0.82rem; font-weight: 500; color: var(--text-2);
-      padding: 0.45rem 1rem; cursor: pointer; border: none;
+      font-size: 0.83rem; font-weight: 500; color: var(--text-2);
+      padding: 0.5rem 1.1rem; cursor: pointer; border: none;
       background: none; border-radius: 0;
       transition: background 0.1s, color 0.1s;
       user-select: none; line-height: 1.3;
     }
     .modal-tab:hover { background: var(--surface2); color: var(--text); }
     .modal-tab.active {
-      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      background: color-mix(in srgb, var(--accent) 13%, transparent);
       color: var(--accent); font-weight: 600;
+      border-left: 2px solid var(--accent);
+      padding-left: calc(1.1rem - 2px);
     }
-    .modal-tab .tab-icon { width: 16px; text-align: center; font-size: 0.8rem; flex-shrink: 0; }
+    .modal-tab .tab-icon { width: 15px; text-align: center; font-size: 0.78rem; flex-shrink: 0; opacity: 0.75; }
+    .modal-tab.active .tab-icon { opacity: 1; }
     .modal-tab .tier-pip {
-      margin-left: auto; font-size: 0.58rem; font-weight: 700;
-      padding: 0.05rem 0.35rem; border-radius: 3px;
+      margin-left: auto; font-size: 0.57rem; font-weight: 700;
+      padding: 0.06rem 0.38rem; border-radius: 3px;
       background: var(--surface2); color: var(--muted);
+      letter-spacing: 0.03em;
     }
 
-    /* Right content area */
+    /* Right content area — fills all remaining space */
     .modal-content {
-      flex: 1; overflow-y: auto; padding: 2rem 2.5rem;
-      max-width: 780px;
+      flex: 1; overflow-y: auto; padding: 0;
+      background: var(--bg);
+    }
+    /* Inner wrapper caps line-length on wide screens */
+    .modal-panel {
+      max-width: 720px;
+      padding: 2rem 2.5rem;
     }
     .modal-content::-webkit-scrollbar { width: 4px; }
     .modal-content::-webkit-scrollbar-track { background: transparent; }
@@ -1048,7 +1060,7 @@
       line-height: 1.55;
     }
 
-    /* panels */
+    /* panels — padding is set on .modal-panel above */
     .modal-panel { display: none; }
     .modal-panel.active { display: block; }
 
@@ -4863,7 +4875,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260510-2"></script>
+<script src="dashboard.js?v=20260510-3"></script>
 
 </body>
 </html>
