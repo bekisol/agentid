@@ -1170,7 +1170,7 @@ async function loadNetwork(){
       _authFetch("/pro/audit-log/json?limit=2000"),
       _authFetch("/trust/compromised?limit=200").catch(()=>null),
     ]);
-    if(ar.status===401){window.location.href="dashboard.html";return;}
+    if(ar.status===401){_showNetAuthWall();return;}
     if(ar.ok)agents=(await ar.json())||[];
     if(lr.ok)logs=((await lr.json()).logs)||[];
     if(cr?.ok)compromised=((await cr.json()).feed)||[];
@@ -1273,20 +1273,40 @@ async function loadNetwork(){
   });
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded",async()=>{
-  try{
-    const r=await _authFetch("/auth/me");
-    if(!r.ok){window.location.href="dashboard.html";return;}
-  }catch(_){window.location.href="dashboard.html";return;}
+// ── Auth wall helpers ──────────────────────────────────────────────────────
+function _showNetAuthWall() {
+  document.getElementById("net-auth-wall").style.display = "flex";
+  document.body.style.visibility = "";
+  const submitBtn = document.getElementById("net-apikey-submit");
+  const keyInput  = document.getElementById("net-apikey-input");
+  const errEl     = document.getElementById("net-auth-err");
+  if (!submitBtn) return;
+  async function tryKey() {
+    const entered = (keyInput.value || "").trim();
+    if (!entered) return;
+    errEl.textContent = "";
+    submitBtn.textContent = "Checking…"; submitBtn.disabled = true;
+    try {
+      const r = await fetch(`${BASE}/auth/me`, { headers: { "x-api-key": entered } });
+      if (r.ok) {
+        sessionStorage.setItem("agentid_key", entered);
+        localStorage.setItem("agentid_persisted_key", entered);
+        document.getElementById("net-auth-wall").style.display = "none";
+        _initNetwork();
+      } else {
+        errEl.textContent = "Invalid API key — check Settings → API Keys.";
+        keyInput.select();
+      }
+    } catch(_) { errEl.textContent = "Network error, please retry."; }
+    submitBtn.textContent = "Sign in with API key"; submitBtn.disabled = false;
+  }
+  submitBtn.addEventListener("click", tryKey);
+  keyInput.addEventListener("keydown", e => { if (e.key === "Enter") tryKey(); });
+}
 
-  // Fetch account tier once — used to gate Pro/Enterprise features in the detail panel
-  _authFetch("/pro/keys/me").then(r=>r.ok?r.json():null).then(d=>{
-    if(d?.tier)_accountTier=d.tier;
-  }).catch(()=>{});
-
-  document.body.style.visibility="";
-
+// ── Main init (called after auth confirmed) ────────────────────────────────
+async function _initNetwork() {
+  document.body.style.visibility = "";
   document.getElementById("range-select")?.addEventListener("change",loadNetwork);
   document.getElementById("refresh-btn")?.addEventListener("click",loadNetwork);
   document.getElementById("search-input")?.addEventListener("input",e=>{
@@ -1306,5 +1326,18 @@ document.addEventListener("DOMContentLoaded",async()=>{
     if(_net.egoMode)exitEgoMode();else{fitView();draw();}
   });
   window.addEventListener("resize",resizeCanvas);
+  // Fetch account tier once — used to gate Pro/Enterprise features in the detail panel
+  _authFetch("/pro/keys/me").then(r=>r.ok?r.json():null).then(d=>{
+    if(d?.tier)_accountTier=d.tier;
+  }).catch(()=>{});
   await loadNetwork();
+}
+
+// ── DOMContentLoaded ──────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded",async()=>{
+  try{
+    const r=await _authFetch("/auth/me");
+    if(!r.ok){_showNetAuthWall();return;}
+  }catch(_){_showNetAuthWall();return;}
+  _initNetwork();
 });

@@ -6797,21 +6797,21 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
 
 const _NAV_SECTIONS = ['overview','agents','analytics','network','audit','signing','playground'];
 
+function _scrollToSection(nav) {
+  const main = document.getElementById('dash-main');
+  const el   = document.getElementById('section-' + nav);
+  if (!el || !main) return;
+  // offsetTop is stable even when async content changes heights above this
+  // element, unlike getBoundingClientRect which shifts during loading.
+  main.scrollTo({ top: el.offsetTop - 8, behavior: 'smooth' });
+}
+
 function _initSidebar() {
   // Click handlers
   document.querySelectorAll('.dsb-item[data-nav]').forEach(item => {
     item.addEventListener('click', e => {
       e.preventDefault();
-      const id = 'section-' + item.dataset.nav;
-      const el = document.getElementById(id);
-      const main = document.getElementById('dash-main');
-      if (el && main) {
-        // getBoundingClientRect gives position relative to viewport;
-        // subtract main's top and add current scroll to get scroll target
-        const elTop = el.getBoundingClientRect().top;
-        const mainTop = main.getBoundingClientRect().top;
-        main.scrollTo({ top: main.scrollTop + elTop - mainTop - 8, behavior: 'smooth' });
-      }
+      _scrollToSection(item.dataset.nav);
       _setSidebarActive(item.dataset.nav);
     });
   });
@@ -6822,20 +6822,24 @@ function _initSidebar() {
   _sidebarUpdateUser();
 
   // Restore section from URL hash on refresh (e.g. #section-analytics)
+  // Fallback: sessionStorage["agentid_last_nav"] written by _setSidebarActive.
   // Settings hash (#settings/...) is handled separately — skip it here.
   const sectionM = location.hash.match(/^#section-([a-z0-9-]+)$/);
-  if (sectionM && _NAV_SECTIONS.includes(sectionM[1])) {
-    const nav = sectionM[1];
-    // Small delay so content has rendered before we scroll
+  const savedNav = sessionStorage.getItem('agentid_last_nav');
+  const nav = (sectionM && _NAV_SECTIONS.includes(sectionM[1]))
+    ? sectionM[1]
+    : (savedNav && _NAV_SECTIONS.includes(savedNav)) ? savedNav : null;
+
+  if (nav) {
+    // Highlight immediately so there's no flash of the wrong active item
+    _setSidebarActive(nav);
+    // Delay scroll until the page has rendered all section heights.
+    // Two-step: 300ms positions the scroll, 900ms re-confirms in case
+    // async content (charts, tables) shifted sections after first scroll.
     setTimeout(() => {
-      const el = document.getElementById('section-' + nav);
-      if (el && main) {
-        const elTop  = el.getBoundingClientRect().top;
-        const mainTop = main.getBoundingClientRect().top;
-        main.scrollTo({ top: main.scrollTop + elTop - mainTop - 8, behavior: 'smooth' });
-      }
-      _setSidebarActive(nav);
-    }, 600);
+      _scrollToSection(nav);
+      setTimeout(() => _scrollToSection(nav), 600);
+    }, 300);
   }
 }
 
@@ -6848,6 +6852,9 @@ function _setSidebarActive(nav) {
   if (!location.hash.startsWith('#settings')) {
     history.replaceState(null, '', '#section-' + nav);
   }
+  // Also mirror to sessionStorage as a belt-and-suspenders backup for
+  // cases where location.hash gets clobbered before _initSidebar reads it.
+  sessionStorage.setItem('agentid_last_nav', nav);
 }
 
 function _sidebarScrollSpy() {
