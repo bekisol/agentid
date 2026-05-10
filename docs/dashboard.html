@@ -950,62 +950,110 @@
     .expand-btn:hover { color: var(--text); }
 
     /* ── SETTINGS MODAL ── */
+    /* ── Full-screen settings ─────────────────────────────────────────── */
     .modal-backdrop {
       position: fixed; inset: 0;
-      background: rgba(0,0,0,0.45);
       z-index: 1000;
-      display: flex; align-items: center; justify-content: center;
-      padding: 1rem;
-      animation: fade-in 0.18s ease;
+      animation: fade-in 0.15s ease;
     }
     @keyframes fade-in { from { opacity:0; } to { opacity:1; } }
+
+    /* The settings page fills the whole viewport */
     .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.18);
-      width: 100%; max-width: 560px;
-      max-height: 90vh;
+      position: fixed; inset: 0;
+      background: var(--bg);
       display: flex; flex-direction: column;
-      animation: modal-in 0.2s ease;
       overflow: hidden;
     }
-    @keyframes modal-in {
-      from { opacity:0; transform: translateY(12px) scale(0.98); }
-      to   { opacity:1; transform: none; }
-    }
+
+    /* Top bar */
     .modal-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 1.1rem 1.4rem 0;
+      display: flex; align-items: center; gap: 1rem;
+      padding: 0 1.5rem;
+      height: 54px; min-height: 54px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
     }
-    .modal-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .modal-title {
+      font-size: 0.95rem; font-weight: 700; color: var(--text);
+      display: flex; align-items: center; gap: 0.5rem;
+    }
     .modal-close {
+      margin-left: auto;
       background: none; border: none; cursor: pointer;
-      font-size: 1.3rem; color: var(--muted); line-height: 1;
-      padding: 0.2rem 0.4rem; border-radius: 6px;
+      font-size: 1.1rem; color: var(--muted); line-height: 1;
+      padding: 0.3rem 0.5rem; border-radius: 6px;
       transition: background 0.12s, color 0.12s;
     }
     .modal-close:hover { background: var(--surface2); color: var(--text); }
 
-    /* tabs */
-    .modal-tabs {
-      display: flex; gap: 0; padding: 0.9rem 1.4rem 0;
-      border-bottom: 1px solid var(--border);
+    /* Body = sidebar + content */
+    .modal-body {
+      display: flex; flex: 1; overflow: hidden;
+    }
+
+    /* Left sidebar navigation */
+    .settings-sidebar {
+      width: 200px; min-width: 200px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto; padding: 1rem 0;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .settings-nav-group { padding: 0 0 0.75rem; }
+    .settings-nav-group + .settings-nav-group { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+    .settings-nav-section {
+      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted);
+      padding: 0 1rem 0.35rem; margin-bottom: 0.1rem;
     }
     .modal-tab {
-      font-size: 0.82rem; font-weight: 600; color: var(--muted);
-      padding: 0.5rem 0.9rem; cursor: pointer;
-      border-bottom: 2px solid transparent; margin-bottom: -1px;
-      transition: color 0.12s, border-color 0.12s;
-      user-select: none;
+      display: flex; align-items: center; gap: 0.55rem;
+      width: 100%; text-align: left;
+      font-size: 0.82rem; font-weight: 500; color: var(--text-2);
+      padding: 0.45rem 1rem; cursor: pointer; border: none;
+      background: none; border-radius: 0;
+      transition: background 0.1s, color 0.1s;
+      user-select: none; line-height: 1.3;
     }
-    .modal-tab:hover { color: var(--text); }
-    .modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .modal-tab:hover { background: var(--surface2); color: var(--text); }
+    .modal-tab.active {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      color: var(--accent); font-weight: 600;
+    }
+    .modal-tab .tab-icon { width: 16px; text-align: center; font-size: 0.8rem; flex-shrink: 0; }
+    .modal-tab .tier-pip {
+      margin-left: auto; font-size: 0.58rem; font-weight: 700;
+      padding: 0.05rem 0.35rem; border-radius: 3px;
+      background: var(--surface2); color: var(--muted);
+    }
 
-    /* body */
-    .modal-body { padding: 1.25rem 1.4rem; overflow-y: auto; flex: 1; }
+    /* Right content area */
+    .modal-content {
+      flex: 1; overflow-y: auto; padding: 2rem 2.5rem;
+      max-width: 780px;
+    }
+    .modal-content::-webkit-scrollbar { width: 4px; }
+    .modal-content::-webkit-scrollbar-track { background: transparent; }
+    .modal-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Panel title inside content */
+    .panel-heading {
+      font-size: 1.15rem; font-weight: 700; color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+    .panel-sub {
+      font-size: 0.82rem; color: var(--text-2); margin-bottom: 1.5rem;
+      line-height: 1.55;
+    }
+
+    /* panels */
     .modal-panel { display: none; }
     .modal-panel.active { display: block; }
+
+    /* hide old tab bar (not used in new layout) */
+    .modal-tabs { display: none; }
 
     /* form elements inside modal */
     .settings-field { margin-bottom: 1rem; }
@@ -3148,24 +3196,45 @@ curl https://api.agentid-protocol.com/agents \
   <!-- ── SETTINGS MODAL ── -->
   <div id="settings-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-label="Settings">
     <div class="modal">
+
+      <!-- Top bar -->
       <div class="modal-header">
         <span class="modal-title">⚙ Settings</span>
-        <button class="modal-close" id="settings-close" aria-label="Close">✕</button>
+        <button class="modal-close" id="settings-close" aria-label="Close settings">✕</button>
       </div>
 
-      <div class="modal-tabs">
-        <div class="modal-tab active" data-tab="account">Account</div>
-        <div class="modal-tab" data-tab="preferences">Preferences</div>
-        <div class="modal-tab" data-tab="api-keys">API Keys</div>
-        <div class="modal-tab" data-tab="team-keys" data-min-tier="pro">Team Keys</div>
-        <div class="modal-tab" data-tab="key-rotation" data-min-tier="pro">Key Rotation</div>
-        <div class="modal-tab" data-tab="webhooks" data-min-tier="pro">Webhooks</div>
-        <div class="modal-tab" data-tab="footprint" data-min-tier="pro">Footprint</div>
-        <div class="modal-tab" data-tab="enterprise-settings" data-min-tier="enterprise">Enterprise</div>
-        <div class="modal-tab" data-tab="sandbox" data-min-tier="pro">Sandbox</div>
-      </div>
-
+      <!-- Body = sidebar + content -->
       <div class="modal-body">
+
+        <!-- ── Sidebar ── -->
+        <nav class="settings-sidebar" aria-label="Settings sections">
+
+          <div class="settings-nav-group">
+            <div class="settings-nav-section">Account</div>
+            <button class="modal-tab active" data-tab="account"><span class="tab-icon">👤</span>Profile</button>
+            <button class="modal-tab" data-tab="preferences"><span class="tab-icon">🎨</span>Preferences</button>
+            <button class="modal-tab" data-tab="security"><span class="tab-icon">🔒</span>Security</button>
+          </div>
+
+          <div class="settings-nav-group">
+            <div class="settings-nav-section">Developer</div>
+            <button class="modal-tab" data-tab="api-keys"><span class="tab-icon">🔑</span>API Keys</button>
+            <button class="modal-tab" data-tab="team-keys" data-min-tier="pro"><span class="tab-icon">👥</span>Team Keys<span class="tier-pip">PRO</span></button>
+            <button class="modal-tab" data-tab="key-rotation" data-min-tier="pro"><span class="tab-icon">🔄</span>Key Rotation<span class="tier-pip">PRO</span></button>
+            <button class="modal-tab" data-tab="webhooks" data-min-tier="pro"><span class="tab-icon">🪝</span>Webhooks<span class="tier-pip">PRO</span></button>
+            <button class="modal-tab" data-tab="sandbox" data-min-tier="pro"><span class="tab-icon">🧪</span>Sandbox<span class="tier-pip">PRO</span></button>
+          </div>
+
+          <div class="settings-nav-group">
+            <div class="settings-nav-section">Enterprise</div>
+            <button class="modal-tab" data-tab="footprint" data-min-tier="pro"><span class="tab-icon">📊</span>Footprint<span class="tier-pip">PRO</span></button>
+            <button class="modal-tab" data-tab="enterprise-settings" data-min-tier="enterprise"><span class="tab-icon">🏢</span>Enterprise<span class="tier-pip">ENT</span></button>
+          </div>
+
+        </nav>
+
+        <!-- ── Content panels ── -->
+        <div class="modal-content" id="settings-content-area">
 
         <!-- ── ACCOUNT TAB ── -->
         <div class="modal-panel active" id="tab-account">
@@ -3426,6 +3495,48 @@ curl https://api.agentid-protocol.com/agents \
 
         </div>
 
+        <!-- ── SECURITY TAB ── -->
+        <div class="modal-panel" id="tab-security">
+          <div class="panel-heading">Security</div>
+          <div class="panel-sub">Password, active sessions, and account-level security controls.</div>
+
+          <!-- Change password -->
+          <div class="modal-section">
+            <div class="modal-section-title">Change Password</div>
+            <div class="settings-field">
+              <label class="settings-label" for="sec-current-pw">Current password</label>
+              <input id="sec-current-pw" class="settings-input" type="password" autocomplete="current-password" />
+            </div>
+            <div class="settings-field">
+              <label class="settings-label" for="sec-new-pw">New password</label>
+              <input id="sec-new-pw" class="settings-input" type="password" autocomplete="new-password" />
+              <p class="settings-hint">Minimum 8 characters.</p>
+            </div>
+            <div class="settings-field">
+              <label class="settings-label" for="sec-confirm-pw">Confirm new password</label>
+              <input id="sec-confirm-pw" class="settings-input" type="password" autocomplete="new-password" />
+            </div>
+            <div id="sec-pw-msg" class="modal-msg"></div>
+            <button class="btn btn-primary" id="sec-change-pw-btn" style="font-size:0.82rem;margin-top:0.25rem;">Update password</button>
+          </div>
+
+          <!-- Active sessions -->
+          <div class="modal-section">
+            <div class="modal-section-title">Active Sessions</div>
+            <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:0.75rem;line-height:1.5;">
+              All devices currently signed in to your account.
+            </p>
+            <div id="security-sessions-list">
+              <div class="loading" style="padding:0.5rem 0;"><div class="spinner"></div> Loading…</div>
+            </div>
+            <div id="sec-session-msg" class="modal-msg" style="margin-top:0.5rem;"></div>
+            <button class="btn btn-outline" id="sec-revoke-all-btn"
+              style="font-size:0.8rem;margin-top:0.75rem;color:var(--red);border-color:var(--red);">
+              Sign out all other sessions
+            </button>
+          </div>
+        </div>
+
         <!-- ── API KEYS TAB ── -->
         <div class="modal-panel" id="tab-api-keys">
           <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
@@ -3575,14 +3686,22 @@ curl https://api.agentid-protocol.com/agents \
 
         <!-- ── KEY ROTATION TAB ── -->
         <div class="modal-panel" id="tab-key-rotation" data-min-tier="pro" data-lock-feature="Key rotation">
-          <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
-            Rotate an agent's signing key without losing its DID or history.
-            Both keys are accepted during the grace period so in-flight
-            interactions are not disrupted.
-          </p>
+          <div class="panel-heading">Key Rotation</div>
+          <div class="panel-sub">
+            Swap an agent's signing key without losing its DID or history.
+            Both keys are accepted during the grace period so nothing breaks mid-flight.
+          </div>
 
+          <!-- Agent list with status badges -->
           <div class="settings-field">
-            <label class="settings-label">Your Agents — Rotation Status</label>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+              <label class="settings-label" style="margin:0;">Your Agents</label>
+              <button class="btn btn-outline" id="rotation-cleanup-btn"
+                style="font-size:0.72rem;padding:0.2rem 0.65rem;color:var(--red);border-color:var(--red);"
+                title="Delete registered agents that have never been used (0 activity, older than 10 min)">
+                🗑 Clean up unused
+              </button>
+            </div>
             <div id="rotation-agent-list">
               <div class="loading" style="padding:0.75rem 0;"><div class="spinner"></div> Loading agents…</div>
             </div>
@@ -3590,30 +3709,68 @@ curl https://api.agentid-protocol.com/agents \
 
           <hr class="settings-divider">
 
+          <!-- Step 1 — Generate a new key pair in the browser -->
+          <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:0.75rem;">
+            Initiate Rotation
+          </div>
+
           <div class="settings-field">
-            <label class="settings-label" for="rotation-did-input">Agent DID to rotate</label>
+            <label class="settings-label" for="rotation-did-input">Agent to rotate</label>
             <input id="rotation-did-input" class="settings-input" type="text"
-              placeholder="did:key:z6Mk…" spellcheck="false" />
+              placeholder="did:agentid:… (click Rotate above to auto-fill)" spellcheck="false" />
           </div>
+
           <div class="settings-field">
-            <label class="settings-label" for="rotation-newkey-input">New Public Key (Base64)</label>
-            <input id="rotation-newkey-input" class="settings-input" type="text"
-              placeholder="Base64-encoded Ed25519 public key" spellcheck="false" />
-            <p class="settings-hint">Generate a new key pair and paste the public key here. The signed payload and signature must be created by your SDK.</p>
+            <label class="settings-label">New Key Pair</label>
+            <!-- Generate button + public key display -->
+            <div style="display:flex;gap:0.5rem;align-items:stretch;">
+              <input id="rotation-newkey-input" class="settings-input" type="text"
+                placeholder="Click Generate to create a key pair in your browser"
+                spellcheck="false" style="flex:1;font-size:0.75rem;font-family:monospace;" readonly />
+              <button class="btn btn-outline" id="rotation-generate-btn"
+                style="white-space:nowrap;flex-shrink:0;">⚡ Generate</button>
+            </div>
+            <p class="settings-hint" id="rotation-key-hint">
+              Keys are generated locally in your browser — nothing is sent until you click Initiate.
+            </p>
+            <!-- Private key download box (shown after generation) -->
+            <div id="rotation-privkey-box" style="display:none;margin-top:0.6rem;
+              background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.8rem;">
+              <div style="font-size:0.75rem;font-weight:700;color:var(--yellow,#b45309);margin-bottom:0.4rem;">
+                ⬇ Download your new private key — it will not be shown again
+              </div>
+              <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-outline" id="rotation-download-btn"
+                  style="font-size:0.78rem;padding:0.3rem 0.8rem;">Download .pem</button>
+                <button class="btn btn-outline" id="rotation-copy-priv-btn"
+                  style="font-size:0.78rem;padding:0.3rem 0.8rem;">Copy raw bytes</button>
+                <span id="rotation-download-confirm" style="font-size:0.75rem;color:var(--green);display:none;">✓ Downloaded</span>
+              </div>
+            </div>
           </div>
+
           <div class="settings-field">
-            <label class="settings-label" for="rotation-grace-input">Grace Period (hours)</label>
-            <input id="rotation-grace-input" class="settings-input" type="number"
-              value="48" min="1" max="168" style="max-width:120px;" />
-            <p class="settings-hint">Both keys are accepted for this many hours after initiating rotation. Default 48 h, max 168 h (7 days).</p>
+            <label class="settings-label" for="rotation-grace-input">Grace period</label>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+              <input id="rotation-grace-input" class="settings-input" type="number"
+                value="48" min="1" max="168" style="max-width:100px;" />
+              <span style="font-size:0.8rem;color:var(--text-2);">hours</span>
+              <span style="font-size:0.75rem;color:var(--muted);">(both keys accepted during this window — max 168 h)</span>
+            </div>
           </div>
 
           <div id="rotation-msg" class="modal-msg"></div>
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.25rem;">
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem;">
+            <button class="btn btn-primary" id="rotation-initiate-btn">Initiate Rotation</button>
             <button class="btn btn-outline" id="rotation-status-btn">Check Status</button>
           </div>
 
-          <div id="rotation-status-box" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.82rem;color:var(--text-2);"></div>
+          <div id="rotation-status-box" style="display:none;margin-top:0.75rem;padding:0.75rem;
+            background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+            font-size:0.82rem;color:var(--text-2);"></div>
+
+          <div id="rotation-cleanup-result" style="display:none;margin-top:0.75rem;padding:0.6rem 0.85rem;
+            background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.82rem;"></div>
         </div>
 
         <!-- ── WEBHOOKS TAB ── -->
@@ -3926,6 +4083,7 @@ curl https://api.agentid-protocol.com/agents \
 
         </div>
 
+        </div><!-- /modal-content -->
       </div><!-- /modal-body -->
     </div>
   </div><!-- /settings-modal -->
@@ -4705,7 +4863,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260510-1"></script>
+<script src="dashboard.js?v=20260510-2"></script>
 
 </body>
 </html>

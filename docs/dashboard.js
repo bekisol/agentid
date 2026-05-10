@@ -2808,6 +2808,193 @@ async function _checkRotationStatus() {
   }
 }
 
+// ── Key rotation: browser keygen + dashboard initiate + cleanup ───────────────
+
+/** Generated private key bytes (Uint8Array) — held in memory until downloaded */
+let _rotationPrivKeyBytes = null;
+
+/**
+ * Generate an Ed25519 key pair in the browser using SubtleCrypto.
+ * Fills the public-key input and reveals the private-key download box.
+ */
+async function _generateRotationKeyPair() {
+  const btn  = document.getElementById("rotation-generate-btn");
+  const inp  = document.getElementById("rotation-newkey-input");
+  const box  = document.getElementById("rotation-privkey-box");
+  const hint = document.getElementById("rotation-key-hint");
+  if (!btn || !inp) return;
+
+  btn.disabled = true;
+  btn.textContent = "Generating…";
+  try {
+    // Ed25519 is supported in Chrome 113+, Firefox 130+, Safari 17+
+    const kp = await crypto.subtle.generateKey(
+      { name: "Ed25519" }, true, ["sign", "verify"]
+    );
+
+    // Export public key as raw bytes → base64
+    const pubRaw  = await crypto.subtle.exportKey("raw", kp.publicKey);
+    const pubArr  = new Uint8Array(pubRaw);
+    const pubB64  = btoa(String.fromCharCode(...pubArr));
+
+    // Export private key as PKCS8 — store for download
+    const privPkcs8 = await crypto.subtle.exportKey("pkcs8", kp.privateKey);
+    _rotationPrivKeyBytes = new Uint8Array(privPkcs8);
+
+    inp.value = pubB64;
+    inp.style.color = "var(--green)";
+    if (hint) hint.textContent = "✓ Key pair generated. Download the private key, then click Initiate Rotation.";
+    if (box) box.style.display = "block";
+    document.getElementById("rotation-download-confirm").style.display = "none";
+  } catch (err) {
+    // Fallback message if browser doesn't support Ed25519 SubtleCrypto
+    _modalMsg("rotation-msg",
+      `Browser key generation failed: ${err.message}. ` +
+      "Use the Python SDK instead: agent.generate_rotation_key()", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "⚡ Generate";
+  }
+}
+
+/** Trigger download of the generated private key as a PKCS8 .pem file */
+function _downloadRotationPrivKey() {
+  if (!_rotationPrivKeyBytes) return;
+  const b64 = btoa(String.fromCharCode(..._rotationPrivKeyBytes));
+  const pem  = `-----BEGIN PRIVATE KEY-----\n${b64.match(/.{1,64}/g).join("\n")}\n-----END PRIVATE KEY-----\n`;
+  const blob = new Blob([pem], { type: "text/plain" });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement("a"), { href: url, download: "agentid_rotation_key.pem" });
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  const conf = document.getElementById("rotation-download-confirm");
+  if (conf) { conf.style.display = "inline"; }
+}
+
+/** Copy raw private key bytes (hex) to clipboard */
+async function _copyRotationPrivKey() {
+  if (!_rotationPrivKeyBytes) return;
+  const hex = Array.from(_rotationPrivKeyBytes).map(b => b.toString(16).padStart(2,"0")).join("");
+  await navigator.clipboard.writeText(hex).catch(() => {});
+  const btn = document.getElementById("rotation-copy-priv-btn");
+  if (btn) { const t = btn.textContent; btn.textContent = "✓ Copied"; setTimeout(() => btn.textContent = t, 1800); }
+}
+
+/** Dashboard-authenticated rotation initiation — no SDK signature needed */
+async function _initiateRotation() {
+  const did      = (document.getElementById("rotation-did-input")?.value || "").trim();
+  const newKey   = (document.getElementById("rotation-newkey-input")?.value || "").trim();
+  const grace    = parseInt(document.getElementById("rotation-grace-input")?.value || "48", 10);
+  _modalMsgClear("rotation-msg");
+
+  if (!did)    return _modalMsg("rotation-msg", "Select or enter an agent DID.", "error");
+  if (!newKey) return _modalMsg("rotation-msg", "Generate a new key pair first.", "error");
+  if (!_rotationPrivKeyBytes)
+    return _modalMsg("rotation-msg", "Download your new private key before initiating — you cannot retrieve it later.", "error");
+
+  const btn = document.getElementById("rotation-initiate-btn");
+  btn.disabled = true; btn.textContent = "Initiating…";
+  try {
+    const data = await apiFetch(`/pro/agents/${encodeURIComponent(did)}/rotation/dashboard`, {
+      method: "POST",
+      body: JSON.stringify({ new_public_key: newKey, grace_hours: grace }),
+    });
+    _modalMsg("rotation-msg",
+      `✓ Rotation staged. Both keys accepted until ${String(data.rotation_expires_at).slice(0,19).replace("T"," ")} UTC. ` +
+      "Use your NEW private key to sign future messages. Run agent.confirm_rotation(did) to finalize.", "ok");
+    // Clear the in-memory private key — user has been warned
+    _rotationPrivKeyBytes = null;
+    document.getElementById("rotation-privkey-box").style.display = "none";
+    document.getElementById("rotation-newkey-input").value = "";
+    document.getElementById("rotation-newkey-input").style.color = "";
+    _loadRotationAgentList();
+  } catch (e) {
+    _modalMsg("rotation-msg", `Error: ${e.message}`, "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "Initiate Rotation";
+  }
+}
+
+/** Delete registered agents with zero activity older than 10 minutes */
+async function _cleanupUnusedAgents() {
+  const btn = document.getElementById("rotation-cleanup-btn");
+  const res = document.getElementById("rotation-cleanup-result");
+  if (!btn || !res) return;
+  if (!confirm("This will permanently delete all your registered agents that have never been used (no activity, created more than 10 minutes ago). Continue?")) return;
+
+  btn.disabled = true; btn.textContent = "Cleaning…";
+  res.style.display = "none";
+  try {
+    const data = await apiFetch("/pro/agents/cleanup", { method: "DELETE" });
+    res.style.display = "block";
+    if (data.deleted === 0) {
+      res.innerHTML = `<span style="color:var(--muted);">No unused agents found — nothing deleted.</span>`;
+    } else {
+      res.innerHTML = `<span style="color:var(--green);font-weight:600;">✓ Deleted ${data.deleted} unused agent${data.deleted !== 1 ? "s" : ""}</span>` +
+        (data.dids?.length ? `<div style="margin-top:0.3rem;font-size:0.72rem;color:var(--muted);word-break:break-all;">${data.dids.map(esc).join("<br>")}</div>` : "");
+      _loadRotationAgentList();
+    }
+  } catch (e) {
+    res.style.display = "block";
+    res.innerHTML = `<span style="color:var(--red);">Error: ${esc(e.message)}</span>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "🗑 Clean up unused";
+  }
+}
+
+// ── Security tab ──────────────────────────────────────────────────────────────
+
+async function _loadSecuritySessions() {
+  const el = document.getElementById("security-sessions-list");
+  if (!el) return;
+  try {
+    const data = await apiFetch("/auth/sessions");
+    const sessions = data.sessions || [];
+    if (!sessions.length) { el.innerHTML = `<p style="font-size:0.82rem;color:var(--muted);">No active sessions found.</p>`; return; }
+    el.innerHTML = sessions.map(s => `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;
+        padding:0.6rem 0;border-bottom:1px solid var(--border);gap:0.75rem;">
+        <div style="font-size:0.8rem;">
+          <div style="font-weight:600;color:var(--text);">${esc(s.user_agent ? s.user_agent.slice(0,60) : "Unknown browser")}</div>
+          <div style="color:var(--muted);font-size:0.72rem;margin-top:0.1rem;">
+            ${esc(s.ip || "?")} · ${s.created_at ? String(s.created_at).slice(0,16).replace("T"," ") : ""}
+          </div>
+        </div>
+        <span style="font-size:0.7rem;padding:0.15rem 0.45rem;border-radius:4px;white-space:nowrap;
+          background:${s.is_current ? "color-mix(in srgb,var(--green) 15%,transparent)" : "var(--surface2)"};
+          color:${s.is_current ? "var(--green)" : "var(--muted)"};">
+          ${s.is_current ? "This session" : "Active"}
+        </span>
+      </div>`).join("");
+  } catch {
+    el.innerHTML = `<p style="font-size:0.82rem;color:var(--muted);">Could not load sessions.</p>`;
+  }
+}
+
+async function _secChangePassword() {
+  const cur  = document.getElementById("sec-current-pw")?.value || "";
+  const np   = document.getElementById("sec-new-pw")?.value || "";
+  const cnf  = document.getElementById("sec-confirm-pw")?.value || "";
+  _modalMsgClear("sec-pw-msg");
+  if (!cur || !np) return _modalMsg("sec-pw-msg", "Fill in both password fields.", "error");
+  if (np !== cnf)  return _modalMsg("sec-pw-msg", "New passwords don't match.", "error");
+  if (np.length < 8) return _modalMsg("sec-pw-msg", "Password must be at least 8 characters.", "error");
+  const btn = document.getElementById("sec-change-pw-btn");
+  btn.disabled = true; btn.textContent = "Updating…";
+  try {
+    await apiFetch("/auth/password/change", {
+      method: "POST",
+      body: JSON.stringify({ current_password: cur, new_password: np }),
+    });
+    _modalMsg("sec-pw-msg", "✓ Password updated.", "ok");
+    ["sec-current-pw","sec-new-pw","sec-confirm-pw"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  } catch (e) {
+    _modalMsg("sec-pw-msg", `Error: ${e.message}`, "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "Update password";
+  }
+}
+
 // ── Webhooks tab ─────────────────────────────────────────────────────────────
 
 const WH_EVENTS = [
@@ -4960,6 +5147,7 @@ function _switchSettingsTab(tab) {
   if (tab === "webhooks") { _initWebhookEventGrid(); _loadWebhooks(); }
   if (tab === "sandbox") _loadSandboxStatus();
   if (tab === "preferences") _initPreferencesPanel();
+  if (tab === "security") { _loadSecuritySessions(); _loadSessionHistory(); }
 }
 
 // ── Preferences panel ─────────────────────────────────────────────────────────
@@ -5609,6 +5797,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Key Rotation tab
   document.getElementById("rotation-status-btn").addEventListener("click", _checkRotationStatus);
+  document.getElementById("rotation-generate-btn").addEventListener("click", _generateRotationKeyPair);
+  document.getElementById("rotation-initiate-btn").addEventListener("click", _initiateRotation);
+  document.getElementById("rotation-cleanup-btn").addEventListener("click", _cleanupUnusedAgents);
+  document.getElementById("rotation-download-btn").addEventListener("click", _downloadRotationPrivKey);
+  document.getElementById("rotation-copy-priv-btn").addEventListener("click", _copyRotationPrivKey);
+
+  // Security tab
+  document.getElementById("sec-change-pw-btn")?.addEventListener("click", _secChangePassword);
+  document.getElementById("sec-revoke-all-btn")?.addEventListener("click", async function () {
+    if (!confirm("Sign out all other sessions? You'll stay logged in here.")) return;
+    this.disabled = true;
+    try {
+      await apiFetch("/auth/logout-all", { method: "POST" });
+      _modalMsg("sec-session-msg", "✓ All other sessions signed out.", "ok");
+      _loadSecuritySessions();
+    } catch (e) {
+      _modalMsg("sec-session-msg", `Error: ${e.message}`, "error");
+    } finally { this.disabled = false; }
+  });
 
   // Webhooks tab
   document.getElementById("wh-create-btn").addEventListener("click", _createWebhook);
