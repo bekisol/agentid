@@ -7248,6 +7248,9 @@ function _initEnterpriseTab() {
       _fpLoadSummary();
       // don't auto-load events — wait for the Load button
     }
+    if (tab === "eu-compliance") {
+      _euLoadAll();
+    }
     if (tab === "enterprise-settings") {
       _loadEnterpriseSettings();
       _loadKeyUsage();
@@ -7255,8 +7258,231 @@ function _initEnterpriseTab() {
   };
 })();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EU AI ACT COMPLIANCE TAB
+// ═══════════════════════════════════════════════════════════════════════════
+
+const _euRiskColors = {
+  minimal_risk: "#10b981",
+  limited_risk: "#f59e0b",
+  high_risk:    "#ef4444",
+  unclassified: "var(--muted)",
+};
+const _euRiskLabel = {
+  minimal_risk: "Minimal",
+  limited_risk: "Limited",
+  high_risk:    "High",
+};
+
+function _initEuComplianceTab() {
+  // Toggle compliance mode
+  document.getElementById("eu-compliance-toggle")?.addEventListener("change", async function() {
+    try {
+      await apiFetch("/pro/compliance/eu-ai-act", {
+        method: "POST",
+        body: JSON.stringify({ enabled: this.checked }),
+      });
+      _euLoadSummary();
+    } catch(e) {
+      alert("Could not update compliance mode: " + e.message);
+      this.checked = !this.checked;
+    }
+  });
+
+  // Review queue filter buttons
+  document.querySelectorAll(".eu-rq-filter").forEach(btn => {
+    btn.addEventListener("click", function() {
+      document.querySelectorAll(".eu-rq-filter").forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+      _euLoadReviewQueue(this.dataset.status);
+    });
+  });
+
+  // Report buttons
+  document.getElementById("eu-report-json-btn")?.addEventListener("click", () => {
+    const days = document.getElementById("eu-report-days")?.value || "30";
+    window.open(API_BASE + `/pro/compliance/eu-ai-act/report?days=${days}&format=json`, "_blank");
+  });
+  document.getElementById("eu-report-pdf-btn")?.addEventListener("click", () => {
+    const days = document.getElementById("eu-report-days")?.value || "30";
+    window.open(API_BASE + `/pro/compliance/eu-ai-act/report?days=${days}&format=pdf`, "_blank");
+  });
+  document.getElementById("eu-monthly-export-btn")?.addEventListener("click", () => {
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+    window.open(API_BASE + `/pro/compliance/monthly-export?month=${month}`, "_blank");
+  });
+}
+
+async function _euLoadAll() {
+  await _euLoadSummary();
+  _euLoadReviewQueue("pending");
+}
+
+async function _euLoadSummary() {
+  try {
+    const d = await apiFetch("/pro/compliance/eu-ai-act");
+
+    // Update compliance mode toggle
+    const toggle = document.getElementById("eu-compliance-toggle");
+    if (toggle) toggle.checked = !!d.enabled;
+    const track = document.querySelector("[data-pref='eu-compliance-mode']");
+    if (track) track.classList.toggle("on", !!d.enabled);
+
+    // Status badge
+    const badge = document.getElementById("eu-compliance-status-badge");
+    if (badge) {
+      if (!d.enabled) {
+        badge.textContent = "⚪ Disabled";
+        badge.style.background = "var(--surface2)";
+        badge.style.color = "var(--muted)";
+        badge.style.borderColor = "var(--border)";
+      } else if (d.compliance_ready) {
+        badge.textContent = "✅ Compliant";
+        badge.style.background = "color-mix(in srgb,#10b981 12%,transparent)";
+        badge.style.color = "#10b981";
+        badge.style.borderColor = "#10b981";
+      } else {
+        badge.textContent = "⚠ Action required";
+        badge.style.background = "color-mix(in srgb,#f59e0b 12%,transparent)";
+        badge.style.color = "#f59e0b";
+        badge.style.borderColor = "#f59e0b";
+      }
+    }
+
+    // Tier stats
+    const ts = d.tier_summary || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v ?? "0"; };
+    set("eu-stat-unclassified", ts.unclassified ?? "0");
+    set("eu-stat-minimal",      ts.minimal_risk ?? "0");
+    set("eu-stat-limited",      ts.limited_risk ?? "0");
+    set("eu-stat-high",         ts.high_risk ?? "0");
+    set("eu-stat-reviews",      d.pending_reviews ?? "0");
+
+    // Agent table
+    const tbody = document.getElementById("eu-agents-body");
+    if (tbody) {
+      const agents = d.agents || [];
+      if (!agents.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:1rem;text-align:center;color:var(--muted);">No agents found. Register an agent first.</td></tr>`;
+      } else {
+        tbody.innerHTML = agents.map(a => {
+          const tier = a.risk_tier || "unclassified";
+          const color = _euRiskColors[tier] || "var(--muted)";
+          const label = _euRiskLabel[tier] || "Unclassified";
+          const readyIcon = a.ready ? `<span style="color:#10b981;">✓ Ready</span>` : `<span style="color:#ef4444;">⚠ Needs action</span>`;
+          const contractIcon = a.has_contract ? `<span style="color:#10b981;">✓</span>` : `<span style="color:var(--muted);">—</span>`;
+          const shortDid = a.did ? a.did.slice(0, 28) + "…" : "—";
+          return `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:0.35rem 0.6rem;font-size:0.78rem;font-weight:500;">${esc(a.name || "Unnamed")}</td>
+            <td style="padding:0.35rem 0.5rem;font-size:0.7rem;font-family:monospace;color:var(--muted);" title="${esc(a.did||"")}">${esc(shortDid)}</td>
+            <td style="padding:0.35rem 0.5rem;">
+              <select class="eu-tier-select" data-did="${esc(a.did||"")}" style="font-size:0.73rem;padding:0.2rem 0.4rem;border:1px solid ${color};border-radius:5px;background:var(--surface2);color:${color};font-weight:600;">
+                <option value="" ${!a.risk_tier ? "selected" : ""}>Unclassified</option>
+                <option value="minimal_risk" ${tier==="minimal_risk"?"selected":""}>Minimal risk</option>
+                <option value="limited_risk" ${tier==="limited_risk"?"selected":""}>Limited risk</option>
+                <option value="high_risk"    ${tier==="high_risk"?"selected":""}>High risk</option>
+              </select>
+            </td>
+            <td style="padding:0.35rem 0.5rem;text-align:center;">${contractIcon}</td>
+            <td style="padding:0.35rem 0.5rem;font-size:0.73rem;">${readyIcon}</td>
+            <td style="padding:0.35rem 0.5rem;">
+              <button class="btn-sm eu-tier-save" data-did="${esc(a.did||"")}" style="font-size:0.7rem;padding:0.15rem 0.5rem;">Save</button>
+            </td>
+          </tr>`;
+        }).join("");
+
+        // Wire up save buttons
+        tbody.querySelectorAll(".eu-tier-save").forEach(btn => {
+          btn.addEventListener("click", async function() {
+            const did = this.dataset.did;
+            const row = this.closest("tr");
+            const sel = row?.querySelector(".eu-tier-select");
+            const tier = sel?.value || "";
+            if (!did || !tier) return;
+            this.disabled = true;
+            this.textContent = "…";
+            try {
+              await apiFetch(`/pro/agents/${encodeURIComponent(did)}/risk-tier`, {
+                method: "POST",
+                body: JSON.stringify({ risk_tier: tier }),
+              });
+              this.textContent = "✓";
+              setTimeout(() => { this.textContent = "Save"; this.disabled = false; }, 1500);
+              _euLoadSummary();
+            } catch(e) {
+              this.textContent = "Error";
+              this.disabled = false;
+            }
+          });
+        });
+      }
+    }
+  } catch(e) {
+    const badge = document.getElementById("eu-compliance-status-badge");
+    if (badge) { badge.textContent = "Not available"; badge.style.color = "var(--muted)"; }
+  }
+}
+
+async function _euLoadReviewQueue(status = "pending") {
+  const tbody = document.getElementById("eu-review-body");
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="7" style="padding:0.75rem;text-align:center;"><div class="spinner" style="margin:auto;"></div></td></tr>`;
+  try {
+    const d = await apiFetch(`/pro/compliance/eu-ai-act/review-queue?status=${status}&limit=25`);
+    const items = d.items || [];
+    if (!items.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:1rem;text-align:center;color:var(--muted);">No ${status === "all" ? "" : status + " "}review items.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = items.map(item => {
+      const statusColor = {pending:"#f59e0b",approved:"#10b981",rejected:"#ef4444",expired:"var(--muted)"}[item.status] || "var(--muted)";
+      const isPending = item.status === "pending";
+      const agentLabel = esc(item.agent_name || (item.agent_did||"").slice(0,20));
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.35rem 0.6rem;font-size:0.72rem;color:var(--muted);">#${item.id}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.74rem;font-weight:500;">${agentLabel}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.73rem;font-family:monospace;">${esc(item.operation||"—")}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.72rem;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(item.reason||"")}">${esc((item.reason||"—").slice(0,60))}</td>
+        <td style="padding:0.35rem 0.5rem;font-weight:600;font-size:0.73rem;color:${statusColor};">${esc(item.status)}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.7rem;color:var(--muted);white-space:nowrap;">${item.created_at ? new Date(item.created_at).toLocaleString() : "—"}</td>
+        <td style="padding:0.35rem 0.5rem;">
+          ${isPending ? `
+            <div style="display:flex;gap:0.3rem;">
+              <button class="btn-sm eu-review-decide" data-id="${item.id}" data-verdict="approved" style="font-size:0.7rem;padding:0.15rem 0.45rem;background:#10b981;color:#fff;border-color:#10b981;">✓</button>
+              <button class="btn-sm eu-review-decide" data-id="${item.id}" data-verdict="rejected" style="font-size:0.7rem;padding:0.15rem 0.45rem;color:var(--red);border-color:var(--red);">✗</button>
+            </div>` : "—"}
+        </td>
+      </tr>`;
+    }).join("");
+
+    // Wire approve/reject buttons
+    tbody.querySelectorAll(".eu-review-decide").forEach(btn => {
+      btn.addEventListener("click", async function() {
+        const id      = this.dataset.id;
+        const verdict = this.dataset.verdict;
+        this.disabled = true;
+        try {
+          await apiFetch(`/pro/compliance/eu-ai-act/review/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ verdict, notes: "" }),
+          });
+          _euLoadReviewQueue(document.querySelector(".eu-rq-filter.active")?.dataset.status || "pending");
+          _euLoadSummary();
+        } catch(e) {
+          this.disabled = false;
+          alert("Could not update review: " + e.message);
+        }
+      });
+    });
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:0.75rem;text-align:center;color:var(--red);">Could not load review queue.</td></tr>`;
+  }
+}
+
 // Init on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
   _initFootprintTab();
   _initEnterpriseTab();
+  _initEuComplianceTab();
 });

@@ -3266,6 +3266,7 @@ curl https://api.agentid-protocol.com/agents \
           <div class="settings-nav-group">
             <div class="settings-nav-section">Enterprise</div>
             <button class="modal-tab" data-tab="footprint" data-min-tier="pro"><span class="tab-icon">📊</span>Footprint<span class="tier-pip">PRO</span></button>
+            <button class="modal-tab" data-tab="eu-compliance" data-min-tier="enterprise"><span class="tab-icon">🇪🇺</span>EU AI Act<span class="tier-pip">ENT</span></button>
             <button class="modal-tab" data-tab="enterprise-settings" data-min-tier="enterprise"><span class="tab-icon">🏢</span>Enterprise<span class="tier-pip">ENT</span></button>
           </div>
 
@@ -4052,6 +4053,137 @@ curl https://api.agentid-protocol.com/agents \
                   <tr><td colspan="6" style="padding:0.75rem;text-align:center;color:var(--muted);">Loading…</td></tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── EU AI ACT COMPLIANCE TAB ── -->
+        <div class="modal-panel" id="tab-eu-compliance" data-min-tier="enterprise" data-lock-feature="EU AI Act Compliance">
+
+          <!-- Header row -->
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.25rem;gap:1rem;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:1rem;font-weight:700;margin-bottom:0.25rem;">EU AI Act Compliance</div>
+              <div style="font-size:0.77rem;color:var(--muted);line-height:1.5;">
+                Enforcement date: <strong style="color:var(--text);">1 August 2026</strong> ·
+                Articles 6, 9, 12, 13, 14, 17
+              </div>
+            </div>
+            <div id="eu-compliance-status-badge" style="font-size:0.75rem;padding:0.3rem 0.75rem;border-radius:20px;background:var(--surface2);border:1px solid var(--border);white-space:nowrap;">Loading…</div>
+          </div>
+
+          <!-- Enable toggle -->
+          <div class="modal-section">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.84rem;font-weight:500;">Compliance Mode</div>
+                <div style="font-size:0.75rem;color:var(--muted);">Enforce risk tiers, human review gates, and capability contracts for all agents</div>
+              </div>
+              <label style="cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+                <input type="checkbox" id="eu-compliance-toggle" style="display:none;" />
+                <span class="pref-toggle-track" data-pref="eu-compliance-mode"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Summary stats -->
+          <div class="modal-section">
+            <div class="modal-section-title">Overview</div>
+            <div id="eu-tier-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:0.5rem;margin-bottom:0.75rem;">
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                <div id="eu-stat-unclassified" style="font-size:1.1rem;font-weight:700;color:var(--muted);">—</div>
+                <div style="font-size:0.7rem;color:var(--muted);">Unclassified</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                <div id="eu-stat-minimal" style="font-size:1.1rem;font-weight:700;color:#10b981;">—</div>
+                <div style="font-size:0.7rem;color:var(--muted);">Minimal risk</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                <div id="eu-stat-limited" style="font-size:1.1rem;font-weight:700;color:#f59e0b;">—</div>
+                <div style="font-size:0.7rem;color:var(--muted);">Limited risk</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                <div id="eu-stat-high" style="font-size:1.1rem;font-weight:700;color:#ef4444;">—</div>
+                <div style="font-size:0.7rem;color:var(--muted);">High risk</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                <div id="eu-stat-reviews" style="font-size:1.1rem;font-weight:700;color:var(--accent);">—</div>
+                <div style="font-size:0.7rem;color:var(--muted);">Pending reviews</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Agent risk tier table -->
+          <div class="modal-section">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+              <div class="modal-section-title" style="margin:0;">Agent Risk Classification</div>
+              <span style="font-size:0.72rem;color:var(--muted);">Set a tier per agent to classify its EU AI Act risk level</span>
+            </div>
+            <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;max-height:240px;overflow-y:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:0.76rem;">
+                <thead style="position:sticky;top:0;background:var(--surface2);z-index:1;">
+                  <tr>
+                    <th style="padding:0.4rem 0.6rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Agent</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">DID</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Risk Tier</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Contract</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Status</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="eu-agents-body">
+                  <tr><td colspan="6" style="padding:1rem;text-align:center;color:var(--muted);">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Human review queue -->
+          <div class="modal-section">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+              <div class="modal-section-title" style="margin:0;">Human Review Queue</div>
+              <div style="display:flex;gap:0.35rem;">
+                <button class="btn-sm btn-outline eu-rq-filter active" data-status="pending" style="font-size:0.73rem;">Pending</button>
+                <button class="btn-sm btn-outline eu-rq-filter" data-status="approved" style="font-size:0.73rem;">Approved</button>
+                <button class="btn-sm btn-outline eu-rq-filter" data-status="rejected" style="font-size:0.73rem;">Rejected</button>
+                <button class="btn-sm btn-outline eu-rq-filter" data-status="all" style="font-size:0.73rem;">All</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;max-height:260px;overflow-y:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:0.76rem;">
+                <thead style="position:sticky;top:0;background:var(--surface2);z-index:1;">
+                  <tr>
+                    <th style="padding:0.4rem 0.6rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">#</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Agent</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Operation</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Reason</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Status</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Time</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="eu-review-body">
+                  <tr><td colspan="7" style="padding:1rem;text-align:center;color:var(--muted);">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Report export -->
+          <div class="modal-section" style="margin-bottom:0.5rem;">
+            <div class="modal-section-title" style="margin-bottom:0.6rem;">Compliance Reports</div>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+              <select id="eu-report-days" style="font-size:0.78rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);">
+                <option value="30">Last 30 days</option>
+                <option value="60">Last 60 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="180">Last 180 days</option>
+                <option value="365">Last 365 days</option>
+              </select>
+              <button class="btn-sm btn-outline" id="eu-report-json-btn" style="font-size:0.78rem;">↓ JSON report</button>
+              <button class="btn-sm btn-outline" id="eu-report-pdf-btn" style="font-size:0.78rem;">↓ PDF report</button>
+              <button class="btn-sm btn-outline" id="eu-monthly-export-btn" style="font-size:0.78rem;">↓ Monthly export</button>
             </div>
           </div>
 
@@ -4961,7 +5093,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260510-10"></script>
+<script src="dashboard.js?v=20260510-11"></script>
 
 </body>
 </html>
