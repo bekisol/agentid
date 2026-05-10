@@ -6975,6 +6975,128 @@ function _initFootprintTab() {
   document.getElementById("fp-export-csv-btn")?.addEventListener("click", () => {
     window.open(API_BASE + "/pro/account/export?fmt=csv&" + _fpExportParams(), "_blank");
   });
+
+  // Webhook log fail-filter toggle
+  document.querySelectorAll(".fp-wh-filter-btn").forEach(btn => {
+    btn.addEventListener("click", function() {
+      document.querySelectorAll(".fp-wh-filter-btn").forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+      _fpLoadWebhookLog(this.dataset.fail === "1");
+    });
+  });
+
+  // Load supplemental sections
+  _fpLoadSessions();
+  _fpLoadKeyUsage();
+  _fpLoadWebhookLog(false);
+}
+
+// ── Footprint: Session History ────────────────────────────────────────────────
+async function _fpLoadSessions() {
+  const body = document.getElementById("fp-sessions-body");
+  const countEl = document.getElementById("fp-session-count");
+  if (!body) return;
+  try {
+    const d = await apiFetch("/pro/account/sessions?limit=50");
+    const sessions = d.sessions || [];
+    if (countEl) countEl.textContent = `${d.total ?? sessions.length} total`;
+    if (!sessions.length) {
+      body.innerHTML = `<tr><td colspan="5" style="padding:0.75rem;text-align:center;color:var(--muted);">No sessions found.</td></tr>`;
+      return;
+    }
+    body.innerHTML = sessions.map(s => {
+      const active = s.active;
+      const ua = s.user_agent || "—";
+      // trim UA to readable browser/OS hint
+      const uaShort = ua.length > 60 ? ua.slice(0, 57) + "…" : ua;
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.35rem 0.6rem;white-space:nowrap;font-size:0.72rem;color:var(--muted);">${s.created_at ? new Date(s.created_at).toLocaleString() : "—"}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.74rem;font-family:monospace;">${esc(s.ip || "—")}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.7rem;color:var(--text-2);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(ua)}">${esc(uaShort)}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.7rem;color:var(--muted);">${s.expires_at ? new Date(s.expires_at).toLocaleDateString() : "—"}</td>
+        <td style="padding:0.35rem 0.5rem;">
+          ${active
+            ? `<span style="color:#10b981;font-weight:600;font-size:0.72rem;">● Active</span>`
+            : `<span style="color:var(--muted);font-size:0.72rem;">Expired</span>`}
+        </td>
+      </tr>`;
+    }).join("");
+  } catch(e) {
+    body.innerHTML = `<tr><td colspan="5" style="padding:0.75rem;text-align:center;color:var(--red);">Could not load sessions.</td></tr>`;
+  }
+}
+
+// ── Footprint: API Key Usage ──────────────────────────────────────────────────
+async function _fpLoadKeyUsage() {
+  const grid = document.getElementById("fp-keys-grid");
+  if (!grid) return;
+  try {
+    const d = await apiFetch("/pro/account/keys/usage");
+    const keys = d.keys || [];
+    if (!keys.length) {
+      grid.innerHTML = `<div style="color:var(--muted);font-size:0.77rem;">No API keys found.</div>`;
+      return;
+    }
+    grid.innerHTML = keys.map(k => {
+      const lastUsed = k.last_used_at ? new Date(k.last_used_at).toLocaleString() : "Never";
+      const created  = k.created_at  ? new Date(k.created_at).toLocaleDateString() : "—";
+      const reqCount = (k.request_count ?? 0).toLocaleString();
+      const scopeStr = k.scopes ? k.scopes : "full access";
+      return `
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.55rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--surface2);">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.2rem;">
+              <span style="font-size:0.82rem;font-weight:600;">${esc(k.label || "Unnamed")}</span>
+              ${k.permanent ? `<span style="font-size:0.65rem;padding:0.1rem 0.4rem;background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent);border-radius:4px;font-weight:600;">OWNER</span>` : ""}
+              <span style="font-size:0.65rem;padding:0.1rem 0.4rem;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--muted);">${esc(k.tier||"free")}</span>
+            </div>
+            <div style="font-size:0.71rem;color:var(--muted);">Scopes: ${esc(scopeStr)} · Created ${created}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:0.88rem;font-weight:700;">${reqCount}</div>
+            <div style="font-size:0.68rem;color:var(--muted);">requests</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;min-width:130px;">
+            <div style="font-size:0.73rem;color:var(--muted);">Last used</div>
+            <div style="font-size:0.74rem;">${esc(lastUsed)}</div>
+          </div>
+        </div>`;
+    }).join("");
+  } catch(e) {
+    grid.innerHTML = `<div style="color:var(--red);font-size:0.77rem;">Could not load key usage.</div>`;
+  }
+}
+
+// ── Footprint: Webhook Delivery Log ───────────────────────────────────────────
+async function _fpLoadWebhookLog(failOnly = false) {
+  const body = document.getElementById("fp-webhook-body");
+  if (!body) return;
+  body.innerHTML = `<tr><td colspan="6" style="padding:0.75rem;text-align:center;"><div class="spinner" style="margin:auto;"></div></td></tr>`;
+  try {
+    const params = new URLSearchParams({ limit: 50 });
+    if (failOnly) params.set("fail_only", "true");
+    const d = await apiFetch("/pro/account/webhook-log?" + params);
+    const deliveries = d.deliveries || [];
+    if (!deliveries.length) {
+      body.innerHTML = `<tr><td colspan="6" style="padding:0.75rem;text-align:center;color:var(--muted);">${failOnly ? "No failures found." : "No webhook deliveries yet."}</td></tr>`;
+      return;
+    }
+    body.innerHTML = deliveries.map(w => {
+      const ok = w.success;
+      const statusColor = ok ? "#10b981" : "#ef4444";
+      const statusText  = ok ? "✓ Success" : "✗ Failed";
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.35rem 0.6rem;white-space:nowrap;font-size:0.72rem;color:var(--muted);">${w.attempted_at ? new Date(w.attempted_at).toLocaleString() : "—"}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.74rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(w.webhook_url||"")}">${esc((w.webhook_url||"—").replace(/^https?:\/\//,"").slice(0,30))}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.73rem;font-family:monospace;">${esc(w.event_type || "—")}</td>
+        <td style="padding:0.35rem 0.5rem;font-weight:600;font-size:0.73rem;color:${statusColor};">${statusText}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.73rem;color:var(--muted);">${w.status_code ?? "—"}</td>
+        <td style="padding:0.35rem 0.5rem;font-size:0.7rem;color:var(--red);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(w.error||"")}">${esc(w.error ? String(w.error).slice(0,60) : "—")}</td>
+      </tr>`;
+    }).join("");
+  } catch(e) {
+    body.innerHTML = `<tr><td colspan="6" style="padding:0.75rem;text-align:center;color:var(--red);">Could not load webhook log.</td></tr>`;
+  }
 }
 
 function _fpExportParams() {

@@ -3995,6 +3995,66 @@ curl https://api.agentid-protocol.com/agents \
             </div>
           </div>
 
+          <!-- Session History -->
+          <div class="modal-section" style="margin-top:1.5rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+              <div class="modal-section-title" style="margin:0;">Session History</div>
+              <span id="fp-session-count" style="font-size:0.72rem;color:var(--muted);"></span>
+            </div>
+            <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:0.76rem;">
+                <thead style="position:sticky;top:0;background:var(--surface2);z-index:1;">
+                  <tr>
+                    <th style="padding:0.4rem 0.6rem;text-align:left;font-weight:600;color:var(--text-2);white-space:nowrap;border-bottom:1px solid var(--border);">Time</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">IP</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Device / Browser</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Expires</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="fp-sessions-body">
+                  <tr><td colspan="5" style="padding:0.75rem;text-align:center;color:var(--muted);">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- API Key Usage -->
+          <div class="modal-section" style="margin-top:1.5rem;">
+            <div class="modal-section-title" style="margin-bottom:0.6rem;">API Key Usage</div>
+            <div id="fp-keys-grid" style="display:flex;flex-direction:column;gap:0.4rem;">
+              <div style="color:var(--muted);font-size:0.77rem;">Loading…</div>
+            </div>
+          </div>
+
+          <!-- Webhook Delivery Log -->
+          <div class="modal-section" style="margin-top:1.5rem;margin-bottom:0.5rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+              <div class="modal-section-title" style="margin:0;">Webhook Delivery Log</div>
+              <div style="display:flex;gap:0.35rem;">
+                <button class="btn-sm btn-outline fp-wh-filter-btn active" data-fail="0" style="font-size:0.73rem;">All</button>
+                <button class="btn-sm btn-outline fp-wh-filter-btn" data-fail="1" style="font-size:0.73rem;color:var(--red);">Failures only</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:0.76rem;">
+                <thead style="position:sticky;top:0;background:var(--surface2);z-index:1;">
+                  <tr>
+                    <th style="padding:0.4rem 0.6rem;text-align:left;font-weight:600;color:var(--text-2);white-space:nowrap;border-bottom:1px solid var(--border);">Time</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Webhook</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Event</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Result</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">HTTP</th>
+                    <th style="padding:0.4rem 0.5rem;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border);">Error</th>
+                  </tr>
+                </thead>
+                <tbody id="fp-webhook-body">
+                  <tr><td colspan="6" style="padding:0.75rem;text-align:center;color:var(--muted);">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
 
         <!-- ── ENTERPRISE SETTINGS TAB ── -->
@@ -4901,7 +4961,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260510-9"></script>
+<script src="dashboard.js?v=20260510-10"></script>
 
 </body>
 </html>
