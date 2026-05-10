@@ -7443,8 +7443,9 @@ async function _euLoadReviewQueue(status = "pending") {
 
       // Parse payload_summary — may be JSON (contract details) or plain text
       let payload = null;
-      try { payload = JSON.parse(item.payload_summary || "null"); } catch(_) {}
-      const hasPayload = payload && typeof payload === "object";
+      let payloadRaw = item.payload_summary || "";
+      try { payload = JSON.parse(payloadRaw || "null"); } catch(_) {}
+      const hasPayload = (payload && typeof payload === "object") || payloadRaw.trim().length > 0;
 
       // Main row
       rows.push(`<tr class="eu-rq-row" data-id="${item.id}" style="border-bottom:1px solid var(--border);cursor:${hasPayload ? "pointer" : "default"};">
@@ -7467,13 +7468,14 @@ async function _euLoadReviewQueue(status = "pending") {
 
       // Expandable detail row (hidden by default)
       if (hasPayload) {
-        const p = payload;
-        const schemaStr = obj => {
-          const keys = Object.keys(obj||{});
-          return keys.length ? keys.join(", ") : "—";
-        };
-        rows.push(`<tr class="eu-rq-detail" data-for="${item.id}" style="display:none;background:color-mix(in srgb,var(--accent) 4%,var(--surface));">
-          <td colspan="7" style="padding:0.75rem 1rem 1rem;">
+        let detailInner = "";
+        if (payload && typeof payload === "object") {
+          const p = payload;
+          const schemaStr = obj => {
+            const keys = Object.keys(obj||{});
+            return keys.length ? keys.join(", ") : "—";
+          };
+          detailInner = `
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1.5rem;font-size:0.76rem;">
               <div>
                 <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Capability</div>
@@ -7507,8 +7509,13 @@ async function _euLoadReviewQueue(status = "pending") {
                 <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem;">Example inputs</div>
                 <pre style="font-size:0.7rem;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:0.4rem 0.6rem;overflow-x:auto;margin:0;">${esc(JSON.stringify(p.example_inputs, null, 2))}</pre>
               </div>` : ""}
-            </div>
-          </td>
+            </div>`;
+        } else {
+          // Legacy plain-text payload_summary
+          detailInner = `<pre style="font-size:0.73rem;white-space:pre-wrap;word-break:break-word;margin:0;color:var(--text-2);">${esc(payloadRaw)}</pre>`;
+        }
+        rows.push(`<tr class="eu-rq-detail" data-for="${item.id}" style="display:none;background:color-mix(in srgb,var(--accent) 4%,var(--surface));">
+          <td colspan="7" style="padding:0.75rem 1rem 1rem;">${detailInner}</td>
         </tr>`);
       }
     });
