@@ -5333,7 +5333,9 @@ async function _loadTrustScoreWidget() {
           <div style="flex:1;min-width:0;">
             <div style="font-size:0.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
                  title="${esc(a.did)}">${name}</div>
-            <div style="font-size:0.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.did)}</div>
+            ${a.top_3_issues && a.top_3_issues.length
+              ? `<div style="font-size:0.68rem;color:#f59e0b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(a.top_3_issues.join(' · '))}">⚠ ${esc(a.top_3_issues[0])}</div>`
+              : `<div style="font-size:0.68rem;color:#22c55e;">✓ No issues</div>`}
           </div>
           <div class="trust-score-bar-wrap" style="width:140px;flex-shrink:0;">
             <div style="height:6px;border-radius:999px;background:var(--surface2);overflow:hidden;">
@@ -5370,9 +5372,18 @@ const _TS_FACTORS = [
 ];
 
 function _renderTrustBreakdown(el, data) {
-  const bd = data.breakdown || {};
+  // Pro endpoint returns `breakdown`; public ?detailed=true returns `breakdown` too.
+  // Fall back to `dimensions` if breakdown is missing (older cached responses).
+  const bd = data.breakdown || data.dimensions || {};
   const totalScore = data.score || 0;
   const level      = data.level || "low";
+  // Show top_3_issues banner if available
+  const issues = data.top_3_issues || [];
+  const issuesBanner = issues.length ? `
+    <div style="background:#1c1200;border:1px solid #78350f;border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.5rem;">
+      <div style="font-size:0.68rem;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Top Issues</div>
+      ${issues.map(i => `<div style="font-size:0.72rem;color:#fcd34d;">⚠ ${esc(i)}</div>`).join("")}
+    </div>` : "";
 
   const rows = _TS_FACTORS.map(f => {
     const b     = bd[f.key] || { score: 0, max: 0, value: "—" };
@@ -5400,6 +5411,7 @@ function _renderTrustBreakdown(el, data) {
 
   el.innerHTML = `
     <div style="padding:0.75rem 1rem 0.25rem;background:var(--surface2,#1c1c1c);border-radius:0 0 0.5rem 0.5rem;margin-bottom:0.25rem;">
+      ${issuesBanner}
       <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">
         <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Score breakdown</span>
         <span style="margin-left:auto;font-size:0.72rem;font-weight:700;color:${levelColor};">${totalScore} pts — ${level}</span>
@@ -5568,6 +5580,8 @@ async function _openTrustScorePanel(did, name, score, level) {
   }
 
   try {
+    // Use the pro endpoint which always returns the full breakdown.
+    // Public endpoint needs ?detailed=true; pro endpoint always includes it.
     const data = await apiFetch(`/pro/agents/${encodeURIComponent(did)}/trust-score`);
     _tsBreakdownCache[did] = data;
     _renderTrustBreakdown(body, data);

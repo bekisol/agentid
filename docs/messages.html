@@ -1346,9 +1346,19 @@ function renderFeed() {
     }
 
     const timeStr = t ? t.toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit" }) : "";
+    // Prefer sender_name; fall back to a short human-readable label (not raw DID).
+    // For human: DIDs strip the "human:" prefix and show the email/handle part.
+    function _shortDid(did) {
+      if (!did) return "Unknown";
+      if (did.startsWith("human:")) return did.replace("human:", "");
+      // did:agentid:XYZ… → show last 8 chars with ellipsis
+      const parts = did.split(":");
+      const id = parts[parts.length - 1] || did;
+      return id.length > 12 ? "…" + id.slice(-8) : id;
+    }
     const senderLabel = isSent
       ? (m._agentName || "You")
-      : (m.sender_name || (m.from_did ? m.from_did.slice(-10) : "Unknown"));
+      : (m.sender_name || _shortDid(m.from_did));
     const avatarLetter = senderLabel.charAt(0).toUpperCase();
     // For sent agent-to-agent messages: sender_name holds the recipient name (JOIN is on to_did)
     const recipientName = isAgentToAgent ? (m.sender_name || (m.to_did ? m.to_did.split(":").pop().slice(-14) : "")) : "";
@@ -1410,10 +1420,11 @@ function _renderMsgBody(body, idx, fileRef, msgType, senderCaps) {
   const negHtml  = (msgType && msgType !== 'message') ? _renderNegBanner(msgType) : '';
   const capsHtml = senderCaps ? _renderCapsBar(senderCaps) : '';
   if (!body) return negHtml + fileHtml + capsHtml;
-  const sig = _parseSignedBody(body);
+  const body2 = _stripContextPrefix(body);  // remove internal context hints
+  const sig = _parseSignedBody(body2);
   let mainHtml;
   if (!sig) {
-    mainHtml = esc(body);
+    mainHtml = esc(body2);
   } else {
     const mainText = sig.payload && sig.payload.body ? sig.payload.body : '';
     mainHtml = (mainText ? esc(mainText) + '\n' : '') + _renderSigBlock(sig, idx);
@@ -1767,12 +1778,20 @@ function mdToHtml(text) {
     .replace(/\n/g, "<br>");
 }
 
+// Strip the [Context: ...]\n\n prefix that is prepended server-side to
+// give the brain context about which conversation is open. It is an internal
+// hint — users should never see it in the chat history.
+function _stripContextPrefix(text) {
+  return (text || "").replace(/^\[Context:[^\]]*\]\n\n/, "");
+}
+
 function renderChatMessages(msgs) {
   const box = document.getElementById("chat-panel-messages");
   box.innerHTML = msgs.map(m => {
     const cls  = m.role === "human" ? "human" : "agent";
     const time = m.sent_at ? new Date(m.sent_at).toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit" }) : "";
-    const body = cls === "agent" ? mdToHtml(m.body || "") : esc(m.body || "");
+    const raw  = _stripContextPrefix(m.body || "");
+    const body = cls === "agent" ? mdToHtml(raw) : esc(raw);
     return `<div class="chat-msg ${cls}">${body}</div><div class="chat-msg-time" style="align-self:${cls === "human" ? "flex-end" : "flex-start"}">${time}</div>`;
   }).join("");
   box.scrollTop = box.scrollHeight;
