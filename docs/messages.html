@@ -1156,6 +1156,9 @@ function selectAgent(agentDid) {
       renderFeed();
     }
   }).catch(() => {});
+
+  // Auto-open chat panel for this agent
+  _openChatForAgent(agentDid);
 }
 
 // Step 2: user picks the TO partner — shows that specific conversation
@@ -1320,13 +1323,9 @@ function renderFeed() {
   const headerActions = document.getElementById("header-right-actions");
   if (headerActions) headerActions.innerHTML = "";
 
-  // Show/update Force Stop button + Chat button based on selection and stop state
+  // Chat panel auto-opens via selectAgent(); hide the manual button
   const chatBtn = document.getElementById("chat-open-btn");
-  if (_selectedDid && _selectedDid !== "__deals__" && _selectedDid !== "__group__") {
-    if (chatBtn) chatBtn.style.display = "";
-  } else {
-    if (chatBtn) chatBtn.style.display = "none";
-  }
+  if (chatBtn) chatBtn.style.display = "none";
   _refreshStopButton();
 
   // Group view is self-contained: showGroupView() owns feed-scroll and
@@ -1841,18 +1840,30 @@ async function deleteSelected() {
 let _chatDid = "";
 let _chatName = "";
 
-async function openChat() {
-  const agent = _agents.find(a => a.did === _selectedDid);
+// Open (or switch) the chat panel to a specific agent DID.
+// Called automatically by selectAgent() — panel is always open when an agent is selected.
+async function _openChatForAgent(agentDid) {
+  const agent = _agents.find(a => a.did === agentDid);
   if (!agent) return;
+  const switching = _chatDid && _chatDid !== agentDid;
   _chatDid  = agent.did;
   _chatName = agent.name || agent.did.slice(-12);
   document.getElementById("chat-panel-title").textContent = `💬 ${_chatName}`;
   document.getElementById("chat-panel-subtitle").textContent = "AI-powered · your agent";
   document.getElementById("chat-panel").classList.add("open");
   document.body.classList.add("chat-open");
+  if (switching) {
+    // Clear old messages immediately when switching agents so stale content isn't shown
+    document.getElementById("chat-panel-messages").innerHTML =
+      '<div class="chat-typing">Loading…</div>';
+  }
   document.getElementById("chat-input").focus();
   await loadChatHistory();
   _startChatPoll();
+}
+
+async function openChat() {
+  await _openChatForAgent(_selectedDid);
 }
 
 function closeChat() {
