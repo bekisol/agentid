@@ -743,7 +743,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.key === "Enter") searchMarket();
   });
 
-  // Check for existing key
+  // Check for existing key; if missing, ask sibling tabs via BroadcastChannel
+  if (!_apiKey && typeof BroadcastChannel !== "undefined") {
+    _apiKey = await new Promise(resolve => {
+      const bc = new BroadcastChannel("agentid_session");
+      const timer = setTimeout(() => { bc.close(); resolve(""); }, 600);
+      bc.onmessage = ev => {
+        const msg = ev.data;
+        if (msg && msg.type === "response" && msg.key && Date.now() - msg.ts < 2000) {
+          clearTimeout(timer);
+          bc.close();
+          sessionStorage.setItem("agentid_key", msg.key);
+          resolve(msg.key);
+        }
+      };
+      bc.postMessage({ type: "request" });
+    });
+  }
+
   if (_apiKey) {
     await doAuth(_apiKey);
   } else {
