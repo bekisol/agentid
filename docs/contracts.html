@@ -749,9 +749,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.key === "Enter") searchMarket();
   });
 
-  // If no key in storage, ask sibling tabs via BroadcastChannel (same mechanism
-  // as dashboard.js). Dashboard responds within ~100ms when open in another tab.
-  if (!_apiKey && typeof BroadcastChannel !== "undefined") {
+  // Fast path: already authed (API key or OAuth session flag) → show immediately.
+  if (_apiKey || sessionStorage.getItem("agentid_authed")) {
+    _showApp("");
+    return;
+  }
+
+  // No key in storage — ask sibling tabs via BroadcastChannel before giving up.
+  // This handles the case where another tab (dashboard) holds the session.
+  if (typeof BroadcastChannel !== "undefined") {
     _apiKey = await new Promise(resolve => {
       const bc = new BroadcastChannel("agentid_session");
       const timer = setTimeout(() => { bc.close(); resolve(""); }, 600);
@@ -768,13 +774,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  const _authed = _apiKey || sessionStorage.getItem("agentid_authed");
-  if (_authed) {
-    // Key from storage or active OAuth session — proceed directly.
-    // If stale, the first API call will 401.
+  if (_apiKey) {
     _showApp("");
   } else {
-    // No session — send to the main sign-in page, which will redirect back here.
+    // No session anywhere — redirect to sign-in, which will come back here.
     location.href = "index.html?redirect=contracts.html";
   }
 });
