@@ -4735,17 +4735,102 @@ curl https://api.agentid-protocol.com/agents \
         <button class="btn btn-outline" id="approvals-refresh-btn" style="font-size:0.78rem;padding:0.28rem 0.7rem;">↻ Refresh</button>
       </div>
     </div>
-    <div style="padding:0.6rem 1.25rem;border-bottom:1px solid var(--border);display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
-      <select id="approvals-status-filter" style="padding:0.3rem 0.55rem;border:1px solid var(--border-dark);border-radius:7px;font-size:0.8rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;">
-        <option value="pending">Pending</option>
-        <option value="approved">Approved</option>
-        <option value="denied">Denied</option>
-        <option value="">All statuses</option>
-      </select>
-      <span style="font-size:0.78rem;color:var(--muted);" id="approvals-count-label"></span>
+
+    <!-- Tab bar -->
+    <div style="display:flex;border-bottom:1px solid var(--border);padding:0 1.25rem;gap:0;">
+      <button class="acp-tab acp-tab-active" data-tab="queue" style="background:none;border:none;border-bottom:2px solid var(--accent);padding:0.55rem 1rem;font-size:0.82rem;font-weight:600;color:var(--accent);cursor:pointer;font-family:inherit;margin-bottom:-1px;">Queue</button>
+      <button class="acp-tab" data-tab="policies" style="background:none;border:none;border-bottom:2px solid transparent;padding:0.55rem 1rem;font-size:0.82rem;font-weight:500;color:var(--muted);cursor:pointer;font-family:inherit;margin-bottom:-1px;">Policies</button>
     </div>
-    <div id="approvals-list">
-      <div style="text-align:center;color:var(--muted);padding:2rem 0;font-size:0.85rem;">Loading approvals…</div>
+
+    <!-- Queue panel -->
+    <div id="acp-panel-queue">
+      <div style="padding:0.6rem 1.25rem;border-bottom:1px solid var(--border);display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+        <select id="approvals-status-filter" style="padding:0.3rem 0.55rem;border:1px solid var(--border-dark);border-radius:7px;font-size:0.8rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="denied">Denied</option>
+          <option value="">All statuses</option>
+        </select>
+        <span style="font-size:0.78rem;color:var(--muted);" id="approvals-count-label"></span>
+      </div>
+      <div id="approvals-list">
+        <div style="text-align:center;color:var(--muted);padding:2rem 0;font-size:0.85rem;">Loading approvals…</div>
+      </div>
+    </div>
+
+    <!-- Policies panel -->
+    <div id="acp-panel-policies" style="display:none;">
+      <div style="padding:0.65rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+        <span id="acp-policies-count" style="font-size:0.78rem;color:var(--muted);"></span>
+        <button class="btn btn-primary" id="acp-add-policy-btn" style="font-size:0.78rem;padding:0.28rem 0.8rem;">+ Add Policy</button>
+      </div>
+      <div id="acp-policies-list">
+        <div style="text-align:center;color:var(--muted);padding:2rem 0;font-size:0.85rem;">Loading policies…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ACP: Add Policy Modal ── -->
+  <div id="modal-acp-policy" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9000;align-items:center;justify-content:center;">
+    <div style="background:var(--card-bg,#fff);border-radius:14px;padding:1.5rem 1.75rem;width:min(500px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem;">
+        <span style="font-size:1rem;font-weight:800;color:var(--text);">Add ACP Policy</span>
+        <button id="acp-policy-modal-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--muted);line-height:1;">✕</button>
+      </div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1.2rem;line-height:1.5;">
+        A policy tells AgentID to pause an agent action and hold it for your approval before it runs.
+      </div>
+
+      <!-- Agent -->
+      <div style="margin-bottom:0.85rem;">
+        <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Agent</label>
+        <select id="acp-policy-agent" style="width:100%;padding:0.45rem 0.65rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.85rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;">
+          <option value="">— select an agent —</option>
+        </select>
+      </div>
+
+      <!-- Action Category -->
+      <div style="margin-bottom:0.85rem;">
+        <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Action Category</label>
+        <select id="acp-policy-category" style="width:100%;padding:0.45rem 0.65rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.85rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;">
+          <option value="message_broadcast">Message Broadcast — sending to multiple recipients</option>
+          <option value="high_value_task">High Value Task — task above cost/importance threshold</option>
+          <option value="contract_publish">Contract Publish — publishing a capability contract</option>
+          <option value="external_call">External Call — outbound HTTP to external URL</option>
+          <option value="file_upload">File Upload — uploading a file</option>
+          <option value="capability_invoke">Capability Invoke — calling another agent's capability</option>
+        </select>
+      </div>
+
+      <!-- Trigger Condition -->
+      <div style="margin-bottom:0.85rem;">
+        <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Trigger Condition</label>
+        <select id="acp-policy-op" style="width:100%;padding:0.45rem 0.65rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.85rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;">
+          <option value="always">Always — every action of this type</option>
+          <option value="gt">Greater than threshold value</option>
+          <option value="gte">Greater than or equal to threshold</option>
+          <option value="eq">Equal to threshold value</option>
+        </select>
+      </div>
+
+      <!-- Threshold (hidden when op=always) -->
+      <div id="acp-threshold-row" style="display:none;margin-bottom:0.85rem;display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;">
+        <div>
+          <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Payload Field</label>
+          <input id="acp-policy-field" type="text" value="recipient_count" placeholder="e.g. recipient_count" style="width:100%;padding:0.45rem 0.65rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.85rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Threshold Value</label>
+          <input id="acp-policy-value" type="number" placeholder="e.g. 5" style="width:100%;padding:0.45rem 0.65rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.85rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;box-sizing:border-box;" />
+        </div>
+      </div>
+
+      <div id="acp-policy-err" style="display:none;font-size:0.78rem;color:var(--red);margin-bottom:0.7rem;padding:0.4rem 0.65rem;background:var(--red-bg,#fef2f2);border-radius:6px;"></div>
+
+      <div style="display:flex;gap:0.6rem;justify-content:flex-end;margin-top:0.5rem;">
+        <button id="acp-policy-cancel" class="btn btn-outline" style="font-size:0.82rem;">Cancel</button>
+        <button id="acp-policy-save" class="btn btn-primary" style="font-size:0.82rem;">Create Policy</button>
+      </div>
     </div>
   </div>
 
@@ -5372,7 +5457,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260511-29"></script>
+<script src="dashboard.js?v=20260511-30"></script>
 
 </body>
 </html>

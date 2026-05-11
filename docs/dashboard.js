@@ -1509,6 +1509,22 @@ function _renderAgentRow(a) {
     style="font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:5px;cursor:pointer;border:1px solid ${isPrivate ? "var(--yellow)" : "var(--border-dark)"};background:${isPrivate ? "var(--yellow-bg)" : "var(--surface2)"};color:${isPrivate ? "var(--yellow)" : "var(--muted)"};">
     ${isPrivate ? "🔒 private" : "🌐 public"}
   </button>`;
+  const oversightLevel = a.human_oversight || "none";
+  const oversightColors = {
+    none:     { border: "var(--border-dark)", bg: "var(--surface2)",    text: "var(--muted)",   label: "🤖 auto"     },
+    advisory: { border: "var(--blue)",        bg: "var(--blue-bg)",     text: "var(--blue)",    label: "👁 advisory"  },
+    required: { border: "var(--yellow)",      bg: "var(--yellow-bg)",   text: "var(--yellow)",  label: "⏸ required"  },
+    always:   { border: "var(--red)",         bg: "var(--red-bg)",      text: "var(--red)",     label: "🔐 always"   },
+  };
+  const oc = oversightColors[oversightLevel] || oversightColors.none;
+  const oversightBtn = `<button
+    class="oversight-toggle"
+    data-did="${esc(a.did || "")}"
+    data-level="${esc(oversightLevel)}"
+    title="Human oversight: ${oversightLevel} — click to change"
+    style="font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:5px;cursor:pointer;border:1px solid ${oc.border};background:${oc.bg};color:${oc.text};">
+    ${oc.label}
+  </button>`;
   const rotBadge = a.rotation_pending
     ? `<span title="Key rotation in progress" style="margin-left:0.35rem;font-size:0.68rem;padding:0.1rem 0.4rem;border-radius:4px;background:var(--yellow-bg,#fff8e1);color:var(--yellow,#b45309);border:1px solid var(--yellow,#b45309);vertical-align:middle;">⟳ rotation</span>`
     : "";
@@ -1536,7 +1552,7 @@ function _renderAgentRow(a) {
     <td style="text-align:center;font-weight:600;">${esc(String(a.audit_events ?? 0))}</td>
     <td class="${lastActiveClass}">${esc(lastActiveStr)}</td>
     <td style="color:var(--muted);font-size:0.78rem;">${esc(createdStr)}</td>
-    <td>${privacyBtn}</td>
+    <td style="white-space:nowrap;">${privacyBtn} ${oversightBtn}</td>
     <td style="white-space:nowrap;">
       <button class="agent-action-btn" data-action="details" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="View agent details, trust graph, recent activity">Details</button>
       <button class="agent-action-btn" data-action="verify" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="Test verify a signed payload against this agent" style="margin-left:0.3rem;">Test</button>
@@ -7887,6 +7903,9 @@ document.addEventListener("DOMContentLoaded", () => {
   _initEnterpriseTab();
   _initEuComplianceTab();
   _initApprovalsSection();
+  _initAcpTabs();
+  _initAcpPolicyModal();
+  _initOversightButtons();
 });
 
 // ── ACP APPROVALS ─────────────────────────────────────────────────────────────
@@ -7999,6 +8018,254 @@ async function _denyAction(id) {
     });
     _loadApprovals();
   } catch(e) { alert("Error denying: " + e.message); }
+}
+
+// ── ACP TABS ──────────────────────────────────────────────────────────────────
+
+function _initAcpTabs() {
+  document.querySelectorAll(".acp-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.tab;
+      // Style tabs
+      document.querySelectorAll(".acp-tab").forEach(t => {
+        const active = t.dataset.tab === tab;
+        t.style.color       = active ? "var(--accent)" : "var(--muted)";
+        t.style.fontWeight  = active ? "600" : "500";
+        t.style.borderBottom= active ? "2px solid var(--accent)" : "2px solid transparent";
+        t.classList.toggle("acp-tab-active", active);
+      });
+      // Show/hide panels
+      document.getElementById("acp-panel-queue").style.display    = tab === "queue"    ? "" : "none";
+      document.getElementById("acp-panel-policies").style.display = tab === "policies" ? "" : "none";
+      if (tab === "policies") _loadAcpPolicies();
+    });
+  });
+}
+
+// ── ACP POLICIES ──────────────────────────────────────────────────────────────
+
+const _CATEGORY_LABELS = {
+  message_broadcast: "Message Broadcast",
+  high_value_task:   "High Value Task",
+  contract_publish:  "Contract Publish",
+  external_call:     "External Call",
+  file_upload:       "File Upload",
+  capability_invoke: "Capability Invoke",
+};
+
+const _OP_LABELS = { always: "always", gt: "> ", gte: "≥ ", eq: "= " };
+
+async function _loadAcpPolicies() {
+  const listEl  = document.getElementById("acp-policies-list");
+  const countEl = document.getElementById("acp-policies-count");
+  if (!listEl) return;
+  listEl.innerHTML = `<div style="text-align:center;color:var(--muted);padding:2rem 0;font-size:0.85rem;">Loading…</div>`;
+
+  try {
+    // Fetch all agents, then load policies for each
+    const agents = _allAgents || [];
+    if (!agents.length) {
+      listEl.innerHTML = `<div style="text-align:center;color:var(--muted);padding:2rem 0;font-size:0.85rem;">No agents registered yet.</div>`;
+      return;
+    }
+
+    // Load policies per agent in parallel
+    const results = await Promise.all(
+      agents.map(async a => {
+        try {
+          const d = await apiFetch(`/pro/agents/${encodeURIComponent(a.did)}/acp-policies`);
+          return (d.policies || []).map(p => ({ ...p, agent_name: a.name, agent_did: a.did }));
+        } catch(_) { return []; }
+      })
+    );
+    const all = results.flat();
+
+    if (countEl) countEl.textContent = `${all.length} polic${all.length !== 1 ? "ies" : "y"} across ${agents.length} agent${agents.length !== 1 ? "s" : ""}`;
+
+    if (!all.length) {
+      listEl.innerHTML = `<div style="text-align:center;color:var(--muted);padding:2rem 1rem;font-size:0.85rem;">
+        No policies yet. Click <b>+ Add Policy</b> to define when an agent should pause and wait for your approval.
+      </div>`;
+      return;
+    }
+
+    listEl.innerHTML = all.map(p => {
+      const catLabel  = _CATEGORY_LABELS[p.action_category] || p.action_category;
+      const opLabel   = _OP_LABELS[p.threshold_op] || p.threshold_op;
+      const threshold = p.threshold_op === "always"
+        ? ""
+        : ` when <code style="font-size:0.75rem;background:var(--surface2);padding:0.1rem 0.3rem;border-radius:3px;">${esc(p.threshold_field)}</code> ${opLabel}${p.threshold_value ?? ""}`;
+      const isActive  = !!p.is_active;
+      const statusCol = isActive ? "var(--green)" : "var(--muted)";
+      return `<div style="border-bottom:1px solid var(--border);padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;flex-wrap:wrap;">
+            <span style="font-size:0.82rem;font-weight:700;color:var(--text);">${esc(catLabel)}</span>
+            <span style="font-size:0.72rem;color:${statusCol};font-weight:600;">${isActive ? "● Active" : "○ Paused"}</span>
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-2);">
+            <b>${esc(p.agent_name)}</b>${threshold ? ` — triggers${threshold}` : " — triggers on every action"}
+          </div>
+        </div>
+        <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+          <button onclick="_toggleAcpPolicy('${esc(p.agent_did)}','${esc(p.id)}',${!isActive})"
+            style="font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:5px;cursor:pointer;border:1px solid var(--border-dark);background:var(--surface2);color:var(--text-2);font-family:inherit;">
+            ${isActive ? "Pause" : "Enable"}
+          </button>
+          <button onclick="_deleteAcpPolicy('${esc(p.agent_did)}','${esc(p.id)}')"
+            style="font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:5px;cursor:pointer;border:1px solid var(--red,#dc2626);background:var(--red-bg,#fef2f2);color:var(--red,#dc2626);font-family:inherit;">
+            Delete
+          </button>
+        </div>
+      </div>`;
+    }).join("");
+
+  } catch(e) {
+    listEl.innerHTML = `<div style="text-align:center;color:var(--red);padding:2rem 1rem;font-size:0.85rem;">${esc(String(e))}</div>`;
+  }
+}
+
+async function _toggleAcpPolicy(did, pid, isActive) {
+  try {
+    await apiFetch(`/pro/agents/${encodeURIComponent(did)}/acp-policies/${encodeURIComponent(pid)}?is_active=${isActive}`, { method: "PATCH" });
+    _loadAcpPolicies();
+  } catch(e) { alert("Error updating policy: " + e.message); }
+}
+
+async function _deleteAcpPolicy(did, pid) {
+  if (!confirm("Delete this policy? Actions of this type will no longer be held for approval.")) return;
+  try {
+    await apiFetch(`/pro/agents/${encodeURIComponent(did)}/acp-policies/${encodeURIComponent(pid)}`, { method: "DELETE" });
+    _loadAcpPolicies();
+  } catch(e) { alert("Error deleting policy: " + e.message); }
+}
+
+function _initAcpPolicyModal() {
+  const modal    = document.getElementById("modal-acp-policy");
+  const opSel    = document.getElementById("acp-policy-op");
+  const threshRow= document.getElementById("acp-threshold-row");
+  const agentSel = document.getElementById("acp-policy-agent");
+
+  document.getElementById("acp-add-policy-btn")?.addEventListener("click", () => {
+    // Populate agent dropdown from cached list
+    const agents = _allAgents || [];
+    agentSel.innerHTML = `<option value="">— select an agent —</option>` +
+      agents.map(a => `<option value="${esc(a.did)}">${esc(a.name)}</option>`).join("");
+    document.getElementById("acp-policy-err").style.display = "none";
+    modal.style.display = "flex";
+  });
+
+  const closeModal = () => { modal.style.display = "none"; };
+  document.getElementById("acp-policy-modal-close")?.addEventListener("click", closeModal);
+  document.getElementById("acp-policy-cancel")?.addEventListener("click", closeModal);
+  modal?.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+
+  // Show/hide threshold row based on op
+  opSel?.addEventListener("change", () => {
+    threshRow.style.display = opSel.value === "always" ? "none" : "grid";
+  });
+
+  document.getElementById("acp-policy-save")?.addEventListener("click", async () => {
+    const errEl    = document.getElementById("acp-policy-err");
+    const savBtn   = document.getElementById("acp-policy-save");
+    const did      = document.getElementById("acp-policy-agent")?.value;
+    const category = document.getElementById("acp-policy-category")?.value;
+    const op       = document.getElementById("acp-policy-op")?.value;
+    const field    = document.getElementById("acp-policy-field")?.value?.trim() || "value";
+    const valRaw   = document.getElementById("acp-policy-value")?.value?.trim();
+
+    errEl.style.display = "none";
+    if (!did)      { errEl.textContent = "Please select an agent."; errEl.style.display = ""; return; }
+    if (!category) { errEl.textContent = "Please select an action category."; errEl.style.display = ""; return; }
+    if (op !== "always" && !valRaw) {
+      errEl.textContent = "Please enter a threshold value."; errEl.style.display = ""; return;
+    }
+
+    const body = { action_category: category, threshold_op: op, threshold_field: field };
+    if (op !== "always") body.threshold_value = parseFloat(valRaw);
+
+    savBtn.disabled = true;
+    savBtn.textContent = "Saving…";
+    try {
+      await apiFetch(`/pro/agents/${encodeURIComponent(did)}/acp-policies`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      closeModal();
+      // Switch to policies tab and reload
+      document.querySelector(".acp-tab[data-tab='policies']")?.click();
+    } catch(e) {
+      errEl.textContent = e.message || "Failed to create policy.";
+      errEl.style.display = "";
+    } finally {
+      savBtn.disabled = false;
+      savBtn.textContent = "Create Policy";
+    }
+  });
+}
+
+// ── HUMAN OVERSIGHT TOGGLE ────────────────────────────────────────────────────
+
+const _OVERSIGHT_CYCLE = ["none", "advisory", "required", "always"];
+const _OVERSIGHT_LABELS = {
+  none:     "🤖 auto — fully autonomous",
+  advisory: "👁 advisory — notified but proceeds",
+  required: "⏸ required — pauses on policy match",
+  always:   "🔐 always — every action reviewed",
+};
+
+async function _setOversightLevel(did, level) {
+  try {
+    await apiFetch(`/pro/agents/${encodeURIComponent(did)}/oversight?level=${encodeURIComponent(level)}`, { method: "PATCH" });
+    // Update cached agent data
+    const ag = (_allAgents || []).find(a => a.did === did);
+    if (ag) ag.human_oversight = level;
+    _renderAgPage();
+  } catch(e) { alert("Error updating oversight: " + e.message); }
+}
+
+function _initOversightButtons() {
+  // Delegated click handler for oversight buttons
+  document.getElementById("agents-table")?.addEventListener("click", e => {
+    const btn = e.target.closest(".oversight-toggle");
+    if (!btn) return;
+    const did   = btn.dataset.did;
+    const cur   = btn.dataset.level || "none";
+    const idx   = _OVERSIGHT_CYCLE.indexOf(cur);
+    const next  = _OVERSIGHT_CYCLE[(idx + 1) % _OVERSIGHT_CYCLE.length];
+    // Show picker dropdown
+    _showOversightPicker(btn, did, cur);
+  });
+}
+
+function _showOversightPicker(anchor, did, current) {
+  // Remove any existing picker
+  document.getElementById("oversight-picker")?.remove();
+
+  const rect   = anchor.getBoundingClientRect();
+  const picker = document.createElement("div");
+  picker.id    = "oversight-picker";
+  picker.style.cssText = `position:fixed;z-index:9999;background:var(--card-bg,#fff);border:1px solid var(--border-dark);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.13);padding:0.35rem 0;min-width:230px;top:${rect.bottom + 4}px;left:${rect.left}px;`;
+
+  picker.innerHTML = _OVERSIGHT_CYCLE.map(level => {
+    const isCur = level === current;
+    return `<div data-level="${level}" style="padding:0.45rem 0.85rem;font-size:0.82rem;cursor:pointer;color:${isCur ? "var(--accent)" : "var(--text)"};font-weight:${isCur ? "700" : "400"};display:flex;align-items:center;gap:0.5rem;">
+      ${isCur ? "✓" : " "}&nbsp;${_OVERSIGHT_LABELS[level]}
+    </div>`;
+  }).join("");
+
+  picker.addEventListener("click", async e => {
+    const row = e.target.closest("[data-level]");
+    if (!row) return;
+    const level = row.dataset.level;
+    picker.remove();
+    if (level !== current) await _setOversightLevel(did, level);
+  });
+
+  document.body.appendChild(picker);
+  // Close on outside click
+  const close = e => { if (!picker.contains(e.target) && e.target !== anchor) { picker.remove(); document.removeEventListener("click", close, true); } };
+  setTimeout(() => document.addEventListener("click", close, true), 10);
 }
 
 // ── SUB-ACCOUNTS / TEAM MEMBERS ───────────────────────────────────────────────
