@@ -868,6 +868,7 @@ async function loadDashboard() {
     loadSigningActivity().catch(e => console.error("loadSigningActivity:", e));
     loadDiscoveryStats().catch(e => console.error("loadDiscoveryStats:", e));
     loadAnomalies().catch(e => console.error("loadAnomalies:", e));
+    _loadApprovals().catch(e => console.warn("loadApprovals:", e));
     _loadGroups().catch?.(e => console.error("loadGroups:", e));
     _initNetworkObserver();
 
@@ -8044,7 +8045,8 @@ function _initApprovalsSection() {
   const statusFilter = document.getElementById("approvals-status-filter");
   if (refreshBtn)    refreshBtn.addEventListener("click", _loadApprovals);
   if (statusFilter)  statusFilter.addEventListener("change", _loadApprovals);
-  _loadApprovals();
+  // Do NOT call _loadApprovals() here — DOMContentLoaded fires before auth.
+  // loadDashboard() calls it once the API key is confirmed valid.
 }
 
 async function _loadApprovals() {
