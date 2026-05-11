@@ -8278,6 +8278,7 @@ const _TG_EVENTS = [
   { key: "task.expired",           label: "Task Expired" },
   { key: "task.rejected",          label: "Task Rejected" },
   { key: "approval.pending",       label: "Approval Needed 🔔" },
+  { key: "approval.decided",       label: "Review Decision Made 📋" },
 ];
 
 let _tgInitialized = false;
