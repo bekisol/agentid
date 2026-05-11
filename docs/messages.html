@@ -76,32 +76,58 @@
     #app { flex:1; display:none; overflow:hidden; }
     .layout { display:flex; height:100%; }
 
-    /* Sidebar */
-    .sidebar { width:268px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
-    .sidebar-header { padding:0.85rem 1rem 0.75rem; border-bottom:1px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:space-between; }
-    .sidebar-title { font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); }
-    .sidebar-compose-btn { background:none; border:1px solid var(--border-dark); border-radius:7px; padding:0.26rem 0.55rem; cursor:pointer; color:var(--muted); font-size:0.88rem; line-height:1; font-family:inherit; transition:color 0.12s,border-color 0.12s; }
-    .sidebar-compose-btn:hover { color:var(--accent); border-color:var(--accent); }
+    /* ── Sidebar: two-panel sender→receiver selector ── */
+    .sidebar { width:220px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
 
-    /* ── Thread list ── */
-    .thread-list { overflow-y:auto; flex:1; padding:0.2rem 0; min-height:0; }
-    .thread-item { display:flex; align-items:flex-start; padding:0.62rem 0.85rem; cursor:pointer; gap:0.6rem; border-left:3px solid transparent; transition:background 0.1s; user-select:none; }
-    .thread-item:hover { background:var(--surface2); }
-    .thread-item.active { background:var(--accent-light); border-left-color:var(--accent); }
-    .thread-avatar { width:35px; height:35px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:0.82rem; font-weight:700; color:var(--text-2); flex-shrink:0; text-transform:uppercase; }
-    .thread-item.active .thread-avatar { background:var(--accent-light); border-color:var(--accent-border); color:var(--accent); }
-    .thread-item.all-item .thread-avatar { font-size:0.7rem; }
-    .thread-info { flex:1; min-width:0; }
-    .thread-top { display:flex; align-items:baseline; justify-content:space-between; gap:0.2rem; margin-bottom:0.16rem; }
-    .thread-name { font-size:0.84rem; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
-    .thread-item.active .thread-name { color:var(--accent); }
-    .thread-item.all-item .thread-name { font-weight:500; color:var(--muted); }
-    .thread-item.all-item.active .thread-name { color:var(--text-2); font-weight:600; }
-    .thread-time { font-size:0.62rem; color:var(--muted); flex-shrink:0; white-space:nowrap; }
-    .thread-sub { font-size:0.7rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.4; }
-    .thread-sub .via { color:var(--text-2); font-weight:500; }
-    .thread-badge { background:var(--accent); color:#fff; font-size:0.6rem; font-weight:700; padding:0.1rem 0.38rem; border-radius:999px; flex-shrink:0; align-self:center; min-width:17px; text-align:center; margin-left:0.2rem; }
-    .thread-sep { height:1px; background:var(--border); margin:0.3rem 0; }
+    /* Top panel — FROM (sender = my agent) */
+    .sb-panel { display:flex; flex-direction:column; overflow:hidden; }
+    .sb-panel-from { flex:0 0 auto; max-height:48%; border-bottom:2px solid var(--border-dark); }
+    .sb-panel-to   { flex:1; min-height:0; }
+    .sb-panel-hdr  { padding:0.5rem 1rem 0.35rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .sb-panel-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; }
+    .sb-panel-from .sb-panel-label { color:var(--accent); }
+    .sb-panel-to   .sb-panel-label { color:var(--blue); }
+    .sb-panel-count { font-size:0.65rem; color:var(--muted); font-weight:500; }
+    .sb-panel-compose { background:none; border:1px solid var(--border-dark); border-radius:6px; padding:0.2rem 0.45rem; cursor:pointer; color:var(--muted); font-size:0.82rem; line-height:1; font-family:inherit; transition:color 0.1s,border-color 0.1s; }
+    .sb-panel-compose:hover { color:var(--accent); border-color:var(--accent); }
+    .sb-search { padding:0 0.75rem 0.4rem; flex-shrink:0; }
+    .sb-search input { width:100%; box-sizing:border-box; padding:0.3rem 0.55rem; border-radius:7px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:0.78rem; font-family:inherit; outline:none; }
+    .sb-search input::placeholder { color:var(--muted); }
+    .sb-search input:focus { border-color:var(--accent); }
+    .sb-list { overflow-y:auto; flex:1; padding:0.2rem 0; }
+
+    /* Shared row styles */
+    .sb-row { display:flex; align-items:center; padding:0.5rem 1rem; cursor:pointer; border-left:3px solid transparent; gap:0.5rem; transition:background 0.1s; user-select:none; }
+    .sb-row:hover { background:var(--surface2); }
+    .sb-row-name { font-size:0.84rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+    .sb-row-badge { font-size:0.62rem; font-weight:700; padding:0.08rem 0.4rem; border-radius:999px; flex-shrink:0; min-width:17px; text-align:center; }
+    .sb-row-badge.unread { background:var(--accent); color:#fff; }
+    .sb-row-badge.zero   { background:var(--surface2); color:var(--muted); }
+
+    /* FROM active row */
+    .sb-panel-from .sb-row.active { background:var(--accent-light); border-left-color:var(--accent); }
+    .sb-panel-from .sb-row.active .sb-row-name { color:var(--accent); font-weight:600; }
+
+    /* TO active row */
+    .sb-panel-to .sb-row.active { background:var(--blue-light); border-left-color:var(--blue); }
+    .sb-panel-to .sb-row.active .sb-row-name { color:var(--blue); font-weight:600; }
+
+    /* TO empty/placeholder state */
+    .sb-to-placeholder { padding:1.5rem 1rem; text-align:center; font-size:0.78rem; color:var(--muted); line-height:1.6; }
+
+    /* Partner row extras: preview line */
+    .sb-partner-wrap { flex:1; min-width:0; }
+    .sb-partner-name { font-size:0.84rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sb-partner-preview { font-size:0.68rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:0.06rem; }
+    .sb-panel-to .sb-row.active .sb-partner-name { color:var(--blue); font-weight:600; }
+    .sb-panel-to .sb-row { padding:0.5rem 1rem 0.5rem 1.1rem; align-items:flex-start; }
+    .sb-panel-to .sb-row .sb-row-badge { align-self:center; }
+
+    /* Footer strip for groups/files/deals */
+    .sb-footer { border-top:1px solid var(--border); flex-shrink:0; padding:0.3rem 0; }
+    .sb-footer-item { display:flex; align-items:center; gap:0.45rem; padding:0.38rem 1rem; cursor:pointer; font-size:0.8rem; color:var(--muted); transition:background 0.1s; }
+    .sb-footer-item:hover { background:var(--surface2); color:var(--text-2); }
+    .sb-footer-item.active { color:var(--accent); background:var(--accent-light); }
 
     /* Keep sidebar-item styles for groups/deals */
     .sidebar-item { display:flex; align-items:center; justify-content:space-between; padding:0.55rem 1rem; cursor:pointer; border-left:3px solid transparent; transition:background 0.1s; user-select:none; }
@@ -487,35 +513,45 @@ document.addEventListener("DOMContentLoaded", () => {
 <div id="app">
   <div class="layout">
 
-    <!-- Sidebar — flat thread list (WhatsApp-style) -->
+    <!-- Sidebar — two-panel FROM → TO selector -->
     <div class="sidebar">
-      <div class="sidebar-header">
-        <div class="sidebar-title">Messages</div>
-        <button class="sidebar-compose-btn" onclick="openCompose()" title="New message">✏</button>
-      </div>
-      <div class="sidebar-search">
-        <input type="text" id="sidebar-search-input" placeholder="Search conversations…" oninput="_filterSidebar(this.value)" autocomplete="off" />
-      </div>
-      <!-- Thread list: all conversations sorted by recency -->
-      <div class="thread-list" id="thread-list">
-        <div style="padding:1.5rem;text-align:center;"><div class="spinner"></div></div>
+
+      <!-- TOP PANEL: FROM — pick your agent (sender) -->
+      <div class="sb-panel sb-panel-from">
+        <div class="sb-panel-hdr">
+          <span class="sb-panel-label">From</span>
+          <button class="sb-panel-compose" onclick="openCompose()" title="New message">✏ New</button>
+        </div>
+        <div class="sb-search">
+          <input type="text" id="sidebar-search-input" placeholder="Search agents…" oninput="_filterSidebar(this.value)" autocomplete="off" />
+        </div>
+        <div class="sb-list" id="sb-agents-list">
+          <div style="padding:1rem;text-align:center;"><div class="spinner"></div></div>
+        </div>
       </div>
 
-      <div class="sidebar-sep"></div>
-      <div class="sidebar-section">
-        <span>Groups</span>
-        <button class="sidebar-section-btn" onclick="openNewGroupModal()" title="New group">＋</button>
+      <!-- BOTTOM PANEL: TO — pick conversation partner (receiver) -->
+      <div class="sb-panel sb-panel-to">
+        <div class="sb-panel-hdr">
+          <span class="sb-panel-label">To</span>
+          <span class="sb-panel-count" id="sb-to-count"></span>
+        </div>
+        <div class="sb-list" id="sb-partners-list">
+          <div class="sb-to-placeholder">← Select an agent<br>to see conversations</div>
+        </div>
       </div>
-      <div id="sidebar-groups-list"></div>
 
-      <div class="sidebar-sep"></div>
-      <div class="sidebar-section"><span>Files &amp; Deals</span></div>
-      <div class="sidebar-item-deal" id="sidebar-files-btn" onclick="showFilesView()">
-        📁 Files <span id="sidebar-files-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
+      <!-- Footer: groups, files, deals -->
+      <div class="sb-footer">
+        <div id="sidebar-groups-list" style="padding:0;"></div>
+        <div class="sb-footer-item" id="sidebar-files-btn" onclick="showFilesView()">
+          📁 Files <span id="sidebar-files-count" style="margin-left:auto;font-size:0.7rem;"></span>
+        </div>
+        <div class="sb-footer-item" id="sidebar-deals-btn" onclick="showDealsView()">
+          📋 Agent Ledger <span id="sidebar-deals-count" style="margin-left:auto;font-size:0.7rem;"></span>
+        </div>
       </div>
-      <div class="sidebar-item-deal" id="sidebar-deals-btn" onclick="showDealsView()">
-        📋 Agent Ledger <span id="sidebar-deals-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
-      </div>
+
     </div>
 
     <!-- New Group modal -->
@@ -967,144 +1003,123 @@ function setFeedLoading() {
     '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading messages…</div></div>';
 }
 
-// ── THREAD LIST ───────────────────────────────────────────────────────────────
-let _threadQuery = '';
+// ── FROM → TO SIDEBAR ─────────────────────────────────────────────────────────
+let _agentQuery = '';
 
 function _filterSidebar(q) {
-  _threadQuery = q.trim().toLowerCase();
-  renderThreadList();
+  _agentQuery = q.trim().toLowerCase();
+  renderAgentsList();
 }
 
-// Build sorted list of unique conversation threads from all messages
-function buildThreadList(messages) {
-  const threads = new Map(); // key: `${agentDid}:::${partnerDid}`
-  for (const m of messages) {
-    const partnerDid  = m.direction === "sent" ? m.to_did   : m.from_did;
-    const partnerName = m.direction === "sent"
-      ? (m.to_name   || m.to_did   || "")
-      : (m.sender_name || m.from_did || "");
-    if (!partnerDid) continue;
-    const key = `${m._agentDid}:::${partnerDid}`;
-    if (!threads.has(key)) {
-      threads.set(key, {
-        agentDid:   m._agentDid,
-        agentName:  m._agentName || m._agentDid.slice(-8),
-        partnerDid,
-        partnerName,
-        unread:     0,
-        total:      0,
-        lastMsg:    "",
-        lastTime:   null,
-      });
-    }
-    const t = threads.get(key);
-    t.total++;
-    if (!m.read && m.direction !== "sent") t.unread++;
-    if (!t.lastTime || new Date(m.sent_at) > new Date(t.lastTime)) {
-      t.lastMsg  = (m.body || "").replace(/\s+/g, " ").slice(0, 55);
-      t.lastTime = m.sent_at;
-    }
-  }
-  // Sort: unread threads first, then by recency
-  return [...threads.values()].sort((a, b) => {
-    if (b.unread !== a.unread) return b.unread - a.unread;
-    return new Date(b.lastTime || 0) - new Date(a.lastTime || 0);
-  });
-}
-
-function renderThreadList() {
-  const list = document.getElementById("thread-list");
+// Render TOP panel: my agents (FROM)
+function renderAgentsList() {
+  const list = document.getElementById("sb-agents-list");
   if (!list) return;
 
-  let threads = buildThreadList(_messages);
+  const unreadMap = {};
+  _messages.forEach(m => {
+    if (!m.read && m.direction !== "sent")
+      unreadMap[m._agentDid] = (unreadMap[m._agentDid] || 0) + 1;
+  });
 
-  // Apply search filter
-  const q = _threadQuery;
-  if (q) {
-    threads = threads.filter(t =>
-      (t.partnerName || "").toLowerCase().includes(q) ||
-      (t.agentName   || "").toLowerCase().includes(q) ||
-      (t.lastMsg     || "").toLowerCase().includes(q) ||
-      t.partnerDid.toLowerCase().includes(q)
-    );
+  const q = _agentQuery;
+  const filtered = q
+    ? _agents.filter(a => (a.name || '').toLowerCase().includes(q) || a.did.toLowerCase().includes(q))
+    : _agents;
+
+  if (!filtered.length) {
+    list.innerHTML = `<div style="padding:1rem;text-align:center;font-size:0.78rem;color:var(--muted);">${q ? 'No matches' : 'No agents'}</div>`;
+    return;
   }
 
-  const totalUnread = _messages.filter(m => !m.read && m.direction !== "sent").length;
-  const allActive   = (!_selectedDid && !_convFilter) ? " active" : "";
+  list.innerHTML = filtered.map(a => {
+    const u     = unreadMap[a.did] || 0;
+    const total = _messages.filter(m => m._agentDid === a.did).length;
+    const active = _selectedDid === a.did ? " active" : "";
+    const label  = esc(a.name || a.did.slice(-12));
+    const safeD  = a.did.replace(/'/g, "\\'");
+    return `
+      <div class="sb-row${active}" onclick="selectAgent('${safeD}')" title="${esc(a.did)}">
+        <span class="sb-row-name">${label}</span>
+        <span class="sb-row-badge ${u > 0 ? 'unread' : 'zero'}">${u > 0 ? u : total}</span>
+      </div>`;
+  }).join('');
+}
 
-  let html = "";
+// Render BOTTOM panel: conversation partners for the selected agent (TO)
+function renderPartnersList() {
+  const list    = document.getElementById("sb-partners-list");
+  const countEl = document.getElementById("sb-to-count");
+  if (!list) return;
 
-  // "All messages" catch-all at top (only show when no search)
-  if (!q) {
-    html += `
-      <div class="thread-item all-item${allActive}" onclick="selectThread('',null)">
-        <div class="thread-avatar" style="font-size:0.72rem;">✉</div>
-        <div class="thread-info">
-          <div class="thread-top">
-            <span class="thread-name">All messages</span>
-            ${totalUnread > 0
-              ? `<span class="thread-time" style="color:var(--accent);font-weight:700;">${totalUnread} unread</span>`
-              : `<span class="thread-time">${_messages.length} total</span>`}
-          </div>
-          <div class="thread-sub">Every agent · every conversation</div>
-        </div>
-      </div>
-      <div class="thread-sep"></div>`;
+  if (!_selectedDid) {
+    list.innerHTML = '<div class="sb-to-placeholder">← Select an agent<br>to see conversations</div>';
+    if (countEl) countEl.textContent = "";
+    return;
   }
 
-  if (!threads.length) {
-    html += `<div style="padding:1.5rem 1rem;text-align:center;font-size:0.8rem;color:var(--muted);">${q ? "No matching conversations" : "No messages yet"}</div>`;
-  } else {
-    for (const t of threads) {
-      const isActive = (_selectedDid === t.agentDid && _convFilter === t.partnerDid);
-      const initials = (t.partnerName || t.partnerDid || "?")[0].toUpperCase();
-      // Display name: partner name if available, else short DID
-      const displayName = t.partnerName
-        ? (t.partnerName.length > 24 ? t.partnerName.slice(0, 22) + "…" : t.partnerName)
-        : (t.partnerDid.length > 22 ? t.partnerDid.slice(0, 9) + "…" + t.partnerDid.slice(-7) : t.partnerDid);
-      const timeStr  = t.lastTime ? relativeTime(t.lastTime) : "";
-      const preview  = t.lastMsg ? esc(t.lastMsg) : '<em style="color:var(--muted)">No messages</em>';
-      const safeADid = t.agentDid.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-      const safePDid = t.partnerDid.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-
-      // Highlight search matches
-      let nameHtml = esc(displayName);
-      if (q) {
-        nameHtml = nameHtml.replace(new RegExp(`(${esc(q)})`, "gi"),
-          '<mark style="background:var(--accent-light);color:var(--accent);border-radius:2px;">$1</mark>');
-      }
-
-      html += `
-        <div class="thread-item${isActive ? " active" : ""}"
-             onclick="selectThread('${safeADid}','${safePDid}')"
-             title="${esc(t.partnerDid)}">
-          <div class="thread-avatar">${esc(initials)}</div>
-          <div class="thread-info">
-            <div class="thread-top">
-              <span class="thread-name">${nameHtml}</span>
-              <span class="thread-time">${esc(timeStr)}</span>
-            </div>
-            <div class="thread-sub">
-              <span class="via">${esc(t.agentName)}</span> · ${preview}
-            </div>
-          </div>
-          ${t.unread > 0 ? `<span class="thread-badge">${t.unread}</span>` : ""}
-        </div>`;
+  // Collect unique partners for this agent
+  const partnerMap = new Map(); // did → {name, unread, total, lastMsg, lastTime}
+  for (const m of _messages) {
+    if (m._agentDid !== _selectedDid) continue;
+    const pDid  = m.direction === "sent" ? m.to_did   : m.from_did;
+    const pName = m.direction === "sent"
+      ? (m.to_name   || m.to_did   || "")
+      : (m.sender_name || m.from_did || "");
+    if (!pDid) continue;
+    if (!partnerMap.has(pDid)) partnerMap.set(pDid, { name: pName, unread: 0, total: 0, lastMsg: "", lastTime: null });
+    const e = partnerMap.get(pDid);
+    e.total++;
+    if (!m.read && m.direction !== "sent") e.unread++;
+    if (!e.lastTime || new Date(m.sent_at) > new Date(e.lastTime)) {
+      e.lastMsg  = (m.body || "").replace(/\s+/g, " ").slice(0, 50);
+      e.lastTime = m.sent_at;
     }
   }
 
-  list.innerHTML = html;
+  if (countEl) countEl.textContent = partnerMap.size ? `${partnerMap.size} conversation${partnerMap.size !== 1 ? 's' : ''}` : "";
+
+  if (!partnerMap.size) {
+    list.innerHTML = '<div class="sb-to-placeholder">No messages yet<br>for this agent</div>';
+    return;
+  }
+
+  // Sort: unread first, then recency
+  const sorted = [...partnerMap.entries()].sort((a, b) =>
+    (b[1].unread - a[1].unread) || (new Date(b[1].lastTime || 0) - new Date(a[1].lastTime || 0))
+  );
+
+  list.innerHTML = sorted.map(([did, info]) => {
+    const active  = _convFilter === did ? " active" : "";
+    const display = info.name
+      ? (info.name.length > 22 ? info.name.slice(0, 20) + "…" : info.name)
+      : (did.length > 20 ? did.slice(0, 8) + "…" + did.slice(-6) : did);
+    const safeDid = did.replace(/'/g, "\\'");
+    const preview = info.lastMsg ? esc(info.lastMsg) : "";
+    return `
+      <div class="sb-row${active}" onclick="selectThread('${_selectedDid.replace(/'/g,"\\'")}','${safeDid}')" title="${esc(did)}">
+        <div class="sb-partner-wrap">
+          <div class="sb-partner-name">${esc(display)}</div>
+          ${preview ? `<div class="sb-partner-preview">${preview}</div>` : ""}
+        </div>
+        <span class="sb-row-badge ${info.unread > 0 ? 'unread' : 'zero'}">${info.unread > 0 ? info.unread : info.total}</span>
+      </div>`;
+  }).join('');
 }
 
-// Called when user clicks a thread item
-function selectThread(agentDid, partnerDid) {
+// Alias so other call sites don't break
+function renderThreadList() { renderAgentsList(); renderPartnersList(); }
+function renderSidebar()    { renderAgentsList(); renderPartnersList(); }
+
+// Step 1: user picks the FROM agent — populates the TO panel, keeps any prior convFilter
+function selectAgent(agentDid) {
   _dealsView    = false;
   _filesView    = false;
   _activeRoomId = null;
   _stopGroupPoll();
   _lastRenderKey = "";
-  _selectedDid   = agentDid  || "";
-  _convFilter    = partnerDid || null;
+  _selectedDid   = agentDid;
+  _convFilter    = null;     // reset TO selection when FROM changes
   _activeStops   = [];
 
   document.getElementById("sidebar-deals-btn")?.classList.remove("active");
@@ -1112,12 +1127,11 @@ function selectThread(agentDid, partnerDid) {
   document.getElementById("deal-search-bar").style.display = "none";
   document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
 
-  renderFeed();
-  renderThreadList(); // sync active highlight
+  renderAgentsList();
+  renderPartnersList();
+  renderFeed(); // show all messages for this agent until a partner is chosen
 
-  if (!agentDid) return; // "All messages" view — no per-agent refresh needed
-
-  // Load comm-stops for this agent
+  // Silently refresh this agent's messages + comm-stops
   const capturedDid = agentDid;
   fetch(`${BASE}/pro/agents/comm-stops`, { headers: apiHeaders(), credentials: "include" })
     .then(r => r.ok ? r.json() : null)
@@ -1128,7 +1142,6 @@ function selectThread(agentDid, partnerDid) {
       }
     }).catch(() => {});
 
-  // Silently refresh this agent's messages
   const agentObj  = _agents.find(a => a.did === agentDid);
   const agentName = agentObj?.name || agentDid.slice(-10);
   fetchMessages(agentDid).then(fresh => {
@@ -1137,24 +1150,63 @@ function selectThread(agentDid, partnerDid) {
       if (!_messages.some(x => x.id === m.id && x._agentDid === m._agentDid)) _messages.push(m);
     });
     _messages.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
-    if (_selectedDid === agentDid && _convFilter === partnerDid) {
+    if (_selectedDid === agentDid) {
       _lastRenderKey = "";
+      renderPartnersList();
       renderFeed();
-      renderThreadList();
     }
   }).catch(() => {});
 }
 
-// Also keep renderSidebar as an alias so any other call sites don't break
-function renderSidebar() { renderThreadList(); }
+// Step 2: user picks the TO partner — shows that specific conversation
+function selectThread(agentDid, partnerDid) {
+  if (agentDid && agentDid !== _selectedDid) {
+    // If agent changed (e.g. called from elsewhere), update FROM first
+    _selectedDid = agentDid;
+    renderAgentsList();
+  }
+  _dealsView    = false;
+  _filesView    = false;
+  _activeRoomId = null;
+  _stopGroupPoll();
+  _lastRenderKey = "";
+  _convFilter    = partnerDid || null;
+  if (!agentDid) { _selectedDid = ""; _convFilter = null; }
 
-// Auto-select the best thread after first load (most unread, else most recent)
+  document.getElementById("sidebar-deals-btn")?.classList.remove("active");
+  document.getElementById("sidebar-files-btn")?.classList.remove("active");
+  document.getElementById("deal-search-bar").style.display = "none";
+  document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
+
+  renderPartnersList();
+  renderFeed();
+}
+
+// Auto-open: pick the agent with most unread, then their top partner
 function _autoSelectFirst() {
-  if (_selectedDid || _convFilter) return; // already selected
-  const threads = buildThreadList(_messages);
-  if (!threads.length) return;
-  const best = threads.find(t => t.unread > 0) || threads[0];
-  selectThread(best.agentDid, best.partnerDid);
+  if (_selectedDid) return;
+  if (!_agents.length || !_messages.length) return;
+
+  // Find agent with most unread
+  const unreadMap = {};
+  _messages.forEach(m => {
+    if (!m.read && m.direction !== "sent")
+      unreadMap[m._agentDid] = (unreadMap[m._agentDid] || 0) + 1;
+  });
+  const bestAgent = _agents
+    .map(a => ({ did: a.did, u: unreadMap[a.did] || 0 }))
+    .sort((a, b) => b.u - a.u)[0];
+  if (!bestAgent) return;
+
+  selectAgent(bestAgent.did);
+
+  // Then auto-pick the top partner for that agent
+  setTimeout(() => {
+    if (_selectedDid === bestAgent.did && !_convFilter) {
+      const partners = [...document.querySelectorAll("#sb-partners-list .sb-row")];
+      if (partners[0]) partners[0].click();
+    }
+  }, 0);
 }
 
 // ── COMPOSE ───────────────────────────────────────────────────────────────────
@@ -2165,7 +2217,7 @@ async function showFilesView() {
   _activeRoomId = null;
   _stopGroupPoll();
   _selectedDid = "__files__";
-  document.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
+  document.querySelectorAll(".sb-row").forEach(e => e.classList.remove("active"));
   document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
   document.getElementById("sidebar-files-btn").classList.add("active");
   document.getElementById("sidebar-deals-btn").classList.remove("active");
@@ -2340,7 +2392,7 @@ let _currentIx        = null;        // interaction open in modal
 async function showDealsView() {
   _dealsView = true;
   _selectedDid = "__deals__";
-  document.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
+  document.querySelectorAll(".sb-row").forEach(e => e.classList.remove("active"));
   document.getElementById("sidebar-deals-btn").classList.add("active");
   document.getElementById("stop-btn").style.display = "none";
   document.getElementById("feed-title").textContent = "Agent Ledger";
@@ -2732,7 +2784,7 @@ async function showGroupView(roomId) {
   _dealsView = false;
 
   // Highlight sidebar
-  document.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
+  document.querySelectorAll(".sb-row").forEach(e => e.classList.remove("active"));
   document.querySelectorAll(".sidebar-item-group").forEach(e => {
     e.classList.toggle("active", parseInt(e.dataset.roomId) === roomId);
   });
