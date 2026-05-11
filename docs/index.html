@@ -1066,12 +1066,32 @@ let _approvals = [];
 async function loadApprovals() {
   const body = document.getElementById("approvals-body");
   try {
-    const r = await fetch(`${BASE}/pro/acp/queue?status=pending&limit=10`, {
-      headers: apiHeaders()
-    });
-    if (!r.ok) throw new Error(r.status);
-    const data = await r.json();
-    _approvals = Array.isArray(data) ? data : (data.items || data.requests || []);
+    // Fetch ACP queue and Human Review queue in parallel
+    const [acpRes, rqRes] = await Promise.all([
+      fetch(`${BASE}/pro/acp/queue?status=pending&limit=10`, { headers: apiHeaders() }).catch(() => null),
+      fetch(`${BASE}/pro/review-queue?status=pending&limit=10`, { headers: apiHeaders() }).catch(() => null)
+    ]);
+
+    const acpItems = (acpRes && acpRes.ok)
+      ? await acpRes.json().then(d => Array.isArray(d) ? d : (d.items || d.requests || []))
+      : [];
+
+    const rqItems = (rqRes && rqRes.ok)
+      ? await rqRes.json().then(d => Array.isArray(d) ? d : (d.items || d.requests || []))
+          .then(items => items.map(i => ({
+            ...i,
+            _source: "review-queue",
+            category: i.reason || i.operation || "human_review",
+            title: i.operation || i.payload_summary || i.title || "Human review required",
+            agent_did: i.agent_did,
+            created_at: i.created_at
+          })))
+      : [];
+
+    if (!acpItems.length && !rqItems.length && !acpRes?.ok && !rqRes?.ok) throw new Error("both failed");
+
+    _approvals = [...acpItems, ...rqItems]
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     renderApprovals();
   } catch(e) {
     body.innerHTML = `<div class="error-state">⚠ Could not load approvals — <button class="btn btn-ghost btn-sm" onclick="loadApprovals()" style="margin-left:0.35rem;">retry</button></div>`;
@@ -1122,25 +1142,33 @@ function renderApprovals() {
           ${created   ? `<div class="approval-time">${relTime(created)}</div>` : ""}
         </div>
         <div class="approval-actions">
-          <button class="btn btn-success btn-sm" onclick="handleApproval('${escHtml(id)}','${escHtml(agentDid)}','approve')">Approve</button>
-          <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red);" onclick="handleApproval('${escHtml(id)}','${escHtml(agentDid)}','deny')">Deny</button>
+          <button class="btn btn-success btn-sm" onclick="handleApproval('${escHtml(id)}','${escHtml(agentDid)}','approve','${escHtml(a._source||'')}')">Approve</button>
+          <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red);" onclick="handleApproval('${escHtml(id)}','${escHtml(agentDid)}','deny','${escHtml(a._source||'')}')">Deny</button>
         </div>
       </div>`;
   }).join("");
 }
 
-async function handleApproval(requestId, agentDid, action) {
+async function handleApproval(requestId, agentDid, action, source) {
   const row = document.getElementById(`approval-${requestId}`);
-  if (row) {
-    row.style.opacity = "0.5";
-    row.style.pointerEvents = "none";
-  }
+  if (row) { row.style.opacity = "0.5"; row.style.pointerEvents = "none"; }
   try {
-    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(agentDid)}/acp/queue/${encodeURIComponent(requestId)}`, {
-      method: "POST",
-      headers: apiHeaders(),
-      body: JSON.stringify({ action })
-    });
+    let r;
+    if (source === "review-queue") {
+      // Human Review Queue: PATCH /pro/review-queue/{id} with verdict
+      r = await fetch(`${BASE}/pro/review-queue/${encodeURIComponent(requestId)}`, {
+        method: "PATCH",
+        headers: apiHeaders(),
+        body: JSON.stringify({ verdict: action === "approve" ? "approved" : "rejected" })
+      });
+    } else {
+      // ACP Queue: POST /pro/agents/{did}/acp/queue/{id}
+      r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(agentDid)}/acp/queue/${encodeURIComponent(requestId)}`, {
+        method: "POST",
+        headers: apiHeaders(),
+        body: JSON.stringify({ action })
+      });
+    }
     if (r.ok) {
       _approvals = _approvals.filter(a => (a.id || a.request_id) !== requestId);
       renderApprovals();
