@@ -5264,8 +5264,8 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 </div>
 
 <!-- ── PDF REPORT MODAL ──────────────────────────────────────────────────── -->
-<div id="report-modal" onclick="_closeReportModal()" style="display:none;position:fixed;inset:0;z-index:3500;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);padding:1rem;cursor:default;">
-  <div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+<div id="report-modal" style="display:none;position:fixed;inset:0;z-index:3500;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);padding:1rem;">
+  <div id="report-modal-card" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
 
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);">
@@ -5273,7 +5273,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
         <div style="font-size:1.05rem;font-weight:700;color:var(--text);">📄 Download Account Report</div>
         <div style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">Select sections and agents to include in your PDF report.</div>
       </div>
-      <button onclick="_closeReportModal()" style="background:none;border:none;font-size:1.2rem;color:var(--muted);cursor:pointer;padding:0.25rem 0.5rem;border-radius:6px;" title="Close">✕</button>
+      <button id="rpt-close-btn" style="background:none;border:none;font-size:1.2rem;color:var(--muted);cursor:pointer;padding:0.25rem 0.5rem;border-radius:6px;" title="Close">✕</button>
     </div>
 
     <!-- Body -->
@@ -5364,15 +5364,15 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
     <!-- Footer -->
     <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding:1rem 1.5rem;border-top:1px solid var(--border);">
-      <button onclick="_closeReportModal()" class="btn btn-outline" style="font-size:0.84rem;">Cancel</button>
-      <button id="rpt-download-btn" onclick="_submitReportDownload()" class="btn btn-primary" style="font-size:0.84rem;background:var(--accent);border-color:var(--accent);color:#fff;">⬇ Download PDF</button>
+      <button id="rpt-cancel-btn" class="btn btn-outline" style="font-size:0.84rem;">Cancel</button>
+      <button id="rpt-download-btn" class="btn btn-primary" style="font-size:0.84rem;background:var(--accent);border-color:var(--accent);color:#fff;">⬇ Download PDF</button>
     </div>
   </div>
 </div>
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260511-27"></script>
+<script src="dashboard.js?v=20260511-28"></script>
 
 </body>
 </html>

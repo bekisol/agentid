@@ -8154,12 +8154,28 @@ function _closeReportModal() {
   const mo = document.getElementById("report-modal");
   if (mo) mo.style.display = "none";
 }
-// Close report modal on Escape key
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    const mo = document.getElementById("report-modal");
-    if (mo && mo.style.display !== "none") { e.stopPropagation(); _closeReportModal(); }
-  }
+
+// Wire report modal interactions once DOM is ready (same pattern as settings-modal)
+document.addEventListener("DOMContentLoaded", () => {
+  const mo = document.getElementById("report-modal");
+  if (!mo) return;
+
+  // Backdrop click (click on the dim overlay itself, not the card) → close
+  mo.addEventListener("click", (e) => {
+    if (e.target === mo) _closeReportModal();
+  });
+
+  // X and Cancel buttons
+  document.getElementById("rpt-close-btn")?.addEventListener("click", _closeReportModal);
+  document.getElementById("rpt-cancel-btn")?.addEventListener("click", _closeReportModal);
+
+  // Download button
+  document.getElementById("rpt-download-btn")?.addEventListener("click", _submitReportDownload);
+
+  // Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && mo.style.display !== "none") _closeReportModal();
+  });
 });
 
 async function _loadReportAgentList() {
