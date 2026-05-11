@@ -923,25 +923,32 @@ async function loadHome() {
     const k = data.kpis;
     const trustVal = k.fleet_trust_avg != null ? Math.round(k.fleet_trust_avg) : "—";
     const trustClass = k.fleet_trust_band === "good" ? "good" : k.fleet_trust_band === "warn" ? "warn" : "bad";
+    const _trendArrow = (delta, higherIsBad) => {
+      if (delta == null) return "";
+      const isUp = delta > 0;
+      const cls = isUp === !higherIsBad ? "kpi-trend-up" : "kpi-trend-down";
+      const sym = isUp ? "↑" : "↓";
+      return `<span class="kpi-trend ${cls}">${sym}${Math.abs(delta)}</span>`;
+    };
     strip.innerHTML = `
       <button class="kpi-tile" onclick="_scrollToSection('overview')" title="View fleet overview">
         <div class="kpi-tile-label">Fleet Trust</div>
-        <div class="kpi-tile-value ${trustClass}">${trustVal}</div>
-        <div class="kpi-tile-sub">avg score</div>
+        <div class="kpi-tile-value ${trustClass}">${trustVal}${_trendArrow(k.trust_delta, false)}</div>
+        <div class="kpi-tile-sub">avg score across fleet</div>
       </button>
       <button class="kpi-tile" onclick="_scrollToSection('agents')" title="View agents">
-        <div class="kpi-tile-label">Online</div>
-        <div class="kpi-tile-value accent">${k.agents_online ?? "—"}<span style="font-size:1rem;font-weight:500;opacity:0.5;"> / ${k.agents_total ?? "—"}</span></div>
-        <div class="kpi-tile-sub">agents active</div>
+        <div class="kpi-tile-label">Agents Online</div>
+        <div class="kpi-tile-value accent">${k.agents_online ?? "—"}${_trendArrow(k.agents_delta, false)}<span style="font-size:1rem;font-weight:500;opacity:0.5;"> / ${k.agents_total ?? "—"}</span></div>
+        <div class="kpi-tile-sub">active this week</div>
       </button>
       <button class="kpi-tile" onclick="_scrollToSection('approvals')" title="View approvals">
-        <div class="kpi-tile-label">Pending</div>
-        <div class="kpi-tile-value ${k.approvals_pending > 0 ? 'bad' : 'good'}">${k.approvals_pending ?? 0}</div>
-        <div class="kpi-tile-sub">approvals</div>
+        <div class="kpi-tile-label">Pending Approvals</div>
+        <div class="kpi-tile-value ${k.approvals_pending > 0 ? 'bad' : 'good'}">${k.approvals_pending ?? 0}${_trendArrow(k.pending_delta, true)}</div>
+        <div class="kpi-tile-sub">awaiting review</div>
       </button>
       <button class="kpi-tile" onclick="_scrollToSection('analytics')" title="View anomalies">
         <div class="kpi-tile-label">Anomalies</div>
-        <div class="kpi-tile-value ${k.anomalies_24h > 0 ? 'warn' : 'good'}">${k.anomalies_24h ?? 0}</div>
+        <div class="kpi-tile-value ${k.anomalies_24h > 0 ? 'warn' : 'good'}">${k.anomalies_24h ?? 0}${_trendArrow(k.anomalies_delta, true)}</div>
         <div class="kpi-tile-sub">last 24 h</div>
       </button>`;
   }
@@ -1622,11 +1629,8 @@ async function _bulkVisibility(makePrivate) {
   }
 }
 
-function _renderAgentRow(a) {
+function _renderAgentCard(a) {
   const capsArr = Array.isArray(a.capabilities) ? a.capabilities : [];
-  const caps = capsArr.length
-    ? `<div class="caps-scroll">${capsArr.map(c => `<span class="cap-pill">${esc(String(c))}</span>`).join("")}</div>`
-    : "";
   const lastActiveStr   = a.last_activity ? timeAgo(a.last_activity) : "—";
   const lastActiveClass = a.last_activity &&
     (Date.now() - new Date(a.last_activity).getTime()) < 86400000 * 7
@@ -1710,25 +1714,39 @@ function _renderAgentRow(a) {
   }
   const trustRing = `<span class="trust-ring ${ringClass}"><span class="tr-n">${ringLabel}</span></span>`;
 
-  return `<tr
-    data-name="${esc(a.name.toLowerCase())}"
+  const capChips = capsArr.length
+    ? capsArr.slice(0, 4).map(c => `<span class="cap-chip">${esc(String(c))}</span>`).join("") +
+      (capsArr.length > 4 ? `<span class="cap-chip" style="color:var(--muted);">+${capsArr.length - 4}</span>` : "")
+    : `<span style="font-size:0.72rem;color:var(--muted);">no capabilities</span>`;
+
+  return `<div class="agent-card"
+    data-name="${esc((a.name || "").toLowerCase())}"
     data-did="${esc((a.did || "").toLowerCase())}"
     data-caps="${esc(capsArr.join(" ").toLowerCase())}"
-    data-raw-did="${esc(a.did || "")}">
-    <td style="width:2rem;text-align:center;"><input type="checkbox" class="agent-row-check" data-did="${esc(a.did||"")}" style="cursor:pointer;" /></td>
-    <td class="agent-name" style="display:flex;align-items:center;gap:0;">${healthDot}${avatarHtml}${esc(a.name)}${rotBadge}</td>
-    <td class="did-mono" title="${esc(rawDid)}">${didCellContent}</td>
-    <td>${caps || '<span style="color:var(--muted);font-size:0.8rem;">none</span>'}</td>
-    <td style="text-align:center;font-weight:600;">${trustRing} <span style="color:var(--muted);font-size:0.72rem;">${esc(String(a.audit_events ?? 0))}</span></td>
-    <td class="${lastActiveClass}">${esc(lastActiveStr)}</td>
-    <td style="color:var(--muted);font-size:0.78rem;">${esc(createdStr)}</td>
-    <td style="white-space:nowrap;">${privacyBtn} ${oversightBtn}</td>
-    <td style="white-space:nowrap;">
-      <button class="agent-action-btn" data-action="details" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="View agent details, trust graph, recent activity">Details</button>
-      <button class="agent-action-btn" data-action="verify" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="Test verify a signed payload against this agent" style="margin-left:0.3rem;">Test</button>
-      <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name)}" title="Copy-paste code snippets for this agent" style="margin-left:0.3rem;">&lt;/&gt;</button>
-    </td>
-  </tr>`;
+    data-raw-did="${esc(rawDid)}">
+    <label class="ag-card-sel" title="Select">
+      <input type="checkbox" class="agent-row-check" data-did="${esc(a.did||"")}" style="cursor:pointer;" />
+    </label>
+    <div class="ag-card-head">
+      <div class="ag-avatar-lg">${esc(initials)}</div>
+      <div class="ag-card-id">
+        <div class="ag-card-name">${esc(a.name)}${rotBadge}</div>
+        <div class="ag-card-did">${didCellContent}</div>
+      </div>
+      ${trustRing}
+    </div>
+    <div class="ag-card-caps">${capChips}</div>
+    <div class="ag-card-meta">
+      <span>${healthDot} <span class="${lastActiveClass}">${esc(lastActiveStr)}</span></span>
+      <span style="color:var(--muted);">📋 ${esc(String(a.audit_events ?? 0))}</span>
+    </div>
+    <div class="ag-card-footer">
+      <button class="agent-action-btn" data-action="details" data-did="${esc(rawDid)}" data-name="${esc(a.name)}" style="flex:1;">Details</button>
+      <button class="agent-action-btn" data-action="verify"  data-did="${esc(rawDid)}" data-name="${esc(a.name)}" title="Test verify">Test</button>
+      <button class="agent-action-btn" data-action="snippets" data-did="${esc(rawDid)}" data-name="${esc(a.name)}" title="Code snippets">&lt;/&gt;</button>
+      ${privacyBtn}
+    </div>
+  </div>`;
 }
 
 function _buildAgFiltered() {
@@ -1764,35 +1782,22 @@ function _renderAgPage() {
     status.textContent = "";
   }
 
-  el.innerHTML = `
-    <div style="overflow:auto;">
-      <table class="agents-table">
-        <thead><tr>
-          <th style="width:2rem;text-align:center;"><input type="checkbox" id="ag-select-all" title="Select all on this page" style="cursor:pointer;" /></th>
-          <th>Name</th><th>DID</th><th>Capabilities</th>
-          <th>Audit Events</th><th>Last Active</th><th>Registered</th>
-          <th>Visibility</th><th></th>
-        </tr></thead>
-        <tbody>${slice.map(_renderAgentRow).join("")}</tbody>
-      </table>
-    </div>`;
+  el.innerHTML = `<div class="agent-grid">${slice.map(_renderAgentCard).join("")}</div>`;
 
-  // Select-all for current page
-  document.getElementById("ag-select-all")?.addEventListener("change", function() {
-    el.querySelectorAll(".agent-row-check").forEach(cb => {
-      cb.checked = this.checked;
-      _agSelection[cb.dataset.did] = this.checked ? _allAgents.find(a => a.did === cb.dataset.did) : undefined;
-      if (!this.checked) delete _agSelection[cb.dataset.did];
-    });
-    _updateBulkBar();
-  });
   el.querySelectorAll(".agent-row-check").forEach(cb => {
     cb.checked = !!_agSelection[cb.dataset.did];
     cb.addEventListener("change", function() {
-      if (this.checked) _agSelection[this.dataset.did] = _allAgents.find(a => a.did === this.dataset.did);
-      else delete _agSelection[this.dataset.did];
+      const card = this.closest(".agent-card");
+      if (this.checked) {
+        _agSelection[this.dataset.did] = _allAgents.find(a => a.did === this.dataset.did);
+        card?.classList.add("ag-selected");
+      } else {
+        delete _agSelection[this.dataset.did];
+        card?.classList.remove("ag-selected");
+      }
       _updateBulkBar();
     });
+    if (cb.checked) cb.closest(".agent-card")?.classList.add("ag-selected");
   });
 
   // Pager
@@ -3408,6 +3413,114 @@ async function _createWebhook() {
 // ── Modal open / close / tab switching ───────────────────────────────────────
 
 // ── AGENT DETAIL DRAWER ──────────────────────────────────────────────────────
+
+// ── INLINE SPLIT-PANE INSPECTOR ───────────────────────────────────────────────
+
+let _inspectorDid = null;
+
+async function _openInspector(did, name) {
+  const pane   = document.getElementById("ag-split-pane");
+  const body   = document.getElementById("ag-insp-body");
+  const title  = document.getElementById("ag-insp-name");
+  const fullBtn= document.getElementById("ag-insp-full");
+  if (!pane || !body) { _openAgentDetail(did, name); return; }
+
+  // Highlight active card
+  document.querySelectorAll(".agent-card.ag-active").forEach(c => c.classList.remove("ag-active"));
+  document.querySelector(`.agent-card[data-raw-did="${CSS.escape(did)}"]`)?.classList.add("ag-active");
+
+  _inspectorDid = did;
+  if (title) title.textContent = name || did;
+  pane.classList.add("inspector-open");
+  body.innerHTML = '<div class="loading" style="padding:1.5rem;"><div class="spinner" style="margin:0 auto;"></div></div>';
+
+  if (fullBtn) {
+    fullBtn.onclick = () => _openAgentDetail(did, name);
+  }
+
+  try {
+    const data = await apiFetch("/pro/agents/" + encodeURIComponent(did) + "/control");
+    const a = data.agent || {};
+    const ts = window._agentTrustScores?.[did];
+    const trustScore = ts?.score != null ? ts.score : "—";
+    const trustBand  = ts?.band || "muted";
+    const ringClass  = trustBand === "good" ? "tr-good" : trustBand === "warn" ? "tr-mid" : trustBand === "bad" ? "tr-low" : "tr-muted";
+    const capsArr = Array.isArray(a.capabilities) ? a.capabilities : [];
+    const initials = (a.name || "??").slice(0, 2).toUpperCase();
+    const rawDid = a.did || did;
+    const didDisplay = rawDid.startsWith("did:agentid:")
+      ? `<span class="did-prefix">did:agentid:</span><span class="did-hash">${esc(rawDid.slice(12, 26))}…</span>`
+      : `<span class="did-hash">${esc(shortDid(rawDid))}</span>`;
+    const lastActive = a.last_activity ? timeAgo(a.last_activity) : "Never";
+    const created = a.created_at ? new Date(a.created_at).toLocaleDateString("en-US", {month:"short",day:"numeric",year:"numeric"}) : "—";
+    const isPrivate = !!a.private;
+    const oversight = a.human_oversight || "none";
+
+    body.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:0.65rem;margin-bottom:0.9rem;">
+        <div class="ag-avatar-lg" style="width:44px;height:44px;font-size:0.85rem;">${esc(initials)}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.9rem;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(a.name || did)}</div>
+          <div style="margin-top:0.15rem;">${didDisplay}</div>
+        </div>
+        <span class="trust-ring ${ringClass}" style="width:42px;height:42px;font-size:0.8rem;"><span class="tr-n">${esc(String(trustScore))}</span></span>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.85rem;">
+        ${capsArr.length ? capsArr.map(c => `<span class="cap-chip">${esc(String(c))}</span>`).join("") : '<span style="font-size:0.75rem;color:var(--muted);">no capabilities</span>'}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.85rem;">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.5rem 0.7rem;">
+          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);font-weight:700;">Last Active</div>
+          <div style="font-size:0.82rem;font-weight:600;color:var(--text);margin-top:0.15rem;">${esc(lastActive)}</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.5rem 0.7rem;">
+          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);font-weight:700;">Registered</div>
+          <div style="font-size:0.82rem;font-weight:600;color:var(--text);margin-top:0.15rem;">${esc(created)}</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.5rem 0.7rem;">
+          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);font-weight:700;">Visibility</div>
+          <div style="font-size:0.82rem;font-weight:600;margin-top:0.15rem;color:${isPrivate ? "var(--yellow)" : "var(--green)"};">${isPrivate ? "🔒 Private" : "🌐 Public"}</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.5rem 0.7rem;">
+          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);font-weight:700;">Oversight</div>
+          <div style="font-size:0.82rem;font-weight:600;color:var(--text);margin-top:0.15rem;">${esc(oversight)}</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${esc(rawDid)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy DID',1500)})">Copy DID</button>
+        <button class="btn btn-ghost btn-sm" data-action="verify" data-did="${esc(rawDid)}" data-name="${esc(a.name||"")}" onclick="_openTestVerify('${esc(rawDid)}','${esc(a.name||"")}')">Test Verify</button>
+        <button class="btn btn-ghost btn-sm" data-action="snippets" data-did="${esc(rawDid)}" data-name="${esc(a.name||"")}" onclick="_openSnippets('${esc(rawDid)}','${esc(a.name||"")}')">Code &lt;/&gt;</button>
+      </div>
+      ${data.recent_activity?.length ? `
+      <div style="margin-top:0.9rem;">
+        <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:700;margin-bottom:0.4rem;">Recent Activity</div>
+        <div class="feed-list">
+          ${data.recent_activity.slice(0,5).map(r => {
+            const op = r.operation || r.event_type || "event";
+            const dotCls = (op==="verify"||op==="register") ? "feed-dot-good" : (op==="deregister"||op==="revoke") ? "feed-dot-bad" : "feed-dot-mid";
+            const chipCls = (op==="verify"||op==="register") ? "feed-chip-good" : (op==="deregister"||op==="revoke") ? "feed-chip-bad" : "feed-chip-muted";
+            return `<div class="feed-row">
+              <span class="feed-dot ${dotCls}"></span>
+              <span class="feed-time">${esc(r.created_at ? timeAgo(r.created_at) : "—")}</span>
+              <div class="feed-body"><span class="feed-chip ${chipCls}">${esc(op)}</span></div>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>` : ""}`;
+  } catch(e) {
+    body.innerHTML = `<div style="padding:1rem;color:var(--red);font-size:0.82rem;">Could not load: ${esc(String(e.message||e))}</div>`;
+  }
+}
+
+function _closeInspector() {
+  const pane = document.getElementById("ag-split-pane");
+  pane?.classList.remove("inspector-open");
+  document.querySelectorAll(".agent-card.ag-active").forEach(c => c.classList.remove("ag-active"));
+  _inspectorDid = null;
+}
 
 // ── AGENT CONTROL PANEL DRAWER ───────────────────────────────────────────────
 // Four tabs. Loaded one-shot from /pro/agents/{did}/control, then refreshed
@@ -6661,15 +6774,18 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
     setTimeout(() => { this.textContent = "copy"; }, 1800);
   });
 
-  // ── Agent row action delegation ───────────────────────────────────────────────
+  // ── Agent card action delegation ─────────────────────────────────────────────
   document.getElementById("agents-table")?.addEventListener("click", e => {
     const btn = e.target.closest(".agent-action-btn");
     if (!btn) return;
     const { action, did, name } = btn.dataset;
-    if (action === "details")  _openAgentDetail(did, name);
+    if (action === "details")  _openInspector(did, name);
     if (action === "verify")   _openTestVerify(did, name);
     if (action === "snippets") _openSnippets(did, name);
   });
+
+  // Inspector close button
+  document.getElementById("ag-insp-close")?.addEventListener("click", _closeInspector);
 
   // ── API Playground ───────────────────────────────────────────────────────────
   (function _initPlayground() {

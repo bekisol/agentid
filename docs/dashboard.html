@@ -843,10 +843,11 @@
       padding: 0.15rem 0.5rem;
       border-radius: 5px;
       font-size: 0.7rem;
-      font-weight: 600;
+      font-weight: 500;
+      font-family: "JetBrains Mono", monospace;
       background: var(--surface2);
       border: 1px solid var(--border);
-      color: var(--muted);
+      color: var(--text-2);
       white-space: nowrap;
     }
 
@@ -3075,6 +3076,157 @@
       .home-item-title { font-size: 0.78rem; }
     }
 
+    /* ── DESIGN TOKENS (mirrors index.html) ── */
+    :root {
+      --good: #3F7D58; --warn: #B58900; --bad: #9B1F1F;
+      --good-bg: #EAF4EE; --warn-bg: #FDF8E2; --bad-bg: #FCEAEA;
+    }
+    html[data-theme="dark"] { --good:#4ade80; --warn:#facc15; --bad:#f87171; }
+    @media (prefers-color-scheme:dark){html:not([data-theme="light"]){--good:#4ade80;--warn:#facc15;--bad:#f87171;}}
+
+    /* ── TRUST RING ── */
+    .trust-ring {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:36px; height:36px; border-radius:50%;
+      border:2.5px solid var(--border-dark);
+      font-size:0.65rem; font-weight:700; font-family:"JetBrains Mono",monospace;
+      color:var(--muted); flex-shrink:0;
+    }
+    .trust-ring.tr-good { border-color:var(--good); color:var(--good); }
+    .trust-ring.tr-mid  { border-color:var(--warn); color:var(--warn); }
+    .trust-ring.tr-low  { border-color:var(--bad);  color:var(--bad); }
+    .trust-ring.tr-muted{ border-color:var(--border-dark); color:var(--muted); }
+    .tr-n { line-height:1; }
+
+    /* ── DID DISPLAY ── */
+    .did-prefix { font-family:"JetBrains Mono",monospace; font-size:0.72em; color:var(--muted); }
+    .did-hash   { font-family:"JetBrains Mono",monospace; font-size:0.78em; color:var(--text-2); font-weight:500; }
+
+    /* ── CAPABILITY CHIP ── */
+    .cap-chip {
+      display:inline-flex; align-items:center;
+      padding:0.12rem 0.5rem; border-radius:5px;
+      font-family:"JetBrains Mono",monospace; font-size:0.68rem; font-weight:500;
+      background:var(--surface2); border:1px solid var(--border); color:var(--text-2);
+      white-space:nowrap;
+    }
+
+    /* ── FEED ROWS (activity feed) ── */
+    .feed-list { padding:0.25rem 0; }
+    .feed-row { display:flex; align-items:center; gap:0.6rem; padding:0.5rem 0; border-bottom:1px solid var(--border); font-size:0.8rem; }
+    .feed-row:last-child { border-bottom:none; }
+    .feed-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+    .feed-dot-good{background:var(--good);} .feed-dot-bad{background:var(--bad);} .feed-dot-mid{background:var(--warn);}
+    .feed-time { font-size:0.7rem; color:var(--muted); white-space:nowrap; font-family:"JetBrains Mono",monospace; }
+    .feed-body { display:flex; align-items:center; gap:0.4rem; flex:1; min-width:0; }
+    .feed-chip { display:inline-flex; align-items:center; padding:0.1rem 0.45rem; border-radius:4px; font-size:0.65rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; white-space:nowrap; background:var(--surface2); color:var(--muted); border:1px solid var(--border); font-family:"JetBrains Mono",monospace; }
+    .feed-chip-good{background:var(--good-bg);color:var(--good);border-color:transparent;}
+    .feed-chip-bad{background:var(--bad-bg);color:var(--bad);border-color:transparent;}
+    .feed-chip-muted{background:var(--surface2);color:var(--muted);}
+
+    /* ── KPI TREND ARROWS ── */
+    .kpi-trend { display:inline-flex;align-items:center;gap:0.15rem;font-size:0.7rem;font-weight:700;margin-left:0.3rem; }
+    .kpi-trend-up   { color: #3F7D58; }
+    .kpi-trend-down { color: #9B1F1F; }
+    .kpi-trend-flat { color: var(--muted); }
+    html[data-theme="dark"] .kpi-trend-up   { color: #4ade80; }
+    html[data-theme="dark"] .kpi-trend-down { color: #f87171; }
+
+    /* ── AGENT PASSPORT CARDS ── */
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+    }
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      position: relative;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .agent-card:hover { border-color: var(--border-dark); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .agent-card.ag-selected { border-color: var(--accent); background: var(--accent-light); }
+    .agent-card.ag-active   { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-border); }
+    .ag-card-sel {
+      position: absolute; top: 0.5rem; left: 0.5rem;
+      opacity: 0; transition: opacity 0.1s;
+    }
+    .agent-card:hover .ag-card-sel,
+    .agent-card.ag-selected .ag-card-sel { opacity: 1; }
+    .ag-card-head {
+      display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem;
+    }
+    .ag-avatar-lg {
+      width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+      background: var(--accent-light); border: 1px solid var(--accent-border);
+      color: var(--accent); font-size: 0.7rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; letter-spacing: 0.03em;
+    }
+    .ag-card-id { flex: 1; min-width: 0; }
+    .ag-card-name {
+      font-size: 0.84rem; font-weight: 700; color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ag-card-did {
+      margin-top: 0.1rem;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ag-card-caps {
+      display: flex; flex-wrap: wrap; gap: 0.3rem;
+      margin-bottom: 0.5rem; min-height: 20px;
+    }
+    .ag-card-meta {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.71rem; color: var(--muted); margin-bottom: 0.55rem;
+    }
+    .ag-card-footer {
+      display: flex; gap: 0.3rem; flex-wrap: wrap;
+      border-top: 1px solid var(--border); padding-top: 0.55rem; margin-top: auto;
+    }
+
+    /* ── SPLIT-PANE INSPECTOR ── */
+    .ag-split-pane {
+      display: flex;
+      min-height: 100px;
+      align-items: stretch;
+    }
+    .ag-split-main { flex: 1; min-width: 0; }
+    .ag-split-inspector {
+      display: none;
+      width: 340px; flex-shrink: 0;
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      flex-direction: column;
+      max-height: 72vh;
+      overflow: hidden;
+    }
+    .ag-split-pane.inspector-open .ag-split-inspector { display: flex; }
+    @media (max-width: 680px) {
+      .ag-split-pane.inspector-open .ag-split-inspector { display: none; }
+    }
+    .ag-insp-head {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);
+      background: var(--surface2); flex-shrink: 0;
+    }
+    .ag-insp-title {
+      flex: 1; font-size: 0.85rem; font-weight: 700;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ag-insp-body {
+      flex: 1; overflow-y: auto; padding: 1rem;
+    }
+    .ag-insp-foot {
+      border-top: 1px solid var(--border);
+      padding: 0.65rem 1rem; flex-shrink: 0;
+    }
+
     /* ── DETAILS TOGGLE ── */
     details summary { list-style: none; }
     details summary::-webkit-details-marker { display: none; }
@@ -5219,8 +5371,30 @@ curl https://api.agentid-protocol.com/agents \
       <button class="bulk-bar-btn danger" id="bulk-deregister">Deregister selected</button>
       <button class="bulk-bar-btn" id="bulk-clear-sel" style="margin-left:auto;">✕ Clear</button>
     </div>
-    <div id="agents-table"><div class="loading"><div class="spinner"></div> Loading…</div></div>
-    <div id="agents-pager-wrap"></div>
+
+    <div class="ag-split-pane" id="ag-split-pane">
+      <!-- Card grid -->
+      <div class="ag-split-main">
+        <div id="agents-table"><div class="loading"><div class="spinner"></div> Loading…</div></div>
+        <div id="agents-pager-wrap"></div>
+      </div>
+
+      <!-- Inline inspector panel (desktop only) -->
+      <div class="ag-split-inspector" id="ag-inspector">
+        <div class="ag-insp-head">
+          <span class="ag-insp-title" id="ag-insp-name">—</span>
+          <button class="btn-icon" id="ag-insp-close" title="Close inspector">✕</button>
+        </div>
+        <div class="ag-insp-body" id="ag-insp-body">
+          <div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:2rem 1rem;">
+            Select an agent to preview
+          </div>
+        </div>
+        <div class="ag-insp-foot">
+          <button class="btn btn-outline" style="width:100%;font-size:0.8rem;" id="ag-insp-full">Open full details →</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ── API PLAYGROUND ── -->
