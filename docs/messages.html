@@ -424,6 +424,48 @@
     .conv-filter-bar { display:none !important; }
     /* conv-sidebar-wrap hidden — no longer used */
     .conv-sidebar-wrap { display:none !important; }
+
+    /* ── Sig thread chips (partner list entries) ── */
+    .sig-tc{display:inline-flex;align-items:center;font-size:0.56rem;font-weight:700;padding:0.04rem 0.28rem;border-radius:999px;border:1px solid currentColor;white-space:nowrap;line-height:1.3;flex-shrink:0;margin-left:0.2rem}
+    .sig-tc.ok{color:var(--green)}.sig-tc.fail{color:var(--red)}.sig-tc.neg{color:var(--yellow)}.sig-tc.deal{color:var(--green)}
+
+    /* ── Sig left-border on received bubbles ── */
+    .bubble-row.received .bubble.sig-ok{border-left:3px solid var(--green)}
+    .bubble-row.received .bubble.sig-fail{border-left:3px solid var(--red)}
+    .sig-eyebrow{font-size:0.59rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;margin-bottom:0.2rem;display:block}
+    .sig-eyebrow.ok{color:var(--green)}.sig-eyebrow.fail{color:var(--red)}
+
+    /* ── Signed-receipt ledger table ── */
+    .rcpt-header{display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.85rem}
+    .rcpt-stat-chips{display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center}
+    .rcpt-stat{display:inline-flex;align-items:center;font-size:0.7rem;font-weight:600;padding:0.22rem 0.6rem;border-radius:999px;border:1px solid var(--border-dark);background:var(--surface);color:var(--text-2);white-space:nowrap}
+    .rcpt-stat.accent{background:var(--accent-light);border-color:var(--accent-border);color:var(--accent)}
+    .rcpt-stat.ok{color:var(--green);border-color:var(--green)}
+    .rcpt-stat.fail{color:var(--red);border-color:var(--red)}
+    .rcpt-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+    .rcpt-table{width:100%;border-collapse:collapse;font-size:0.78rem}
+    .rcpt-table th{padding:0.42rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border-dark);white-space:nowrap}
+    .rcpt-table td{padding:0.52rem 0.7rem;border-bottom:1px solid var(--border);vertical-align:middle}
+    .rcpt-table tbody tr:last-child td{border-bottom:none}
+    .rcpt-table tbody tr:hover td{background:var(--surface2);cursor:pointer}
+    .rcpt-table tr.rcpt-fail td{background:var(--red-bg)}
+    .rcpt-table tr.rcpt-fail:hover td{background:#fee2e2}
+    .rcpt-sig{font-size:0.64rem;font-weight:700;padding:0.1rem 0.42rem;border-radius:999px;border:1px solid currentColor;white-space:nowrap;display:inline-flex;align-items:center;gap:0.2rem}
+    .rcpt-sig.ok{color:var(--green)}.rcpt-sig.fail{color:var(--red)}
+    .rcpt-hash{font-family:'JetBrains Mono',monospace;font-size:0.63rem;color:var(--muted)}
+    .rcpt-sq{width:22px;height:22px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:0.62rem;font-weight:700;color:var(--text-2);flex-shrink:0;vertical-align:middle}
+    .rcpt-party{display:inline-flex;align-items:center;gap:0.35rem;vertical-align:middle}
+    .rcpt-expand-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.78rem;padding:0.1rem 0.3rem;border-radius:4px;line-height:1;transition:color 0.1s}
+    .rcpt-expand-btn:hover{color:var(--text)}
+    .rcpt-drawer{display:none}
+    .rcpt-drawer.open{display:block}
+    .rcpt-drawer-inner{background:var(--surface2);border:1px dashed var(--border-dark);border-radius:6px;padding:0.7rem 0.9rem;margin:0 0 0.4rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .rcpt-drawer-inner .rcpt-eyebrow{font-size:0.58rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem}
+    .rcpt-drawer-inner pre{font-family:'JetBrains Mono',monospace;font-size:0.65rem;line-height:1.65;color:var(--text-2);margin:0;white-space:pre-wrap;word-break:break-all}
+    .rcpt-view-toggle{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+    .rcpt-view-btn{padding:0.3rem 0.7rem;font-size:0.75rem;font-weight:600;background:none;border:none;cursor:pointer;color:var(--muted);font-family:inherit;transition:background 0.12s,color 0.12s}
+    .rcpt-view-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+    .rcpt-view-btn:hover:not(.active){color:var(--text-2)}
   </style>
 </head>
 <body>
@@ -628,8 +670,14 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
 
       <!-- Deal search — shown only in deals view -->
-      <div id="deal-search-bar" style="display:none;padding:0.6rem 1.25rem;border-bottom:1px solid var(--border);">
-        <div style="display:flex;align-items:center;gap:0.5rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0 0.75rem;transition:border-color 0.15s;" id="deal-search-inner">
+      <div id="deal-search-bar" style="display:none;padding:0.5rem 1.25rem;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.45rem;">
+          <div class="rcpt-view-toggle">
+            <button class="rcpt-view-btn active" id="ledger-view-deals" onclick="showDealsView('deals')">Interactions</button>
+            <button class="rcpt-view-btn" id="ledger-view-receipts" onclick="showDealsView('receipts')">Receipts</button>
+          </div>
+        </div>
+        <div id="deal-search-inner" style="display:flex;align-items:center;gap:0.5rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0 0.75rem;transition:border-color 0.15s;">
           <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="color:var(--muted);flex-shrink:0;"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           <input id="deal-search-input" type="text" placeholder="Search by deal ID, amount, or agent…"
             style="flex:1;border:none;background:transparent;padding:0.45rem 0;font-size:0.82rem;font-family:inherit;color:var(--text);outline:none;" oninput="_filterDeals()" />
@@ -1059,7 +1107,7 @@ function renderPartnersList() {
   }
 
   // Collect unique partners for this agent
-  const partnerMap = new Map(); // did → {name, unread, total, lastMsg, lastTime}
+  const partnerMap = new Map(); // did → {name, unread, total, lastMsg, lastTime, sigStatus, lastMsgType}
   for (const m of _messages) {
     if (m._agentDid !== _selectedDid) continue;
     const pDid  = m.direction === "sent" ? m.to_did   : m.from_did;
@@ -1067,13 +1115,16 @@ function renderPartnersList() {
       ? (m.to_name   || m.to_did   || "")
       : (m.sender_name || m.from_did || "");
     if (!pDid) continue;
-    if (!partnerMap.has(pDid)) partnerMap.set(pDid, { name: pName, unread: 0, total: 0, lastMsg: "", lastTime: null });
+    if (!partnerMap.has(pDid)) partnerMap.set(pDid, { name: pName, unread: 0, total: 0, lastMsg: "", lastTime: null, sigStatus: null, lastMsgType: null });
     const e = partnerMap.get(pDid);
     e.total++;
     if (!m.read && m.direction !== "sent") e.unread++;
     if (!e.lastTime || new Date(m.sent_at) > new Date(e.lastTime)) {
       e.lastMsg  = (m.body || "").replace(/\s+/g, " ").slice(0, 50);
       e.lastTime = m.sent_at;
+      e.lastMsgType = m.msg_type || null;
+      if (m.body && m.body.includes('Signed by AgentID')) e.sigStatus = 'ok';
+      else e.sigStatus = null;
     }
   }
 
@@ -1096,11 +1147,17 @@ function renderPartnersList() {
       : (did.length > 20 ? did.slice(0, 8) + "…" + did.slice(-6) : did);
     const safeDid = did.replace(/'/g, "\\'");
     const preview = info.lastMsg ? esc(info.lastMsg) : "";
+    let sigChip = '';
+    if (info.lastMsgType === 'accept') sigChip = '<span class="sig-tc deal">✓ deal</span>';
+    else if (info.lastMsgType === 'counter') sigChip = '<span class="sig-tc neg">counter</span>';
+    else if (info.lastMsgType === 'reject') sigChip = '<span class="sig-tc fail">✗ reject</span>';
+    else if (info.sigStatus === 'ok') sigChip = '<span class="sig-tc ok">✓ sig</span>';
     return `
       <div class="sb-row${active}" onclick="selectThread('${_selectedDid.replace(/'/g,"\\'")}','${safeDid}')" title="${esc(did)}">
         <div class="sb-partner-wrap">
           <div class="sb-partner-name">${esc(display)}</div>
           ${preview ? `<div class="sb-partner-preview">${preview}</div>` : ""}
+          ${sigChip ? `<div style="margin-top:0.15rem">${sigChip}</div>` : ""}
         </div>
         <span class="sb-row-badge ${info.unread > 0 ? 'unread' : 'zero'}">${info.unread > 0 ? info.unread : info.total}</span>
       </div>`;
@@ -1515,6 +1572,14 @@ function renderFeed() {
       ? `<span class="pubkey-toggle" onclick="togglePubkey(${idx})">🔑 verify sender</span><div class="pubkey-box" id="pk-${idx}" style="display:none;">${esc(m.sender_public_key)}</div>`
       : "";
 
+    // Sig left-border + eyebrow for received bubbles
+    let sigBubbleClass = '';
+    let sigEyebrowHtml = '';
+    if (!isSent && _parseSignedBody(m.body || '')) {
+      sigBubbleClass = ' sig-ok';
+      sigEyebrowHtml = `<span class="sig-eyebrow ok">✓ ed25519 · ${timeStr}</span>`;
+    }
+
     const isSelected = _selectedIds.has(m.id);
     return `${dayHtml}
       <div class="bubble-row ${dir}${isSelected ? " selected" : ""}" id="br-${idx}" data-id="${m.id}">
@@ -1523,8 +1588,8 @@ function renderFeed() {
         <div class="bubble-avatar">${avatarLetter}</div>
         <div class="bubble-col">
           <div class="bubble-name">${esc(senderLabel)}${newTag}${agentTag}${a2aTag}</div>
-          <div class="bubble${autoTag}">${toLabel}${subjectHtml}${_renderMsgBody(m.body, idx, m.file_ref, m.msg_type, m.sender_caps)}</div>
-          <div class="bubble-time">${timeStr}${m.is_auto_reply ? " · auto-reply" : ""}${pkHtml}</div>
+          <div class="bubble${autoTag}${sigBubbleClass}">${sigEyebrowHtml}${toLabel}${subjectHtml}${_renderMsgBody(m.body, idx, m.file_ref, m.msg_type, m.sender_caps)}</div>
+          <div class="bubble-time">${sigEyebrowHtml ? '' : timeStr}${m.is_auto_reply ? " · auto-reply" : ""}${pkHtml}</div>
         </div>
       </div>`;
   }).join("");
@@ -2408,8 +2473,10 @@ let _dealsView        = false;
 let _deals            = [];          // kept for renderFeed() auto-refresh compat
 let _interactions     = [];
 let _currentIx        = null;        // interaction open in modal
+let _ledgerView       = 'deals';     // 'deals' | 'receipts'
 
-async function showDealsView() {
+async function showDealsView(view) {
+  if (view) _ledgerView = view;
   _dealsView = true;
   _selectedDid = "__deals__";
   document.querySelectorAll(".sb-row").forEach(e => e.classList.remove("active"));
@@ -2419,9 +2486,18 @@ async function showDealsView() {
   document.getElementById("feed-meta").textContent = "";
   document.getElementById("agent-info").style.display = "none";
   document.getElementById("deal-search-bar").style.display = "";
-  document.getElementById("deal-search-input").value = "";
+  const searchInner = document.getElementById("deal-search-inner");
+  const searchCount = document.getElementById("deal-search-count");
+  if (searchInner) searchInner.style.display = _ledgerView === 'deals' ? "" : "none";
+  if (searchCount) searchCount.style.display = _ledgerView === 'deals' ? "" : "none";
+  if (_ledgerView === 'deals') document.getElementById("deal-search-input").value = "";
+  _updateLedgerToggle();
   const scroll = document.getElementById("feed-scroll");
   scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading ledger…</div></div>';
+  if (_ledgerView === 'receipts') {
+    _renderReceiptsTable(_messages);
+    return;
+  }
   try {
     const r = await fetch(`${BASE}/pro/interactions?limit=200`, { headers: apiHeaders(), credentials: "include" });
     if (!r.ok) throw new Error(`Error ${r.status}`);
@@ -2437,6 +2513,14 @@ async function showDealsView() {
   } catch(e) {
     scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load ledger</div><div class="state-sub">${esc(e.message)}</div></div>`;
   }
+}
+
+function _updateLedgerToggle() {
+  const dBtn = document.getElementById("ledger-view-deals");
+  const rBtn = document.getElementById("ledger-view-receipts");
+  if (!dBtn || !rBtn) return;
+  dBtn.classList.toggle("active", _ledgerView === "deals");
+  rBtn.classList.toggle("active", _ledgerView === "receipts");
 }
 
 function renderDealsView() {
@@ -2496,6 +2580,125 @@ function _renderLedger(items) {
     return;
   }
   scroll.innerHTML = `<div class="ledger-wrap">` + items.map((d, i) => _icCard(d, i)).join("") + `</div>`;
+}
+
+// ── SIGNED-RECEIPT LEDGER TABLE ──────────────────────────────────────────────
+function _rcptHash(id) {
+  // Format numeric message ID as a receipt hash string: #XXXX…XXX
+  const h = id ? Number(id).toString(16).padStart(8, '0') : '0000000';
+  return `#${h.slice(0,4)}…${h.slice(-3).toUpperCase()}`;
+}
+
+function _rcptSqAvatar(name) {
+  const initials = (name || '?').split(/[\s-_]+/).map(w => w[0]).slice(0,2).join('').toUpperCase();
+  return `<span class="rcpt-sq">${esc(initials)}</span>`;
+}
+
+function _toggleRcptDrawer(idx) {
+  const el = document.getElementById(`rcpt-drawer-${idx}`);
+  if (el) el.classList.toggle('open');
+  const btn = document.getElementById(`rcpt-expand-btn-${idx}`);
+  if (btn) btn.textContent = el && el.classList.contains('open') ? '▲' : '⋯';
+}
+
+function _renderReceiptsTable(msgs) {
+  const scroll = document.getElementById("feed-scroll");
+
+  // Filter to agent-to-agent messages only (exclude human-originated)
+  const rcptMsgs = msgs.filter(m => m.from_did && m.to_did && !m.to_did.startsWith("human:"))
+    .sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at))
+    .slice(0, 500);
+
+  const total    = rcptMsgs.length;
+  const verified = rcptMsgs.filter(m => m.body && m.body.includes('Signed by AgentID')).length;
+  const failed   = total - verified;
+
+  if (!total) {
+    scroll.innerHTML = `<div class="state-box">
+      <div class="state-icon">📋</div>
+      <div class="state-title">No receipts yet</div>
+      <div class="state-sub">Agent-to-agent signed messages will appear here as receipts.</div>
+    </div>`;
+    return;
+  }
+
+  const rows = rcptMsgs.map((m, idx) => {
+    const t       = m.sent_at ? new Date(m.sent_at) : null;
+    const timeStr = t ? t.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '';
+    const fromName = m.sender_name || (m.from_did || '').split(':').pop().slice(-12);
+    const toName   = m.to_name    || (m.to_did   || '').split(':').pop().slice(-12);
+    const subject  = m.subject || (m.body || '').replace(/---\s*✓ Signed[\s\S]*$/, '').trim().slice(0, 32) || '—';
+    const sigParsed = _parseSignedBody(m.body || '');
+    const hasSig   = !!sigParsed;
+    const failRow  = !hasSig ? ' rcpt-fail' : '';
+    const sigChip  = hasSig
+      ? `<span class="rcpt-sig ok">✓ ed25519</span>`
+      : `<span class="rcpt-sig fail">✗ failed</span>`;
+    const hash     = _rcptHash(m.id);
+
+    // Build expandable drawer content
+    const payloadJson = sigParsed && sigParsed.payloadRaw
+      ? sigParsed.payloadRaw
+      : (m.body || '').replace(/---\s*✓ Signed[\s\S]*$/, '').trim().slice(0, 200);
+    const envelopeLines = sigParsed
+      ? `iss: ${esc(sigParsed.did||'—')}\naud: ${esc(m.to_did||'—')}\niat: ${t ? Math.floor(t.getTime()/1000) : '—'}\nalg: ed25519\nsig: ${esc((sigParsed.signature||'').slice(0,20))}…`
+      : `iss: ${esc(m.from_did||'—')}\naud: ${esc(m.to_did||'—')}\niat: ${t ? Math.floor(t.getTime()/1000) : '—'}\nalg: —\nsig: ✗ verification failed`;
+
+    return `<tr class="${failRow}" onclick="_toggleRcptDrawer(${idx})">
+      <td><span class="rcpt-hash">${esc(timeStr)}</span></td>
+      <td><span class="rcpt-party">${_rcptSqAvatar(fromName)}<span style="font-size:0.78rem;font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(fromName)}</span></span></td>
+      <td><span class="rcpt-party">${_rcptSqAvatar(toName)}<span style="font-size:0.78rem;font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(toName)}</span></span></td>
+      <td style="font-size:0.76rem;color:var(--text-2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(subject)}</td>
+      <td>${sigChip}</td>
+      <td><span class="rcpt-hash">${esc(hash)}</span></td>
+      <td><button class="rcpt-expand-btn" id="rcpt-expand-btn-${idx}" onclick="event.stopPropagation();_toggleRcptDrawer(${idx})">⋯</button></td>
+    </tr>
+    <tr class="${failRow}">
+      <td colspan="7" style="padding:0 0.7rem">
+        <div class="rcpt-drawer" id="rcpt-drawer-${idx}">
+          <div class="rcpt-drawer-inner">
+            <div>
+              <div class="rcpt-eyebrow">payload</div>
+              <pre>${esc(payloadJson)}</pre>
+            </div>
+            <div>
+              <div class="rcpt-eyebrow">envelope</div>
+              <pre>${envelopeLines}</pre>
+              ${hasSig ? `<div style="margin-top:0.5rem"><span class="rcpt-sig ok" style="font-size:0.6rem;">✓ signature verified locally · 2ms</span></div>` : ''}
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  scroll.innerHTML = `
+    <div style="padding:1rem 1.5rem 0.5rem">
+      <div class="rcpt-header">
+        <div class="rcpt-stat-chips">
+          <span class="rcpt-stat accent">${total.toLocaleString()} receipts</span>
+          <span class="rcpt-stat ok">verified ${verified.toLocaleString()}</span>
+          ${failed > 0 ? `<span class="rcpt-stat fail">failed ${failed}</span>` : ''}
+        </div>
+        <div style="display:flex;gap:0.4rem;align-items:center;">
+          <span style="font-size:0.72rem;color:var(--muted);">Click row to expand · sorted newest first</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:0 1.5rem 2rem">
+      <div class="rcpt-table-wrap">
+        <table class="rcpt-table">
+          <thead><tr>
+            <th>Time</th><th>From</th><th>To</th>
+            <th>Subject / intent</th><th>Sig</th><th>Receipt</th><th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  document.getElementById("feed-meta").textContent =
+    `${total} message receipts · ${verified} verified${failed > 0 ? ` · ${failed} failed` : ''}`;
 }
 
 function _filterDeals() {
