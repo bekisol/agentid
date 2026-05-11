@@ -8200,16 +8200,6 @@ async function _denyAction(id, source) {
   } catch(e) { alert("Error denying: " + e.message); }
 }
 
-// keep old signature for any existing callers
-async function _denyAction_legacy(id) {
-  return _denyAction(id, "acp");
-}
-async function _approveAction_legacy(id) {
-  return _approveAction(id, "acp");
-}
-  } catch(e) { alert("Error denying: " + e.message); }
-}
-
 // ── ACP TABS ──────────────────────────────────────────────────────────────────
 
 function _initAcpTabs() {
