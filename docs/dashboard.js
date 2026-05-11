@@ -5979,26 +5979,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ── PDF Report ───────────────────────────────────────────────────────────────
-  document.getElementById("pdf-btn").addEventListener("click", async function () {
-    const btn = this;
-    const original = btn.textContent;
-    btn.textContent = "Generating…";
-    btn.disabled = true;
-    try {
-      const res = await _authFetch("/pro/analytics/report.pdf");
-      if (!res.ok) throw new Error(res.status);
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      const cd   = res.headers.get("Content-Disposition") || "";
-      const match = cd.match(/filename="([^"]+)"/);
-      a.download = match ? match[1] : "agentid-analytics.pdf";
-      a.href = url; a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      if (e.message === "403") alert("PDF reports require a Pro or Enterprise plan.");
-      else alert("Could not generate PDF — please try again.");
-    } finally { btn.textContent = original; btn.disabled = false; }
+  document.getElementById("pdf-btn").addEventListener("click", function () {
+    _openReportModal();
   });
 
   // ── Signing filters ──────────────────────────────────────────────────────────
@@ -8036,4 +8018,143 @@ async function _deleteMember(id, email) {
     await apiFetch(`/pro/account/members/${encodeURIComponent(id)}`, { method: "DELETE" });
     await _loadSubAccounts();
   } catch(e) { alert("Error: " + e.message); }
+}
+
+// ── PDF Report Modal ─────────────────────────────────────────────────────────
+
+const _REPORT_SECTIONS = [
+  { id: "agents",       label: "Agents",         desc: "Registry: DID, name, trust score, capabilities" },
+  { id: "trust_scores", label: "Trust Scores",    desc: "Full D1–D5 dimension breakdown per agent" },
+  { id: "contracts",    label: "Contracts",       desc: "Published capability contracts per agent" },
+  { id: "tasks",        label: "Tasks",           desc: "Recent task request history" },
+  { id: "messages",     label: "Messages",        desc: "Recent message activity summary" },
+  { id: "approvals",    label: "Approvals",       desc: "ACP approval queue history" },
+  { id: "analytics",    label: "Analytics",       desc: "Discovery stats, signing activity, search summary" },
+];
+
+async function _openReportModal() {
+  const mo = document.getElementById("report-modal");
+  if (!mo) return;
+  mo.style.display = "flex";
+  // reset
+  document.getElementById("rpt-select-all").checked = true;
+  _REPORT_SECTIONS.forEach(s => {
+    const cb = document.getElementById(`rpt-sec-${s.id}`);
+    if (cb) cb.checked = true;
+  });
+  document.getElementById("rpt-agents-all").checked = true;
+  document.getElementById("rpt-agent-list").style.display = "none";
+  document.getElementById("rpt-title").value = "";
+  document.getElementById("rpt-date-start").value = "";
+  document.getElementById("rpt-date-end").value = "";
+  document.getElementById("rpt-error").textContent = "";
+  // populate agent list
+  await _loadReportAgentList();
+}
+
+function _closeReportModal() {
+  const mo = document.getElementById("report-modal");
+  if (mo) mo.style.display = "none";
+}
+
+async function _loadReportAgentList() {
+  const wrap = document.getElementById("rpt-agent-checkboxes");
+  if (!wrap) return;
+  wrap.innerHTML = '<span style="color:var(--muted);font-size:0.8rem;">Loading…</span>';
+  try {
+    const data = await apiFetch("/agents?mine=true&limit=200");
+    const agents = data.agents || data.items || (Array.isArray(data) ? data : []);
+    if (!agents.length) {
+      wrap.innerHTML = '<span style="color:var(--muted);font-size:0.8rem;">No agents found.</span>';
+      return;
+    }
+    wrap.innerHTML = agents.map(a => {
+      const did = a.did || "";
+      const name = (a.name || did).replace(/</g,"&lt;");
+      const safeDid = did.replace(/</g,"&lt;");
+      return `<label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;cursor:pointer;padding:0.2rem 0;">
+        <input type="checkbox" class="rpt-agent-cb" value="${safeDid}" checked style="accent-color:var(--accent);">
+        <span>${name}</span>
+        <span style="font-size:0.7rem;color:var(--muted);font-family:monospace;">${safeDid.slice(0,30)}…</span>
+      </label>`;
+    }).join("");
+  } catch(e) {
+    wrap.innerHTML = '<span style="color:var(--red);font-size:0.8rem;">Could not load agents.</span>';
+  }
+}
+
+function _rptToggleAll(checked) {
+  _REPORT_SECTIONS.forEach(s => {
+    const cb = document.getElementById(`rpt-sec-${s.id}`);
+    if (cb) cb.checked = checked;
+  });
+}
+
+function _rptToggleAgentScope(scope) {
+  document.getElementById("rpt-agent-list").style.display = scope === "specific" ? "block" : "none";
+}
+
+async function _submitReportDownload() {
+  const btn = document.getElementById("rpt-download-btn");
+  const errEl = document.getElementById("rpt-error");
+  errEl.textContent = "";
+
+  // Collect sections
+  const sections = _REPORT_SECTIONS
+    .filter(s => document.getElementById(`rpt-sec-${s.id}`)?.checked)
+    .map(s => s.id);
+
+  if (!sections.length) {
+    errEl.textContent = "Select at least one section to include.";
+    return;
+  }
+
+  // Collect agents
+  let agent_dids = "all";
+  if (document.getElementById("rpt-agents-specific")?.checked) {
+    const checked = Array.from(document.querySelectorAll(".rpt-agent-cb:checked")).map(cb => cb.value);
+    if (!checked.length) {
+      errEl.textContent = "Select at least one agent, or choose 'All agents'.";
+      return;
+    }
+    agent_dids = checked;
+  }
+
+  // Optional fields
+  const title = document.getElementById("rpt-title")?.value.trim() || undefined;
+  const start = document.getElementById("rpt-date-start")?.value;
+  const end   = document.getElementById("rpt-date-end")?.value;
+  const date_range = (start || end) ? { start: start || undefined, end: end || undefined } : undefined;
+
+  btn.disabled = true;
+  btn.textContent = "Generating…";
+
+  try {
+    const key = sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key") || "";
+    const res = await fetch(BASE + "/pro/reports/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": key },
+      body: JSON.stringify({ sections, agent_dids, title, date_range }),
+    });
+    if (res.status === 403) throw new Error("PDF reports require a Pro or Enterprise plan.");
+    if (!res.ok) {
+      let msg = `Server error ${res.status}`;
+      try { const j = await res.json(); msg = j.detail || msg; } catch(_) {}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    const cd   = res.headers.get("Content-Disposition") || "";
+    const match = cd.match(/filename="([^"]+)"/);
+    a.download = match ? match[1] : "agentid_report.pdf";
+    a.href = url; a.click();
+    URL.revokeObjectURL(url);
+    _closeReportModal();
+  } catch(e) {
+    errEl.textContent = e.message || "Download failed. Please try again.";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "⬇ Download PDF";
+  }
 }

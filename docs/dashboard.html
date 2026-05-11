@@ -5205,9 +5205,116 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
   </aside>
 </div>
 
+<!-- ── PDF REPORT MODAL ──────────────────────────────────────────────────── -->
+<div id="report-modal" style="display:none;position:fixed;inset:0;z-index:3500;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);padding:1rem;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;color:var(--text);">📄 Download Account Report</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">Select sections and agents to include in your PDF report.</div>
+      </div>
+      <button onclick="_closeReportModal()" style="background:none;border:none;font-size:1.2rem;color:var(--muted);cursor:pointer;padding:0.25rem 0.5rem;border-radius:6px;" title="Close">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:1.25rem;">
+
+      <!-- Section selector -->
+      <div>
+        <div style="font-size:0.82rem;font-weight:600;color:var(--text-2);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.04em;">Sections to include</div>
+        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.84rem;font-weight:600;color:var(--text);cursor:pointer;margin-bottom:0.65rem;padding-bottom:0.6rem;border-bottom:1px solid var(--border);">
+          <input type="checkbox" id="rpt-select-all" checked onchange="_rptToggleAll(this.checked)" style="accent-color:var(--accent);width:15px;height:15px;">
+          Select all
+        </label>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          <label style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.83rem;cursor:pointer;">
+            <input type="checkbox" id="rpt-sec-agents" checked style="accent-color:var(--accent);margin-top:2px;width:14px;height:14px;flex-shrink:0;">
+            <div><span style="font-weight:500;">Agents</span> <span style="color:var(--muted);font-size:0.76rem;">— Registry: DID, name, trust score, capabilities</span></div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.83rem;cursor:pointer;">
+            <input type="checkbox" id="rpt-sec-trust_scores" checked style="accent-color:var(--accent);margin-top:2px;width:14px;height:14px;flex-shrink:0;">
+            <div><span style="font-weight:500;">Trust Scores</span> <span style="color:var(--muted);font-size:0.76rem;">— Full D1–D5 dimension breakdown per agent</span></div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.83rem;cursor:pointer;">
+            <input type="checkbox" id="rpt-sec-contracts" checked style="accent-color:var(--accent);margin-top:2px;width:14px;height:14px;flex-shrink:0;">
+            <div><span style="font-weight:500;">Contracts</span> <span style="color:var(--muted);font-size:0.76rem;">— Published capability contracts per agent</span></div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.83rem;cursor:pointer;">
+            <input type="checkbox" id="rpt-sec-tasks" checked style="accent-color:var(--accent);margin-top:2px;width:14px;height:14px;flex-shrink:0;">
+            <div><span style="font-weight:500;">Tasks</span> <span style="color:var(--muted);font-size:0.76rem;">— Recent task request history</span></div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.83rem;cursor:pointer;">
+            <input type="checkbox" id="rpt-sec-messages" checked style="accent-color:var(--accent);margin-top:2px;width:14px;height:14px;flex-shrink:0;">
+            <div><span style="font-weight:500;">Messages</span> <span style="color:var(--muted);font-size:0.76rem;">— Recent message activity summary</span></div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.83rem;cursor:pointer;">
+            <input type="checkbox" id="rpt-sec-approvals" checked style="accent-color:var(--accent);margin-top:2px;width:14px;height:14px;flex-shrink:0;">
+            <div><span style="font-weight:500;">Approvals</span> <span style="color:var(--muted);font-size:0.76rem;">— ACP approval queue history</span></div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.83rem;cursor:pointer;">
+            <input type="checkbox" id="rpt-sec-analytics" checked style="accent-color:var(--accent);margin-top:2px;width:14px;height:14px;flex-shrink:0;">
+            <div><span style="font-weight:500;">Analytics</span> <span style="color:var(--muted);font-size:0.76rem;">— Discovery stats, signing activity, search summary</span></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Agent scope -->
+      <div>
+        <div style="font-size:0.82rem;font-weight:600;color:var(--text-2);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.04em;">Agent scope</div>
+        <div style="display:flex;flex-direction:column;gap:0.45rem;">
+          <label style="display:flex;align-items:center;gap:0.55rem;font-size:0.84rem;cursor:pointer;">
+            <input type="radio" name="rpt-agent-scope" id="rpt-agents-all" value="all" checked onchange="_rptToggleAgentScope('all')" style="accent-color:var(--accent);">
+            <span>All my agents</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:0.55rem;font-size:0.84rem;cursor:pointer;">
+            <input type="radio" name="rpt-agent-scope" id="rpt-agents-specific" value="specific" onchange="_rptToggleAgentScope('specific')" style="accent-color:var(--accent);">
+            <span>Specific agents</span>
+          </label>
+        </div>
+        <!-- Agent checklist (shown when specific is selected) -->
+        <div id="rpt-agent-list" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;">
+          <div id="rpt-agent-checkboxes" style="display:flex;flex-direction:column;gap:0.25rem;">
+            <span style="color:var(--muted);font-size:0.8rem;">Loading…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optional: Title -->
+      <div>
+        <div style="font-size:0.82rem;font-weight:600;color:var(--text-2);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.04em;">Report title <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional)</span></div>
+        <input type="text" id="rpt-title" placeholder="e.g. Q2 2026 Agent Compliance Report"
+          style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);font-size:0.84rem;outline:none;">
+      </div>
+
+      <!-- Optional: Date range -->
+      <div>
+        <div style="font-size:0.82rem;font-weight:600;color:var(--text-2);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.04em;">Date range <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional — filters tasks, messages, approvals)</span></div>
+        <div style="display:flex;gap:0.75rem;align-items:center;">
+          <input type="date" id="rpt-date-start"
+            style="flex:1;padding:0.5rem 0.65rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);font-size:0.83rem;outline:none;">
+          <span style="color:var(--muted);font-size:0.82rem;">to</span>
+          <input type="date" id="rpt-date-end"
+            style="flex:1;padding:0.5rem 0.65rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);font-size:0.83rem;outline:none;">
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="rpt-error" style="font-size:0.82rem;color:var(--red);min-height:1.1rem;"></div>
+    </div>
+
+    <!-- Footer -->
+    <div style="display:flex;justify-content:flex-end;gap:0.75rem;padding:1rem 1.5rem;border-top:1px solid var(--border);">
+      <button onclick="_closeReportModal()" class="btn btn-outline" style="font-size:0.84rem;">Cancel</button>
+      <button id="rpt-download-btn" onclick="_submitReportDownload()" class="btn btn-primary" style="font-size:0.84rem;background:var(--accent);border-color:var(--accent);color:#fff;">⬇ Download PDF</button>
+    </div>
+  </div>
+</div>
+
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260511-19"></script>
+<script src="dashboard.js?v=20260511-20"></script>
 
 </body>
 </html>
