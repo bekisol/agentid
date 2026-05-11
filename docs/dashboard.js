@@ -5167,7 +5167,7 @@ function _switchSettingsTab(tab) {
   history.replaceState(null, "", `#settings/${tab}`);
   // Lazy-load heavy tabs only when opened
   if (tab === "key-rotation") _loadRotationAgentList();
-  if (tab === "webhooks") { _initWebhookEventGrid(); _loadWebhooks(); }
+  if (tab === "webhooks") { _initWebhookEventGrid(); _loadWebhooks(); _initTelegramSection(); }
   if (tab === "sandbox") _loadSandboxStatus();
   if (tab === "preferences") _initPreferencesPanel();
   if (tab === "security") { _loadSecuritySessions(); _loadSessionHistory(); }
@@ -6008,6 +6008,18 @@ document.addEventListener("DOMContentLoaded", () => {
     navigator.clipboard.writeText(val).catch(() => {});
     this.textContent = "Copied!";
     setTimeout(() => { this.textContent = "Copy secret"; }, 1800);
+  });
+
+  // Telegram integration tab buttons
+  document.getElementById("tg-save-btn").addEventListener("click", _saveTelegram);
+  document.getElementById("tg-test-btn").addEventListener("click", _testTelegram);
+  document.getElementById("tg-toggle-btn").addEventListener("click", _toggleTelegram);
+  document.getElementById("tg-delete-btn").addEventListener("click", _deleteTelegram);
+  document.getElementById("tg-events-all-btn").addEventListener("click", () => {
+    document.querySelectorAll("#tg-events-grid input[type='checkbox']").forEach(cb => cb.checked = true);
+  });
+  document.getElementById("tg-events-none-btn").addEventListener("click", () => {
+    document.querySelectorAll("#tg-events-grid input[type='checkbox']").forEach(cb => cb.checked = false);
   });
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
@@ -8245,4 +8257,215 @@ async function _submitReportDownload() {
     btn.disabled = false;
     btn.textContent = "⬇ Download PDF";
   }
+}
+
+// ── TELEGRAM INTEGRATION ──────────────────────────────────────────────────────
+
+const _TG_EVENTS = [
+  { key: "agent.registered",       label: "Agent Registered" },
+  { key: "agent.deregistered",     label: "Agent Deregistered" },
+  { key: "agent.updated",          label: "Agent Updated" },
+  { key: "verification.failed",    label: "Verification Failed" },
+  { key: "verification.succeeded", label: "Verification Succeeded" },
+  { key: "key.created",            label: "Key Created" },
+  { key: "key.revoked",            label: "Key Revoked" },
+  { key: "anomaly.detected",       label: "Anomaly Detected" },
+  { key: "task.created",           label: "Task Created" },
+  { key: "task.accepted",          label: "Task Accepted" },
+  { key: "task.completed",         label: "Task Completed" },
+  { key: "task.failed",            label: "Task Failed" },
+  { key: "task.expired",           label: "Task Expired" },
+  { key: "task.rejected",          label: "Task Rejected" },
+  { key: "approval.pending",       label: "Approval Needed 🔔" },
+];
+
+let _tgInitialized = false;
+
+function _initTelegramSection() {
+  // Build event checkboxes once
+  if (!_tgInitialized) {
+    _tgInitialized = true;
+    const grid = document.getElementById("tg-events-grid");
+    if (grid && grid.children.length === 0) {
+      _TG_EVENTS.forEach(ev => {
+        const label = document.createElement("label");
+        label.style.cssText = "display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;cursor:pointer;";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = ev.key;
+        cb.id = `tg-ev-${ev.key.replace(/\./g, "-")}`;
+        cb.checked = true;
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(ev.label));
+        grid.appendChild(label);
+      });
+    }
+  }
+  _loadTelegramConfig();
+}
+
+async function _loadTelegramConfig() {
+  const badge = document.getElementById("tg-status-badge");
+  const currentDiv = document.getElementById("tg-current-config");
+  const setupForm = document.getElementById("tg-setup-form");
+  const details = document.getElementById("tg-config-details");
+
+  try {
+    const data = await apiFetch("/pro/integrations/telegram");
+    if (!data.configured) {
+      badge.textContent = "Not configured";
+      badge.style.background = "var(--surface2)";
+      badge.style.color = "var(--muted)";
+      currentDiv.style.display = "none";
+      setupForm.style.display = "";
+      return;
+    }
+
+    // Show current config
+    badge.textContent = data.is_active ? "Active" : "Disabled";
+    badge.style.background = data.is_active ? "rgba(16,185,129,0.15)" : "var(--surface2)";
+    badge.style.color = data.is_active ? "#10b981" : "var(--muted)";
+
+    const evList = (data.enabled_events || []).map(e => {
+      const found = _TG_EVENTS.find(t => t.key === e);
+      return found ? found.label : e;
+    }).join(", ") || "All events";
+
+    details.innerHTML = `
+      <div>Bot token: <code>${_esc(data.bot_token)}</code></div>
+      <div>Chat ID: <code>${_esc(data.chat_id)}</code></div>
+      <div>Events: ${_esc(evList)}</div>
+      ${data.last_sent_at ? `<div>Last sent: ${_esc(new Date(data.last_sent_at).toLocaleString())}</div>` : ""}
+      ${data.messages_sent ? `<div>Messages sent: ${data.messages_sent}</div>` : ""}
+      ${data.last_error ? `<div style="color:var(--red);">Last error: ${_esc(data.last_error.slice(0, 120))}</div>` : ""}
+    `;
+
+    const toggleBtn = document.getElementById("tg-toggle-btn");
+    if (toggleBtn) toggleBtn.textContent = data.is_active ? "Disable" : "Enable";
+
+    currentDiv.style.display = "";
+    setupForm.style.display = "none";
+
+    // Pre-fill form with existing values for editing
+    const tokenInput = document.getElementById("tg-token-input");
+    const chatIdInput = document.getElementById("tg-chat-id-input");
+    if (tokenInput) tokenInput.placeholder = data.bot_token + " (enter new token to update)";
+    if (chatIdInput && data.chat_id) chatIdInput.value = data.chat_id;
+
+    // Check the saved events
+    const enabled = new Set(data.enabled_events || []);
+    document.querySelectorAll("#tg-events-grid input[type='checkbox']").forEach(cb => {
+      cb.checked = data.enabled_events.length === 0 || enabled.has(cb.value);
+    });
+
+  } catch(e) {
+    badge.textContent = "Error";
+    badge.style.color = "var(--red)";
+    console.warn("[telegram] load config error:", e);
+  }
+}
+
+async function _saveTelegram() {
+  const btn = document.getElementById("tg-save-btn");
+  const spinner = document.getElementById("tg-save-spinner");
+  const msg = document.getElementById("tg-msg");
+  const token = document.getElementById("tg-token-input")?.value?.trim();
+  const chatId = document.getElementById("tg-chat-id-input")?.value?.trim();
+
+  if (!token || !chatId) {
+    msg.textContent = "Bot token and Chat ID are required.";
+    msg.className = "modal-msg error";
+    return;
+  }
+
+  const enabledEvents = [];
+  document.querySelectorAll("#tg-events-grid input[type='checkbox']:checked").forEach(cb => {
+    enabledEvents.push(cb.value);
+  });
+
+  btn.disabled = true;
+  if (spinner) spinner.style.display = "inline-block";
+  msg.textContent = "Validating and saving…";
+  msg.className = "modal-msg";
+
+  try {
+    const data = await apiFetch("/pro/integrations/telegram", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bot_token: token, chat_id: chatId, enabled_events: enabledEvents }),
+    });
+    msg.textContent = data.message || "Telegram integration saved!";
+    msg.className = "modal-msg success";
+    document.getElementById("tg-token-input").value = "";
+    await _loadTelegramConfig();
+    // Show the current config panel, hide form
+    document.getElementById("tg-current-config").style.display = "";
+    document.getElementById("tg-setup-form").style.display = "none";
+  } catch(e) {
+    msg.textContent = e.message || "Failed to save Telegram integration.";
+    msg.className = "modal-msg error";
+  } finally {
+    btn.disabled = false;
+    if (spinner) spinner.style.display = "none";
+  }
+}
+
+async function _testTelegram() {
+  const btn = document.getElementById("tg-test-btn");
+  const msg = document.getElementById("tg-msg");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  try {
+    const data = await apiFetch("/pro/integrations/telegram/test", { method: "POST" });
+    msg.textContent = data.message || "Test message sent!";
+    msg.className = "modal-msg success";
+  } catch(e) {
+    msg.textContent = e.message || "Test failed.";
+    msg.className = "modal-msg error";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send Test";
+  }
+}
+
+async function _toggleTelegram() {
+  const btn = document.getElementById("tg-toggle-btn");
+  const msg = document.getElementById("tg-msg");
+  btn.disabled = true;
+  try {
+    const data = await apiFetch("/pro/integrations/telegram/toggle", { method: "PATCH" });
+    msg.textContent = data.message || "Updated.";
+    msg.className = "modal-msg success";
+    await _loadTelegramConfig();
+  } catch(e) {
+    msg.textContent = e.message || "Failed to toggle.";
+    msg.className = "modal-msg error";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function _deleteTelegram() {
+  const msg = document.getElementById("tg-msg");
+  if (!confirm("Remove Telegram integration? You won't receive any more notifications.")) return;
+  try {
+    await apiFetch("/pro/integrations/telegram", { method: "DELETE" });
+    msg.textContent = "Telegram integration removed.";
+    msg.className = "modal-msg success";
+    _tgInitialized = false; // reset so form rebuilds on next open
+    await _loadTelegramConfig();
+    document.getElementById("tg-current-config").style.display = "none";
+    document.getElementById("tg-setup-form").style.display = "";
+  } catch(e) {
+    msg.textContent = e.message || "Failed to remove.";
+    msg.className = "modal-msg error";
+  }
+}
+
+function _esc(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

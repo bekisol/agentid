@@ -3934,6 +3934,64 @@ curl https://api.agentid-protocol.com/agents \
               <div class="key-reveal-warning">⚠ The secret will not be shown again. Store it to verify incoming signatures.</div>
             </div>
           </div>
+
+          <!-- ── TELEGRAM INTEGRATION ── -->
+          <hr class="settings-divider" style="margin-top:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem;">
+            <span style="font-size:1.25rem;">✈️</span>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--text);">Telegram Notifications</div>
+            <span id="tg-status-badge" style="font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:20px;background:var(--surface2);color:var(--muted);margin-left:auto;">Not configured</span>
+          </div>
+          <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:1rem;line-height:1.5;">
+            Get AgentID events delivered directly to a Telegram chat. Works with personal chats,
+            groups, and channels. <a href="https://core.telegram.org/bots#how-do-i-create-a-bot" target="_blank" style="color:var(--accent);">Create a bot →</a>
+          </p>
+
+          <!-- Existing config status -->
+          <div id="tg-current-config" style="display:none;background:var(--surface2);border-radius:8px;padding:0.85rem 1rem;margin-bottom:1rem;font-size:0.82rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+              <span style="font-weight:600;">Active Integration</span>
+              <div style="display:flex;gap:0.4rem;">
+                <button class="btn btn-outline" id="tg-test-btn" style="font-size:0.72rem;padding:0.2rem 0.6rem;">Send Test</button>
+                <button class="btn btn-outline" id="tg-toggle-btn" style="font-size:0.72rem;padding:0.2rem 0.6rem;">Disable</button>
+                <button class="btn btn-outline danger" id="tg-delete-btn" style="font-size:0.72rem;padding:0.2rem 0.6rem;color:var(--red);border-color:var(--red);">Remove</button>
+              </div>
+            </div>
+            <div id="tg-config-details" style="color:var(--text-2);font-size:0.8rem;line-height:1.6;"></div>
+          </div>
+
+          <!-- Setup form -->
+          <div id="tg-setup-form">
+            <div class="settings-field">
+              <label class="settings-label" for="tg-token-input">Bot Token</label>
+              <input id="tg-token-input" class="settings-input" type="password"
+                placeholder="123456789:ABCDEFGhijklmnopqrstuvwxyz" spellcheck="false" autocomplete="off" />
+              <p class="settings-hint">From <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent);">@BotFather</a> → /newbot or /token</p>
+            </div>
+
+            <div class="settings-field">
+              <label class="settings-label" for="tg-chat-id-input">Chat ID</label>
+              <input id="tg-chat-id-input" class="settings-input" type="text"
+                placeholder="-100123456789 or @yourchannel" spellcheck="false" />
+              <p class="settings-hint">Your personal chat ID, group ID, or channel username. Forward a message to <a href="https://t.me/userinfobot" target="_blank" style="color:var(--accent);">@userinfobot</a> to find your chat ID.</p>
+            </div>
+
+            <div class="settings-field">
+              <label class="settings-label">Events to Receive</label>
+              <div style="display:flex;gap:0.4rem;margin-bottom:0.5rem;">
+                <button class="btn btn-outline" id="tg-events-all-btn" style="font-size:0.72rem;padding:0.2rem 0.6rem;">All</button>
+                <button class="btn btn-outline" id="tg-events-none-btn" style="font-size:0.72rem;padding:0.2rem 0.6rem;">None</button>
+              </div>
+              <div id="tg-events-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.3rem;"></div>
+            </div>
+
+            <button class="btn btn-primary" id="tg-save-btn" style="margin-top:0.5rem;">
+              <span id="tg-save-spinner" style="display:none;" class="spinner" style="width:14px;height:14px;"></span>
+              Save &amp; Connect
+            </button>
+          </div>
+
+          <div id="tg-msg" class="modal-msg" style="margin-top:0.5rem;"></div>
         </div>
 
         <!-- ── SANDBOX TAB ── -->
@@ -5314,7 +5372,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260511-22"></script>
+<script src="dashboard.js?v=20260511-23"></script>
 
 </body>
 </html>
