@@ -5032,15 +5032,18 @@ curl https://api.agentid-protocol.com/agents \
       </div>
 
       <!-- Threshold (hidden when op=always) -->
-      <div id="acp-threshold-row" style="display:none;margin-bottom:0.85rem;display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;">
-        <div>
-          <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Payload Field</label>
-          <input id="acp-policy-field" type="text" value="recipient_count" placeholder="e.g. recipient_count" style="width:100%;padding:0.45rem 0.65rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.85rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;box-sizing:border-box;" />
+      <div id="acp-threshold-row" style="display:none;margin-bottom:0.85rem;">
+        <!-- Context hint — updated by JS when category changes -->
+        <div id="acp-threshold-hint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.55rem;padding:0.4rem 0.6rem;background:var(--surface2);border-radius:6px;border-left:3px solid var(--accent);line-height:1.4;"></div>
+        <div style="display:grid;grid-template-columns:1fr;gap:0.5rem;">
+          <!-- Threshold value — the only field the user needs to fill -->
+          <div>
+            <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;" id="acp-threshold-label">Threshold</label>
+            <input id="acp-policy-value" type="number" min="0" step="any" placeholder="Enter a number" style="width:100%;padding:0.45rem 0.65rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.85rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;box-sizing:border-box;" />
+          </div>
         </div>
-        <div>
-          <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Threshold Value</label>
-          <input id="acp-policy-value" type="number" placeholder="e.g. 5" style="width:100%;padding:0.45rem 0.65rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.85rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;box-sizing:border-box;" />
-        </div>
+        <!-- Hidden field name — set programmatically per category, never shown to user -->
+        <input id="acp-policy-field" type="hidden" value="value" />
       </div>
 
       <div id="acp-policy-err" style="display:none;font-size:0.78rem;color:var(--red);margin-bottom:0.7rem;padding:0.4rem 0.65rem;background:var(--red-bg,#fef2f2);border-radius:6px;"></div>

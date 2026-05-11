@@ -8164,14 +8164,30 @@ async function _loadApprovals() {
           ${isPending ? `
           <div style="display:flex;flex-direction:column;gap:0.35rem;flex-shrink:0;min-width:120px;">
             <textarea id="note-${esc(item.id)}" rows="2" placeholder="Optional reviewer note…" style="width:100%;padding:0.35rem 0.55rem;border:1px solid var(--border-dark);border-radius:6px;font-size:0.76rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;resize:none;box-sizing:border-box;"></textarea>
-            <button onclick="_approveAction('${esc(item.id)}','${src}')" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✓ Approve</button>
-            <button onclick="_denyAction('${esc(item.id)}','${src}')" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--red);background:var(--red-bg);color:var(--red);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✗ Deny</button>
+            <button data-approve data-id="${esc(item.id)}" data-src="${src}" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✓ Approve</button>
+            <button data-deny data-id="${esc(item.id)}" data-src="${src}" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--red);background:var(--red-bg);color:var(--red);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✗ Deny</button>
           </div>` : ""}
         </div>
       </div>`;
     }).join("");
+
+    // Delegated listener — CSP blocks inline onclick attributes in dynamically built HTML
+    listEl.addEventListener("click", _approvalsListClick, { once: true });
   } catch(e) {
     listEl.innerHTML = `<div style="text-align:center;color:var(--red);padding:2rem 1rem;font-size:0.85rem;">${esc(String(e))}</div>`;
+  }
+}
+
+function _approvalsListClick(e) {
+  const approveBtn = e.target.closest("[data-approve]");
+  const denyBtn    = e.target.closest("[data-deny]");
+  if (approveBtn) {
+    _approveAction(approveBtn.dataset.id, approveBtn.dataset.src);
+  } else if (denyBtn) {
+    _denyAction(denyBtn.dataset.id, denyBtn.dataset.src);
+  } else {
+    const listEl = document.getElementById("approvals-list");
+    if (listEl) listEl.addEventListener("click", _approvalsListClick, { once: true });
   }
 }
 
@@ -8290,6 +8306,7 @@ async function _loadAcpPolicies() {
         : ` when <code style="font-size:0.75rem;background:var(--surface2);padding:0.1rem 0.3rem;border-radius:3px;">${esc(p.threshold_field)}</code> ${opLabel}${p.threshold_value ?? ""}`;
       const isActive  = !!p.is_active;
       const statusCol = isActive ? "var(--green)" : "var(--muted)";
+      // Use data-* attributes instead of inline onclick — CSP blocks inline handlers
       return `<div style="border-bottom:1px solid var(--border);padding:0.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;flex-wrap:wrap;">
@@ -8301,11 +8318,11 @@ async function _loadAcpPolicies() {
           </div>
         </div>
         <div style="display:flex;gap:0.4rem;flex-shrink:0;">
-          <button onclick="_toggleAcpPolicy('${esc(p.agent_did)}','${esc(p.id)}',${!isActive})"
+          <button data-acp-toggle data-did="${esc(p.agent_did)}" data-pid="${esc(p.id)}" data-active="${!isActive}"
             style="font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:5px;cursor:pointer;border:1px solid var(--border-dark);background:var(--surface2);color:var(--text-2);font-family:inherit;">
             ${isActive ? "Pause" : "Enable"}
           </button>
-          <button onclick="_deleteAcpPolicy('${esc(p.agent_did)}','${esc(p.id)}')"
+          <button data-acp-delete data-did="${esc(p.agent_did)}" data-pid="${esc(p.id)}"
             style="font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:5px;cursor:pointer;border:1px solid var(--red,#dc2626);background:var(--red-bg,#fef2f2);color:var(--red,#dc2626);font-family:inherit;">
             Delete
           </button>
@@ -8313,8 +8330,30 @@ async function _loadAcpPolicies() {
       </div>`;
     }).join("");
 
+    // Event delegation — CSP blocks inline onclick, so we attach one listener to the container
+    listEl.addEventListener("click", _acpPolicyListClick, { once: true });
+
   } catch(e) {
     listEl.innerHTML = `<div style="text-align:center;color:var(--red);padding:2rem 1rem;font-size:0.85rem;">${esc(String(e))}</div>`;
+  }
+}
+
+function _acpPolicyListClick(e) {
+  const toggleBtn = e.target.closest("[data-acp-toggle]");
+  const deleteBtn = e.target.closest("[data-acp-delete]");
+  if (toggleBtn) {
+    const did    = toggleBtn.dataset.did;
+    const pid    = toggleBtn.dataset.pid;
+    const active = toggleBtn.dataset.active === "true";
+    _toggleAcpPolicy(did, pid, active);
+  } else if (deleteBtn) {
+    const did = deleteBtn.dataset.did;
+    const pid = deleteBtn.dataset.pid;
+    _deleteAcpPolicy(did, pid);
+  } else {
+    // Click was not on a button — re-attach listener for next interaction
+    const listEl = document.getElementById("acp-policies-list");
+    if (listEl) listEl.addEventListener("click", _acpPolicyListClick, { once: true });
   }
 }
 
@@ -8345,6 +8384,11 @@ function _initAcpPolicyModal() {
     agentSel.innerHTML = `<option value="">— select an agent —</option>` +
       agents.map(a => `<option value="${esc(a.did)}">${esc(a.name)}</option>`).join("");
     document.getElementById("acp-policy-err").style.display = "none";
+    // Reset op to "always" so threshold row is hidden by default
+    opSel.value = "always";
+    threshRow.style.display = "none";
+    document.getElementById("acp-policy-value").value = "";
+    _updateAcpThresholdHint();
     modal.style.display = "flex";
   });
 
@@ -8353,9 +8397,47 @@ function _initAcpPolicyModal() {
   document.getElementById("acp-policy-cancel")?.addEventListener("click", closeModal);
   modal?.addEventListener("click", e => { if (e.target === modal) closeModal(); });
 
+  // Per-category defaults: [threshold_field, label, hint, placeholder]
+  const _ACP_CAT_HINTS = {
+    message_broadcast: ["recipient_count", "Number of recipients",
+      "Pause when the agent tries to send to more than N recipients at once. Example: set 10 to require approval for any broadcast to 11+ people.",
+      "e.g. 10"],
+    high_value_task:   ["cost_usd", "Cost threshold (USD)",
+      "Pause when the estimated task cost exceeds this amount in US dollars. Example: set 50 to approve anything above $50.",
+      "e.g. 50"],
+    contract_publish:  ["count", "Number of contracts",
+      "Pause when the agent tries to publish this many or more capability contracts. Set 1 to approve every publish.",
+      "e.g. 1"],
+    external_call:     ["count", "Number of calls",
+      "Pause when the agent makes this many external HTTP calls in a single flow. Set 1 to approve every outbound request.",
+      "e.g. 1"],
+    file_upload:       ["size_mb", "File size (MB)",
+      "Pause when the uploaded file exceeds this size in megabytes. Example: set 10 to approve files larger than 10 MB.",
+      "e.g. 10"],
+    capability_invoke: ["count", "Number of invocations",
+      "Pause when the agent invokes another agent's capability this many times in one flow. Set 1 to approve every invocation.",
+      "e.g. 1"],
+  };
+
+  function _updateAcpThresholdHint() {
+    const cat = document.getElementById("acp-policy-category")?.value;
+    const info = _ACP_CAT_HINTS[cat] || ["value", "Threshold", "Enter the numeric threshold that triggers the approval gate.", "e.g. 1"];
+    document.getElementById("acp-policy-field").value = info[0];
+    const lbl = document.getElementById("acp-threshold-label");
+    if (lbl) lbl.textContent = info[1];
+    const hint = document.getElementById("acp-threshold-hint");
+    if (hint) hint.textContent = info[2];
+    const val = document.getElementById("acp-policy-value");
+    if (val) val.placeholder = info[3];
+  }
+
+  document.getElementById("acp-policy-category")?.addEventListener("change", _updateAcpThresholdHint);
+
   // Show/hide threshold row based on op
   opSel?.addEventListener("change", () => {
-    threshRow.style.display = opSel.value === "always" ? "none" : "grid";
+    const show = opSel.value !== "always";
+    threshRow.style.display = show ? "block" : "none";
+    if (show) _updateAcpThresholdHint();
   });
 
   document.getElementById("acp-policy-save")?.addEventListener("click", async () => {

@@ -1067,25 +1067,28 @@ async function loadApprovals() {
   const body = document.getElementById("approvals-body");
   try {
     // Fetch ACP queue and Human Review queue in parallel
+    // Fetch ACP queue and unified review queue in parallel.
+    // The unified review_queue (source=eu_ai_act + source=checkpoint) replaced
+    // two separate tables — see agentid-pro/review_queue.py for the full story.
     const [acpRes, rqRes] = await Promise.all([
       fetch(`${BASE}/pro/acp/queue?status=pending&limit=10`, { headers: apiHeaders() }).catch(() => null),
       fetch(`${BASE}/pro/review-queue?status=pending&limit=10`, { headers: apiHeaders() }).catch(() => null)
     ]);
 
     const acpItems = (acpRes && acpRes.ok)
-      ? await acpRes.json().then(d => Array.isArray(d) ? d : (d.items || d.requests || []))
+      ? await acpRes.json().then(d => {
+          const raw = Array.isArray(d) ? d : (d.approvals || d.items || d.requests || []);
+          return raw.map(i => ({ ...i, _source: "acp" }));
+        })
       : [];
 
     const rqItems = (rqRes && rqRes.ok)
-      ? await rqRes.json().then(d => Array.isArray(d) ? d : (d.items || d.requests || []))
-          .then(items => items.map(i => ({
-            ...i,
-            _source: "review-queue",
-            category: i.reason || i.operation || "human_review",
-            title: i.operation || i.payload_summary || i.title || "Human review required",
-            agent_did: i.agent_did,
-            created_at: i.created_at
-          })))
+      ? await rqRes.json().then(d => (d.items || []).map(i => ({
+          ...i,
+          _source: "review-queue",
+          category: i.reason || i.operation || "human_review",
+          title: i.operation || i.payload_summary || i.title || "Human review required",
+        })))
       : [];
 
     if (!acpItems.length && !rqItems.length && !acpRes?.ok && !rqRes?.ok) throw new Error("both failed");
@@ -1162,11 +1165,11 @@ async function handleApproval(requestId, agentDid, action, source) {
         body: JSON.stringify({ verdict: action === "approve" ? "approved" : "rejected" })
       });
     } else {
-      // ACP Queue: POST /pro/agents/{did}/acp/queue/{id}
-      r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(agentDid)}/acp/queue/${encodeURIComponent(requestId)}`, {
+      // ACP Queue: POST /pro/approvals/{id}/approve  or  /reject
+      const verb = action === "approve" ? "approve" : "reject";
+      r = await fetch(`${BASE}/pro/approvals/${encodeURIComponent(requestId)}/${verb}`, {
         method: "POST",
-        headers: apiHeaders(),
-        body: JSON.stringify({ action })
+        headers: apiHeaders()
       });
     }
     if (r.ok) {
