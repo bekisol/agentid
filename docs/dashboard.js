@@ -351,9 +351,23 @@ async function apiFetch(path, options = {}) {
 
 // Raw fetch mirroring apiFetch auth — returns raw Response (for blob/stream callers).
 async function _authFetch(path) {
-  const key = apiKey || sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key");
+  const key = apiKey || sessionStorage.getItem("agentid_key")
+           || localStorage.getItem("agentid_persisted_key")
+           || localStorage.getItem("agentid_key") || "";
   const headers = key ? { "x-api-key": key } : {};
   return fetch(`${BASE}${path}`, { credentials: "include", headers });
+}
+
+// Wrapper for raw fetch calls that need proper auth (both API key and cookie).
+// Merges auth headers into whatever opts.headers is passed; always adds
+// credentials: "include" so cookie-auth users work too.
+function _fetchAuth(url, opts = {}) {
+  const key = apiKey || sessionStorage.getItem("agentid_key")
+           || localStorage.getItem("agentid_persisted_key")
+           || localStorage.getItem("agentid_key") || "";
+  const headers = { ...(opts.headers || {}) };
+  if (key) headers["x-api-key"] = key;
+  return fetch(url, { ...opts, credentials: "include", headers });
 }
 
 let _sessionDropFired = false;
@@ -1653,9 +1667,9 @@ async function _doPrivacyChange(btn, did, newPrivate) {
   btn.disabled = true;
   btn.textContent = "…";
   try {
-    const res = await fetch(
+    const res = await _fetchAuth(
       `${BASE}/agents/${encodeURIComponent(did)}/visibility?private=${newPrivate}`,
-      { method: "PATCH", headers: { "x-api-key": apiKey } }
+      { method: "PATCH" }
     );
     if (!res.ok) throw new Error((await res.json()).detail || res.status);
     _applyPrivacyResult(btn, newPrivate);
@@ -2646,10 +2660,10 @@ async function _saveAllowlist() {
   btn.disabled = true;
   btn.textContent = "Saving…";
   try {
-    const res = await fetch(`${BASE}/pro/keys/allowlist`, {
-      method:  "PATCH",
-      headers: { "x-api-key": apiKey, "content-type": "application/json" },
-      body:    JSON.stringify({ allowed_ips: val || null }),
+    const res = await _fetchAuth(`${BASE}/pro/keys/allowlist`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body:   JSON.stringify({ allowed_ips: val || null }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || res.status);
@@ -3128,18 +3142,18 @@ async function _webhookAction(action, id, btn) {
   try {
     let res;
     if (action === "test") {
-      res = await fetch(`${BASE}/pro/webhooks/${id}/test`, { method: "POST", headers: { "x-api-key": apiKey } });
+      res = await _fetchAuth(`${BASE}/pro/webhooks/${id}/test`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || res.status);
       btn.textContent = data.delivered ? "✓ sent" : "✗ failed";
     } else if (action === "toggle") {
-      res = await fetch(`${BASE}/pro/webhooks/${id}/toggle`, { method: "PATCH", headers: { "x-api-key": apiKey } });
+      res = await _fetchAuth(`${BASE}/pro/webhooks/${id}/toggle`, { method: "PATCH" });
       if (!res.ok) throw new Error((await res.json()).detail || res.status);
       await _loadWebhooks();
       return;
     } else if (action === "delete") {
       if (!confirm("Delete this webhook? This cannot be undone.")) { btn.disabled = false; btn.textContent = orig; return; }
-      res = await fetch(`${BASE}/pro/webhooks/${id}`, { method: "DELETE", headers: { "x-api-key": apiKey } });
+      res = await _fetchAuth(`${BASE}/pro/webhooks/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(res.status);
       await _loadWebhooks();
       return;
@@ -3167,9 +3181,9 @@ async function _createWebhook() {
   btn.disabled = true;
   btn.textContent = "Adding…";
   try {
-    const res = await fetch(`${BASE}/pro/webhooks`, {
+    const res = await _fetchAuth(`${BASE}/pro/webhooks`, {
       method:  "POST",
-      headers: { "x-api-key": apiKey, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body:    JSON.stringify({ url, secret, events }),
     });
     const data = await res.json();
@@ -6228,10 +6242,9 @@ document.addEventListener("DOMContentLoaded", () => {
         private:      isPrivate,
       };
       const proof = await _signPayload(_reg.kp, payload);
-      const res = await fetch(`${BASE}/agents`, {
+      const res = await _fetchAuth(`${BASE}/agents`, {
         method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json", ...(apiKey ? { "x-api-key": apiKey } : {}) },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, proof }),
       });
       const data = await res.json();
@@ -6322,9 +6335,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     this.textContent = "Verifying…"; this.disabled = true;
     try {
-      const res = await fetch(`${BASE}/agents/${encodeURIComponent(_verifyDid)}/verify`, {
+      const res = await _fetchAuth(`${BASE}/agents/${encodeURIComponent(_verifyDid)}/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ payload, signature: sig }),
       });
       const data = await res.json();
@@ -6476,13 +6489,16 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
       bodyEl.textContent   = "";
       const t0 = Date.now();
       try {
-        const opts = { method, headers: { "x-api-key": apiKey } };
+        const pgHeaders = {};
         const rawBody = document.getElementById("pg-body")?.value?.trim();
         if ((method === "POST" || method === "PATCH") && rawBody) {
-          opts.headers["Content-Type"] = "application/json";
-          opts.body = rawBody;
+          pgHeaders["Content-Type"] = "application/json";
         }
-        const res = await fetch(BASE + path, opts);
+        const res = await _fetchAuth(BASE + path, {
+          method,
+          headers: pgHeaders,
+          ...(rawBody && (method === "POST" || method === "PATCH") ? { body: rawBody } : {}),
+        });
         const ms  = Date.now() - t0;
         const text = await res.text();
         let pretty = text;
