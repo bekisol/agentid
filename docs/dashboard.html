@@ -3,7 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AgentID — Dashboard</title>
+  <title>AgentID — Home</title>
+  <!-- Auth boot: hide login card instantly if session key is stored, prevents flash -->
+  <script>
+    if (sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key")) {
+      document.documentElement.classList.add("authed-boot");
+    }
+  </script>
+  <style>
+    .authed-boot #login-screen { display: none !important; }
+    .authed-boot #dashboard    { display: block !important; }
+  </style>
   <!-- SEC: frame-ancestors prevents clickjacking; connect-src locks fetch targets -->
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
@@ -2895,6 +2905,185 @@
     body.pref-no-animate .stat-card {
       transition: box-shadow 0.1s, border-color 0.1s;
     }
+
+    /* ── Home / Priority Inbox ── */
+    .home-section { margin-bottom: 1.5rem; }
+    .home-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      margin: 0 0 1rem 0;
+    }
+
+    /* KPI strip */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.65rem;
+      margin-bottom: 1.25rem;
+    }
+    .kpi-tile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      text-align: left;
+    }
+    .kpi-tile:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    .kpi-tile-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.3rem;
+    }
+    .kpi-tile-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .kpi-tile-sub { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
+    .kpi-tile-value.good { color: var(--green, #22c55e); }
+    .kpi-tile-value.warn { color: var(--yellow, #f59e0b); }
+    .kpi-tile-value.bad  { color: var(--red, #ef4444); }
+    .kpi-tile-value.accent { color: var(--accent); }
+
+    /* "Needs your action" header */
+    .home-list-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 0.55rem;
+    }
+    .home-count {
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.1rem 0.45rem;
+      border-radius: 20px;
+      min-width: 18px;
+      text-align: center;
+    }
+    .home-live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      margin-left: auto;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+    .home-live-dot.active { opacity: 1; animation: livePulse 2s ease-in-out infinite; }
+    @keyframes livePulse {
+      0%,100% { opacity: 1; } 50% { opacity: 0.4; }
+    }
+
+    /* Inbox item rows */
+    .home-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+    .home-item {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 0.6rem 0.85rem;
+      transition: border-color 0.13s;
+    }
+    .home-item:hover { border-color: var(--accent); }
+    .home-item-icon {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .home-item-icon.high   { background: var(--red, #ef4444); }
+    .home-item-icon.medium { background: var(--yellow, #f59e0b); }
+    .home-item-icon.low    { background: var(--yellow, #f59e0b); opacity: 0.7; }
+    .home-item-icon.info   { background: var(--muted); }
+    .home-item-body { flex: 1; min-width: 0; }
+    .home-item-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .home-item-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .home-item-age { font-size: 0.7rem; color: var(--muted); flex-shrink: 0; white-space: nowrap; }
+    .home-item-action {
+      flex-shrink: 0;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      cursor: pointer;
+      color: var(--text);
+      text-decoration: none;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .home-item-action:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* Skeleton loader */
+    .home-skeleton {
+      height: 48px;
+      border-radius: 9px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%,100% { opacity: 0.6; } 50% { opacity: 1; }
+    }
+
+    /* Empty / all-clear state */
+    .home-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 2rem 1rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .home-empty .check-icon {
+      font-size: 2rem;
+      color: var(--green, #22c55e);
+      line-height: 1;
+    }
+    .home-empty-link { color: var(--accent); text-decoration: none; font-size: 0.8rem; }
+    .home-empty-link:hover { text-decoration: underline; }
+
+    /* Flash animation when a new item arrives via SSE */
+    @keyframes homeItemFlash {
+      0%   { background: var(--accent-light); border-color: var(--accent); }
+      100% { background: var(--surface); border-color: var(--border); }
+    }
+    .home-item.flash { animation: homeItemFlash 1.2s ease forwards; }
+
+    /* Mobile: collapse KPI strip to 2×2 */
+    @media (max-width: 768px) {
+      .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+      .home-item-title { font-size: 0.78rem; }
+    }
   </style>
 </head>
 <body>
@@ -3043,10 +3232,10 @@
       AgentID
     </a>
 
-    <!-- Overview -->
-    <a class="dsb-item active" data-nav="overview" href="#section-overview">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
-      Overview
+    <!-- Home -->
+    <a class="dsb-item active" data-nav="home" href="#section-home">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 7.5L8 2l6 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 6.5V13a.5.5 0 00.5.5h3V10h2v3.5h3a.5.5 0 00.5-.5V6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Home
     </a>
 
     <!-- ACTIVITY — top priority, first group -->
@@ -3119,6 +3308,34 @@
 
   <!-- ── MAIN content pane ── -->
   <div class="dash-main" id="dash-main">
+
+  <!-- ── HOME / Priority Inbox ── -->
+  <section id="section-home" class="home-section">
+    <h1 class="home-title">Home</h1>
+
+    <div class="kpi-strip" id="home-kpi-strip">
+      <!-- populated by loadHome() -->
+    </div>
+
+    <div class="home-list-header">
+      <span>Needs your action</span>
+      <span class="home-count" id="home-count" style="display:none;"></span>
+      <span class="home-live-dot" id="home-live-dot"></span>
+    </div>
+
+    <ul class="home-list" id="home-list">
+      <!-- skeleton while loading -->
+      <li class="home-skeleton"></li>
+      <li class="home-skeleton" style="opacity:0.7;"></li>
+      <li class="home-skeleton" style="opacity:0.45;"></li>
+    </ul>
+
+    <div id="home-empty" class="home-empty" style="display:none;">
+      <span class="check-icon">✓</span>
+      <div>All clear — no action needed.</div>
+      <a class="home-empty-link" href="#section-overview">View analytics →</a>
+    </div>
+  </section>
 
   <!-- Header -->
   <div class="dash-header">

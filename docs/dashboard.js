@@ -890,8 +890,138 @@ async function loadDashboard() {
   // No-op for existing accounts.
   _maybeShowWelcome();
 
+  // Home inbox — load for all tiers (works with free too)
+  loadHome().catch(e => console.warn("loadHome:", e));
+
   // Start 5s auto-poll after first successful load
   startPolling();
+}
+
+// ── HOME / PRIORITY INBOX ────────────────────────────────────────────────────
+
+let _homePollerTimer = null;
+
+async function loadHome() {
+  const list  = document.getElementById("home-list");
+  const empty = document.getElementById("home-empty");
+  const strip = document.getElementById("home-kpi-strip");
+  if (!list) return;
+
+  let data;
+  try {
+    data = await apiFetch("/pro/account/home");
+  } catch (e) {
+    list.innerHTML = `<li style="padding:0.75rem;color:var(--muted);font-size:0.82rem;">Could not load — ${esc(String(e?.message || e))}</li>`;
+    return;
+  }
+
+  // KPI strip
+  if (strip && data.kpis) {
+    const k = data.kpis;
+    const trustVal = k.fleet_trust_avg != null ? Math.round(k.fleet_trust_avg) : "—";
+    const trustClass = k.fleet_trust_band === "good" ? "good" : k.fleet_trust_band === "warn" ? "warn" : "bad";
+    strip.innerHTML = `
+      <button class="kpi-tile" onclick="_scrollToSection('overview')" title="View fleet overview">
+        <div class="kpi-tile-label">Fleet Trust</div>
+        <div class="kpi-tile-value ${trustClass}">${trustVal}</div>
+        <div class="kpi-tile-sub">avg score</div>
+      </button>
+      <button class="kpi-tile" onclick="_scrollToSection('agents')" title="View agents">
+        <div class="kpi-tile-label">Online</div>
+        <div class="kpi-tile-value accent">${k.agents_online ?? "—"}<span style="font-size:1rem;font-weight:500;opacity:0.5;"> / ${k.agents_total ?? "—"}</span></div>
+        <div class="kpi-tile-sub">agents active</div>
+      </button>
+      <button class="kpi-tile" onclick="_scrollToSection('approvals')" title="View approvals">
+        <div class="kpi-tile-label">Pending</div>
+        <div class="kpi-tile-value ${k.approvals_pending > 0 ? 'bad' : 'good'}">${k.approvals_pending ?? 0}</div>
+        <div class="kpi-tile-sub">approvals</div>
+      </button>
+      <button class="kpi-tile" onclick="_scrollToSection('analytics')" title="View anomalies">
+        <div class="kpi-tile-label">Anomalies</div>
+        <div class="kpi-tile-value ${k.anomalies_24h > 0 ? 'warn' : 'good'}">${k.anomalies_24h ?? 0}</div>
+        <div class="kpi-tile-sub">last 24 h</div>
+      </button>`;
+  }
+
+  // Inbox list
+  const items = data.items || [];
+  const agentsTotal = data.kpis?.agents_total ?? 1;
+
+  // Zero-agents: show first-run hero, hide home list
+  if (agentsTotal === 0) {
+    const hero = document.getElementById("first-run-hero");
+    if (hero) hero.style.display = "";
+    list.innerHTML = "";
+    if (empty) empty.style.display = "none";
+    _updateHomeCount(0);
+    return;
+  }
+
+  if (items.length === 0) {
+    list.innerHTML = "";
+    if (empty) empty.style.display = "";
+    _updateHomeCount(0);
+  } else {
+    if (empty) empty.style.display = "none";
+    list.innerHTML = items.map(item => _renderHomeItem(item)).join("");
+    _updateHomeCount(items.length);
+  }
+
+  // Tab title badge
+  _updateTabTitle(items.length);
+
+  // SSE live dot
+  const dot = document.getElementById("home-live-dot");
+  if (dot) dot.classList.toggle("active", !!window._sseSource);
+
+  // Polling fallback when SSE is not connected
+  clearInterval(_homePollerTimer);
+  if (!window._sseSource) {
+    const interval = (data.next_poll_after_seconds || 30) * 1000;
+    _homePollerTimer = setInterval(() => loadHome().catch(() => {}), interval);
+  }
+}
+
+function _renderHomeItem(item) {
+  const age = _fmtAge(item.age_seconds || 0);
+  const iconClass = item.severity === "high" ? "high" : item.severity === "medium" ? "medium" : item.severity === "low" ? "low" : "info";
+  const agentLabel = esc(item.agent_name || item.agent_did?.split(":").pop() || "agent");
+  const title  = esc(item.title || "");
+  const sub    = esc(item.subtitle || "");
+  const label  = esc(item.action_label || "Open");
+  const link   = esc(item.deep_link || "#");
+  return `<li class="home-item">
+    <span class="home-item-icon ${iconClass}"></span>
+    <div class="home-item-body">
+      <div class="home-item-title">${title}</div>
+      <div class="home-item-meta">${agentLabel}${sub ? " · " + sub : ""}</div>
+    </div>
+    <span class="home-item-age">${age}</span>
+    <a class="home-item-action" href="${link}">${label}</a>
+  </li>`;
+}
+
+function _fmtAge(seconds) {
+  if (seconds < 60)   return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  return `${Math.round(seconds / 86400)}d`;
+}
+
+function _updateHomeCount(n) {
+  const el = document.getElementById("home-count");
+  if (!el) return;
+  if (n > 0) { el.style.display = ""; el.textContent = String(n); }
+  else { el.style.display = "none"; }
+}
+
+function _updateTabTitle(n) {
+  document.title = n > 0 ? `(${n}) AgentID — Home` : "AgentID — Home";
+}
+
+// Hash back-compat: #section-overview → #section-analytics for old bookmarks
+if (location.hash === "#section-overview") {
+  history.replaceState(null, "", "#section-home");
 }
 
 // ── ONBOARDING CHECKLIST ──────────────────────────────────────────────────────
@@ -6892,7 +7022,7 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
 });
 
 
-const _NAV_SECTIONS = ['overview','agents','analytics','network','audit','signing','playground'];
+const _NAV_SECTIONS = ['home','overview','agents','analytics','network','audit','signing','playground','approvals'];
 
 function _scrollToSection(nav) {
   const main = document.getElementById('dash-main');
@@ -6925,7 +7055,7 @@ function _initSidebar() {
   const savedNav = sessionStorage.getItem('agentid_last_nav');
   const nav = (sectionM && _NAV_SECTIONS.includes(sectionM[1]))
     ? sectionM[1]
-    : (savedNav && _NAV_SECTIONS.includes(savedNav)) ? savedNav : null;
+    : (savedNav && _NAV_SECTIONS.includes(savedNav)) ? savedNav : 'home';
 
   if (nav) {
     // Highlight immediately so there's no flash of the wrong active item
@@ -6958,7 +7088,7 @@ function _sidebarScrollSpy() {
   const main = document.getElementById('dash-main');
   if (!main) return;
   const scrollTop = main.scrollTop + 100;
-  let current = 'overview';
+  let current = 'home';
   for (const s of _NAV_SECTIONS) {
     const el = document.getElementById('section-' + s);
     if (el && el.offsetTop <= scrollTop) current = s;
