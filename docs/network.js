@@ -880,16 +880,33 @@ function renderDetailPanel(node){
   // Unlocked when: paid tier (show real data if available, placeholders if not yet built)
   // Locked when:  free tier or tier not yet fetched
   const dimsUnlocked=isPaidTier||hasDims;
-  // Flatten capability_trust (object→average) so every dim is a number or null
+  // Backend returns dimension values as either plain numbers (legacy) or
+  // {score, trend_30d, volatility_90d} objects (current). Normalise to number.
+  function _dv(v){
+    if(v==null)return null;
+    if(typeof v==="object")return typeof v.score==="number"?v.score:null;
+    return typeof v==="number"?v:null;
+  }
   const rawDims=hasDims?ts.dimensions:{};
-  const capVals=rawDims.capability_trust?Object.values(rawDims.capability_trust):[];
-  const capAvg=capVals.length?Math.round(capVals.reduce((a,b)=>a+b,0)/capVals.length):null;
+  // capability_trust may be: null | number | {score:N} | {cap_name:score,...}
+  const capRaw=rawDims.capability_trust;
+  let capAvg=null;
+  if(capRaw!=null){
+    if(typeof capRaw==="number"){capAvg=Math.round(capRaw);}
+    else if(typeof capRaw==="object"){
+      if(typeof capRaw.score==="number"){capAvg=Math.round(capRaw.score);}
+      else{
+        const vals=Object.values(capRaw).filter(v=>typeof v==="number");
+        capAvg=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
+      }
+    }
+  }
   const dims={
-    identity_integrity:      rawDims.identity_integrity      ??null,
-    operational_reliability: rawDims.operational_reliability ??null,
-    network_reputation:      rawDims.network_reputation      ??null,
-    behavioral_history:      rawDims.behavioral_history      ??null,
-    governance:              rawDims.governance               ??null,
+    identity_integrity:      _dv(rawDims.identity_integrity),
+    operational_reliability: _dv(rawDims.operational_reliability),
+    network_reputation:      _dv(rawDims.network_reputation),
+    behavioral_history:      _dv(rawDims.behavioral_history),
+    governance:              _dv(rawDims.governance),
     capability_trust:        capAvg,
   };
   const dimDefs=[

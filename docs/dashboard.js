@@ -561,6 +561,9 @@ async function login() {
     await loadDashboard();
     sessionStorage.setItem("agentid_key", apiKey);
     sessionStorage.setItem("agentid_login_ts", String(Date.now()));
+    // Write to localStorage so sibling pages (contracts, tasks, messages, my-agents)
+    // can pick up the key without re-entering it. Cleared on logout.
+    localStorage.setItem("agentid_key", apiKey);
     if (window._bcTabSync) {
       window._bcTabSync.postMessage({ type: "response", key: apiKey, ts: Date.now() });
     } else {
@@ -596,6 +599,8 @@ async function logout() {
   sessionStorage.removeItem("agentid_auth_mode");
   // Also wipe the "stay signed in" persisted key so logout means logout.
   localStorage.removeItem("agentid_persisted_key");
+  // Clear cross-tab session key
+  localStorage.removeItem("agentid_key");
   apiKey = "";
   authMode = "session";   // default for next visit
   clearTimeout(sessionTimer);
@@ -2684,12 +2689,7 @@ async function _createTeamKey() {
 
   try {
     const params = new URLSearchParams({ label, scopes: scopes.join(",") });
-    const res = await fetch(`${BASE}/pro/keys/team?${params}`, {
-      method:  "POST",
-      headers: { "x-api-key": apiKey },
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || res.status);
+    const data = await apiFetch(`/pro/keys/team?${params}`, { method: "POST" });
 
     // Show key once
     document.getElementById("team-key-value").textContent = data.key;
@@ -5361,62 +5361,116 @@ async function _loadTrustScoreWidget() {
   }
 }
 
-const _TS_FACTORS = [
-  { key: "verified_badge",      label: "Verified Badge",       hint: "Enterprise admin-granted badge — highest trust signal (25 pts)" },
-  { key: "liveness",            label: "Liveness",             hint: "Agent recently sent a heartbeat ping (max 20 pts)" },
-  { key: "verification_rate",   label: "Verification Rate",    hint: "Success rate of verifications in the last 30 days (max 20 pts)" },
-  { key: "age",                 label: "Agent Age",            hint: "Older agents are more established (full 15 pts at 1 year)" },
-  { key: "verification_volume", label: "Verification Volume",  hint: "Number of verifications in the last 30 days; 100+ = full 10 pts" },
-  { key: "not_deprecated",      label: "Not Deprecated",       hint: "Agent is still active, not marked as deprecated (5 pts)" },
-  { key: "not_revoked",         label: "Not Revoked",          hint: "Agent is not on the revocation list (5 pts)" },
+// D1-D5 dimension definitions — match the backend's weighted scoring model.
+// Weights: D1=20%, D2=25%, D3=20%, D4=20%, D5=15%, D6=capability trust (unweighted).
+const _TS_DIMENSIONS = [
+  { key: "identity_integrity",      label: "D1 · Identity Integrity",      color: "#6366f1", weight: 20,
+    hint: "DID consistency, key rotation, signing compliance, deprecation/revocation status" },
+  { key: "operational_reliability", label: "D2 · Operational Reliability",  color: "#10b981", weight: 25,
+    hint: "Verification rate & volume, liveness, SLA compliance, uptime, task completion" },
+  { key: "network_reputation",      label: "D3 · Network Reputation",       color: "#f59e0b", weight: 20,
+    hint: "Peer attestations, complaint density, PageRank-based network standing" },
+  { key: "behavioral_history",      label: "D4 · Behavioral History",       color: "#3b82f6", weight: 20,
+    hint: "Scope violations, accountability, interaction scoring, trajectory decay" },
+  { key: "governance",              label: "D5 · Governance",               color: "#8b5cf6", weight: 15,
+    hint: "Verified badge tier, published & validated capability contracts, POLP compliance" },
 ];
 
 function _renderTrustBreakdown(el, data) {
-  // Pro endpoint returns `breakdown`; public ?detailed=true returns `breakdown` too.
-  // Fall back to `dimensions` if breakdown is missing (older cached responses).
-  const bd = data.breakdown || data.dimensions || {};
-  const totalScore = data.score || 0;
+  const totalScore = typeof data.score === "number" ? data.score : 0;
   const level      = data.level || "low";
-  // Show top_3_issues banner if available
-  const issues = data.top_3_issues || [];
-  const issuesBanner = issues.length ? `
-    <div style="background:#1c1200;border:1px solid #78350f;border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.5rem;">
-      <div style="font-size:0.68rem;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Top Issues</div>
-      ${issues.map(i => `<div style="font-size:0.72rem;color:#fcd34d;">⚠ ${esc(i)}</div>`).join("")}
-    </div>` : "";
-
-  const rows = _TS_FACTORS.map(f => {
-    const b     = bd[f.key] || { score: 0, max: 0, value: "—" };
-    const pct   = b.max > 0 ? Math.round((b.score / b.max) * 100) : 0;
-    const color = pct >= 80 ? "#22c55e" : pct >= 40 ? "#f59e0b" : "#ef4444";
-    const val   = _fmtTrustVal(f.key, String(b.value || "—"));
-    const valColor = _trustValColor(f.key, String(b.value || ""));
-    return `
-      <div style="display:grid;grid-template-columns:1fr 110px 90px;gap:0.5rem 0.75rem;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);">
-        <div>
-          <div style="font-size:0.78rem;font-weight:600;color:var(--fg);">${esc(f.label)}</div>
-          <div style="font-size:0.68rem;color:var(--muted);margin-top:1px;">${esc(f.hint)}</div>
-        </div>
-        <div>
-          <div style="height:4px;background:var(--surface3,#2a2a2a);border-radius:999px;overflow:hidden;margin-bottom:3px;">
-            <div style="width:${pct}%;height:100%;background:${color};border-radius:999px;"></div>
-          </div>
-          <div style="font-size:0.68rem;color:var(--muted);">${b.score} / ${b.max} pts</div>
-        </div>
-        <div style="font-size:0.72rem;font-weight:600;text-align:right;color:${valColor};">${esc(val)}</div>
-      </div>`;
-  }).join("");
+  const dims       = data.dimensions || {};
+  const issues     = data.top_3_issues || [];
 
   const levelColor = { excellent: "#22c55e", good: "#3b82f6", moderate: "#f59e0b", low: "#ef4444" }[level] || "#94a3b8";
 
+  // ── Top-issues banner ──────────────────────────────────────────────────────
+  const issuesBanner = issues.length ? `
+    <div style="background:rgba(120,53,15,0.25);border:1px solid #78350f;border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.65rem;">
+      <div style="font-size:0.65rem;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.3rem;">⚠ Top Issues</div>
+      ${issues.map(i => `<div style="font-size:0.71rem;color:#fcd34d;line-height:1.45;">${esc(i)}</div>`).join("")}
+    </div>` : "";
+
+  // ── D1-D5 dimension rows ───────────────────────────────────────────────────
+  // Backend returns dimensions as plain numbers (legacy) or {score, trend_30d} objects.
+  function _dScore(v) {
+    if (v == null) return null;
+    if (typeof v === "object") return typeof v.score === "number" ? v.score : null;
+    return typeof v === "number" ? v : null;
+  }
+  function _dTrend(v) {
+    if (v == null || typeof v !== "object") return null;
+    return typeof v.trend_30d === "number" ? v.trend_30d : null;
+  }
+
+  const dimRows = _TS_DIMENSIONS.map(d => {
+    const raw   = dims[d.key];
+    const score = _dScore(raw);
+    const trend = _dTrend(raw);
+    const pct   = score != null ? Math.min(100, Math.max(0, Math.round(score))) : 0;
+    const color = pct >= 75 ? "#22c55e" : pct >= 45 ? "#f59e0b" : "#ef4444";
+    const trendHtml = trend != null ? `<span style="font-size:0.63rem;color:${trend >= 0 ? "#22c55e" : "#ef4444"};margin-left:4px;">${trend >= 0 ? "↑" : "↓"}${Math.abs(trend).toFixed(1)}</span>` : "";
+    const wt = d.weight ? `<span style="font-size:0.6rem;color:var(--muted);margin-left:auto;">${d.weight}%</span>` : "";
+    return `
+      <div style="padding:0.4rem 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:0.3rem;margin-bottom:4px;">
+          <span style="font-size:0.75rem;font-weight:600;color:${d.color};">${esc(d.label)}</span>
+          ${trendHtml}
+          ${wt}
+          <span style="font-size:0.72rem;font-weight:700;margin-left:6px;color:${color};">${score != null ? pct : "—"}</span>
+        </div>
+        <div style="height:4px;background:var(--surface3,#2a2a2a);border-radius:999px;overflow:hidden;margin-bottom:3px;">
+          <div style="width:${pct}%;height:100%;background:${d.color};border-radius:999px;transition:width 0.4s;"></div>
+        </div>
+        <div style="font-size:0.63rem;color:var(--muted);">${esc(d.hint)}</div>
+      </div>`;
+  }).join("");
+
+  // ── Capability trust row (D6, unweighted) ─────────────────────────────────
+  const capRaw  = dims.capability_trust;
+  let   capHtml = "";
+  if (capRaw != null) {
+    let capScore = null;
+    if (typeof capRaw === "number") { capScore = Math.round(capRaw); }
+    else if (typeof capRaw === "object") {
+      if (typeof capRaw.score === "number") { capScore = Math.round(capRaw.score); }
+      else {
+        const vals = Object.values(capRaw).filter(v => typeof v === "number");
+        capScore = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+      }
+    }
+    if (capScore != null) {
+      const pct = Math.min(100, Math.max(0, capScore));
+      const col = pct >= 75 ? "#22c55e" : pct >= 45 ? "#f59e0b" : "#ef4444";
+      capHtml = `
+        <div style="padding:0.4rem 0;">
+          <div style="display:flex;align-items:center;gap:0.3rem;margin-bottom:4px;">
+            <span style="font-size:0.75rem;font-weight:600;color:#ec4899;">D6 · Capability Trust</span>
+            <span style="font-size:0.72rem;font-weight:700;margin-left:auto;color:${col};">${capScore}</span>
+          </div>
+          <div style="height:4px;background:var(--surface3,#2a2a2a);border-radius:999px;overflow:hidden;margin-bottom:3px;">
+            <div style="width:${pct}%;height:100%;background:#ec4899;border-radius:999px;"></div>
+          </div>
+          <div style="font-size:0.63rem;color:var(--muted);">Average capability contract trust score across all published capabilities</div>
+        </div>`;
+    }
+  }
+
+  // ── Formula note ──────────────────────────────────────────────────────────
+  const formulaNote = `<div style="margin-top:0.5rem;font-size:0.63rem;color:var(--muted);line-height:1.5;">
+    Total = D1×20% + D2×25% + D3×20% + D4×20% + D5×15%
+  </div>`;
+
   el.innerHTML = `
-    <div style="padding:0.75rem 1rem 0.25rem;background:var(--surface2,#1c1c1c);border-radius:0 0 0.5rem 0.5rem;margin-bottom:0.25rem;">
+    <div style="padding:0.75rem 1rem 0.5rem;background:var(--surface2,#1c1c1c);border-radius:0 0 0.5rem 0.5rem;">
       ${issuesBanner}
-      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">
-        <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Score breakdown</span>
-        <span style="margin-left:auto;font-size:0.72rem;font-weight:700;color:${levelColor};">${totalScore} pts — ${level}</span>
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.65rem;">
+        <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);">Trust Dimensions</span>
+        <span style="margin-left:auto;font-size:0.75rem;font-weight:700;color:${levelColor};">${totalScore.toFixed(1)} pts — ${level}</span>
       </div>
-      ${rows}
+      ${dimRows}
+      ${capHtml}
+      ${formulaNote}
     </div>`;
 }
 
@@ -7017,28 +7071,38 @@ async function _fpLoad() {
   }
 }
 
+let _fpTabInited = false;
 function _initFootprintTab() {
-  document.getElementById("fp-load-btn")?.addEventListener("click", () => { _fp.page = 1; _fpLoad(); });
-  document.getElementById("fp-prev-btn")?.addEventListener("click", () => { if (_fp.page > 1) { _fp.page--; _fpLoad(); } });
-  document.getElementById("fp-next-btn")?.addEventListener("click", () => { if (_fp.hasMore) { _fp.page++; _fpLoad(); } });
+  // Guard: attach click listeners only once (tab can be opened multiple times)
+  if (!_fpTabInited) {
+    _fpTabInited = true;
 
-  document.getElementById("fp-export-json-btn")?.addEventListener("click", () => {
-    window.open(BASE + "/pro/account/export?fmt=json&" + _fpExportParams(), "_blank");
-  });
-  document.getElementById("fp-export-csv-btn")?.addEventListener("click", () => {
-    window.open(BASE + "/pro/account/export?fmt=csv&" + _fpExportParams(), "_blank");
-  });
+    const loadBtn = document.getElementById("fp-load-btn");
+    const prevBtn = document.getElementById("fp-prev-btn");
+    const nextBtn = document.getElementById("fp-next-btn");
+    if (loadBtn) loadBtn.addEventListener("click", () => { _fp.page = 1; _fpLoad(); });
+    if (prevBtn) prevBtn.addEventListener("click", () => { if (_fp.page > 1) { _fp.page--; _fpLoad(); } });
+    if (nextBtn) nextBtn.addEventListener("click", () => { if (_fp.hasMore) { _fp.page++; _fpLoad(); } });
 
-  // Webhook log fail-filter toggle
-  document.querySelectorAll(".fp-wh-filter-btn").forEach(btn => {
-    btn.addEventListener("click", function() {
-      document.querySelectorAll(".fp-wh-filter-btn").forEach(b => b.classList.remove("active"));
-      this.classList.add("active");
-      _fpLoadWebhookLog(this.dataset.fail === "1");
+    document.getElementById("fp-export-json-btn")?.addEventListener("click", () => {
+      window.open(BASE + "/pro/account/export?fmt=json&" + _fpExportParams(), "_blank");
     });
-  });
+    document.getElementById("fp-export-csv-btn")?.addEventListener("click", () => {
+      window.open(BASE + "/pro/account/export?fmt=csv&" + _fpExportParams(), "_blank");
+    });
 
-  // Load supplemental sections
+    // Webhook log fail-filter toggle
+    document.querySelectorAll(".fp-wh-filter-btn").forEach(btn => {
+      btn.addEventListener("click", function() {
+        document.querySelectorAll(".fp-wh-filter-btn").forEach(b => b.classList.remove("active"));
+        this.classList.add("active");
+        _fpLoadWebhookLog(this.dataset.fail === "1");
+      });
+    });
+  }
+
+  // Always refresh summary cards and supplemental sections on tab open
+  _fpLoadSummary();
   _fpLoadSessions();
   _fpLoadKeyUsage();
   _fpLoadWebhookLog(false);
@@ -8130,10 +8194,18 @@ async function _submitReportDownload() {
   btn.textContent = "Generating…";
 
   try {
-    const key = sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key") || "";
+    // Use same auth chain as apiFetch/authFetch: in-memory → session → local persisted → local key
+    const _rptKey = apiKey
+                 || sessionStorage.getItem("agentid_key")
+                 || localStorage.getItem("agentid_persisted_key")
+                 || localStorage.getItem("agentid_key")
+                 || "";
+    const _rptHeaders = { "Content-Type": "application/json" };
+    if (_rptKey) _rptHeaders["x-api-key"] = _rptKey;
     const res = await fetch(BASE + "/pro/reports/pdf", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": key },
+      credentials: "include",       // cookie auth (session-mode users)
+      headers: _rptHeaders,
       body: JSON.stringify({ sections, agent_dids, title, date_range }),
     });
     if (res.status === 403) throw new Error("PDF reports require a Pro or Enterprise plan.");

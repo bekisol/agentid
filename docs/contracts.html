@@ -384,7 +384,10 @@
 <!-- ── Fast auth check ───────────────────────────────────────────────── -->
 <script>
 const BASE = "https://api.agentid-protocol.com";
-let _apiKey = sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key") || "";
+let _apiKey = sessionStorage.getItem("agentid_key")
+           || localStorage.getItem("agentid_persisted_key")
+           || localStorage.getItem("agentid_key")
+           || "";
 let _allContracts = [];   // full list from server
 let _filteredContracts = [];
 let _agents = [];         // [{did, name}] for publish dropdown
