@@ -8059,8 +8059,33 @@ async function _loadApprovals() {
   try {
     const params = new URLSearchParams({ limit: 50 });
     if (status) params.set("status", status);
-    const data = await apiFetch(`/pro/acp/queue?${params}`);
-    const items = data.items || data.approvals || (Array.isArray(data) ? data : []);
+
+    // Fetch ACP queue and human-review queue in parallel
+    const [acpRes, rqRes] = await Promise.all([
+      apiFetch(`/pro/acp/queue?${params}`).catch(() => null),
+      apiFetch(`/pro/review-queue?${params}`).catch(() => null),
+    ]);
+
+    const acpItems = acpRes
+      ? (acpRes.items || acpRes.approvals || (Array.isArray(acpRes) ? acpRes : []))
+          .map(i => ({ ...i, _source: "acp" }))
+      : [];
+
+    const rqItems = rqRes
+      ? (rqRes.items || (Array.isArray(rqRes) ? rqRes : []))
+          .map(i => ({
+            ...i,
+            _source: "review-queue",
+            // normalise fields to match ACP shape
+            action_category: i.operation || i.reason || "human_review",
+            action_payload:  i.payload_summary || "",
+            reviewer_note:   i.notes || "",
+            resolved_at:     i.reviewed_at || null,
+          }))
+      : [];
+
+    const items = [...acpItems, ...rqItems]
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
     if (countEl) countEl.textContent = `${items.length} item${items.length !== 1 ? "s" : ""}`;
 
@@ -8076,9 +8101,13 @@ async function _loadApprovals() {
 
     if (!items.length) {
       const msg = status === "pending"
-        ? "No pending approvals. Your agents are running without human checkpoints, or all actions were auto-approved."
+        ? "No pending approvals. Your agents are running within policy."
         : `No ${status} approvals found.`;
-      listEl.innerHTML = `<div style="text-align:center;color:var(--muted);padding:2rem 1rem;font-size:0.85rem;">${esc(msg)}</div>`;
+      listEl.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5rem 1rem;gap:0.5rem;">
+        <div style="font-size:2rem;">✅</div>
+        <div style="font-weight:600;font-size:0.9rem;">No pending approvals</div>
+        <div style="font-size:0.8rem;color:var(--muted);">Your agents are running within policy.</div>
+      </div>`;
       return;
     }
 
@@ -8088,37 +8117,42 @@ async function _loadApprovals() {
       const statusColor = item.status === "approved" ? "var(--green)" : (item.status === "rejected" || item.status === "denied") ? "var(--red)" : item.status === "expired" ? "var(--muted)" : "var(--yellow)";
       const statusLabel = item.status === "approved" ? "✓ Approved" : (item.status === "rejected" || item.status === "denied") ? "✗ Rejected" : item.status === "expired" ? "✕ Expired" : "⏳ Pending";
       const category = item.action_category || "—";
+      const sourceTag = item._source === "review-queue"
+        ? `<span style="font-size:0.66rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:4px;background:rgba(59,130,246,0.15);color:#60a5fa;">EU AI Act</span>`
+        : "";
       let payloadPreview = "";
       try {
         const p = typeof item.action_payload === "string" ? JSON.parse(item.action_payload) : item.action_payload;
-        payloadPreview = JSON.stringify(p, null, 2);
+        payloadPreview = p ? JSON.stringify(p, null, 2) : String(item.action_payload || "");
       } catch(_) {
         payloadPreview = String(item.action_payload || "");
       }
 
       const agentShort = (item.agent_did || "").slice(-20);
       const isPending = item.status === "pending";
+      const src = esc(item._source || "acp");
 
       return `<div style="border-bottom:1px solid var(--border);padding:1rem 1.25rem;">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.35rem;flex-wrap:wrap;">
               <span style="font-size:0.82rem;font-weight:700;color:var(--text);">${esc(category)}</span>
+              ${sourceTag}
               <span style="font-size:0.72rem;font-weight:700;color:${statusColor};">${esc(statusLabel)}</span>
               <span style="font-size:0.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">…${esc(agentShort)}</span>
             </div>
-            <details style="margin-bottom:0.4rem;">
+            ${payloadPreview ? `<details style="margin-bottom:0.4rem;">
               <summary style="font-size:0.76rem;color:var(--accent);cursor:pointer;user-select:none;">View payload</summary>
               <pre style="margin-top:0.35rem;font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.65rem;overflow:auto;max-height:160px;white-space:pre-wrap;word-break:break-word;color:var(--text-2);">${esc(payloadPreview)}</pre>
-            </details>
+            </details>` : ""}
             ${item.reviewer_note ? `<div style="font-size:0.78rem;color:var(--text-2);margin-bottom:0.2rem;"><b>Note:</b> ${esc(item.reviewer_note)}</div>` : ""}
             <div style="font-size:0.71rem;color:var(--muted);">Requested ${esc(ts)}${resolvedAt ? ` · Resolved ${esc(resolvedAt)}` : ""}</div>
           </div>
           ${isPending ? `
           <div style="display:flex;flex-direction:column;gap:0.35rem;flex-shrink:0;min-width:120px;">
             <textarea id="note-${esc(item.id)}" rows="2" placeholder="Optional reviewer note…" style="width:100%;padding:0.35rem 0.55rem;border:1px solid var(--border-dark);border-radius:6px;font-size:0.76rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;resize:none;box-sizing:border-box;"></textarea>
-            <button onclick="_approveAction('${esc(item.id)}')" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✓ Approve</button>
-            <button onclick="_denyAction('${esc(item.id)}')" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--red);background:var(--red-bg);color:var(--red);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✗ Deny</button>
+            <button onclick="_approveAction('${esc(item.id)}','${src}')" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✓ Approve</button>
+            <button onclick="_denyAction('${esc(item.id)}','${src}')" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--red);background:var(--red-bg);color:var(--red);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✗ Deny</button>
           </div>` : ""}
         </div>
       </div>`;
@@ -8128,25 +8162,51 @@ async function _loadApprovals() {
   }
 }
 
-async function _approveAction(id) {
+async function _approveAction(id, source) {
   const note = document.getElementById(`note-${id}`)?.value?.trim() || "";
   try {
-    const r = await apiFetch(`/pro/approvals/${encodeURIComponent(id)}/approve`, {
-      method: "POST",
-      body: JSON.stringify({ reviewer_note: note }),
-    });
+    if (source === "review-queue") {
+      await apiFetch(`/pro/review-queue/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ verdict: "approved", notes: note }),
+      });
+    } else {
+      await apiFetch(`/pro/approvals/${encodeURIComponent(id)}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ reviewer_note: note }),
+      });
+    }
     _loadApprovals();
+    loadHome().catch(() => {});
   } catch(e) { alert("Error approving: " + e.message); }
 }
 
-async function _denyAction(id) {
+async function _denyAction(id, source) {
   const note = document.getElementById(`note-${id}`)?.value?.trim() || "";
   try {
-    const r = await apiFetch(`/pro/approvals/${encodeURIComponent(id)}/reject`, {
-      method: "POST",
-      body: JSON.stringify({ reviewer_note: note }),
-    });
+    if (source === "review-queue") {
+      await apiFetch(`/pro/review-queue/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ verdict: "rejected", notes: note }),
+      });
+    } else {
+      await apiFetch(`/pro/approvals/${encodeURIComponent(id)}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reviewer_note: note }),
+      });
+    }
     _loadApprovals();
+    loadHome().catch(() => {});
+  } catch(e) { alert("Error denying: " + e.message); }
+}
+
+// keep old signature for any existing callers
+async function _denyAction_legacy(id) {
+  return _denyAction(id, "acp");
+}
+async function _approveAction_legacy(id) {
+  return _approveAction(id, "acp");
+}
   } catch(e) { alert("Error denying: " + e.message); }
 }
 
