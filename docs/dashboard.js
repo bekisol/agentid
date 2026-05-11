@@ -297,7 +297,8 @@ async function apiFetch(path, options = {}) {
   // (set by "stay signed in" toggle, persists across refresh + close).
   const storedKey = apiKey
                   || sessionStorage.getItem("agentid_key")
-                  || localStorage.getItem("agentid_persisted_key");
+                  || localStorage.getItem("agentid_persisted_key")
+                  || localStorage.getItem("agentid_key");
   if (storedKey) {
     apiKey = storedKey;            // re-hydrate in-memory copy
     if (!sessionStorage.getItem("agentid_key")) {
