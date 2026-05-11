@@ -18,13 +18,13 @@ import { RegistryClient, AgentDocument } from "./registry.js";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface SignedMessage {
-  /** The original payload with signer_did, timestamp, and nonce injected. */
+  /** The original payload with signer, timestamp, and nonce injected. */
   payload: Record<string, unknown>;
   /** Base64-encoded Ed25519 signature of the canonical payload. */
   signature: string;
   /** DID of the agent that produced this message. */
-  signer_did: string;
-  /** Unix timestamp in milliseconds when the message was signed. */
+  signer: string;
+  /** Unix timestamp in seconds (not milliseconds) when the message was signed. */
   timestamp: number;
   /** Random UUID nonce for replay protection. */
   nonce: string;
@@ -193,27 +193,29 @@ export class Agent {
   /**
    * Sign an arbitrary payload.
    *
-   * Injects `signer_did`, `timestamp` (ms), and `nonce` (UUID) into the
-   * payload before signing — providing replay protection out of the box.
+   * Injects `signer`, `timestamp` (Unix seconds), and `nonce` (UUID) into
+   * the payload before signing — providing replay protection out of the box.
+   *
+   * Note: timestamp is in seconds (not milliseconds) to match Python and Go SDKs.
    */
   async sign(payload: Record<string, unknown>): Promise<SignedMessage> {
     if (!this._privateKey) {
       throw new Error("No private key — agent was loaded read-only");
     }
 
-    const timestamp = Date.now();
+    const timestamp = Math.floor(Date.now() / 1000);  // Unix seconds — matches Python time.time()
     const nonce = crypto.randomUUID();
 
     const signedPayload: Record<string, unknown> = {
       ...payload,
-      signer_did: this.did,
+      signer: this.did,
       timestamp,
       nonce,
     };
 
     const signature = await cryptoSign(this._privateKey, signedPayload);
 
-    return { payload: signedPayload, signature, signer_did: this.did, timestamp, nonce };
+    return { payload: signedPayload, signature, signer: this.did, timestamp, nonce };
   }
 
   // ── Local verification (you already have the signer's public key) ─────────
@@ -241,7 +243,7 @@ export class Agent {
     registry: RegistryClient
   ): Promise<boolean> {
     try {
-      const doc = await registry.resolve(msg.signer_did);
+      const doc = await registry.resolve(msg.signer);
       const publicKey = base64ToPublicKey(doc.public_key);
 
       // Validate that the DID is cryptographically bound to the stored key.
@@ -347,7 +349,7 @@ export class Agent {
  * Top-level convenience function — equivalent to `Agent.create(opts)`.
  *
  * @example
- * import { createAgent } from '@agentid/sdk';
+ * import { createAgent } from '@vikhulus/agentid-protocol';
  * const agent = await createAgent({ name: 'my-bot', capabilities: ['search'], owner: 'me@example.com' });
  */
 export async function createAgent(opts: CreateAgentOptions): Promise<Agent> {

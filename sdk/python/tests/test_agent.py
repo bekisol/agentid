@@ -5,7 +5,8 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from agentid import Agent, AgentDocument
+from agentid import Agent
+from agentid.agent import AgentDocument
 from agentid.identity import generate_keypair, public_key_to_did, did_to_public_key_bytes
 from agentid.crypto import sign, verify
 

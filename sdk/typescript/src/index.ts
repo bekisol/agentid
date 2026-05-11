@@ -3,7 +3,7 @@
  *
  * Quick start:
  *
- *   import { createAgent } from '@agentid/sdk';
+ *   import { createAgent } from '@vikhulus/agentid-protocol';
  *
  *   const agent = await createAgent({
  *     name: 'my-bot',

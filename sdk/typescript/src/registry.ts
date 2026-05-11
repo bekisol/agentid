@@ -242,7 +242,7 @@ export class RegistryClient {
       const body = await res.text();
       throw new Error(`Failed to publish capability contract (${res.status}): ${body}`);
     }
-    return res.json();
+    return res.json() as Promise<Record<string, unknown>>;
   }
 
   /**
@@ -282,7 +282,7 @@ export class RegistryClient {
     if (!res.ok) {
       throw new Error(`Failed to fetch capability contract (${res.status})`);
     }
-    return res.json();
+    return res.json() as Promise<Record<string, unknown>>;
   }
 
   /**

@@ -126,6 +126,7 @@ func (a *Agent) Sign(input any) (SignedPayload, error) {
 	}
 	if _, ok := payload["timestamp"]; !ok { payload["timestamp"] = time.Now().Unix() }
 	if _, ok := payload["nonce"];     !ok { payload["nonce"]     = randomHex(16) }
+	if _, ok := payload["signer"];    !ok { payload["signer"]    = a.DID }
 	canonical, err := canonicalJSON(payload)
 	if err != nil { return SignedPayload{}, err }
 	sig := ed25519.Sign(priv, canonical)
