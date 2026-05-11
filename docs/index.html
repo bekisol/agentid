@@ -1,27 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Redirect authenticated users straight to the Home dashboard -->
-  <script>
-    (function() {
-      var key = sessionStorage.getItem("agentid_key")
-             || localStorage.getItem("agentid_persisted_key")
-             || localStorage.getItem("agentid_key");
-      if (key) window.location.replace("home.html");
-    })();
-  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentID — Home</title>
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
              script-src 'self' 'unsafe-inline';
              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
              font-src https://fonts.gstatic.com;
-             connect-src https://api.agentid-protocol.com;
+             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
              img-src 'self' data:;
              frame-ancestors 'none';" />
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AgentID — Identity for AI Agents</title>
-  <meta name="description" content="Open identity, discovery, and trust protocol for AI agents. Every agent gets a cryptographic DID. Sign messages. Verify sources. Build trusted multi-agent systems." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -38,12 +28,64 @@
       --text-2:       #44403C;
       --muted:        #78716C;
       --accent:       #C2410C;
-      --accent-bg:    #FFF7ED;
+      --accent-light: #FFF7ED;
       --accent-border:#FDBA74;
       --green:        #059669;
       --green-bg:     #ECFDF5;
-      --code-bg:      #1C1917;
-      --code-border:  #292524;
+      --red:          #DC2626;
+      --red-bg:       #FEF2F2;
+      --yellow:       #D97706;
+      --yellow-bg:    #FFFBEB;
+      --blue:         #2563EB;
+      --blue-bg:      #EFF6FF;
+      --blue-light:   #DBEAFE;
+    }
+
+    html[data-theme="dark"] {
+      --bg:           #0e0f12;
+      --surface:      #17181c;
+      --surface2:     #1f2025;
+      --border:       #2a2c33;
+      --border-dark:  #3a3d45;
+      --text:         #f0eee9;
+      --text-2:       #c5c1b8;
+      --muted:        #8a847a;
+      --accent:       #ee7d4a;
+      --accent-light: #2a1d12;
+      --accent-border:#7a4824;
+      --green:        #4ade80;
+      --green-bg:     #0f2f1d;
+      --red:          #f87171;
+      --red-bg:       #2f1414;
+      --yellow:       #facc15;
+      --yellow-bg:    #2f240a;
+      --blue:         #60a5fa;
+      --blue-bg:      #122335;
+      --blue-light:   #1e3a5f;
+    }
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme="light"]) {
+        --bg:           #0e0f12;
+        --surface:      #17181c;
+        --surface2:     #1f2025;
+        --border:       #2a2c33;
+        --border-dark:  #3a3d45;
+        --text:         #f0eee9;
+        --text-2:       #c5c1b8;
+        --muted:        #8a847a;
+        --accent:       #ee7d4a;
+        --accent-light: #2a1d12;
+        --accent-border:#7a4824;
+        --green:        #4ade80;
+        --green-bg:     #0f2f1d;
+        --red:          #f87171;
+        --red-bg:       #2f1414;
+        --yellow:       #facc15;
+        --yellow-bg:    #2f240a;
+        --blue:         #60a5fa;
+        --blue-bg:      #122335;
+        --blue-light:   #1e3a5f;
+      }
     }
 
     body {
@@ -51,1323 +93,1359 @@
       color: var(--text);
       font-family: "Inter", -apple-system, sans-serif;
       line-height: 1.6;
-      font-size: 16px;
+      font-size: 14px;
+      min-height: 100vh;
       -webkit-font-smoothing: antialiased;
     }
-
     a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
 
-    /* ── NAV ── */
-    nav {
+    /* ── TOP NAV ── */
+    .topnav {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 0 2rem;
-      height: 60px;
+      justify-content: space-between;
+      padding: 0 1.5rem;
+      height: 56px;
+      background: var(--surface);
       border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
-      background: rgba(249, 247, 244, 0.92);
-      backdrop-filter: blur(12px);
-      z-index: 100;
+      z-index: 200;
     }
-
     .nav-logo {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.02em;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
       text-decoration: none;
     }
-
     .logo-mark {
-      width: 28px;
-      height: 28px;
+      width: 26px; height: 26px;
       background: var(--accent);
-      border-radius: 7px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 0.75rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 0.25rem;
-      align-items: center;
-    }
-
-    .nav-links a {
-      color: var(--muted);
-      font-size: 0.875rem;
-      font-weight: 500;
-      padding: 0.4rem 0.75rem;
       border-radius: 6px;
-      transition: all 0.1s;
-      text-decoration: none;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 800;
     }
-    .nav-links a:hover { color: var(--text); background: var(--surface2); }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .nav-user {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .theme-toggle {
+      width: 32px; height: 32px;
+      border-radius: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      color: var(--muted);
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
 
+    /* ── BUTTONS ── */
     .btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      padding: 0.5rem 1.1rem;
-      border-radius: 8px;
-      font-size: 0.875rem;
+      gap: 0.35rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 7px;
+      font-size: 0.82rem;
       font-weight: 500;
       font-family: "Inter", sans-serif;
       cursor: pointer;
       transition: all 0.15s;
       border: none;
       text-decoration: none;
-      line-height: 1;
+      white-space: nowrap;
     }
-    .btn-primary {
-      background: var(--accent);
-      color: white;
-      box-shadow: 0 1px 3px rgba(194, 65, 12, 0.25);
-    }
-    .btn-primary:hover { background: #B45309; text-decoration: none; box-shadow: 0 2px 6px rgba(194, 65, 12, 0.3); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-outline { background: transparent; color: var(--text-2); border: 1px solid var(--border-dark); }
+    .btn-outline:hover { background: var(--surface2); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+    .btn-sm { font-size: 0.75rem; padding: 0.25rem 0.65rem; }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-danger:hover { opacity: 0.88; }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-success:hover { opacity: 0.88; }
 
-    .btn-outline {
-      background: transparent;
-      color: var(--text-2);
-      border: 1px solid var(--border-dark);
-    }
-    .btn-outline:hover { background: var(--surface2); text-decoration: none; border-color: var(--muted); }
-
-    .btn-lg { padding: 0.75rem 1.5rem; font-size: 0.95rem; border-radius: 10px; }
-
-    /* ── HERO ── */
-    .hero {
-      max-width: 820px;
-      margin: 0 auto;
-      padding: 5rem 2rem 4rem;
-      text-align: center;
+    /* ── APP SHELL ── */
+    #app { display: none; }
+    .shell {
+      display: flex;
+      height: calc(100vh - 56px);
+      overflow: hidden;
     }
 
-    .hero-badge {
-      display: inline-flex;
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 212px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .sb-brand {
+      display: flex;
       align-items: center;
-      gap: 0.5rem;
-      background: var(--green-bg);
-      border: 1px solid #6EE7B7;
-      color: var(--green);
-      padding: 0.3rem 0.9rem;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      margin-bottom: 2rem;
-      letter-spacing: 0.01em;
-    }
-
-    .badge-dot {
-      width: 6px;
-      height: 6px;
-      background: var(--green);
-      border-radius: 50%;
-      animation: pulse 2.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.85); }
-    }
-
-    h1 {
-      font-size: clamp(2.4rem, 5vw, 3.75rem);
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.04em;
+      gap: 0.45rem;
+      padding: 0.9rem 1.1rem 0.75rem;
+      font-size: 0.88rem;
+      font-weight: 700;
       color: var(--text);
-      margin-bottom: 1.25rem;
-    }
-
-    h1 em {
-      font-style: normal;
-      color: var(--accent);
-    }
-
-    .hero-sub {
-      font-size: 1.15rem;
-      color: var(--muted);
-      max-width: 540px;
-      margin: 0 auto 2.5rem;
-      line-height: 1.75;
-      font-weight: 400;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 0.75rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 4rem;
-    }
-
-    /* ── DID CARD ── */
-    .did-card {
-      background: var(--code-bg);
-      border: 1px solid var(--code-border);
-      border-radius: 14px;
-      padding: 1.5rem 1.75rem;
-      max-width: 640px;
-      margin: 0 auto;
-      text-align: left;
-      box-shadow: 0 20px 60px rgba(28, 25, 23, 0.12);
-    }
-
-    .did-card-top {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .did-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-    }
-    .did-dot.red { background: #FF5F57; }
-    .did-dot.yellow { background: #FFBD2E; }
-    .did-dot.green { background: #28C840; }
-
-    .did-card-label {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.72rem;
-      color: #78716C;
-      margin-left: auto;
-    }
-
-    .did-line {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.8rem;
-      line-height: 1.8;
-    }
-
-    .did-comment { color: #57534E; }
-    .did-key { color: #C084FC; }
-    .did-str { color: #86EFAC; }
-    .did-fn { color: #7DD3FC; }
-    .did-val { color: #FCA5A5; word-break: break-all; }
-
-    /* ── STAT STRIP ── */
-    .stat-strip {
-      border-top: 1px solid var(--border);
+      text-decoration: none;
       border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      padding: 2rem;
-    }
-
-    .stat-strip-inner {
-      max-width: 900px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
-      text-align: center;
-    }
-
-    @media (max-width: 640px) { .stat-strip-inner { grid-template-columns: repeat(2, 1fr); } }
-
-    .stat-item-num {
-      font-size: 1.75rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: var(--text);
-    }
-    .stat-item-label {
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-top: 0.15rem;
-      font-weight: 500;
-    }
-
-    /* ── SECTIONS ── */
-    section { padding: 5.5rem 2rem; }
-    .section-inner { max-width: 1040px; margin: 0 auto; }
-
-    .section-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 1rem;
-    }
-
-    .section-eyebrow::before {
-      content: "";
-      display: block;
-      width: 20px;
-      height: 2px;
-      background: var(--accent);
-      border-radius: 1px;
-    }
-
-    h2 {
-      font-size: clamp(1.75rem, 3.5vw, 2.5rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.15;
-      margin-bottom: 1rem;
-      color: var(--text);
-    }
-
-    .section-sub {
-      color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.7;
-      max-width: 500px;
-    }
-
-    /* ── PROBLEM CARDS ── */
-    .problem-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
-      margin-top: 3rem;
-    }
-
-    @media (max-width: 768px) { .problem-grid { grid-template-columns: 1fr; } }
-
-    .problem-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 2rem;
-      transition: box-shadow 0.2s, border-color 0.2s;
-    }
-    .problem-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); border-color: var(--border-dark); }
-
-    .problem-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.25rem;
-      margin-bottom: 1.25rem;
-    }
-
-    .problem-card h3 {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 0.6rem;
-      letter-spacing: -0.01em;
-    }
-
-    .problem-card p {
-      color: var(--muted);
-      font-size: 0.9rem;
-      line-height: 1.65;
-    }
-
-    /* ── HOW IT WORKS ── */
-    .how-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-
-    .how-grid {
-      display: grid;
-      grid-template-columns: 1fr 1.1fr;
-      gap: 4rem;
-      align-items: start;
-    }
-
-    @media (max-width: 820px) { .how-grid { grid-template-columns: 1fr; } }
-
-    .how-left { padding-top: 0.5rem; }
-
-    .how-steps { margin-top: 2rem; display: flex; flex-direction: column; gap: 1.25rem; }
-
-    .how-step {
-      display: flex;
-      gap: 1rem;
-      align-items: flex-start;
-    }
-
-    .step-num {
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      background: var(--accent-bg);
-      border: 1px solid var(--accent-border);
-      color: var(--accent);
-      font-size: 0.78rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       flex-shrink: 0;
     }
-
-    .step-text h4 { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 0.2rem; }
-    .step-text p { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
-
-    /* ── CODE BLOCK ── */
-    .code-block {
-      background: var(--code-bg);
-      border: 1px solid var(--code-border);
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 20px 60px rgba(28, 25, 23, 0.15);
+    .dsb-section-label {
+      padding: 0.8rem 1.1rem 0.25rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
     }
-
-    .code-bar {
+    .dsb-item {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.875rem 1.25rem;
-      border-bottom: 1px solid var(--code-border);
-      background: #161311;
-    }
-
-    .code-tab {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.72rem;
-      color: #78716C;
-      padding: 0.2rem 0.6rem;
-      border-radius: 4px;
+      gap: 0.55rem;
+      padding: 0.5rem 1.1rem;
+      font-size: 0.83rem;
+      font-weight: 500;
+      color: var(--text-2);
+      text-decoration: none;
+      border-left: 3px solid transparent;
+      transition: background 0.1s, color 0.1s;
       cursor: pointer;
-      transition: all 0.1s;
-      background: transparent;
-      border: none;
-      outline: none;
+      border-right: none;
+      border-top: none;
+      border-bottom: none;
+      background: none;
+      font-family: inherit;
+      width: 100%;
+      text-align: left;
     }
-    .code-tab:hover { color: #A8A29E; }
-    .code-tab.active { background: #292524; color: #E7E5E4; }
-
-    pre {
-      padding: 1.5rem 1.75rem;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.8rem;
-      line-height: 1.8;
-      overflow-x: auto;
-      color: #D6D3D1;
+    .dsb-item:hover { background: var(--surface2); color: var(--text); }
+    .dsb-item.active {
+      background: var(--accent-light);
+      border-left-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .dsb-badge {
+      margin-left: auto;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 0.1rem 0.38rem;
+      border-radius: 20px;
+      min-width: 17px;
+      text-align: center;
+    }
+    .dsb-footer {
+      margin-top: auto;
+      border-top: 1px solid var(--border);
+      padding: 0.3rem 0;
     }
 
-    .kw { color: #C084FC; }
-    .fn { color: #7DD3FC; }
-    .st { color: #86EFAC; }
-    .cm { color: #57534E; font-style: italic; }
-    .hl { color: #FB923C; }
-    .num { color: #F9A8D4; }
+    /* ── MAIN ── */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+    }
 
-    /* ── API DEMO ── */
-    .api-demo {
-      margin-top: 2rem;
-      background: var(--surface2);
+    /* ── PAGE HEADER ── */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+    .page-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      color: var(--text);
+    }
+    .page-subtitle {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+
+    /* ── KPI STRIP ── */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+    .kpi-tile {
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      text-decoration: none;
+      display: block;
     }
+    .kpi-tile:hover {
+      border-color: var(--accent-border);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    }
+    .kpi-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+    .kpi-value {
+      font-size: 1.9rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      line-height: 1.1;
+    }
+    .kpi-value.loading { color: var(--border-dark); font-size: 1.4rem; }
+    .kpi-value.error { color: var(--red); font-size: 0.85rem; font-weight: 500; letter-spacing: 0; }
+    .kpi-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+    .kpi-tile.kpi-urgent { border-color: var(--accent-border); background: var(--accent-light); }
+    .kpi-tile.kpi-urgent .kpi-value { color: var(--accent); }
+    .kpi-tile.kpi-ok { border-color: #86efac; background: var(--green-bg); }
+    .kpi-tile.kpi-ok .kpi-value { color: var(--green); }
 
-    .api-demo-label {
+    /* ── SECTION CARD ── */
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 1.25rem;
+      overflow: hidden;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-title {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--green);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 0.6rem;
-    }
-
-    .api-demo-cmd {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.78rem;
-      color: var(--muted);
-    }
-
-    .api-demo-cmd span { color: var(--accent); }
-
-    /* ── INTEGRATIONS ── */
-    .integrations-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-      margin-top: 3rem;
-    }
-
-    @media (max-width: 560px) { .integrations-grid { grid-template-columns: 1fr; } }
-
-    .integration-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .integration-card:hover { border-color: var(--border-dark); box-shadow: 0 4px 16px rgba(0,0,0,0.05); }
-
-    .int-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.3rem;
-      flex-shrink: 0;
-    }
-
-    .int-body h3 { font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 0.2rem; }
-    .int-body p { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.6rem; }
-
-    .install-pill {
-      display: inline-block;
-      background: var(--code-bg);
-      color: #86EFAC;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.72rem;
-      padding: 0.25rem 0.6rem;
-      border-radius: 5px;
-      border: 1px solid var(--code-border);
-    }
-
-    /* ── PRICING ── */
-    .pricing-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-
-    .pricing-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
-      margin-top: 3rem;
-    }
-
-    @media (max-width: 820px) { .pricing-grid { grid-template-columns: 1fr; max-width: 420px; } }
-
-    .pricing-card {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .pricing-card.featured {
-      background: var(--text);
-      border-color: var(--text);
-      color: #E7E5E4;
-    }
-
-    .plan-badge {
-      position: absolute;
-      top: -11px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--accent);
-      color: white;
-      font-size: 0.68rem;
-      font-weight: 700;
-      padding: 0.2rem 0.75rem;
-      border-radius: 999px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
-    .plan-name {
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      margin-bottom: 0.75rem;
-    }
-    .pricing-card.featured .plan-name { color: #A8A29E; }
-
-    .plan-price {
-      font-size: 2.5rem;
-      font-weight: 800;
-      letter-spacing: -0.04em;
-      line-height: 1;
-      margin-bottom: 0.25rem;
-    }
-
-    .plan-period {
-      font-size: 0.85rem;
-      font-weight: 400;
-      color: var(--muted);
-      margin-left: 0.1rem;
-    }
-    .pricing-card.featured .plan-period { color: #A8A29E; }
-
-    .plan-desc {
-      font-size: 0.85rem;
-      color: var(--muted);
-      margin: 0.75rem 0 1.5rem;
-      line-height: 1.55;
-      flex: 0;
-    }
-    .pricing-card.featured .plan-desc { color: #A8A29E; }
-
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin-bottom: 1.25rem;
-    }
-    .pricing-card.featured .divider { background: #292524; }
-
-    .feature-list { list-style: none; margin-bottom: 2rem; flex: 1; }
-
-    .feature-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.6rem;
-      font-size: 0.875rem;
-      padding: 0.35rem 0;
-      color: var(--text-2);
-      line-height: 1.4;
-    }
-    .pricing-card.featured .feature-list li { color: #D6D3D1; }
-
-    .feature-check {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--green-bg);
-      border: 1px solid #6EE7B7;
-      color: var(--green);
-      font-size: 0.6rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      margin-top: 2px;
-      font-weight: 700;
-    }
-    .pricing-card.featured .feature-check {
-      background: rgba(52, 211, 153, 0.15);
-      border-color: rgba(52, 211, 153, 0.4);
-      color: #34D399;
-    }
-
-    /* ── CTA SECTION ── */
-    .cta-section { text-align: center; }
-
-    .cta-box {
-      background: var(--text);
-      border-radius: 20px;
-      padding: 4rem 2rem;
-      max-width: 680px;
-      margin: 0 auto;
-    }
-
-    .cta-box h2 { color: #FAFAF8; letter-spacing: -0.03em; }
-    .cta-box p { color: #A8A29E; font-size: 1rem; margin-top: 0.75rem; }
-    .cta-box .hero-actions { margin-top: 2.5rem; margin-bottom: 0; }
-
-    .btn-light {
-      background: #FAFAF8;
-      color: var(--text);
-    }
-    .btn-light:hover { background: white; text-decoration: none; }
-
-    .btn-outline-light {
-      background: transparent;
-      color: #D6D3D1;
-      border: 1px solid #44403C;
-    }
-    .btn-outline-light:hover { border-color: #78716C; color: #FAFAF8; text-decoration: none; }
-
-    /* ── FOOTER ── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 2.5rem 2rem;
-      background: var(--surface);
-    }
-
-    .footer-inner {
-      max-width: 1040px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .footer-logo {
       font-size: 0.9rem;
       font-weight: 700;
       color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
     }
-
-    .footer-links {
-      display: flex;
-      gap: 1.5rem;
-    }
-
-    .footer-links a {
-      font-size: 0.85rem;
-      color: var(--muted);
-      text-decoration: none;
-      transition: color 0.1s;
-    }
-    .footer-links a:hover { color: var(--text); }
-
-    .footer-copy {
-      font-size: 0.8rem;
-      color: var(--muted);
-      width: 100%;
-      margin-top: 1.25rem;
-      padding-top: 1.25rem;
-      border-top: 1px solid var(--border);
-      text-align: center;
-    }
-
-    /* ── MOBILE NAV ── */
-    @media (max-width: 640px) {
-      .nav-links .nav-hide { display: none; }
-    }
-
-    /* ── LIVE DEMO ── */
-    .demo-section { background: var(--bg); }
-
-    .demo-steps {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
-      margin-top: 3rem;
-    }
-
-    @media (max-width: 820px) { .demo-steps { grid-template-columns: 1fr; } }
-
-    .demo-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-      opacity: 0;
-      transform: translateY(16px);
-    }
-
-    .demo-card.visible {
-      animation: demo-fade-in 0.45s ease forwards;
-    }
-
-    .demo-card:nth-child(2).visible { animation-delay: 0.1s; }
-    .demo-card:nth-child(3).visible { animation-delay: 0.2s; }
-
-    @keyframes demo-fade-in {
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .demo-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-      border-color: var(--border-dark);
-    }
-
-    .demo-step-num {
-      font-size: 2.5rem;
-      font-weight: 800;
-      letter-spacing: -0.05em;
-      color: var(--accent);
-      line-height: 1;
-    }
-
-    .demo-card h3 {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.01em;
-      margin: 0;
-    }
-
-    .demo-card p {
-      font-size: 0.85rem;
-      color: var(--muted);
-      line-height: 1.65;
-      margin: 0;
-    }
-
-    .demo-code {
-      background: var(--code-bg);
-      border: 1px solid var(--code-border);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-
-    .demo-code-bar {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.6rem 1rem;
-      border-bottom: 1px solid var(--code-border);
-      background: #161311;
-    }
-
-    .demo-code pre {
-      padding: 1rem 1.1rem;
-      font-size: 0.75rem;
-      line-height: 1.75;
-      overflow-x: auto;
-    }
-
-    .demo-result {
-      margin-top: 2.5rem;
-      background: var(--code-bg);
-      border: 1px solid var(--code-border);
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 8px 32px rgba(28, 25, 23, 0.12);
-    }
-
-    .demo-result-bar {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.875rem 1.25rem;
-      border-bottom: 1px solid var(--code-border);
-      background: #161311;
-    }
-
-    .demo-result-label {
-      font-family: "JetBrains Mono", monospace;
+    .section-count {
       font-size: 0.72rem;
-      color: #78716C;
-      margin-left: auto;
+      font-weight: 600;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 0.08rem 0.45rem;
+      border-radius: 20px;
+    }
+    .section-body {
+      padding: 0;
     }
 
-    .demo-result pre {
-      padding: 1.25rem 1.5rem;
-      font-size: 0.8rem;
-      line-height: 1.9;
-    }
-
-    .json-brace { color: #A8A29E; }
-    .json-key   { color: #7DD3FC; }
-    .json-str   { color: #86EFAC; }
-    .json-num   { color: #FB923C; }
-
-    .demo-verify-banner {
-      margin-top: 1.25rem;
+    /* ── SKELETON ── */
+    .skeleton-row {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      background: var(--green-bg);
-      border: 1px solid #6EE7B7;
-      border-radius: 10px;
-      padding: 0.875rem 1.25rem;
-      font-size: 0.9rem;
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .skeleton-row:last-child { border-bottom: none; }
+    .skel {
+      background: var(--surface2);
+      border-radius: 4px;
+      height: 12px;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      color: var(--muted);
+      gap: 0.5rem;
+    }
+    .empty-state .empty-icon { font-size: 1.5rem; }
+    .empty-state .empty-text { font-size: 0.85rem; font-weight: 500; color: var(--text-2); }
+    .empty-state .empty-sub { font-size: 0.78rem; }
+
+    /* ── ERROR STATE ── */
+    .error-state {
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-size: 0.82rem;
+      color: var(--red);
+    }
+
+    /* ── APPROVAL ROWS ── */
+    .approval-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      gap: 1rem;
+    }
+    .approval-row:last-child { border-bottom: none; }
+    .approval-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      flex: 1;
+      min-width: 0;
+    }
+    .approval-action {
+      font-size: 0.84rem;
       font-weight: 600;
-      color: var(--green);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .approval-category {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      background: var(--yellow-bg);
+      color: var(--yellow);
+      border: 1px solid #FDE68A;
+      white-space: nowrap;
+    }
+    .approval-agent {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-family: "JetBrains Mono", monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .approval-time {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .approval-actions {
+      display: flex;
+      gap: 0.4rem;
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .approval-payload {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-family: "JetBrains Mono", monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 340px;
+      margin-top: 0.15rem;
+    }
+
+    /* ── TASK ROWS ── */
+    .task-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.8rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      gap: 0.75rem;
+    }
+    .task-row:last-child { border-bottom: none; }
+    .task-left { flex: 1; min-width: 0; }
+    .task-title {
+      font-size: 0.84rem;
+      font-weight: 500;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .task-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+    .task-status {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.12rem 0.45rem;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .status-pending  { background: var(--yellow-bg); color: var(--yellow); }
+    .status-running  { background: var(--blue-bg);   color: var(--blue); }
+    .status-done     { background: var(--green-bg);  color: var(--green); }
+    .status-failed   { background: var(--red-bg);    color: var(--red); }
+
+    /* ── MESSAGE ROWS ── */
+    .msg-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.8rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .msg-row:last-child { border-bottom: none; }
+    .msg-row:hover { background: var(--surface2); }
+    .msg-row.unread { background: var(--accent-light); }
+    .msg-avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .msg-body { flex: 1; min-width: 0; }
+    .msg-from {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .msg-time { font-size: 0.7rem; color: var(--muted); font-weight: 400; }
+    .msg-preview {
+      font-size: 0.77rem;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-top: 0.1rem;
+    }
+    .msg-unread-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+      margin-top: 0.3rem;
+    }
+
+    /* ── ANOMALY ROWS ── */
+    .anomaly-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .anomaly-row:last-child { border-bottom: none; }
+    .anomaly-icon {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .anomaly-icon.warn { background: var(--yellow-bg); }
+    .anomaly-icon.danger { background: var(--red-bg); }
+    .anomaly-text { flex: 1; min-width: 0; }
+    .anomaly-title { font-size: 0.82rem; font-weight: 500; color: var(--text); }
+    .anomaly-sub { font-size: 0.72rem; color: var(--muted); margin-top: 0.08rem; }
+    .anomaly-time { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+
+    /* ── "View all" link ── */
+    .view-all {
+      display: block;
+      text-align: center;
+      padding: 0.65rem;
+      font-size: 0.78rem;
+      color: var(--accent);
+      border-top: 1px solid var(--border);
+      text-decoration: none;
+    }
+    .view-all:hover { background: var(--surface2); }
+
+    /* ── AUTH WALL ── */
+    #auth-wall {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 56px);
+      padding: 2rem;
+    }
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.25rem 2rem;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+    .auth-icon {
+      font-size: 2rem;
+      margin-bottom: 0.9rem;
+    }
+    .auth-card h2 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 0.4rem;
+    }
+    .auth-card p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.55;
+    }
+    .oauth-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      margin-bottom: 1rem;
+    }
+    .oauth-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1rem;
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text);
+      background: var(--surface);
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .oauth-btn:hover { background: var(--surface2); }
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin: 0.85rem 0;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .auth-input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-family: "JetBrains Mono", monospace;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      margin-bottom: 0.55rem;
+    }
+    .auth-input:focus { border-color: var(--accent); }
+    .auth-error { font-size: 0.78rem; color: var(--red); margin-top: 0.35rem; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+      .sidebar { display: none; }
+      .main { padding: 1rem; }
+    }
+    @media (max-width: 600px) {
+      .kpi-strip { grid-template-columns: 1fr; }
+      .approval-payload { display: none; }
     }
   </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <a href="/" class="nav-logo">
+<!-- ── TOP NAV ── -->
+<nav class="topnav">
+  <a class="nav-logo" href="index.html">
     <div class="logo-mark">AI</div>
     AgentID
   </a>
-  <div class="nav-links">
-    <a href="#how-it-works" class="nav-hide">Docs</a>
-    <a href="#integrations" class="nav-hide">Integrations</a>
-    <a href="#pricing" class="nav-hide">Pricing</a>
-    <a href="https://github.com/bekisol/agentid" target="_blank" class="nav-hide">GitHub</a>
-    <a href="dashboard.html" class="btn btn-outline" style="margin-left:0.5rem;">Dashboard</a>
-    <a href="https://github.com/bekisol/agentid" class="btn btn-primary" target="_blank" style="margin-left:0.25rem;">Get started</a>
+  <div class="nav-right">
+    <span class="nav-user" id="nav-user"></span>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="theme-icon"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    </button>
+    <a class="btn btn-primary" href="dashboard.html" onclick="openRegisterAgent(event)" style="font-size:0.78rem;padding:0.35rem 0.8rem;">+ Register Agent</a>
+    <button class="btn btn-ghost" id="signout-btn" style="font-size:0.78rem;padding:0.35rem 0.75rem;">Sign out</button>
   </div>
 </nav>
 
-<!-- HERO -->
-<div class="hero">
-  <div class="hero-badge">
-    <span class="badge-dot"></span>
-    Open source · MIT License · v0.4.0
-  </div>
-
-  <h1>Identity and trust<br>for <em>AI agents</em></h1>
-
-  <p class="hero-sub">
-    Every agent gets a cryptographic DID. Sign messages, verify sources, and discover agents by capability — with three lines of code.
-  </p>
-
-  <div class="hero-actions">
-    <a href="https://github.com/bekisol/agentid" class="btn btn-primary btn-lg" target="_blank">
-      View on GitHub
-    </a>
-    <a href="#how-it-works" class="btn btn-outline btn-lg">
-      See how it works
-    </a>
-  </div>
-
-  <div class="did-card">
-    <div class="did-card-top">
-      <div class="did-dot red"></div>
-      <div class="did-dot yellow"></div>
-      <div class="did-dot green"></div>
-      <span class="did-card-label">quickstart.py</span>
+<!-- ── AUTH WALL ── -->
+<div id="auth-wall">
+  <div class="auth-card">
+    <div class="auth-icon">🔑</div>
+    <h2>Sign in to AgentID</h2>
+    <p>Access your agent fleet, approvals, and activity in one place.</p>
+    <div class="oauth-row">
+      <a class="oauth-btn" href="https://api.agentid-protocol.com/auth/oauth/google/start?next=https://agentid-protocol.com/index.html">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Continue with Google
+      </a>
+      <a class="oauth-btn" href="https://api.agentid-protocol.com/auth/oauth/github/start?next=https://agentid-protocol.com/index.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+        Continue with GitHub
+      </a>
     </div>
-    <pre class="did-line"><span class="kw">from</span> <span class="hl">agentid</span> <span class="kw">import</span> Agent
-
-<span class="cm"># One call — instant cryptographic identity</span>
-agent = Agent.<span class="fn">create</span>(
-    name=<span class="st">"research-agent"</span>,
-    capabilities=[<span class="st">"web-search"</span>, <span class="st">"summarization"</span>],
-    registry_url=<span class="st">"https://api.agentid-protocol.com"</span>,
-)
-
-<span class="cm"># → did:agentid:7sP3V2mNkQxRtYbLcDfHgJwAeUiMoZnXvBqKpTsWyE</span>
-<span class="fn">print</span>(agent.did)
-
-<span class="cm"># Sign outputs — anyone can verify</span>
-signed = agent.<span class="fn">sign</span>({<span class="st">"result"</span>: <span class="st">"task complete"</span>})
-Agent.<span class="fn">verify_from_did</span>(signed)  <span class="cm"># → True</span></pre>
+    <div class="auth-divider">or use API key</div>
+    <input class="auth-input" id="auth-key-input" type="password" placeholder="agentid_key_…" autocomplete="off" />
+    <button class="btn btn-primary" id="auth-key-btn" style="width:100%;">Sign in with API key</button>
+    <div class="auth-error" id="auth-error"></div>
   </div>
 </div>
 
-<!-- STAT STRIP -->
-<div class="stat-strip">
-  <div class="stat-strip-inner">
-    <div>
-      <div class="stat-item-num">Ed25519</div>
-      <div class="stat-item-label">Cryptography</div>
-    </div>
-    <div>
-      <div class="stat-item-num">3</div>
-      <div class="stat-item-label">SDK languages</div>
-    </div>
-    <div>
-      <div class="stat-item-num">MIT</div>
-      <div class="stat-item-label">License</div>
-    </div>
-    <div>
-      <div class="stat-item-num">0</div>
-      <div class="stat-item-label">Central authority</div>
-    </div>
+<!-- ── APP ── -->
+<div id="app">
+  <div class="shell">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+      <a class="sb-brand" href="index.html">
+        <div class="logo-mark" style="width:22px;height:22px;font-size:0.6rem;">AI</div>
+        AgentID
+      </a>
+
+      <a class="dsb-item active" href="index.html">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 5.5L8 1.5l6 4V14a1 1 0 01-1 1H3a1 1 0 01-1-1V5.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5.5 15v-5h5v5" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        Home
+      </a>
+
+      <div class="dsb-section-label">Activity</div>
+
+      <a class="dsb-item" href="messages.html">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 3.5h12a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1v-7a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 5l6.5 4.5L14.5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Messages
+        <span class="dsb-badge" id="sb-msg-badge" style="display:none;"></span>
+      </a>
+      <a class="dsb-item" href="tasks.html">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 4.5h10M3 8h7M3 11.5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12.5 9.5l1.5 1.5-2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Tasks
+        <span class="dsb-badge" id="sb-task-badge" style="display:none;"></span>
+      </a>
+      <a class="dsb-item" href="dashboard.html#section-approvals">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8l2 2 4-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Approvals
+        <span class="dsb-badge" id="sb-approvals-badge" style="display:none;"></span>
+      </a>
+
+      <div class="dsb-section-label">Agents</div>
+
+      <a class="dsb-item" href="my-agents.html">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.8" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 13.5c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        My Agents
+      </a>
+      <a class="dsb-item" href="contracts.html">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="1.5" width="12" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 5h7M4.5 8h5M4.5 11h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Contracts
+      </a>
+      <a class="dsb-item" href="network.html">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="3" cy="4" r="1.5" stroke="currentColor" stroke-width="1.4"/><circle cx="13" cy="4" r="1.5" stroke="currentColor" stroke-width="1.4"/><circle cx="3" cy="12" r="1.5" stroke="currentColor" stroke-width="1.4"/><circle cx="13" cy="12" r="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M4.3 4.8L6.2 6.5M11.7 4.8L9.8 6.5M4.3 11.2L6.2 9.5M11.7 11.2L9.8 9.5" stroke="currentColor" stroke-width="1.2"/></svg>
+        Network
+      </a>
+
+      <div class="dsb-section-label">Insights</div>
+
+      <a class="dsb-item" href="dashboard.html#section-analytics">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 12l3.5-4 3 2.5 3-5 2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Analytics
+      </a>
+      <a class="dsb-item" href="dashboard.html#section-audit">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 6.5h6M5 9.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Audit Log
+      </a>
+      <a class="dsb-item" href="directory.html">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Public Registry
+      </a>
+
+      <div class="dsb-footer">
+        <a class="dsb-item" href="dashboard.html" style="color:var(--muted);">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 10a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v1.2M8 13.3v1.2M1.5 8h1.2M13.3 8h1.2M3.2 3.2l.85.85M11.95 11.95l.85.85M3.2 12.8l.85-.85M11.95 4.05l.85-.85" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          Settings &amp; Analytics
+        </a>
+      </div>
+    </aside>
+
+    <!-- ── MAIN CONTENT ── -->
+    <main class="main">
+
+      <!-- Page header -->
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="greeting">Good morning</div>
+          <div class="page-subtitle">Here's what needs your attention today.</div>
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-outline" id="refresh-btn" style="font-size:0.78rem;">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- KPI Strip -->
+      <div class="kpi-strip">
+        <a class="kpi-tile" href="dashboard.html#section-agents" id="kpi-agents">
+          <div class="kpi-label">Active Agents</div>
+          <div class="kpi-value loading" id="kpi-agents-val">…</div>
+          <div class="kpi-sub" id="kpi-agents-sub">Loading…</div>
+        </a>
+        <a class="kpi-tile" href="dashboard.html#section-approvals" id="kpi-approvals">
+          <div class="kpi-label">Pending Approvals</div>
+          <div class="kpi-value loading" id="kpi-approvals-val">…</div>
+          <div class="kpi-sub" id="kpi-approvals-sub">Loading…</div>
+        </a>
+        <a class="kpi-tile" href="dashboard.html#section-overview" id="kpi-trust">
+          <div class="kpi-label">Fleet Avg Trust</div>
+          <div class="kpi-value loading" id="kpi-trust-val">…</div>
+          <div class="kpi-sub" id="kpi-trust-sub">Loading…</div>
+        </a>
+      </div>
+
+      <!-- ── Pending Approvals ── -->
+      <div class="section-card" id="section-approvals">
+        <div class="section-header">
+          <div class="section-title">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8l2 2 4-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Pending Approvals
+            <span class="section-count" id="approvals-count" style="display:none;"></span>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="approvals-refresh">↻</button>
+        </div>
+        <div class="section-body" id="approvals-body">
+          <!-- skeleton -->
+          <div class="skeleton-row" id="approvals-skel-1"><div class="skel" style="width:60%;"></div><div class="skel" style="width:20%;margin-left:auto;"></div></div>
+          <div class="skeleton-row" id="approvals-skel-2"><div class="skel" style="width:45%;"></div><div class="skel" style="width:20%;margin-left:auto;"></div></div>
+          <div class="skeleton-row" id="approvals-skel-3"><div class="skel" style="width:70%;"></div><div class="skel" style="width:20%;margin-left:auto;"></div></div>
+        </div>
+      </div>
+
+      <!-- ── Pending Tasks ── -->
+      <div class="section-card" id="section-tasks">
+        <div class="section-header">
+          <div class="section-title">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 4.5h10M3 8h7M3 11.5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12.5 9.5l1.5 1.5-2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Active Tasks
+            <span class="section-count" id="tasks-count" style="display:none;"></span>
+          </div>
+          <a class="btn btn-ghost btn-sm" href="tasks.html">View all →</a>
+        </div>
+        <div class="section-body" id="tasks-body">
+          <div class="skeleton-row" id="tasks-skel-1"><div class="skel" style="width:55%;"></div><div class="skel" style="width:15%;margin-left:auto;"></div></div>
+          <div class="skeleton-row" id="tasks-skel-2"><div class="skel" style="width:40%;"></div><div class="skel" style="width:15%;margin-left:auto;"></div></div>
+        </div>
+      </div>
+
+      <!-- ── Unread Messages ── -->
+      <div class="section-card" id="section-messages">
+        <div class="section-header">
+          <div class="section-title">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 3.5h12a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1v-7a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 5l6.5 4.5L14.5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            Recent Messages
+            <span class="section-count" id="messages-count" style="display:none;"></span>
+          </div>
+          <a class="btn btn-ghost btn-sm" href="messages.html">View all →</a>
+        </div>
+        <div class="section-body" id="messages-body">
+          <div class="skeleton-row" id="msgs-skel-1"><div class="skel" style="width:30px;height:30px;border-radius:50%;flex-shrink:0;"></div><div class="skel" style="width:55%;"></div></div>
+          <div class="skeleton-row" id="msgs-skel-2"><div class="skel" style="width:30px;height:30px;border-radius:50%;flex-shrink:0;"></div><div class="skel" style="width:45%;"></div></div>
+        </div>
+      </div>
+
+      <!-- ── Anomalies / Trust Drops ── -->
+      <div class="section-card" id="section-anomalies">
+        <div class="section-header">
+          <div class="section-title">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2L1.5 13.5h13L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5v3.5M8 11.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Anomalies &amp; Trust Drops
+            <span class="section-count" id="anomalies-count" style="display:none;"></span>
+          </div>
+          <a class="btn btn-ghost btn-sm" href="dashboard.html#section-audit">Audit log →</a>
+        </div>
+        <div class="section-body" id="anomalies-body">
+          <div class="skeleton-row" id="anom-skel-1"><div class="skel" style="width:30px;height:30px;border-radius:50%;flex-shrink:0;"></div><div class="skel" style="width:65%;"></div></div>
+          <div class="skeleton-row" id="anom-skel-2"><div class="skel" style="width:30px;height:30px;border-radius:50%;flex-shrink:0;"></div><div class="skel" style="width:50%;"></div></div>
+        </div>
+      </div>
+
+    </main>
   </div>
 </div>
-
-<!-- PROBLEM -->
-<section>
-  <div class="section-inner">
-    <div class="section-eyebrow">The problem</div>
-    <h2>Multi-agent systems have<br>no trust infrastructure</h2>
-    <p class="section-sub">Every team building with AI agents hits the same three walls. AgentID tears them down.</p>
-
-    <div class="problem-grid">
-      <div class="problem-card">
-        <div class="problem-icon">🪪</div>
-        <h3>Who is this agent?</h3>
-        <p>No standard identity — every team hand-rolls their own auth. Agents can't prove who they are across systems.</p>
-      </div>
-      <div class="problem-card">
-        <div class="problem-icon">🔍</div>
-        <h3>Which agent can do X?</h3>
-        <p>No discovery — agents are hardcoded or manually configured. Finding the right agent for a task is manual work.</p>
-      </div>
-      <div class="problem-card">
-        <div class="problem-icon">🔏</div>
-        <h3>Is this message genuine?</h3>
-        <p>No signing — outputs can be spoofed or tampered with. There's no way to verify a message is authentic.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- HOW IT WORKS -->
-<section id="how-it-works" class="how-section">
-  <div class="section-inner">
-    <div class="how-grid">
-      <div class="how-left">
-        <div class="section-eyebrow">How it works</div>
-        <h2>Permanent identity.<br>No central authority.</h2>
-        <p class="section-sub" style="margin-top:0.75rem;">Every agent gets a DID derived from an Ed25519 keypair. No sign-up. Works offline. Cryptographically verifiable.</p>
-
-        <div class="how-steps">
-          <div class="how-step">
-            <div class="step-num">1</div>
-            <div class="step-text">
-              <h4>Generate a keypair</h4>
-              <p>Ed25519 key generated locally. The DID is derived from the public key — no server involved.</p>
-            </div>
-          </div>
-          <div class="how-step">
-            <div class="step-num">2</div>
-            <div class="step-text">
-              <h4>Register in the public registry</h4>
-              <p>Submit your DID, capabilities, and a cryptographic proof. The registry verifies ownership before accepting.</p>
-            </div>
-          </div>
-          <div class="how-step">
-            <div class="step-num">3</div>
-            <div class="step-text">
-              <h4>Sign and verify</h4>
-              <p>Sign messages with your private key. Anyone verifies using only the DID — no shared secrets, no central login.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="api-demo" style="margin-top:2rem;">
-          <div class="api-demo-label">
-            <span class="badge-dot" style="width:5px;height:5px;background:var(--green);border-radius:50%;animation:pulse 2s infinite;"></span>
-            Live public registry
-          </div>
-          <div class="api-demo-cmd">GET <span>https://api.agentid-protocol.com/agents?capability=summarization</span></div>
-        </div>
-      </div>
-
-      <div>
-        <div class="code-block">
-          <div class="code-bar">
-            <div class="did-dot red"></div>
-            <div class="did-dot yellow"></div>
-            <div class="did-dot green"></div>
-            <button class="code-tab active" id="tab-py" onclick="switchTab('py')" style="margin-left:0.5rem;">Python</button>
-            <button class="code-tab" id="tab-ts" onclick="switchTab('ts')">TypeScript</button>
-          </div>
-<pre id="code-py"><span class="kw">from</span> <span class="hl">agentid</span> <span class="kw">import</span> Agent
-
-<span class="cm"># Create — generates keypair, registers</span>
-agent = Agent.<span class="fn">create</span>(
-    name=<span class="st">"analyst-v2"</span>,
-    capabilities=[<span class="st">"analysis"</span>, <span class="st">"reporting"</span>],
-    owner=<span class="st">"team@company.com"</span>,
-    registry_url=<span class="st">"https://api.agentid-protocol.com"</span>,
-)
-
-<span class="cm"># Discover agents by capability</span>
-agents = Agent.<span class="fn">find</span>(
-    capability=<span class="st">"analysis"</span>,
-    registry_url=<span class="st">"https://api.agentid-protocol.com"</span>,
-)
-
-<span class="cm"># Sign a message</span>
-signed = agent.<span class="fn">sign</span>({<span class="st">"output"</span>: <span class="st">"Q3 revenue up 18%"</span>})
-
-<span class="cm"># Verify from anywhere — no shared secret</span>
-valid = <span class="kw">await</span> Agent.<span class="fn">verify_from_did</span>(
-    signed,
-    registry_url=<span class="st">"https://api.agentid-protocol.com"</span>,
-)
-<span class="fn">print</span>(valid)  <span class="cm"># True</span></pre>
-<pre id="code-ts" style="display:none"><span class="kw">import</span> { <span class="hl">Agent</span> } <span class="kw">from</span> <span class="st">"@vikhulus/agentid-protocol"</span>;
-
-<span class="cm">// Create — generates keypair, registers</span>
-<span class="kw">const</span> agent = <span class="kw">await</span> Agent.<span class="fn">create</span>({
-  name: <span class="st">"analyst-v2"</span>,
-  capabilities: [<span class="st">"analysis"</span>, <span class="st">"reporting"</span>],
-  owner: <span class="st">"team@company.com"</span>,
-  registryUrl: <span class="st">"https://api.agentid-protocol.com"</span>,
-});
-
-<span class="cm">// Discover agents by capability</span>
-<span class="kw">const</span> agents = <span class="kw">await</span> Agent.<span class="fn">find</span>({
-  capability: <span class="st">"analysis"</span>,
-  registryUrl: <span class="st">"https://api.agentid-protocol.com"</span>,
-});
-
-<span class="cm">// Sign a message</span>
-<span class="kw">const</span> signed = agent.<span class="fn">sign</span>({ output: <span class="st">"Q3 revenue up 18%"</span> });
-
-<span class="cm">// Verify from anywhere — no shared secret</span>
-<span class="kw">const</span> valid = <span class="kw">await</span> Agent.<span class="fn">verifyFromDid</span>(
-  signed,
-  <span class="st">"https://api.agentid-protocol.com"</span>,
-);
-console.<span class="fn">log</span>(valid); <span class="cm">// true</span></pre>
-        </div>
-        <script>
-          function switchTab(lang) {
-            document.getElementById("code-py").style.display = lang === "py" ? "block" : "none";
-            document.getElementById("code-ts").style.display = lang === "ts" ? "block" : "none";
-            document.getElementById("tab-py").classList.toggle("active", lang === "py");
-            document.getElementById("tab-ts").classList.toggle("active", lang === "ts");
-          }
-        </script>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- LIVE DEMO -->
-<section id="live-demo" class="demo-section">
-  <div class="section-inner">
-    <div class="section-eyebrow">Live demo</div>
-    <h2>See it in action</h2>
-    <p class="section-sub">Agent-to-agent authentication in 4 lines</p>
-
-    <div class="demo-steps" id="demo-steps">
-      <!-- Step 01: Register -->
-      <div class="demo-card">
-        <div class="demo-step-num">01</div>
-        <h3>Register</h3>
-        <div class="demo-code">
-          <div class="demo-code-bar">
-            <div class="did-dot red"></div>
-            <div class="did-dot yellow"></div>
-            <div class="did-dot green"></div>
-          </div>
-          <pre><span class="kw">from</span> <span class="hl">agentid</span> <span class="kw">import</span> Agent
-
-agent = Agent.<span class="fn">create</span>(
-  name=<span class="st">"worker-agent"</span>,
-  capabilities=[<span class="st">"analysis"</span>],
-)
-<span class="cm"># → did:agentid:5Ht...</span></pre>
-        </div>
-        <p>Agent generates an Ed25519 keypair locally and publishes a cryptographic DID to the registry. No central authority required.</p>
-      </div>
-
-      <!-- Step 02: Sign -->
-      <div class="demo-card">
-        <div class="demo-step-num">02</div>
-        <h3>Sign</h3>
-        <div class="demo-code">
-          <div class="demo-code-bar">
-            <div class="did-dot red"></div>
-            <div class="did-dot yellow"></div>
-            <div class="did-dot green"></div>
-          </div>
-          <pre>signed = agent.<span class="fn">sign</span>({
-  <span class="st">"task"</span>: <span class="st">"analyze dataset"</span>,
-  <span class="st">"priority"</span>: <span class="st">"high"</span>,
-})
-<span class="cm"># Attaches DID + signature</span></pre>
-        </div>
-        <p>The worker agent signs its message with its private key. The resulting envelope carries the DID, a nonce, and a timestamp alongside the payload.</p>
-      </div>
-
-      <!-- Step 03: Verify -->
-      <div class="demo-card">
-        <div class="demo-step-num">03</div>
-        <h3>Verify</h3>
-        <div class="demo-code">
-          <div class="demo-code-bar">
-            <div class="did-dot red"></div>
-            <div class="did-dot yellow"></div>
-            <div class="did-dot green"></div>
-          </div>
-          <pre>valid = Agent.<span class="fn">verify_from_did</span>(
-  signed,
-)
-<span class="fn">print</span>(valid)  <span class="cm"># True</span></pre>
-        </div>
-        <p>Any peer agent resolves the DID from the registry and checks the signature — no shared secrets, no API keys, no manual config.</p>
-      </div>
-    </div>
-
-    <!-- Result block -->
-    <div class="demo-result">
-      <div class="demo-result-bar">
-        <div class="did-dot red"></div>
-        <div class="did-dot yellow"></div>
-        <div class="did-dot green"></div>
-        <span class="demo-result-label">signed_message.json</span>
-      </div>
-      <pre><span class="json-brace">{</span>
-  <span class="json-key">"payload"</span><span class="json-brace">:</span> <span class="json-brace">{</span>
-    <span class="json-key">"task"</span><span class="json-brace">:</span>     <span class="json-str">"analyze dataset"</span><span class="json-brace">,</span>
-    <span class="json-key">"priority"</span><span class="json-brace">:</span> <span class="json-str">"high"</span>
-  <span class="json-brace">},</span>
-  <span class="json-key">"signature"</span><span class="json-brace">:</span>  <span class="json-str">"MEQCIBx7k2nP...3dQsYaR"</span><span class="json-brace">,</span>
-  <span class="json-key">"signer_did"</span><span class="json-brace">:</span> <span class="json-str">"did:agentid:5HtNkQxRtYbLcDfHgJw"</span><span class="json-brace">,</span>
-  <span class="json-key">"timestamp"</span><span class="json-brace">:</span>  <span class="json-num">1714234567</span><span class="json-brace">,</span>
-  <span class="json-key">"nonce"</span><span class="json-brace">:</span>      <span class="json-str">"a3f9c12e"</span>
-<span class="json-brace">}</span></pre>
-    </div>
-
-    <!-- Verification banner -->
-    <div class="demo-verify-banner">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <circle cx="10" cy="10" r="9" fill="#059669" fill-opacity="0.15" stroke="#059669" stroke-width="1.5"/>
-        <path d="M6 10.5l2.5 2.5 5-5" stroke="#059669" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      Identity verified — worker is who they claim to be
-    </div>
-  </div>
-</section>
 
 <script>
-  (function () {
-    var cards = document.querySelectorAll("#demo-steps .demo-card");
-    if (!cards.length) return;
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("visible");
-          observer.unobserve(entry.target);
+// ── THEME ─────────────────────────────────────────────────────────────────────
+(function() {
+  const saved = localStorage.getItem("agentid_theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (saved === "dark" || (!saved && prefersDark)) {
+    document.documentElement.setAttribute("data-theme", "dark");
+  } else if (saved === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+  }
+})();
+
+document.getElementById("theme-toggle").addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  const isDark = current === "dark" || (!current && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const next = isDark ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("agentid_theme", next);
+  document.getElementById("theme-icon").innerHTML = next === "dark"
+    ? '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
+    : '<circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+});
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+const BASE = "https://api.agentid-protocol.com";
+let apiKey = sessionStorage.getItem("agentid_key")
+          || localStorage.getItem("agentid_persisted_key")
+          || localStorage.getItem("agentid_key")
+          || "";
+
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(url, opts = {}) {
+  if (typeof url === "string" && url.startsWith(BASE)) {
+    const h = { ...(opts.headers || {}) };
+    if (apiKey && !h["x-api-key"]) h["x-api-key"] = apiKey;
+    opts = { ...opts, credentials: "include", headers: h };
+  }
+  return _origFetch(url, opts);
+};
+
+function apiHeaders() {
+  const h = { "Content-Type": "application/json" };
+  if (apiKey) h["x-api-key"] = apiKey;
+  return h;
+}
+
+function showAuthWall() {
+  document.getElementById("auth-wall").style.display = "flex";
+  document.getElementById("app").style.display = "none";
+}
+
+async function initAuth() {
+  try {
+    const headers = apiKey ? { "x-api-key": apiKey } : {};
+    const r = await _origFetch(`${BASE}/auth/me`, { credentials: "include", headers });
+    if (r.ok) {
+      const me = await r.json();
+      document.getElementById("nav-user").textContent = me.email || "";
+      boot();
+      return;
+    }
+  } catch(_) {}
+  if (apiKey) {
+    localStorage.removeItem("agentid_key");
+    localStorage.removeItem("agentid_persisted_key");
+    sessionStorage.removeItem("agentid_key");
+    apiKey = "";
+  }
+  showAuthWall();
+}
+
+// API key sign-in
+document.getElementById("auth-key-btn").addEventListener("click", async () => {
+  const input = document.getElementById("auth-key-input");
+  const key = input.value.trim();
+  const errEl = document.getElementById("auth-error");
+  errEl.textContent = "";
+  if (!key) { errEl.textContent = "Enter your API key."; return; }
+  try {
+    const r = await _origFetch(`${BASE}/auth/me`, { headers: { "x-api-key": key }, credentials: "include" });
+    if (r.ok) {
+      const me = await r.json();
+      apiKey = key;
+      sessionStorage.setItem("agentid_key", key);
+      localStorage.setItem("agentid_persisted_key", key);
+      document.getElementById("nav-user").textContent = me.email || "";
+      document.getElementById("auth-wall").style.display = "none";
+      boot();
+    } else {
+      errEl.textContent = "Invalid API key — check and try again.";
+    }
+  } catch(_) {
+    errEl.textContent = "Could not reach server. Check your connection.";
+  }
+});
+document.getElementById("auth-key-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("auth-key-btn").click();
+});
+
+// Sign out
+document.getElementById("signout-btn").addEventListener("click", () => {
+  sessionStorage.removeItem("agentid_key");
+  localStorage.removeItem("agentid_key");
+  localStorage.removeItem("agentid_persisted_key");
+  apiKey = "";
+  document.getElementById("app").style.display = "none";
+  showAuthWall();
+});
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function relTime(ts) {
+  const d = Date.now() - new Date(ts).getTime();
+  if (d < 60_000) return "just now";
+  if (d < 3_600_000) return `${Math.floor(d / 60_000)}m ago`;
+  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h ago`;
+  return `${Math.floor(d / 86_400_000)}d ago`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function shortDid(did) {
+  if (!did) return "";
+  return did.length > 32 ? did.slice(0, 12) + "…" + did.slice(-8) : did;
+}
+
+function setKpi(id, value, sub, urgency) {
+  const tile = document.getElementById(`kpi-${id}`);
+  const valEl = document.getElementById(`kpi-${id}-val`);
+  const subEl = document.getElementById(`kpi-${id}-sub`);
+  valEl.className = "kpi-value";
+  valEl.textContent = value;
+  subEl.textContent = sub;
+  tile.classList.remove("kpi-urgent", "kpi-ok");
+  if (urgency === "urgent") tile.classList.add("kpi-urgent");
+  if (urgency === "ok") tile.classList.add("kpi-ok");
+}
+
+// ── GREETING ─────────────────────────────────────────────────────────────────
+function setGreeting() {
+  const h = new Date().getHours();
+  const prefix = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  document.getElementById("greeting").textContent = prefix;
+}
+
+// ── APPROVALS ─────────────────────────────────────────────────────────────────
+let _approvals = [];
+
+async function loadApprovals() {
+  const body = document.getElementById("approvals-body");
+  try {
+    const r = await fetch(`${BASE}/pro/acp/queue?status=pending&limit=10`, {
+      headers: apiHeaders()
+    });
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    _approvals = Array.isArray(data) ? data : (data.items || data.requests || []);
+    renderApprovals();
+  } catch(e) {
+    body.innerHTML = `<div class="error-state">⚠ Could not load approvals — <button class="btn btn-ghost btn-sm" onclick="loadApprovals()" style="margin-left:0.35rem;">retry</button></div>`;
+    setKpi("approvals", "—", "Could not load", "");
+  }
+}
+
+function renderApprovals() {
+  const body = document.getElementById("approvals-body");
+  const countEl = document.getElementById("approvals-count");
+  const badge = document.getElementById("sb-approvals-badge");
+
+  if (!_approvals.length) {
+    body.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">✅</div>
+        <div class="empty-text">No pending approvals</div>
+        <div class="empty-sub">Your agents are running within policy.</div>
+      </div>`;
+    countEl.style.display = "none";
+    badge.style.display = "none";
+    setKpi("approvals", "0", "Nothing waiting", "ok");
+    return;
+  }
+
+  const n = _approvals.length;
+  countEl.textContent = n;
+  countEl.style.display = "";
+  badge.textContent = n;
+  badge.style.display = "";
+  setKpi("approvals", String(n), n === 1 ? "action needed" : "actions needed", "urgent");
+
+  body.innerHTML = _approvals.map(a => {
+    const category = a.category || a.action_type || a.type || "action";
+    const agentDid = a.agent_did || a.agent || "";
+    const payload  = a.payload ? JSON.stringify(a.payload).slice(0, 80) : (a.description || "");
+    const created  = a.created_at || a.timestamp || "";
+    const id       = a.id || a.request_id || "";
+    return `
+      <div class="approval-row" id="approval-${escHtml(id)}">
+        <div class="approval-meta">
+          <div class="approval-action">
+            <span class="approval-category">${escHtml(category)}</span>
+            ${escHtml(a.title || a.action || "Awaiting review")}
+          </div>
+          ${agentDid ? `<div class="approval-agent">${escHtml(shortDid(agentDid))}</div>` : ""}
+          ${payload   ? `<div class="approval-payload">${escHtml(payload)}</div>` : ""}
+          ${created   ? `<div class="approval-time">${relTime(created)}</div>` : ""}
+        </div>
+        <div class="approval-actions">
+          <button class="btn btn-success btn-sm" onclick="handleApproval('${escHtml(id)}','${escHtml(agentDid)}','approve')">Approve</button>
+          <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red);" onclick="handleApproval('${escHtml(id)}','${escHtml(agentDid)}','deny')">Deny</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+async function handleApproval(requestId, agentDid, action) {
+  const row = document.getElementById(`approval-${requestId}`);
+  if (row) {
+    row.style.opacity = "0.5";
+    row.style.pointerEvents = "none";
+  }
+  try {
+    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(agentDid)}/acp/queue/${encodeURIComponent(requestId)}`, {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ action })
+    });
+    if (r.ok) {
+      _approvals = _approvals.filter(a => (a.id || a.request_id) !== requestId);
+      renderApprovals();
+    } else {
+      if (row) { row.style.opacity = ""; row.style.pointerEvents = ""; }
+    }
+  } catch(_) {
+    if (row) { row.style.opacity = ""; row.style.pointerEvents = ""; }
+  }
+}
+
+// ── AGENTS + TRUST ────────────────────────────────────────────────────────────
+let _agents = [];
+
+async function loadAgentsAndTrust() {
+  try {
+    const r = await fetch(`${BASE}/agents?mine=true&limit=100`, { headers: apiHeaders() });
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    _agents = Array.isArray(data) ? data : (data.agents || data.items || []);
+
+    const total = _agents.length;
+    setKpi("agents", String(total), total === 1 ? "registered" : "registered", total > 0 ? "ok" : "");
+
+    // Fetch trust scores in parallel (cap at 6 to avoid hammering)
+    const sample = _agents.slice(0, 6);
+    const scores = await Promise.all(
+      sample.map(a =>
+        fetch(`${BASE}/agents/${encodeURIComponent(a.did)}/trust-score`, { headers: apiHeaders() })
+          .then(r2 => r2.ok ? r2.json() : null)
+          .catch(() => null)
+      )
+    );
+    const valid = scores.filter(s => s && typeof s.score === "number").map(s => s.score);
+    if (valid.length) {
+      const avg = Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
+      const urgency = avg >= 80 ? "ok" : avg < 50 ? "urgent" : "";
+      setKpi("trust", `${avg}`, `avg across ${valid.length} agent${valid.length !== 1 ? "s" : ""}`, urgency);
+    } else {
+      setKpi("trust", "—", total ? "Trust data unavailable" : "No agents yet", "");
+    }
+
+    // Load tasks for each agent (cap at 3 agents to avoid hammering)
+    loadTasks(_agents.slice(0, 3));
+    // Load messages (comm-stops)
+    loadMessages();
+    // Load anomalies
+    loadAnomalies();
+
+  } catch(e) {
+    setKpi("agents", "—", "Could not load", "");
+    setKpi("trust", "—", "Could not load", "");
+    document.getElementById("tasks-body").innerHTML = `<div class="error-state">⚠ Could not load — <button class="btn btn-ghost btn-sm" onclick="loadAgentsAndTrust()" style="margin-left:0.35rem;">retry</button></div>`;
+    document.getElementById("messages-body").innerHTML = `<div class="error-state">⚠ Could not load</div>`;
+    document.getElementById("anomalies-body").innerHTML = `<div class="error-state">⚠ Could not load</div>`;
+  }
+}
+
+// ── TASKS ─────────────────────────────────────────────────────────────────────
+async function loadTasks(agents) {
+  const body = document.getElementById("tasks-body");
+  if (!agents.length) {
+    body.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No agents yet</div><div class="empty-sub"><a href="dashboard.html">Register your first agent →</a></div></div>`;
+    return;
+  }
+  try {
+    const all = await Promise.all(
+      agents.map(a =>
+        fetch(`${BASE}/agents/${encodeURIComponent(a.did)}/tasks?limit=8`, { headers: apiHeaders() })
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      )
+    );
+    const tasks = all.flatMap(d => {
+      if (!d) return [];
+      return Array.isArray(d) ? d : (d.tasks || d.items || []);
+    })
+    .filter(t => ["pending","running","in_progress"].includes((t.status || "").toLowerCase()))
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    .slice(0, 8);
+
+    const countEl = document.getElementById("tasks-count");
+    const badge   = document.getElementById("sb-task-badge");
+    countEl.textContent = tasks.length;
+    countEl.style.display = tasks.length ? "" : "none";
+    badge.textContent = tasks.length;
+    badge.style.display = tasks.length ? "" : "none";
+
+    if (!tasks.length) {
+      body.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">No active tasks</div><div class="empty-sub">All caught up.</div></div>`;
+      return;
+    }
+    body.innerHTML = tasks.map(t => {
+      const status = (t.status || "pending").toLowerCase();
+      const agentName = (_agents.find(a => a.did === (t.agent_did || t.from_did)) || {}).name || shortDid(t.agent_did || t.from_did || "");
+      return `
+        <div class="task-row">
+          <div class="task-left">
+            <div class="task-title">${escHtml(t.title || t.action || t.id || "Task")}</div>
+            <div class="task-meta">${agentName ? escHtml(agentName) + " · " : ""}${t.created_at ? relTime(t.created_at) : ""}</div>
+          </div>
+          <span class="task-status status-${status}">${escHtml(status)}</span>
+        </div>`;
+    }).join("") + `<a class="view-all" href="tasks.html">View all tasks →</a>`;
+  } catch(e) {
+    body.innerHTML = `<div class="error-state">⚠ Could not load tasks — <button class="btn btn-ghost btn-sm" onclick="loadTasks(_agents.slice(0,3))" style="margin-left:0.35rem;">retry</button></div>`;
+  }
+}
+
+// ── MESSAGES ──────────────────────────────────────────────────────────────────
+async function loadMessages() {
+  const body = document.getElementById("messages-body");
+  try {
+    const r = await fetch(`${BASE}/pro/agents/comm-stops`, { headers: apiHeaders() });
+    let items = [];
+    if (r.ok) {
+      const d = await r.json();
+      items = Array.isArray(d) ? d : (d.stops || d.items || []);
+    }
+
+    // Also try fetching recent messages across agents
+    const msgResults = await Promise.all(
+      _agents.slice(0, 4).map(a =>
+        fetch(`${BASE}/pro/agents/${encodeURIComponent(a.did)}/messages?limit=6&unread=true`, { headers: apiHeaders() })
+          .then(r2 => r2.ok ? r2.json().then(d => ({ agent: a, msgs: Array.isArray(d) ? d : (d.messages || d.items || []) })) : null)
+          .catch(() => null)
+      )
+    );
+
+    let threads = [];
+    for (const res of msgResults) {
+      if (!res) continue;
+      for (const m of res.msgs) {
+        threads.push({ ...m, _agentName: res.agent.name || shortDid(res.agent.did), _agentDid: res.agent.did });
+      }
+    }
+
+    // Fallback: show comm-stops if no messages
+    if (!threads.length && items.length) {
+      threads = items.map(s => ({
+        _agentName: s.agent_name || shortDid(s.agent_did || ""),
+        sender: s.sender_did || s.from || "Unknown",
+        content: s.reason || s.message || "Comm stop active",
+        created_at: s.created_at || s.timestamp,
+        unread: true,
+        _agentDid: s.agent_did
+      }));
+    }
+
+    threads = threads.slice(0, 6);
+
+    const countEl = document.getElementById("messages-count");
+    const badge   = document.getElementById("sb-msg-badge");
+    const unread  = threads.filter(t => t.unread || t.read === false).length;
+    if (unread) { badge.textContent = unread; badge.style.display = ""; }
+    countEl.textContent = threads.length;
+    countEl.style.display = threads.length ? "" : "none";
+
+    if (!threads.length) {
+      body.innerHTML = `<div class="empty-state"><div class="empty-icon">📬</div><div class="empty-text">No recent messages</div><div class="empty-sub">Your agents haven't exchanged messages yet.</div></div>`;
+      return;
+    }
+
+    body.innerHTML = threads.map(t => {
+      const isUnread = t.unread || t.read === false;
+      const sender = t.sender_name || t.from_name || shortDid(t.sender || t.from || t.sender_did || "");
+      const preview = t.content || t.body || t.text || t.subject || "";
+      return `
+        <div class="msg-row${isUnread ? " unread" : ""}" onclick="window.location='messages.html'">
+          <div class="msg-avatar">✉</div>
+          <div class="msg-body">
+            <div class="msg-from">
+              <span>${escHtml(t._agentName || "")} → ${escHtml(sender)}</span>
+              <span class="msg-time">${t.created_at ? relTime(t.created_at) : ""}</span>
+            </div>
+            <div class="msg-preview">${escHtml(preview)}</div>
+          </div>
+          ${isUnread ? '<div class="msg-unread-dot"></div>' : ""}
+        </div>`;
+    }).join("") + `<a class="view-all" href="messages.html">View all messages →</a>`;
+  } catch(e) {
+    body.innerHTML = `<div class="error-state">⚠ Could not load messages</div>`;
+  }
+}
+
+// ── ANOMALIES ─────────────────────────────────────────────────────────────────
+async function loadAnomalies() {
+  const body = document.getElementById("anomalies-body");
+  try {
+    // Fetch audit log events flagged as anomalies or trust drops
+    const r = await fetch(`${BASE}/pro/account/audit?limit=20&type=anomaly,trust_drop,scope_violation`, {
+      headers: apiHeaders()
+    });
+    let events = [];
+    if (r.ok) {
+      const d = await r.json();
+      events = Array.isArray(d) ? d : (d.events || d.items || []);
+    }
+
+    // Also check trust scores for agents that dropped
+    const trustDrops = [];
+    if (!events.length) {
+      const trustChecks = await Promise.all(
+        _agents.slice(0, 6).map(a =>
+          fetch(`${BASE}/agents/${encodeURIComponent(a.did)}/trust-score`, { headers: apiHeaders() })
+            .then(r2 => r2.ok ? r2.json().then(s => ({ agent: a, score: s })) : null)
+            .catch(() => null)
+        )
+      );
+      for (const c of trustChecks) {
+        if (!c) continue;
+        const score = c.score;
+        if (score && score.score < 60) {
+          trustDrops.push({
+            type: "trust_drop",
+            title: `Trust score low: ${c.agent.name || shortDid(c.agent.did)}`,
+            sub: `Score: ${score.score}/100`,
+            severity: score.score < 40 ? "danger" : "warn",
+            time: null
+          });
         }
-      });
-    }, { threshold: 0.15 });
-    cards.forEach(function (card) { observer.observe(card); });
-  })();
+      }
+    }
+
+    const all = [
+      ...events.map(e => ({
+        type: e.type || "anomaly",
+        title: e.title || e.message || e.event || "Flagged event",
+        sub: e.detail || e.description || e.agent_did || "",
+        severity: e.severity === "high" || e.type === "scope_violation" ? "danger" : "warn",
+        time: e.created_at || e.timestamp
+      })),
+      ...trustDrops
+    ].slice(0, 6);
+
+    const countEl = document.getElementById("anomalies-count");
+    countEl.textContent = all.length;
+    countEl.style.display = all.length ? "" : "none";
+
+    if (!all.length) {
+      body.innerHTML = `<div class="empty-state"><div class="empty-icon">🛡</div><div class="empty-text">No anomalies detected</div><div class="empty-sub">All agents are operating within normal parameters in the last 24h.</div></div>`;
+      return;
+    }
+
+    body.innerHTML = all.map(e => `
+      <div class="anomaly-row">
+        <div class="anomaly-icon ${e.severity}">${e.severity === "danger" ? "🔴" : "⚠️"}</div>
+        <div class="anomaly-text">
+          <div class="anomaly-title">${escHtml(e.title)}</div>
+          ${e.sub ? `<div class="anomaly-sub">${escHtml(e.sub)}</div>` : ""}
+        </div>
+        ${e.time ? `<div class="anomaly-time">${relTime(e.time)}</div>` : ""}
+      </div>`).join("") + `<a class="view-all" href="dashboard.html#section-audit">View audit log →</a>`;
+  } catch(e) {
+    body.innerHTML = `<div class="empty-state"><div class="empty-icon">🛡</div><div class="empty-text">No anomalies detected</div><div class="empty-sub">All agents are operating within normal parameters.</div></div>`;
+  }
+}
+
+// ── REGISTER AGENT shortcut ───────────────────────────────────────────────────
+function openRegisterAgent(e) {
+  // If dashboard.html is open, trigger its modal; otherwise navigate there
+  // For now just navigate
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+function boot() {
+  document.getElementById("auth-wall").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  setGreeting();
+
+  // Kick off all fetches in parallel
+  loadApprovals();
+  loadAgentsAndTrust();  // also triggers tasks, messages, anomalies after agents load
+
+  // Refresh approvals independently every 30s
+  setInterval(loadApprovals, 30_000);
+}
+
+document.getElementById("refresh-btn").addEventListener("click", () => {
+  // Reset KPIs to loading state
+  ["agents","approvals","trust"].forEach(id => {
+    document.getElementById(`kpi-${id}-val`).className = "kpi-value loading";
+    document.getElementById(`kpi-${id}-val`).textContent = "…";
+    document.getElementById(`kpi-${id}-sub`).textContent = "Loading…";
+  });
+  // Reset section bodies to skeletons
+  document.getElementById("approvals-body").innerHTML = [1,2,3].map(i =>
+    `<div class="skeleton-row"><div class="skel" style="width:${[60,45,70][i-1]}%;"></div><div class="skel" style="width:20%;margin-left:auto;"></div></div>`
+  ).join("");
+  document.getElementById("tasks-body").innerHTML = [1,2].map(() =>
+    `<div class="skeleton-row"><div class="skel" style="width:55%;"></div><div class="skel" style="width:15%;margin-left:auto;"></div></div>`
+  ).join("");
+  document.getElementById("messages-body").innerHTML = [1,2].map(() =>
+    `<div class="skeleton-row"><div class="skel" style="width:30px;height:30px;border-radius:50%;flex-shrink:0;"></div><div class="skel" style="width:55%;"></div></div>`
+  ).join("");
+  document.getElementById("anomalies-body").innerHTML = [1,2].map(() =>
+    `<div class="skeleton-row"><div class="skel" style="width:30px;height:30px;border-radius:50%;flex-shrink:0;"></div><div class="skel" style="width:65%;"></div></div>`
+  ).join("");
+  loadApprovals();
+  loadAgentsAndTrust();
+});
+
+document.getElementById("approvals-refresh").addEventListener("click", loadApprovals);
+
+initAuth();
 </script>
-
-<!-- INTEGRATIONS -->
-<section id="integrations">
-  <div class="section-inner">
-    <div class="section-eyebrow">Integrations</div>
-    <h2>Works with frameworks<br>you already use</h2>
-    <p class="section-sub">Drop-in identity for the leading AI agent frameworks. One install, full AgentID support.</p>
-
-    <div class="integrations-grid">
-      <div class="integration-card">
-        <div class="int-icon">🦜</div>
-        <div class="int-body">
-          <h3>LangChain</h3>
-          <p>Callback handler, identity tools, and automatic signing for LangChain agents and chains.</p>
-          <span class="install-pill">pip install agentid-protocol</span>
-        </div>
-      </div>
-      <div class="integration-card">
-        <div class="int-icon">🤖</div>
-        <div class="int-body">
-          <h3>AutoGen</h3>
-          <p>ConversableAgent mixin with built-in discovery and verification for multi-agent conversations.</p>
-          <span class="install-pill">pip install agentid-protocol</span>
-        </div>
-      </div>
-      <div class="integration-card">
-        <div class="int-icon">⚓</div>
-        <div class="int-body">
-          <h3>CrewAI</h3>
-          <p>Agent wrapper with AgentID tools for crew-to-crew trust and capability-based discovery.</p>
-          <span class="install-pill">pip install agentid-protocol</span>
-        </div>
-      </div>
-      <div class="integration-card">
-        <div class="int-icon">📦</div>
-        <div class="int-body">
-          <h3>TypeScript / Node</h3>
-          <p>Full-featured SDK for TypeScript and Node.js projects. Identical API to the Python SDK.</p>
-          <span class="install-pill">npm install @vikhulus/agentid-protocol</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- PRICING -->
-<section id="pricing" class="pricing-section">
-  <div class="section-inner">
-    <div class="section-eyebrow">Pricing</div>
-    <h2>Start free.<br>Scale when you're ready.</h2>
-    <p class="section-sub">The protocol is open source and free forever. Pay for the hosted registry and enterprise features.</p>
-
-    <div class="pricing-grid">
-      <!-- Free -->
-      <div class="pricing-card">
-        <div class="plan-name">Free</div>
-        <div class="plan-price">$0<span class="plan-period">/mo</span></div>
-        <div class="plan-desc">For developers and open source projects.</div>
-        <div class="divider"></div>
-        <ul class="feature-list">
-          <li><span class="feature-check">✓</span> 100 registered agents</li>
-          <li><span class="feature-check">✓</span> Public registry</li>
-          <li><span class="feature-check">✓</span> DID resolution</li>
-          <li><span class="feature-check">✓</span> Capability search</li>
-          <li><span class="feature-check">✓</span> Ed25519 signing &amp; verification</li>
-        </ul>
-        <a href="https://github.com/bekisol/agentid" class="btn btn-outline" style="width:100%;justify-content:center;" target="_blank">Get started free</a>
-      </div>
-
-      <!-- Pro -->
-      <div class="pricing-card featured">
-        <div class="plan-badge">Most popular</div>
-        <div class="plan-name">Pro</div>
-        <div class="plan-price" style="color:#FAFAF8;">$29<span class="plan-period">/mo</span></div>
-        <div class="plan-desc">For startups shipping production agents.</div>
-        <div class="divider"></div>
-        <ul class="feature-list">
-          <li><span class="feature-check">✓</span> 10,000 registered agents</li>
-          <li><span class="feature-check">✓</span> Private registry</li>
-          <li><span class="feature-check">✓</span> Analytics dashboard</li>
-          <li><span class="feature-check">✓</span> Audit log exports</li>
-          <li><span class="feature-check">✓</span> API key management</li>
-          <li><span class="feature-check">✓</span> Everything in Free</li>
-        </ul>
-        <a href="mailto:hello@vikhulus.com" class="btn btn-primary" style="width:100%;justify-content:center;">Get Pro</a>
-      </div>
-
-      <!-- Enterprise -->
-      <div class="pricing-card">
-        <div class="plan-name">Enterprise</div>
-        <div class="plan-price" style="font-size:1.6rem;line-height:1.2;padding-top:0.2rem;">Custom</div>
-        <div class="plan-desc">For regulated industries and large-scale deployments.</div>
-        <div class="divider"></div>
-        <ul class="feature-list">
-          <li><span class="feature-check">✓</span> Unlimited agents</li>
-          <li><span class="feature-check">✓</span> Verified identity badges</li>
-          <li><span class="feature-check">✓</span> Enterprise KYC</li>
-          <li><span class="feature-check">✓</span> Compliance reports</li>
-          <li><span class="feature-check">✓</span> SLA &amp; dedicated support</li>
-          <li><span class="feature-check">✓</span> Everything in Pro</li>
-        </ul>
-        <a href="mailto:hello@vikhulus.com" class="btn btn-outline" style="width:100%;justify-content:center;">Contact us</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- CTA -->
-<section class="cta-section">
-  <div class="section-inner">
-    <div class="cta-box">
-      <h2 style="font-size:clamp(1.75rem,3.5vw,2.4rem);">Give every agent<br>a verified identity</h2>
-      <p>Open source, cryptographically sound, and ready for production.</p>
-      <div class="hero-actions">
-        <a href="https://github.com/bekisol/agentid" class="btn btn-light btn-lg" target="_blank">Start building</a>
-        <a href="mailto:hello@vikhulus.com" class="btn btn-outline-light btn-lg">Talk to us</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- FOOTER -->
-<footer>
-  <div class="footer-inner">
-    <div class="footer-logo">
-      <div class="logo-mark">AI</div>
-      AgentID
-    </div>
-    <div class="footer-links">
-      <a href="https://github.com/bekisol/agentid" target="_blank">GitHub</a>
-      <a href="https://github.com/bekisol/agentid/blob/main/spec/protocol.md" target="_blank">Protocol spec</a>
-      <a href="https://pypi.org/project/agentid-protocol/" target="_blank">PyPI</a>
-      <a href="https://www.npmjs.com/package/@vikhulus/agentid-protocol" target="_blank">npm</a>
-      <a href="mailto:hello@vikhulus.com">Contact</a>
-    </div>
-    <div class="footer-copy">
-      © 2026 Vikhulus · AgentID is open source under the MIT License · Built by <a href="mailto:hello@vikhulus.com" style="color:var(--muted);text-decoration:underline;">Vikhulus</a>
-    </div>
-  </div>
-</footer>
-
 </body>
 </html>
