@@ -1308,7 +1308,7 @@ function renderActivity(activity) {
 
 async function loadBadge(owner) {
   try {
-    const res = await fetch(`${BASE}/pro/verified/${encodeURIComponent(owner)}`);
+    const res = await _fetchAuth(`${BASE}/pro/verified/${encodeURIComponent(owner)}`);
     const section = document.getElementById("badge-section");
     if (res.ok) {
       const b = await res.json();
@@ -2666,8 +2666,8 @@ async function _saveAllowlist() {
       headers: { "content-type": "application/json" },
       body:   JSON.stringify({ allowed_ips: val || null }),
     });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || res.status);
     _modalMsg("allowlist-msg", data.message || "Allowlist updated.", "ok");
     // Refresh the info rows
     _loadAccountInfo();
@@ -2737,7 +2737,7 @@ async function _loadRotationAgentList() {
     // Fetch rotation status for each in parallel (best-effort)
     const statuses = await Promise.allSettled(
       agents.map(a =>
-        fetch(`${BASE}/agents/${encodeURIComponent(a.did)}/rotation`)
+        _fetchAuth(`${BASE}/agents/${encodeURIComponent(a.did)}/rotation`)
           .then(r => r.ok ? r.json() : null)
           .catch(() => null)
       )
@@ -2802,9 +2802,9 @@ async function _checkRotationStatus() {
     return;
   }
   try {
-    const res = await fetch(`${BASE}/agents/${encodeURIComponent(did)}/rotation`);
+    const res = await _fetchAuth(`${BASE}/agents/${encodeURIComponent(did)}/rotation`);
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || res.status);
     box.style.display = "block";
     if (data.rotation_pending) {
       box.innerHTML = `
@@ -3144,8 +3144,8 @@ async function _webhookAction(action, id, btn) {
     let res;
     if (action === "test") {
       res = await _fetchAuth(`${BASE}/pro/webhooks/${id}/test`, { method: "POST" });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || res.status);
       btn.textContent = data.delivered ? "✓ sent" : "✗ failed";
     } else if (action === "toggle") {
       res = await _fetchAuth(`${BASE}/pro/webhooks/${id}/toggle`, { method: "PATCH" });
@@ -3187,8 +3187,8 @@ async function _createWebhook() {
       headers: { "content-type": "application/json" },
       body:    JSON.stringify({ url, secret, events }),
     });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.status); }
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || res.status);
 
     // Show secret once
     document.getElementById("wh-secret-value").textContent = data.secret;
@@ -4709,6 +4709,7 @@ function _welcomeShowExisting(info) {
     let info2;
     try {
       const r = await fetch(BASE + "/pro/keys/me", {
+        credentials: "include",
         headers: { "x-api-key": key },
       });
       if (!r.ok) {
@@ -5174,6 +5175,7 @@ function _switchSettingsTab(tab) {
   if (tab === "security") { _loadSecuritySessions(); _loadSessionHistory(); }
   if (tab === "eu-compliance") _euLoadAll();
   if (tab === "footprint") _initFootprintTab();
+  if (tab === "sub-accounts") _loadSubAccounts();
 }
 
 // ── Preferences panel ─────────────────────────────────────────────────────────
@@ -7464,8 +7466,11 @@ function _initEuComplianceTab() {
     const days = document.getElementById("eu-report-days")?.value || "30";
     this.disabled = true; this.textContent = "Generating PDF…";
     try {
-      const storedKey = apiKey || sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key");
+      const storedKey = apiKey || sessionStorage.getItem("agentid_key")
+                     || localStorage.getItem("agentid_persisted_key")
+                     || localStorage.getItem("agentid_key");
       const resp = await fetch(BASE + `/pro/compliance/eu-ai-act/report?days=${days}&format=pdf`, {
+        credentials: "include",
         headers: storedKey ? {"x-api-key": storedKey} : {},
       });
       if (!resp.ok) { const t = await resp.text(); throw new Error(t); }
