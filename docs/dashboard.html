@@ -3074,6 +3074,86 @@
       .kpi-strip { grid-template-columns: repeat(2, 1fr); }
       .home-item-title { font-size: 0.78rem; }
     }
+
+    /* ── DETAILS TOGGLE ── */
+    details summary { list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    details[open] summary span:first-child { transform: rotate(90deg); display: inline-block; }
+
+    /* ── MEMBER ROLE CHIPS ── */
+    .member-role-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.1rem 0.5rem;
+      border-radius: 5px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+    .role-owner    { background: #1e3a5f; color: #60a5fa; }
+    .role-admin    { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-border); }
+    .role-developer{ background: #0f2f1d; color: #4ade80; }
+    .role-auditor  { background: #2f240a; color: #facc15; }
+    .role-viewer   { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    html[data-theme="dark"] .role-owner     { background: #1e3a5f; color: #93c5fd; }
+    html[data-theme="dark"] .role-developer { background: #0f2f1d; color: #86efac; }
+    html[data-theme="dark"] .role-auditor   { background: #2f1f08; color: #fde68a; }
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme="light"]) .role-owner     { background: #1e3a5f; color: #93c5fd; }
+      html:not([data-theme="light"]) .role-developer { background: #0f2f1d; color: #86efac; }
+      html:not([data-theme="light"]) .role-auditor   { background: #2f1f08; color: #fde68a; }
+    }
+
+    /* ── MEMBER ROWS ── */
+    .member-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 0.4rem;
+      background: var(--surface);
+      transition: border-color 0.15s;
+    }
+    .member-row:hover { border-color: var(--border-dark); }
+    .member-avatar {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--accent-light);
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+      font-size: 0.68rem;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      letter-spacing: 0.03em;
+    }
+    .member-info { flex: 1; min-width: 0; }
+    .member-email {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .member-meta {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.08rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .member-status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .member-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -3806,49 +3886,46 @@ curl https://api.agentid-protocol.com/agents \
 
         <!-- ── SUB-ACCOUNTS TAB ── -->
         <div class="modal-panel" id="tab-sub-accounts">
-          <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
-            Sub-accounts let you grant team members scoped access to specific agents and features —
-            without sharing your main API key. Each sub-account gets its own API key with limited permissions.
-          </p>
 
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;flex-wrap:wrap;gap:0.5rem;">
-            <div style="font-size:0.85rem;font-weight:700;">Team Members</div>
-            <button class="btn btn-primary" style="font-size:0.8rem;padding:0.35rem 0.85rem;" onclick="_openAddMember()">+ Add Member</button>
+          <!-- Header row -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <div>
+              <div style="font-size:0.9rem;font-weight:700;">Team Members &amp; Roles</div>
+              <div style="font-size:0.77rem;color:var(--muted);margin-top:0.1rem;">Each member gets a scoped API key — no shared credentials.</div>
+            </div>
+            <button class="btn btn-primary" style="font-size:0.8rem;padding:0.35rem 0.85rem;flex-shrink:0;" onclick="_openAddMember()">+ Invite Member</button>
           </div>
 
-          <div id="sub-accounts-list" style="font-size:0.82rem;color:var(--muted);text-align:center;padding:1.5rem 0;">Loading…</div>
-
           <!-- Add member form (hidden by default) -->
-          <div id="add-member-form" style="display:none;border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;margin-top:0.75rem;background:var(--surface2);">
-            <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.75rem;">New Team Member</div>
-            <div style="margin-bottom:0.55rem;">
-              <label style="font-size:0.77rem;font-weight:600;color:var(--text-2);display:block;margin-bottom:0.2rem;">Email</label>
-              <input id="new-member-email" type="email" placeholder="team@example.com" style="width:100%;padding:0.4rem 0.65rem;border:1px solid var(--border-dark);border-radius:7px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;" />
-            </div>
-            <div style="margin-bottom:0.55rem;">
-              <label style="font-size:0.77rem;font-weight:600;color:var(--text-2);display:block;margin-bottom:0.2rem;">Label (optional)</label>
-              <input id="new-member-label" type="text" placeholder="e.g. Developer, Read-only" style="width:100%;padding:0.4rem 0.65rem;border:1px solid var(--border-dark);border-radius:7px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;" />
-            </div>
-            <div style="margin-bottom:0.75rem;">
-              <label style="font-size:0.77rem;font-weight:600;color:var(--text-2);display:block;margin-bottom:0.3rem;">Agent access</label>
-              <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-                <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;">
-                  <input type="radio" name="member-agents" id="member-agents-all" value="all" checked /> All agents
-                </label>
-                <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;">
-                  <input type="radio" name="member-agents" id="member-agents-select" value="select" /> Specific agents
-                </label>
+          <div id="add-member-form" style="display:none;border:1px solid var(--accent-border);border-radius:10px;padding:1rem 1.1rem;margin-bottom:0.9rem;background:var(--accent-light);">
+            <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.75rem;color:var(--text);">Invite a Team Member</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem;">
+              <div>
+                <label style="font-size:0.77rem;font-weight:600;color:var(--text-2);display:block;margin-bottom:0.2rem;">Email</label>
+                <input id="new-member-email" type="email" placeholder="team@example.com"
+                  style="width:100%;padding:0.4rem 0.65rem;border:1px solid var(--border-dark);border-radius:7px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;" />
+              </div>
+              <div>
+                <label style="font-size:0.77rem;font-weight:600;color:var(--text-2);display:block;margin-bottom:0.2rem;">Role</label>
+                <select id="new-member-role"
+                  style="width:100%;padding:0.4rem 0.65rem;border:1px solid var(--border-dark);border-radius:7px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;cursor:pointer;">
+                  <option value="Admin">Admin — full control except billing</option>
+                  <option value="Developer">Developer — agents, tasks, messages</option>
+                  <option value="Auditor">Auditor — read-only + export</option>
+                  <option value="Viewer">Viewer — read-only analytics</option>
+                  <option value="Owner">Owner — all permissions</option>
+                </select>
               </div>
             </div>
-            <div id="add-member-msg" style="font-size:0.78rem;min-height:1.2rem;color:var(--red);margin-bottom:0.4rem;"></div>
+            <div id="add-member-msg" style="font-size:0.78rem;min-height:1.1rem;color:var(--red);margin-bottom:0.35rem;"></div>
             <div style="display:flex;gap:0.5rem;">
-              <button class="btn btn-primary" style="font-size:0.8rem;padding:0.35rem 0.85rem;" id="add-member-submit-btn" onclick="_submitAddMember()">Create sub-account</button>
+              <button class="btn btn-primary" style="font-size:0.8rem;padding:0.35rem 0.85rem;" id="add-member-submit-btn" onclick="_submitAddMember()">Send Invite</button>
               <button class="btn btn-outline" style="font-size:0.8rem;padding:0.35rem 0.85rem;" onclick="document.getElementById('add-member-form').style.display='none'">Cancel</button>
             </div>
           </div>
 
           <!-- New key display (shown once after creation) -->
-          <div id="new-member-key-box" style="display:none;border:1px solid var(--green);border-radius:10px;padding:0.9rem 1.1rem;margin-top:0.75rem;background:var(--green-bg);">
+          <div id="new-member-key-box" style="display:none;border:1px solid var(--green);border-radius:10px;padding:0.9rem 1.1rem;margin-bottom:0.75rem;background:var(--green-bg);">
             <div style="font-size:0.82rem;font-weight:700;color:var(--green);margin-bottom:0.35rem;">✓ Sub-account created — save this key now</div>
             <div style="font-size:0.75rem;color:var(--text-2);margin-bottom:0.4rem;">This API key will not be shown again. Share it with the team member.</div>
             <div style="display:flex;align-items:center;gap:0.5rem;">
@@ -3857,6 +3934,51 @@ curl https://api.agentid-protocol.com/agents \
             </div>
             <button class="btn btn-outline" style="font-size:0.78rem;margin-top:0.6rem;" onclick="document.getElementById('new-member-key-box').style.display='none';_loadSubAccounts();">Dismiss</button>
           </div>
+
+          <!-- Member list -->
+          <div id="sub-accounts-list" style="margin-bottom:1rem;">
+            <div style="text-align:center;padding:1.5rem 0;color:var(--muted);font-size:0.82rem;"><div class="spinner" style="margin:0 auto 0.5rem;"></div>Loading…</div>
+          </div>
+
+          <!-- Role definitions reference panel -->
+          <details style="border:1px solid var(--border);border-radius:9px;overflow:hidden;">
+            <summary style="padding:0.65rem 1rem;font-size:0.8rem;font-weight:700;cursor:pointer;background:var(--surface2);list-style:none;display:flex;align-items:center;gap:0.4rem;user-select:none;">
+              <span>▸</span> Role Definitions
+            </summary>
+            <div style="padding:0.75rem 1rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0.55rem;">
+              <div style="padding:0.6rem 0.75rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);">
+                <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">
+                  <span class="member-role-chip role-owner">Owner</span>
+                </div>
+                <div style="font-size:0.72rem;color:var(--muted);line-height:1.4;">All permissions including billing &amp; member management.</div>
+              </div>
+              <div style="padding:0.6rem 0.75rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);">
+                <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">
+                  <span class="member-role-chip role-admin">Admin</span>
+                </div>
+                <div style="font-size:0.72rem;color:var(--muted);line-height:1.4;">Full control of agents, tasks, contracts, approvals, analytics &amp; keys.</div>
+              </div>
+              <div style="padding:0.6rem 0.75rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);">
+                <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">
+                  <span class="member-role-chip role-developer">Developer</span>
+                </div>
+                <div style="font-size:0.72rem;color:var(--muted);line-height:1.4;">Agents, tasks, messages, contracts &amp; trust scores. No billing/keys.</div>
+              </div>
+              <div style="padding:0.6rem 0.75rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);">
+                <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">
+                  <span class="member-role-chip role-auditor">Auditor</span>
+                </div>
+                <div style="font-size:0.72rem;color:var(--muted);line-height:1.4;">Read-only access to analytics, trust scores &amp; audit logs. Export allowed.</div>
+              </div>
+              <div style="padding:0.6rem 0.75rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);">
+                <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">
+                  <span class="member-role-chip role-viewer">Viewer</span>
+                </div>
+                <div style="font-size:0.72rem;color:var(--muted);line-height:1.4;">Read-only analytics &amp; trust scores. Cannot modify anything.</div>
+              </div>
+            </div>
+          </details>
+
         </div>
 
         <!-- ── API KEYS TAB ── -->

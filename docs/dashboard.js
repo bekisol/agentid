@@ -1501,31 +1501,32 @@ async function loadAuditLog() {
       const pal = _opPalette(op);
       const did = r.did || "";
       const shortened = did.length > 32 ? did.slice(0, 22) + "…" + did.slice(-6) : did;
-      return `
-        <tr>
-          <td class="audit-time" title="${esc(ts)}">${esc(timeLabel)}</td>
-          <td><span class="op-pill ${pal.cls}">${esc(op)}</span></td>
-          <td class="audit-did" title="${esc(did)}">${esc(shortened || "—")}</td>
-          <td>${_statusPill(r.status)}</td>
-          <td style="color:var(--muted);font-size:0.72rem;font-variant-numeric:tabular-nums;">${esc(r.ip || "—")}</td>
-        </tr>`;
+
+      const dotClass = op === "verify" || op === "register" ? "feed-dot-good"
+                     : op === "deregister" || op === "revoke" ? "feed-dot-bad"
+                     : op === "update" || op === "resolve" ? "feed-dot-mid"
+                     : "feed-dot-muted";
+      const chipClass = op === "verify" || op === "register" ? "feed-chip-good"
+                      : op === "deregister" || op === "revoke" ? "feed-chip-bad"
+                      : "feed-chip-muted";
+      const statusClass = (r.status === "ok" || r.status === "success") ? "feed-chip-good"
+                        : (r.status === "fail" || r.status === "error") ? "feed-chip-bad"
+                        : "feed-chip-muted";
+      const didParts = did.includes("did:agentid:")
+        ? `<span class="did-prefix">did:agentid:</span><span class="did-hash">${esc(did.replace("did:agentid:","").slice(0,14))}…</span>`
+        : esc(shortened || "—");
+      return `<div class="feed-row">
+        <span class="feed-dot ${dotClass}"></span>
+        <span class="feed-time">${esc(timeLabel)}</span>
+        <div class="feed-body">
+          <span class="feed-chip ${chipClass}">${esc(op)}</span>
+          <span class="feed-did">${didParts}</span>
+        </div>
+        <span class="feed-chip ${statusClass}">${esc(r.status || "—")}</span>
+      </div>`;
     }).join("");
 
-    el.innerHTML = `
-      <div style="max-height:340px;overflow:auto;">
-        <table class="audit-log-table">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Operation</th>
-              <th>DID</th>
-              <th>Status</th>
-              <th>IP</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
+    el.innerHTML = `<div class="feed-list" style="max-height:340px;overflow:auto;">${rows}</div>`;
   } catch {
     if (countEl) {
       countEl.textContent = "error";
@@ -1673,16 +1674,52 @@ function _renderAgentRow(a) {
   } else {
     healthDot = `<span class="health-dot health-dot-grey" title="Never active"></span>`;
   }
+
+  // Agent avatar with initials
+  const initials = (a.name || "??").slice(0, 2).toUpperCase();
+  const avatarHtml = `<span class="ag-avatar">${initials}</span>`;
+
+  // Styled DID cell: split prefix and hash
+  const rawDid = a.did || "";
+  let didCellContent;
+  if (rawDid.startsWith("did:agentid:")) {
+    const afterPrefix = rawDid.slice("did:agentid:".length);
+    const shortHash = afterPrefix.length > 20
+      ? afterPrefix.slice(0, 14) + "…" + afterPrefix.slice(-6)
+      : afterPrefix;
+    didCellContent = `<span class="did-prefix">did:agentid:</span><span class="did-hash">${shortHash}</span>`;
+  } else {
+    didCellContent = esc(shortDid(rawDid));
+  }
+
+  // Trust ring — use real trust score if pre-loaded, fall back to health-based
+  let ringClass, ringLabel;
+  const ts = window._agentTrustScores?.[rawDid];
+  if (ts && ts.score != null && ts.band != null) {
+    ringClass = "tr-" + (ts.band === "good" ? "good" : ts.band === "warn" ? "mid" : "low");
+    ringLabel = String(ts.score);
+  } else if (a.last_activity) {
+    const ageMs = Date.now() - new Date(a.last_activity).getTime();
+    ringClass = ageMs < 86400000      ? "tr-good"
+              : ageMs < 86400000 * 7  ? "tr-mid"
+              : "tr-low";
+    ringLabel = "●";
+  } else {
+    ringClass = "tr-muted";
+    ringLabel = "○";
+  }
+  const trustRing = `<span class="trust-ring ${ringClass}"><span class="tr-n">${ringLabel}</span></span>`;
+
   return `<tr
     data-name="${esc(a.name.toLowerCase())}"
     data-did="${esc((a.did || "").toLowerCase())}"
     data-caps="${esc(capsArr.join(" ").toLowerCase())}"
     data-raw-did="${esc(a.did || "")}">
     <td style="width:2rem;text-align:center;"><input type="checkbox" class="agent-row-check" data-did="${esc(a.did||"")}" style="cursor:pointer;" /></td>
-    <td class="agent-name" style="display:flex;align-items:center;gap:0;">${healthDot}${esc(a.name)}${rotBadge}</td>
-    <td class="did-mono" title="${esc(a.did || "")}">${esc(shortDid(a.did))}</td>
+    <td class="agent-name" style="display:flex;align-items:center;gap:0;">${healthDot}${avatarHtml}${esc(a.name)}${rotBadge}</td>
+    <td class="did-mono" title="${esc(rawDid)}">${didCellContent}</td>
     <td>${caps || '<span style="color:var(--muted);font-size:0.8rem;">none</span>'}</td>
-    <td style="text-align:center;font-weight:600;">${esc(String(a.audit_events ?? 0))}</td>
+    <td style="text-align:center;font-weight:600;">${trustRing} <span style="color:var(--muted);font-size:0.72rem;">${esc(String(a.audit_events ?? 0))}</span></td>
     <td class="${lastActiveClass}">${esc(lastActiveStr)}</td>
     <td style="color:var(--muted);font-size:0.78rem;">${esc(createdStr)}</td>
     <td style="white-space:nowrap;">${privacyBtn} ${oversightBtn}</td>
@@ -1902,6 +1939,16 @@ async function loadAgentsTable() {
   try {
     const data = await apiFetch("/pro/analytics/agents");
     _allAgents = data.agents || [];
+
+    // Load trust scores concurrently
+    let _agentTrustScores = {};
+    try {
+      const ts = await apiFetch("/pro/trust-scores");
+      if (ts && ts.agents) {
+        ts.agents.forEach(a => { _agentTrustScores[a.did] = a; });
+      }
+    } catch (_) { /* trust scores optional */ }
+    window._agentTrustScores = _agentTrustScores;
 
     if (!_allAgents.length) {
       el.innerHTML = '<div class="empty"><div class="empty-icon">🤖</div><p>No agents registered yet</p></div>';
@@ -8584,38 +8631,64 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+const _ROLE_PERMISSIONS = {
+  Owner:     { agents: "all", features: ["tasks","messages","contracts","approvals","analytics","bootstrap","missions","trust_scores","audit","keys"] },
+  Admin:     { agents: "all", features: ["tasks","messages","contracts","approvals","analytics","trust_scores","audit","keys"] },
+  Developer: { agents: "all", features: ["tasks","messages","contracts","trust_scores"] },
+  Auditor:   { agents: "all", features: ["analytics","trust_scores","audit"] },
+  Viewer:    { agents: "all", features: ["analytics","trust_scores"] },
+};
+
+function _roleFromPermissions(perms) {
+  const feats = (perms.features || []).slice().sort().join(",");
+  for (const [role, def] of Object.entries(_ROLE_PERMISSIONS)) {
+    if (def.features.slice().sort().join(",") === feats) return role;
+  }
+  // Best-effort heuristic
+  const f = perms.features || [];
+  if (f.includes("audit") && f.includes("keys")) return "Admin";
+  if (f.includes("tasks")) return "Developer";
+  if (f.includes("audit")) return "Auditor";
+  return "Viewer";
+}
+
+function _roleChip(role) {
+  const cls = { Owner:"role-owner", Admin:"role-admin", Developer:"role-developer", Auditor:"role-auditor", Viewer:"role-viewer" }[role] || "role-viewer";
+  return `<span class="member-role-chip ${cls}">${esc(role)}</span>`;
+}
+
 async function _loadSubAccounts() {
   const listEl = document.getElementById("sub-accounts-list");
   if (!listEl) return;
-  listEl.innerHTML = `<div style="text-align:center;padding:1.5rem 0;"><div class="spinner" style="margin:0 auto;"></div></div>`;
+  listEl.innerHTML = `<div style="text-align:center;padding:1.5rem 0;color:var(--muted);font-size:0.82rem;"><div class="spinner" style="margin:0 auto 0.5rem;"></div>Loading…</div>`;
   try {
     const data = await apiFetch("/pro/account/members");
     const members = data.members || [];
     if (!members.length) {
-      listEl.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:0.85rem;">No sub-accounts yet. Add a team member to get started.</div>`;
+      listEl.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.85rem;">No team members yet.<br><span style="font-size:0.78rem;">Click "Invite Member" to get started.</span></div>`;
       return;
     }
     listEl.innerHTML = members.map(m => {
+      const initials = (m.email || "?").slice(0,2).toUpperCase();
       const perms = m.permissions || {};
-      const agents = perms.agents === "all" ? "All agents" : `${(perms.agents || []).length} agent(s)`;
-      const features = (perms.features || []).length + " features";
+      const role = _roleFromPermissions(perms);
       const lastUsed = m.last_used_at ? timeAgo(m.last_used_at) : "Never";
-      const statusDot = m.is_active
-        ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:0.3rem;"></span>`
-        : `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--border-dark);margin-right:0.3rem;"></span>`;
-      return `<div style="border-bottom:1px solid var(--border);padding:0.7rem 0;display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">
-            ${statusDot}
-            <span style="font-weight:600;font-size:0.83rem;">${esc(m.email)}</span>
-            ${m.label ? `<span style="font-size:0.72rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:0.08rem 0.35rem;">${esc(m.label)}</span>` : ""}
+      const dotColor = m.is_active ? "var(--green)" : "var(--border-dark)";
+      return `<div class="member-row">
+        <div class="member-avatar">${esc(initials)}</div>
+        <div class="member-info">
+          <div class="member-email">${esc(m.email)}</div>
+          <div class="member-meta">
+            <span class="member-status-dot" style="background:${dotColor};"></span>
+            ${m.is_active ? "Active" : "Disabled"}
+            &middot; Last used: ${esc(lastUsed)}
           </div>
-          <div style="font-size:0.75rem;color:var(--muted);">${agents} · ${features} · Last used: ${esc(lastUsed)}</div>
         </div>
-        <div style="display:flex;gap:0.35rem;flex-shrink:0;">
-          <button onclick="_rotateMemberKey('${esc(m.id)}')" style="padding:0.22rem 0.55rem;font-size:0.72rem;border-radius:5px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;" title="Rotate API key">↻ Key</button>
-          <button onclick="_toggleMember('${esc(m.id)}',${!m.is_active})" style="padding:0.22rem 0.55rem;font-size:0.72rem;border-radius:5px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;">${m.is_active ? "Disable" : "Enable"}</button>
-          <button onclick="_deleteMember('${esc(m.id)}','${esc(m.email)}')" style="padding:0.22rem 0.55rem;font-size:0.72rem;border-radius:5px;border:1px solid var(--red);background:var(--red-bg);color:var(--red);cursor:pointer;font-family:inherit;">Remove</button>
+        ${_roleChip(role)}
+        <div class="member-actions">
+          <button class="btn btn-ghost btn-sm" onclick="_rotateMemberKey('${esc(m.id)}')" title="Rotate API key">↻ Key</button>
+          <button class="btn btn-ghost btn-sm" onclick="_toggleMember('${esc(m.id)}',${!m.is_active})">${m.is_active ? "Disable" : "Enable"}</button>
+          <button class="btn btn-danger btn-sm" onclick="_deleteMember('${esc(m.id)}','${esc(m.email)}')">Remove</button>
         </div>
       </div>`;
     }).join("");
@@ -8628,28 +8701,24 @@ function _openAddMember() {
   document.getElementById("add-member-form").style.display = "block";
   document.getElementById("add-member-msg").textContent = "";
   document.getElementById("new-member-email").value = "";
-  document.getElementById("new-member-label").value = "";
+  document.getElementById("new-member-role").value = "Admin";
   document.getElementById("new-member-key-box").style.display = "none";
 }
 
 async function _submitAddMember() {
-  const email = document.getElementById("new-member-email").value.trim();
-  const label = document.getElementById("new-member-label").value.trim();
-  const msgEl = document.getElementById("add-member-msg");
-  const btn   = document.getElementById("add-member-submit-btn");
+  const email   = document.getElementById("new-member-email").value.trim();
+  const roleVal = document.getElementById("new-member-role").value;
+  const msgEl   = document.getElementById("add-member-msg");
+  const btn     = document.getElementById("add-member-submit-btn");
   if (!email) { msgEl.textContent = "Email is required."; return; }
+  const permissions = _ROLE_PERMISSIONS[roleVal] || _ROLE_PERMISSIONS.Viewer;
   btn.disabled = true; btn.textContent = "Creating…";
   try {
     const data = await apiFetch("/pro/account/members", {
       method: "POST",
-      body: JSON.stringify({
-        email,
-        label: label || undefined,
-        permissions: { agents: "all", features: ["tasks","messages","contracts","approvals","analytics","bootstrap","missions","trust_scores"] },
-      }),
+      body: JSON.stringify({ email, label: roleVal, permissions }),
     });
     document.getElementById("add-member-form").style.display = "none";
-    // Show the key
     const keyBox = document.getElementById("new-member-key-box");
     document.getElementById("new-member-key-value").textContent = data.api_key || "";
     keyBox.style.display = "block";
@@ -8657,7 +8726,7 @@ async function _submitAddMember() {
   } catch(e) {
     msgEl.textContent = e.message || "Failed to create sub-account.";
   } finally {
-    btn.disabled = false; btn.textContent = "Create sub-account";
+    btn.disabled = false; btn.textContent = "Send Invite";
   }
 }
 

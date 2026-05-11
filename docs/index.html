@@ -686,6 +686,177 @@
     .auth-input:focus { border-color: var(--accent); }
     .auth-error { font-size: 0.78rem; color: var(--red); margin-top: 0.35rem; }
 
+    /* ── DESIGN SYSTEM TOKENS ── */
+    :root {
+      --good: #3F7D58;
+      --warn: #B58900;
+      --bad:  #9B1F1F;
+      --good-bg: #EAF4EE;
+      --warn-bg: #FDF8E2;
+      --bad-bg:  #FCEAEA;
+    }
+    html[data-theme="dark"] {
+      --good: #4ade80;
+      --warn: #facc15;
+      --bad:  #f87171;
+      --good-bg: #0f2f1d;
+      --warn-bg: #2f240a;
+      --bad-bg:  #2f1414;
+    }
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme="light"]) {
+        --good: #4ade80;
+        --warn: #facc15;
+        --bad:  #f87171;
+        --good-bg: #0f2f1d;
+        --warn-bg: #2f240a;
+        --bad-bg:  #2f1414;
+      }
+    }
+
+    /* ── TRUST RING ── */
+    .trust-ring {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 2.5px solid var(--border-dark);
+      font-size: 0.65rem;
+      font-weight: 700;
+      font-family: "JetBrains Mono", monospace;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .trust-ring.tr-good { border-color: var(--good); color: var(--good); }
+    .trust-ring.tr-mid  { border-color: var(--warn); color: var(--warn); }
+    .trust-ring.tr-low  { border-color: var(--bad);  color: var(--bad); }
+    .trust-ring.tr-muted{ border-color: var(--border-dark); color: var(--muted); }
+    .tr-n { line-height: 1; }
+
+    /* ── AGENT AVATAR ── */
+    .ag-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 7px;
+      background: var(--accent-light);
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+      margin-right: 0.4rem;
+    }
+
+    /* ── DID DISPLAY ── */
+    .did-prefix {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72em;
+      color: var(--muted);
+    }
+    .did-hash {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78em;
+      color: var(--text-2);
+      font-weight: 500;
+    }
+
+    /* ── ACTIVITY FEED ── */
+    .feed-list {
+      padding: 0.25rem 0;
+    }
+    .feed-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.55rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+    }
+    .feed-row:last-child { border-bottom: none; }
+    .feed-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+    .feed-dot-good  { background: var(--good); }
+    .feed-dot-bad   { background: var(--bad); }
+    .feed-dot-mid   { background: var(--warn); }
+    .feed-dot-muted { background: var(--muted); }
+    .feed-time {
+      font-size: 0.7rem;
+      color: var(--muted);
+      white-space: nowrap;
+      min-width: 60px;
+      flex-shrink: 0;
+      font-family: "JetBrains Mono", monospace;
+    }
+    .feed-body {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .feed-did {
+      font-size: 0.72rem;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .feed-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      font-family: "JetBrains Mono", monospace;
+    }
+    .feed-chip-good { background: var(--good-bg); color: var(--good); border-color: transparent; }
+    .feed-chip-bad  { background: var(--bad-bg);  color: var(--bad);  border-color: transparent; }
+    .feed-chip-muted{ background: var(--surface2); color: var(--muted); }
+
+    /* ── KPI TREND ARROWS ── */
+    .kpi-trend {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-left: 0.35rem;
+    }
+    .kpi-trend-up   { color: var(--good); }
+    .kpi-trend-down { color: var(--bad); }
+    .kpi-trend-flat { color: var(--muted); }
+
+    /* ── CAPABILITY CHIPS ── */
+    .cap-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.12rem 0.5rem;
+      border-radius: 5px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.68rem;
+      font-weight: 500;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      white-space: nowrap;
+    }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 900px) {
       .kpi-strip { grid-template-columns: repeat(2, 1fr); }
