@@ -2982,7 +2982,7 @@ async function _secChangePassword() {
   const btn = document.getElementById("sec-change-pw-btn");
   btn.disabled = true; btn.textContent = "Updating…";
   try {
-    await apiFetch("/auth/password/change", {
+    await apiFetch("/auth/change-password", {
       method: "POST",
       body: JSON.stringify({ current_password: cur, new_password: np }),
     });
@@ -7856,8 +7856,8 @@ async function _loadApprovals() {
     listEl.innerHTML = items.map(item => {
       const ts = item.created_at ? new Date(item.created_at).toLocaleString() : "—";
       const resolvedAt = item.resolved_at ? new Date(item.resolved_at).toLocaleString() : null;
-      const statusColor = item.status === "approved" ? "var(--green)" : item.status === "denied" ? "var(--red)" : "var(--yellow)";
-      const statusLabel = item.status === "approved" ? "✓ Approved" : item.status === "denied" ? "✗ Denied" : "⏳ Pending";
+      const statusColor = item.status === "approved" ? "var(--green)" : (item.status === "rejected" || item.status === "denied") ? "var(--red)" : item.status === "expired" ? "var(--muted)" : "var(--yellow)";
+      const statusLabel = item.status === "approved" ? "✓ Approved" : (item.status === "rejected" || item.status === "denied") ? "✗ Rejected" : item.status === "expired" ? "✕ Expired" : "⏳ Pending";
       const category = item.action_category || "—";
       let payloadPreview = "";
       try {
@@ -7913,10 +7913,127 @@ async function _approveAction(id) {
 async function _denyAction(id) {
   const note = document.getElementById(`note-${id}`)?.value?.trim() || "";
   try {
-    const r = await apiFetch(`/pro/approvals/${encodeURIComponent(id)}/deny`, {
+    const r = await apiFetch(`/pro/approvals/${encodeURIComponent(id)}/reject`, {
       method: "POST",
       body: JSON.stringify({ reviewer_note: note }),
     });
     _loadApprovals();
   } catch(e) { alert("Error denying: " + e.message); }
+}
+
+// ── SUB-ACCOUNTS / TEAM MEMBERS ───────────────────────────────────────────────
+
+// Load sub-accounts whenever the "sub-accounts" tab is opened
+document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("click", (e) => {
+    if (e.target.closest && e.target.closest('.modal-tab[data-tab="sub-accounts"]')) {
+      _loadSubAccounts();
+    }
+  });
+});
+
+async function _loadSubAccounts() {
+  const listEl = document.getElementById("sub-accounts-list");
+  if (!listEl) return;
+  listEl.innerHTML = `<div style="text-align:center;padding:1.5rem 0;"><div class="spinner" style="margin:0 auto;"></div></div>`;
+  try {
+    const data = await apiFetch("/pro/account/members");
+    const members = data.members || [];
+    if (!members.length) {
+      listEl.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:0.85rem;">No sub-accounts yet. Add a team member to get started.</div>`;
+      return;
+    }
+    listEl.innerHTML = members.map(m => {
+      const perms = m.permissions || {};
+      const agents = perms.agents === "all" ? "All agents" : `${(perms.agents || []).length} agent(s)`;
+      const features = (perms.features || []).length + " features";
+      const lastUsed = m.last_used_at ? timeAgo(m.last_used_at) : "Never";
+      const statusDot = m.is_active
+        ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:0.3rem;"></span>`
+        : `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--border-dark);margin-right:0.3rem;"></span>`;
+      return `<div style="border-bottom:1px solid var(--border);padding:0.7rem 0;display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">
+            ${statusDot}
+            <span style="font-weight:600;font-size:0.83rem;">${esc(m.email)}</span>
+            ${m.label ? `<span style="font-size:0.72rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:0.08rem 0.35rem;">${esc(m.label)}</span>` : ""}
+          </div>
+          <div style="font-size:0.75rem;color:var(--muted);">${agents} · ${features} · Last used: ${esc(lastUsed)}</div>
+        </div>
+        <div style="display:flex;gap:0.35rem;flex-shrink:0;">
+          <button onclick="_rotateMemberKey('${esc(m.id)}')" style="padding:0.22rem 0.55rem;font-size:0.72rem;border-radius:5px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;" title="Rotate API key">↻ Key</button>
+          <button onclick="_toggleMember('${esc(m.id)}',${!m.is_active})" style="padding:0.22rem 0.55rem;font-size:0.72rem;border-radius:5px;border:1px solid var(--border-dark);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;">${m.is_active ? "Disable" : "Enable"}</button>
+          <button onclick="_deleteMember('${esc(m.id)}','${esc(m.email)}')" style="padding:0.22rem 0.55rem;font-size:0.72rem;border-radius:5px;border:1px solid var(--red);background:var(--red-bg);color:var(--red);cursor:pointer;font-family:inherit;">Remove</button>
+        </div>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:1rem;color:var(--red);font-size:0.82rem;">${esc(String(e))}</div>`;
+  }
+}
+
+function _openAddMember() {
+  document.getElementById("add-member-form").style.display = "block";
+  document.getElementById("add-member-msg").textContent = "";
+  document.getElementById("new-member-email").value = "";
+  document.getElementById("new-member-label").value = "";
+  document.getElementById("new-member-key-box").style.display = "none";
+}
+
+async function _submitAddMember() {
+  const email = document.getElementById("new-member-email").value.trim();
+  const label = document.getElementById("new-member-label").value.trim();
+  const msgEl = document.getElementById("add-member-msg");
+  const btn   = document.getElementById("add-member-submit-btn");
+  if (!email) { msgEl.textContent = "Email is required."; return; }
+  btn.disabled = true; btn.textContent = "Creating…";
+  try {
+    const data = await apiFetch("/pro/account/members", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        label: label || undefined,
+        permissions: { agents: "all", features: ["tasks","messages","contracts","approvals","analytics","bootstrap","missions","trust_scores"] },
+      }),
+    });
+    document.getElementById("add-member-form").style.display = "none";
+    // Show the key
+    const keyBox = document.getElementById("new-member-key-box");
+    document.getElementById("new-member-key-value").textContent = data.api_key || "";
+    keyBox.style.display = "block";
+    await _loadSubAccounts();
+  } catch(e) {
+    msgEl.textContent = e.message || "Failed to create sub-account.";
+  } finally {
+    btn.disabled = false; btn.textContent = "Create sub-account";
+  }
+}
+
+async function _rotateMemberKey(id) {
+  if (!confirm("Rotate API key? The old key will stop working immediately.")) return;
+  try {
+    const data = await apiFetch(`/pro/account/members/${encodeURIComponent(id)}/rotate-key`, { method: "POST" });
+    const keyBox = document.getElementById("new-member-key-box");
+    document.getElementById("new-member-key-value").textContent = data.api_key || "";
+    keyBox.style.display = "block";
+    keyBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch(e) { alert("Error rotating key: " + e.message); }
+}
+
+async function _toggleMember(id, setActive) {
+  try {
+    await apiFetch(`/pro/account/members/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_active: setActive }),
+    });
+    await _loadSubAccounts();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function _deleteMember(id, email) {
+  if (!confirm(`Remove sub-account for ${email}? Their API key will stop working immediately.`)) return;
+  try {
+    await apiFetch(`/pro/account/members/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await _loadSubAccounts();
+  } catch(e) { alert("Error: " + e.message); }
 }

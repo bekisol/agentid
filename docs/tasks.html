@@ -190,6 +190,7 @@
     <a href="messages.html">Messages</a>
     <a href="tasks.html" class="active">Tasks</a>
     <a href="my-agents.html">My Agents</a>
+    <a href="contracts.html">Contracts</a>
   </div>
   <div style="display:flex;align-items:center;gap:0.75rem;">
     <div class="topbar-user" id="topbar-user"></div>
@@ -1233,9 +1234,8 @@ async function loadContracts() {
 
   listEl.innerHTML = `<div class="empty-state"><div class="spinner"></div></div>`;
   try {
-    const params = new URLSearchParams({ agent_did: _fromDid, limit: 50 });
-    const data = await call(`/capability-contracts/search?${params}`);
-    const contracts = data.results || (Array.isArray(data) ? data : []);
+    const data = await call(`/agents/${encodeURIComponent(_fromDid)}/capability-contracts`);
+    const contracts = data.contracts || (Array.isArray(data) ? data : []);
 
     if (!contracts.length) {
       listEl.innerHTML = `<div class="empty-state">No contracts published for this agent yet. Publish one to let others discover and call you.</div>`;
@@ -1255,16 +1255,16 @@ async function loadContracts() {
         const price   = priceObj.price_per_call != null ? `$${priceObj.price_per_call}` : "free";
         const status  = c.status || "active";
         const sColor  = statusColors[status] || "var(--muted)";
-        const contractId = c.id || c.contract_id || "";
+        const capability = c.capability || "";
         return `<tr>
-          <td style="font-weight:700;">${esc(c.capability || "—")}</td>
+          <td style="font-weight:700;">${esc(capability || "—")}</td>
           <td><span style="font-size:0.75rem;font-weight:700;color:${sColor};">${esc(status)}</span></td>
           <td style="color:var(--muted);font-size:0.78rem;">${esc(sla)}</td>
           <td style="color:var(--muted);font-size:0.78rem;">${esc(price)}</td>
           <td style="font-size:0.74rem;color:var(--muted);">${c.created_at ? relTime(c.created_at) : "—"}</td>
           <td style="display:flex;gap:0.35rem;padding:0.5rem 1rem;">
-            ${contractId ? `<button class="btn btn-danger" style="font-size:0.73rem;padding:0.2rem 0.55rem;"
-              onclick="deactivateContract('${esc(contractId)}')">Deactivate</button>` : ""}
+            ${capability ? `<button class="btn btn-danger" style="font-size:0.73rem;padding:0.2rem 0.55rem;"
+              onclick="deactivateContract('${esc(capability)}')">Deactivate</button>` : ""}
           </td>
         </tr>`;
       }).join("") +
@@ -1274,10 +1274,10 @@ async function loadContracts() {
   }
 }
 
-async function deactivateContract(contractId) {
-  if (!confirm("Deactivate this capability contract? It will no longer appear in search results.")) return;
+async function deactivateContract(capability) {
+  if (!confirm(`Deactivate the "${capability}" contract? It will no longer appear in search results.`)) return;
   try {
-    await call(`/capability-contracts/${encodeURIComponent(contractId)}`, { method: "DELETE" });
+    await call(`/agents/${encodeURIComponent(_fromDid)}/capability-contracts/${encodeURIComponent(capability)}`, { method: "DELETE" });
     loadContracts();
   } catch(e) { alert("Error: " + e.message); }
 }
@@ -1301,7 +1301,6 @@ async function publishContract() {
   }
 
   const body = {
-    agent_did: _fromDid,
     capability,
     description: description || undefined,
     input_schema: inputSchema,
@@ -1311,7 +1310,7 @@ async function publishContract() {
 
   btn.disabled = true; btn.textContent = "Publishing…";
   try {
-    await call("/capability-contracts", { method: "POST", body: JSON.stringify(body) });
+    await call(`/agents/${encodeURIComponent(_fromDid)}/capability-contracts`, { method: "POST", body: JSON.stringify(body) });
     document.getElementById("publish-contract-modal").classList.remove("open");
     msgEl.textContent = "";
     loadContracts();
