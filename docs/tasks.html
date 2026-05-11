@@ -250,10 +250,19 @@
           <div class="pane-title" id="pane-title">Agent Tasks</div>
           <div class="pane-sub" id="pane-sub">Select an agent on the left to send tasks</div>
         </div>
-        <button class="btn btn-outline" id="refresh-btn" style="font-size:0.8rem;">↻ Refresh</button>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <div style="display:flex;border:1px solid var(--border-dark);border-radius:7px;overflow:hidden;font-size:0.8rem;">
+            <button id="tab-tasks-btn" onclick="switchTab('tasks')" style="padding:0.3rem 0.8rem;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer;font-family:inherit;">Tasks</button>
+            <button id="tab-contracts-btn" onclick="switchTab('contracts')" style="padding:0.3rem 0.8rem;border:none;background:var(--surface2);color:var(--text-2);font-weight:500;cursor:pointer;font-family:inherit;border-left:1px solid var(--border-dark);">Contracts</button>
+          </div>
+          <button class="btn btn-outline" id="refresh-btn" style="font-size:0.8rem;">↻ Refresh</button>
+        </div>
       </div>
 
       <div class="pane-scroll">
+
+        <!-- Tasks pane (default visible) -->
+        <div id="tasks-pane">
 
         <!-- Send Task card -->
         <div class="card" id="send-card">
@@ -360,6 +369,25 @@
           </div>
         </div>
 
+        </div><!-- /tasks-pane -->
+
+        <!-- Contracts pane (hidden by default) -->
+        <div id="contracts-pane" style="display:none;flex-direction:column;gap:1.25rem;">
+          <!-- My published contracts -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📄 My Capability Contracts</div>
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-size:0.78rem;color:var(--muted);" id="contracts-agent-name"></span>
+                <button class="btn btn-primary" id="publish-contract-btn" style="font-size:0.78rem;padding:0.28rem 0.7rem;" disabled>+ Publish Contract</button>
+              </div>
+            </div>
+            <div id="contracts-list">
+              <div class="empty-state">Select an agent on the left to manage contracts.</div>
+            </div>
+          </div>
+        </div>
+
       </div><!-- /pane-scroll -->
     </div><!-- /main-pane -->
   </div><!-- /layout -->
@@ -371,7 +399,56 @@
     <div class="modal-title" id="detail-title">Task Detail</div>
     <div id="detail-body"></div>
     <div class="modal-footer">
+      <button class="btn btn-outline" id="detail-flow-btn" style="display:none;" title="View full workflow timeline for this task">🔗 Flow Trace</button>
       <button class="btn btn-outline" id="detail-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Flow trace modal -->
+<div class="modal-bg" id="flow-modal">
+  <div class="modal" style="max-width:680px;max-height:88vh;">
+    <div class="modal-title" id="flow-modal-title">Flow Trace</div>
+    <div style="padding:0.75rem 1.75rem 0.25rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;border-bottom:1px solid var(--border);font-size:0.75rem;color:var(--muted);" id="flow-summary-bar"></div>
+    <div id="flow-body" style="padding:1rem 1.75rem 0.5rem;overflow-y:auto;max-height:55vh;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="flow-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Publish Contract modal -->
+<div class="modal-bg" id="publish-contract-modal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-title">📄 Publish Capability Contract</div>
+    <div style="padding:1rem 1.75rem;display:flex;flex-direction:column;gap:0.85rem;">
+      <div>
+        <label class="field-label">Capability name <span style="color:var(--red);">*</span></label>
+        <input id="pc-capability" class="field-input" placeholder="e.g. web_search, generate_report" autocomplete="off" spellcheck="false" />
+      </div>
+      <div>
+        <label class="field-label">Description</label>
+        <textarea id="pc-description" class="field-textarea" rows="3" placeholder="What this agent does when called with this capability…"></textarea>
+      </div>
+      <div>
+        <label class="field-label">Input schema <span style="font-weight:400;color:var(--muted);">(JSON Schema, optional)</span></label>
+        <textarea id="pc-schema" class="field-textarea" rows="4" placeholder='{"type":"object","properties":{"query":{"type":"string"}}}'></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+          <label class="field-label">SLA — max latency (seconds)</label>
+          <input id="pc-sla" class="field-input" type="number" min="0" placeholder="e.g. 30" />
+        </div>
+        <div>
+          <label class="field-label">Price per call (USD, 0 = free)</label>
+          <input id="pc-price" class="field-input" type="number" min="0" step="0.001" placeholder="0.00" />
+        </div>
+      </div>
+      <p id="pc-msg" style="font-size:0.8rem;min-height:1em;"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="pc-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="pc-publish-btn">Publish Contract</button>
     </div>
   </div>
 </div>
@@ -596,9 +673,12 @@ async function loadAgents() {
 function selectAgent(did, name) {
   _fromDid = did;
   _taskPage = 1;
+  const pubBtn = document.getElementById("publish-contract-btn");
+  if (pubBtn) pubBtn.disabled = false;
   document.getElementById("pane-title").textContent = name || did.slice(-20);
   document.getElementById("pane-sub").textContent = did;
-  loadTasks(1);
+  if (_currentTab === "contracts") loadContracts();
+  else loadTasks(1);
 }
 
 // ── contract search & selection ───────────────────────────────────────────────
@@ -991,6 +1071,22 @@ function renderOutput(output) {
   return fileHtml + `<div class="modal-pre">${esc(JSON.stringify(output, null, 2))}</div>`;
 }
 
+// ── tab switching ─────────────────────────────────────────────────────────────
+let _currentTab = "tasks";
+function switchTab(tab) {
+  _currentTab = tab;
+  const isContracts = tab === "contracts";
+  document.getElementById("tasks-pane").style.display       = isContracts ? "none" : "";
+  document.getElementById("contracts-pane").style.display   = isContracts ? "flex" : "none";
+  document.getElementById("tab-tasks-btn").style.background     = isContracts ? "var(--surface2)" : "var(--accent)";
+  document.getElementById("tab-tasks-btn").style.color          = isContracts ? "var(--text-2)"   : "#fff";
+  document.getElementById("tab-tasks-btn").style.fontWeight     = isContracts ? "500" : "600";
+  document.getElementById("tab-contracts-btn").style.background = isContracts ? "var(--accent)" : "var(--surface2)";
+  document.getElementById("tab-contracts-btn").style.color      = isContracts ? "#fff" : "var(--text-2)";
+  document.getElementById("tab-contracts-btn").style.fontWeight = isContracts ? "600" : "500";
+  if (isContracts && _fromDid) loadContracts();
+}
+
 // ── view / cancel ─────────────────────────────────────────────────────────────
 async function viewTask(taskId, toDid) {
   try {
@@ -1005,6 +1101,20 @@ async function viewTask(taskId, toDid) {
       <div class="modal-row"><div class="modal-label">Inputs</div><div class="modal-pre">${esc(t.inputs ? JSON.stringify(t.inputs, null, 2) : "(none)")}</div></div>
       <div class="modal-row"><div class="modal-label">Output</div>${renderOutput(t.output)}</div>
       ${t.error ? `<div class="modal-row"><div class="modal-label">Error</div><div class="modal-pre" style="color:var(--red);">${esc(t.error)}</div></div>` : ""}`;
+
+    // Show "Flow Trace" button only when flow_id is available
+    const flowBtn = document.getElementById("detail-flow-btn");
+    if (flowBtn) {
+      if (t.flow_id) {
+        flowBtn.style.display = "";
+        flowBtn.onclick = () => {
+          document.getElementById("detail-modal").classList.remove("open");
+          openFlowTrace(t.flow_id, taskId);
+        };
+      } else {
+        flowBtn.style.display = "none";
+      }
+    }
     document.getElementById("detail-modal").classList.add("open");
   } catch (e) { alert("Could not load task: " + e.message); }
 }
@@ -1035,10 +1145,189 @@ function _schedulePoll() {
   }, 10000);
 }
 
+// ── flow trace ────────────────────────────────────────────────────────────────
+async function openFlowTrace(flowId, taskId) {
+  document.getElementById("flow-modal-title").textContent = `Flow Trace · ${flowId.slice(0,8)}…`;
+  document.getElementById("flow-summary-bar").textContent = "Loading…";
+  document.getElementById("flow-body").innerHTML = `<div style="text-align:center;padding:2rem;color:var(--muted);"><div class="spinner"></div></div>`;
+  document.getElementById("flow-modal").classList.add("open");
+  try {
+    const data = await call(`/pro/flows/${encodeURIComponent(flowId)}`);
+    const events = data.events || [];
+
+    const summaryBar = document.getElementById("flow-summary-bar");
+    const parts = [];
+    if (data.messages)  parts.push(`${data.messages} message${data.messages !== 1 ? "s" : ""}`);
+    if (data.tasks)     parts.push(`${data.tasks} task${data.tasks !== 1 ? "s" : ""}`);
+    if (data.cap_calls) parts.push(`${data.cap_calls} capability call${data.cap_calls !== 1 ? "s" : ""}`);
+    if (data.approvals) parts.push(`${data.approvals} approval${data.approvals !== 1 ? "s" : ""}`);
+    summaryBar.textContent = parts.join(" · ") || "0 events";
+
+    if (!events.length) {
+      document.getElementById("flow-body").innerHTML = `<div style="text-align:center;color:var(--muted);padding:2rem;">No events found for this flow.</div>`;
+      return;
+    }
+
+    const eventIcons = { message:"💬", task_request:"📋", capability_call:"⚡", approval:"🛡" };
+    const eventColors = {
+      message:         "var(--blue)",
+      task_request:    "var(--accent)",
+      capability_call: "var(--green)",
+      approval:        "var(--yellow)",
+    };
+
+    document.getElementById("flow-body").innerHTML = `
+      <div style="position:relative;padding-left:1.25rem;">
+        <div style="position:absolute;left:0.4rem;top:0;bottom:0;width:2px;background:var(--border);border-radius:1px;"></div>
+        ${events.map((ev, i) => {
+          const icon  = eventIcons[ev.event_type] || "•";
+          const color = eventColors[ev.event_type] || "var(--muted)";
+          const ts    = ev.ts ? new Date(ev.ts).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" }) : "—";
+          let detail = "";
+          switch(ev.event_type) {
+            case "message":
+              detail = `<b>${esc(ev.msg_type || "message")}</b>${ev.subject ? ` — ${esc(ev.subject)}` : ""}${ev.from_did ? `<br><span style="color:var(--muted);font-size:0.7rem;">From: …${esc(ev.from_did.slice(-16))}</span>` : ""}`;
+              break;
+            case "task_request":
+              detail = `<b>${esc(ev.capability || "task")}</b> — <span style="font-size:0.76rem;">${statusBadge(ev.status)}</span>${ev.title ? `<br><span style="color:var(--text-2);font-size:0.76rem;">${esc(ev.title)}</span>` : ""}`;
+              break;
+            case "capability_call":
+              const ok = ev.success === true ? "✓" : ev.success === false ? "✗" : "?";
+              const okColor = ev.success === true ? "var(--green)" : ev.success === false ? "var(--red)" : "var(--muted)";
+              detail = `<b>${esc(ev.capability || "call")}</b> <span style="color:${okColor};font-weight:700;">${ok}</span>${ev.latency_ms != null ? `<span style="color:var(--muted);font-size:0.72rem;"> ${ev.latency_ms}ms</span>` : ""}`;
+              break;
+            case "approval":
+              const appColor = ev.status === "approved" ? "var(--green)" : ev.status === "denied" ? "var(--red)" : "var(--yellow)";
+              detail = `<b>${esc(ev.action_category || "approval")}</b> <span style="color:${appColor};font-size:0.76rem;font-weight:700;">${esc(ev.status || "pending")}</span>`;
+              break;
+          }
+          return `<div style="position:relative;display:flex;gap:0.6rem;margin-bottom:0.75rem;align-items:flex-start;">
+            <span style="position:absolute;left:-1rem;top:0.15rem;width:1.1rem;height:1.1rem;border-radius:50%;background:${color}22;border:2px solid ${color};display:inline-flex;align-items:center;justify-content:center;font-size:0.6rem;">${icon}</span>
+            <div style="flex:1;min-width:0;padding-left:0.6rem;">
+              <div style="display:flex;align-items:baseline;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.1rem;">
+                <span style="font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:${color};">${esc(ev.event_type.replace("_"," "))}</span>
+                <span style="font-size:0.68rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">${ts}</span>
+              </div>
+              <div style="font-size:0.8rem;color:var(--text);line-height:1.45;">${detail}</div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>`;
+  } catch(e) {
+    document.getElementById("flow-body").innerHTML = `<div style="text-align:center;color:var(--red);padding:1rem;">${esc(e.message)}</div>`;
+  }
+}
+
+// ── capability contracts ───────────────────────────────────────────────────────
+async function loadContracts() {
+  const listEl = document.getElementById("contracts-list");
+  const nameEl = document.getElementById("contracts-agent-name");
+  const pubBtn = document.getElementById("publish-contract-btn");
+  if (!listEl || !_fromDid) return;
+
+  if (nameEl) {
+    const agent = _agents.find(a => a.did === _fromDid);
+    nameEl.textContent = agent ? agent.name : "";
+  }
+  if (pubBtn) pubBtn.disabled = false;
+
+  listEl.innerHTML = `<div class="empty-state"><div class="spinner"></div></div>`;
+  try {
+    const params = new URLSearchParams({ agent_did: _fromDid, limit: 50 });
+    const data = await call(`/capability-contracts/search?${params}`);
+    const contracts = data.results || (Array.isArray(data) ? data : []);
+
+    if (!contracts.length) {
+      listEl.innerHTML = `<div class="empty-state">No contracts published for this agent yet. Publish one to let others discover and call you.</div>`;
+      return;
+    }
+
+    const statusColors = { active:"var(--green)", inactive:"var(--muted)", pending:"var(--yellow)", challenge_passed:"var(--blue)" };
+    listEl.innerHTML = `<table class="task-table" style="width:100%;">
+      <thead><tr>
+        <th>Capability</th><th>Status</th><th>SLA</th><th>Price</th><th>Published</th><th></th>
+      </tr></thead>
+      <tbody>` +
+      contracts.map(c => {
+        const slaObj  = c.sla || {};
+        const sla     = slaObj.max_latency_seconds ? `${slaObj.max_latency_seconds}s` : "—";
+        const priceObj = c.pricing || {};
+        const price   = priceObj.price_per_call != null ? `$${priceObj.price_per_call}` : "free";
+        const status  = c.status || "active";
+        const sColor  = statusColors[status] || "var(--muted)";
+        const contractId = c.id || c.contract_id || "";
+        return `<tr>
+          <td style="font-weight:700;">${esc(c.capability || "—")}</td>
+          <td><span style="font-size:0.75rem;font-weight:700;color:${sColor};">${esc(status)}</span></td>
+          <td style="color:var(--muted);font-size:0.78rem;">${esc(sla)}</td>
+          <td style="color:var(--muted);font-size:0.78rem;">${esc(price)}</td>
+          <td style="font-size:0.74rem;color:var(--muted);">${c.created_at ? relTime(c.created_at) : "—"}</td>
+          <td style="display:flex;gap:0.35rem;padding:0.5rem 1rem;">
+            ${contractId ? `<button class="btn btn-danger" style="font-size:0.73rem;padding:0.2rem 0.55rem;"
+              onclick="deactivateContract('${esc(contractId)}')">Deactivate</button>` : ""}
+          </td>
+        </tr>`;
+      }).join("") +
+      `</tbody></table>`;
+  } catch(e) {
+    listEl.innerHTML = `<div class="empty-state" style="color:var(--red);">${esc(String(e))}</div>`;
+  }
+}
+
+async function deactivateContract(contractId) {
+  if (!confirm("Deactivate this capability contract? It will no longer appear in search results.")) return;
+  try {
+    await call(`/capability-contracts/${encodeURIComponent(contractId)}`, { method: "DELETE" });
+    loadContracts();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function publishContract() {
+  const capability = document.getElementById("pc-capability").value.trim();
+  const description = document.getElementById("pc-description").value.trim();
+  const schemaRaw = document.getElementById("pc-schema").value.trim();
+  const slaVal = document.getElementById("pc-sla").value.trim();
+  const priceVal = document.getElementById("pc-price").value.trim();
+  const msgEl = document.getElementById("pc-msg");
+  const btn = document.getElementById("pc-publish-btn");
+
+  msgEl.style.color = "var(--red)";
+  if (!capability) { msgEl.textContent = "Capability name is required."; return; }
+
+  let inputSchema = undefined;
+  if (schemaRaw) {
+    try { inputSchema = JSON.parse(schemaRaw); }
+    catch { msgEl.textContent = "Input schema must be valid JSON."; return; }
+  }
+
+  const body = {
+    agent_did: _fromDid,
+    capability,
+    description: description || undefined,
+    input_schema: inputSchema,
+    sla: slaVal ? { max_latency_seconds: parseInt(slaVal) } : undefined,
+    pricing: priceVal ? { model: parseFloat(priceVal) > 0 ? "per_call" : "free", price_per_call: parseFloat(priceVal) } : undefined,
+  };
+
+  btn.disabled = true; btn.textContent = "Publishing…";
+  try {
+    await call("/capability-contracts", { method: "POST", body: JSON.stringify(body) });
+    document.getElementById("publish-contract-modal").classList.remove("open");
+    msgEl.textContent = "";
+    loadContracts();
+  } catch(e) {
+    msgEl.textContent = e.message || "Failed to publish.";
+    btn.disabled = false; btn.textContent = "Publish Contract";
+  }
+}
+
 // ── event listeners ───────────────────────────────────────────────────────────
 function bindEventListeners() {
   document.getElementById("send-btn").addEventListener("click", sendTask);
-  document.getElementById("refresh-btn").addEventListener("click", () => loadTasks(_taskPage));
+  document.getElementById("refresh-btn").addEventListener("click", () => {
+    if (_currentTab === "contracts") loadContracts();
+    else loadTasks(_taskPage);
+  });
   document.getElementById("role-filter").addEventListener("change", () => loadTasks(1));
   document.getElementById("status-filter").addEventListener("change", () => loadTasks(1));
   document.getElementById("detail-close").addEventListener("click", () => {
@@ -1047,6 +1336,34 @@ function bindEventListeners() {
   document.getElementById("detail-modal").addEventListener("click", e => {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
   });
+
+  // Flow modal
+  document.getElementById("flow-close").addEventListener("click", () => {
+    document.getElementById("flow-modal").classList.remove("open");
+  });
+  document.getElementById("flow-modal").addEventListener("click", e => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
+  });
+
+  // Publish contract modal
+  document.getElementById("publish-contract-btn").addEventListener("click", () => {
+    document.getElementById("pc-capability").value = "";
+    document.getElementById("pc-description").value = "";
+    document.getElementById("pc-schema").value = "";
+    document.getElementById("pc-sla").value = "";
+    document.getElementById("pc-price").value = "";
+    document.getElementById("pc-msg").textContent = "";
+    document.getElementById("pc-publish-btn").disabled = false;
+    document.getElementById("pc-publish-btn").textContent = "Publish Contract";
+    document.getElementById("publish-contract-modal").classList.add("open");
+  });
+  document.getElementById("pc-cancel-btn").addEventListener("click", () => {
+    document.getElementById("publish-contract-modal").classList.remove("open");
+  });
+  document.getElementById("publish-contract-modal").addEventListener("click", e => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
+  });
+  document.getElementById("pc-publish-btn").addEventListener("click", publishContract);
 
   // Contract search
   document.getElementById("contract-search-btn").addEventListener("click", searchContracts);

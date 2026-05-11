@@ -484,6 +484,96 @@
   </div>
 </div>
 
+<!-- ── BRAIN / BOOTSTRAP MODAL ──────────────────────────────────────────── -->
+<div id="brain-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <span class="modal-title">🧬 Brain — <span id="brain-modal-name"></span></span>
+      <button class="modal-close" id="brain-modal-close">✕</button>
+    </div>
+    <div class="modal-body" style="padding-bottom:0;">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.9rem;">Bootstrap files are injected into the system prompt before every interaction. Shape your agent's identity, goals, tone, and tool preferences.</p>
+      <div class="snippet-tabs" id="brain-tabs">
+        <button class="snippet-tab active" data-btab="SOUL">SOUL</button>
+        <button class="snippet-tab" data-btab="MISSION">MISSION</button>
+        <button class="snippet-tab" data-btab="STYLE">STYLE</button>
+        <button class="snippet-tab" data-btab="TOOLS">TOOLS</button>
+      </div>
+      <div id="brain-tab-panels" style="padding:1rem 0 0;">
+        <div id="brain-SOUL-panel">
+          <p style="font-size:0.76rem;color:var(--muted);margin-bottom:0.4rem;">Who is this agent? Core identity, values, and personality.</p>
+          <textarea id="brain-SOUL" rows="10" placeholder="You are a precise, reliable assistant specialised in…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.8rem;font-family:'JetBrains Mono',monospace;color:var(--text);background:var(--surface);outline:none;resize:vertical;box-sizing:border-box;line-height:1.55;"></textarea>
+        </div>
+        <div id="brain-MISSION-panel" style="display:none;">
+          <p style="font-size:0.76rem;color:var(--muted);margin-bottom:0.4rem;">What is this agent here to do? Primary objective and scope.</p>
+          <textarea id="brain-MISSION" rows="10" placeholder="Your primary mission is to…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.8rem;font-family:'JetBrains Mono',monospace;color:var(--text);background:var(--surface);outline:none;resize:vertical;box-sizing:border-box;line-height:1.55;"></textarea>
+        </div>
+        <div id="brain-STYLE-panel" style="display:none;">
+          <p style="font-size:0.76rem;color:var(--muted);margin-bottom:0.4rem;">How should responses be phrased? Tone, format, length guidelines.</p>
+          <textarea id="brain-STYLE" rows="10" placeholder="Always be concise. Use bullet points for lists…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.8rem;font-family:'JetBrains Mono',monospace;color:var(--text);background:var(--surface);outline:none;resize:vertical;box-sizing:border-box;line-height:1.55;"></textarea>
+        </div>
+        <div id="brain-TOOLS-panel" style="display:none;">
+          <p style="font-size:0.76rem;color:var(--muted);margin-bottom:0.4rem;">Which capabilities to prioritise and how to invoke them.</p>
+          <textarea id="brain-TOOLS" rows="10" placeholder="Use web_search for any factual queries. Always cite sources…" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.8rem;font-family:'JetBrains Mono',monospace;color:var(--text);background:var(--surface);outline:none;resize:vertical;box-sizing:border-box;line-height:1.55;"></textarea>
+        </div>
+      </div>
+      <div id="brain-error" style="display:none;font-size:0.8rem;color:var(--red);margin-top:0.5rem;"></div>
+      <div id="brain-saved" style="display:none;font-size:0.8rem;color:var(--green);margin-top:0.5rem;"></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 1.25rem;border-top:1px solid var(--border);margin-top:0.75rem;">
+      <span style="font-size:0.74rem;color:var(--muted);" id="brain-char-count"></span>
+      <div style="display:flex;gap:0.5rem;">
+        <button class="btn btn-outline" id="brain-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="brain-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MISSIONS MODAL ────────────────────────────────────────────────────── -->
+<div id="missions-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:660px;">
+    <div class="modal-header">
+      <span class="modal-title">⏰ Missions — <span id="missions-modal-name"></span></span>
+      <button class="modal-close" id="missions-modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;">Missions are recurring instructions delivered to your agent on a schedule. Your agent executes them automatically without being asked.</p>
+
+      <!-- Mission list -->
+      <div id="missions-list" style="margin-bottom:1.25rem;"></div>
+
+      <!-- Create new mission -->
+      <div style="border-top:1px solid var(--border);padding-top:1rem;">
+        <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.75rem;">+ New Mission</div>
+        <div class="field">
+          <label>Name</label>
+          <input id="mission-name" type="text" placeholder="Daily market check" maxlength="128" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Instructions <span style="font-weight:400;color:var(--muted);">(what should your agent do on each tick?)</span></label>
+          <textarea id="mission-text" rows="4" placeholder="Search for the latest AI news and write a 3-bullet summary in your reply."></textarea>
+        </div>
+        <div class="field">
+          <label>Schedule</label>
+          <select id="mission-schedule-preset" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.875rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;margin-bottom:0.4rem;">
+            <option value="every:1h">Every hour</option>
+            <option value="every:6h">Every 6 hours</option>
+            <option value="every:12h">Every 12 hours</option>
+            <option value="every:24h" selected>Every 24 hours (daily)</option>
+            <option value="every:7d">Every 7 days (weekly)</option>
+            <option value="custom">Custom expression…</option>
+          </select>
+          <input id="mission-cron-custom" type="text" placeholder="e.g. 0 9 * * 1 or every:30m" style="display:none;width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.875rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;box-sizing:border-box;" />
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem;">Use <code style="background:var(--surface2);padding:0.1rem 0.3rem;border-radius:3px;">every:Ns/m/h/d</code> for simple intervals or a 5-part cron expression (min 60 s).</div>
+        </div>
+        <p id="mission-create-msg" style="font-size:0.8rem;min-height:1.2em;margin-bottom:0.75rem;"></p>
+        <button class="btn btn-primary" id="mission-create-btn" style="width:100%;">Create Mission</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Webhook modal ─────────────────────────────────────────────────────── -->
 <div id="webhook-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:500px;">
@@ -839,6 +929,8 @@ function renderAgentRow(a) {
       <button class="agent-action-btn" data-action="webhook" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Get notified when this agent receives a message">🔔 Webhook</button>
       <button class="agent-action-btn" data-action="storekey" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Store this agent's private key so it can sign messages">✍ Signing</button>
       <button class="agent-action-btn" data-action="aireply" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Let this agent automatically reply to messages using AI">🤖 Auto-Reply</button>
+      <button class="agent-action-btn" data-action="brain" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Edit bootstrap files that shape this agent's personality (SOUL, MISSION, STYLE, TOOLS)">🧬 Brain</button>
+      <button class="agent-action-btn" data-action="missions" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Manage recurring scheduled missions for this agent">⏰ Missions</button>
       <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">&lt;/&gt;</button>
     </td>
   </tr>`;
@@ -1352,6 +1444,250 @@ document.getElementById("inbox-modal").addEventListener("click", function(e) { i
 document.getElementById("inbox-refresh-btn").addEventListener("click", loadInbox);
 document.getElementById("inbox-unread-only").addEventListener("change", loadInbox);
 
+// ── BRAIN / BOOTSTRAP ─────────────────────────────────────────────────────────
+let _brainDid = "";
+let _brainTab = "SOUL";
+const BRAIN_TABS = ["SOUL","MISSION","STYLE","TOOLS"];
+
+document.getElementById("brain-tabs").addEventListener("click", e => {
+  const btn = e.target.closest("[data-btab]");
+  if (!btn) return;
+  _brainTab = btn.dataset.btab;
+  document.querySelectorAll("[data-btab]").forEach(t => t.classList.toggle("active", t === btn));
+  BRAIN_TABS.forEach(tab => {
+    document.getElementById(`brain-${tab}-panel`).style.display = tab === _brainTab ? "" : "none";
+  });
+  _updateBrainCharCount();
+});
+
+document.getElementById("brain-save-btn").addEventListener("click", saveBrainTab);
+document.getElementById("brain-cancel-btn").addEventListener("click", () => { document.getElementById("brain-modal").style.display = "none"; });
+document.getElementById("brain-modal-close").addEventListener("click", () => { document.getElementById("brain-modal").style.display = "none"; });
+document.getElementById("brain-modal").addEventListener("click", function(e) { if (e.target === this) this.style.display = "none"; });
+
+BRAIN_TABS.forEach(tab => {
+  document.getElementById(`brain-${tab}`)?.addEventListener("input", _updateBrainCharCount);
+});
+
+function _updateBrainCharCount() {
+  const ta = document.getElementById(`brain-${_brainTab}`);
+  const len = ta ? ta.value.length : 0;
+  const MAX = 4096;
+  const el = document.getElementById("brain-char-count");
+  if (el) {
+    el.textContent = `${len} / ${MAX} chars`;
+    el.style.color = len > MAX ? "var(--red)" : "var(--muted)";
+  }
+}
+
+async function openBrain(did, name) {
+  _brainDid = did;
+  _brainTab = "SOUL";
+  document.getElementById("brain-modal-name").textContent = name;
+  document.getElementById("brain-error").style.display = "none";
+  document.getElementById("brain-saved").style.display = "none";
+  // Reset tabs
+  document.querySelectorAll("[data-btab]").forEach(t => t.classList.toggle("active", t.dataset.btab === "SOUL"));
+  BRAIN_TABS.forEach(tab => {
+    document.getElementById(`brain-${tab}-panel`).style.display = tab === "SOUL" ? "" : "none";
+    document.getElementById(`brain-${tab}`).value = "";
+  });
+  document.getElementById("brain-modal").style.display = "flex";
+  // Load all 4 tabs in parallel
+  await Promise.all(BRAIN_TABS.map(async tab => {
+    try {
+      const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(did)}/bootstrap/${tab}`, {
+        headers: apiKey ? { "x-api-key": apiKey } : {},
+        credentials: "include",
+      });
+      if (r.ok) {
+        const d = await r.json();
+        document.getElementById(`brain-${tab}`).value = d.content || "";
+      }
+    } catch(_) {}
+  }));
+  _updateBrainCharCount();
+}
+
+async function saveBrainTab() {
+  const content = document.getElementById(`brain-${_brainTab}`).value;
+  if (content.length > 4096) {
+    document.getElementById("brain-error").textContent = `Content exceeds 4096 characters (${content.length}).`;
+    document.getElementById("brain-error").style.display = "block";
+    return;
+  }
+  const saveBtn = document.getElementById("brain-save-btn");
+  const errEl   = document.getElementById("brain-error");
+  const savedEl = document.getElementById("brain-saved");
+  errEl.style.display = "none"; savedEl.style.display = "none";
+  saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+  try {
+    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_brainDid)}/bootstrap/${_brainTab}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...(apiKey ? { "x-api-key": apiKey } : {}) },
+      credentials: "include",
+      body: JSON.stringify({ content }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+    savedEl.textContent = `✓ ${_brainTab} saved.`;
+    savedEl.style.display = "block";
+    setTimeout(() => { savedEl.style.display = "none"; }, 2500);
+  } catch(e) {
+    errEl.textContent = e.message || "Save failed.";
+    errEl.style.display = "block";
+  } finally {
+    saveBtn.disabled = false; saveBtn.textContent = "Save";
+  }
+}
+
+// ── MISSIONS ──────────────────────────────────────────────────────────────────
+let _missionsDid = "";
+
+document.getElementById("missions-modal-close").addEventListener("click", () => { document.getElementById("missions-modal").style.display = "none"; });
+document.getElementById("missions-modal").addEventListener("click", function(e) { if (e.target === this) this.style.display = "none"; });
+
+document.getElementById("mission-schedule-preset").addEventListener("change", function() {
+  const isCustom = this.value === "custom";
+  document.getElementById("mission-cron-custom").style.display = isCustom ? "" : "none";
+});
+
+document.getElementById("mission-create-btn").addEventListener("click", createMission);
+
+async function openMissions(did, name) {
+  _missionsDid = did;
+  document.getElementById("missions-modal-name").textContent = name;
+  document.getElementById("mission-name").value = "";
+  document.getElementById("mission-text").value = "";
+  document.getElementById("mission-schedule-preset").value = "every:24h";
+  document.getElementById("mission-cron-custom").style.display = "none";
+  document.getElementById("mission-create-msg").textContent = "";
+  document.getElementById("missions-modal").style.display = "flex";
+  await loadMissions();
+}
+
+async function loadMissions() {
+  const listEl = document.getElementById("missions-list");
+  listEl.innerHTML = '<div style="text-align:center;color:var(--muted);padding:1rem 0;font-size:0.82rem;">Loading…</div>';
+  try {
+    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_missionsDid)}/missions`, {
+      headers: apiKey ? { "x-api-key": apiKey } : {},
+      credentials: "include",
+    });
+    if (!r.ok) { listEl.innerHTML = `<div style="color:var(--red);font-size:0.82rem;">Could not load missions.</div>`; return; }
+    const data = await r.json();
+    const missions = data.missions || (Array.isArray(data) ? data : []);
+    if (!missions.length) {
+      listEl.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">No missions yet. Create one below.</div>';
+      return;
+    }
+    listEl.innerHTML = missions.map(m => {
+      const nextFire = m.next_fire_at ? new Date(m.next_fire_at).toLocaleString() : "—";
+      const lastFire = m.last_fired_at ? timeAgo(m.last_fired_at) : "never";
+      const activeColor = m.is_active ? "var(--green)" : "var(--muted)";
+      const activeTxt   = m.is_active ? "● Active" : "○ Paused";
+      return `<div style="border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;margin-bottom:0.65rem;background:var(--surface2);">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:0.88rem;margin-bottom:0.15rem;">${esc(m.name)}</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.35rem;font-family:'JetBrains Mono',monospace;">${esc(m.cron_expr)}</div>
+            <div style="font-size:0.78rem;color:var(--text-2);line-height:1.45;white-space:pre-wrap;word-break:break-word;max-height:80px;overflow-y:auto;">${esc(m.mission_text)}</div>
+            <div style="margin-top:0.5rem;font-size:0.72rem;color:var(--muted);">Next: <b>${esc(nextFire)}</b> · Last fired: ${esc(lastFire)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.35rem;flex-shrink:0;">
+            <span style="font-size:0.72rem;font-weight:700;color:${activeColor};text-align:right;">${activeTxt}</span>
+            <button class="agent-action-btn" onclick="toggleMission('${esc(m.id)}',${!m.is_active})" style="white-space:nowrap;">
+              ${m.is_active ? "Pause" : "Resume"}
+            </button>
+            <button class="agent-action-btn" onclick="fireMissionNow('${esc(m.id)}')" style="white-space:nowrap;">▶ Fire Now</button>
+            <button class="agent-action-btn" onclick="deleteMission('${esc(m.id)}')" style="color:var(--red);border-color:var(--red);white-space:nowrap;">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    listEl.innerHTML = `<div style="color:var(--red);font-size:0.82rem;">${esc(String(e))}</div>`;
+  }
+}
+
+async function toggleMission(id, newActive) {
+  try {
+    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_missionsDid)}/missions/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(apiKey ? { "x-api-key": apiKey } : {}) },
+      credentials: "include",
+      body: JSON.stringify({ is_active: newActive }),
+    });
+    if (!r.ok) throw new Error("Failed");
+    await loadMissions();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function fireMissionNow(id) {
+  try {
+    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_missionsDid)}/missions/${encodeURIComponent(id)}/fire`, {
+      method: "POST",
+      headers: apiKey ? { "x-api-key": apiKey } : {},
+      credentials: "include",
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d?.detail || "Failed"); }
+    alert("✓ Mission fired — your agent will receive a mission_tick shortly.");
+    await loadMissions();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function deleteMission(id) {
+  if (!confirm("Delete this mission? This cannot be undone.")) return;
+  try {
+    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_missionsDid)}/missions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: apiKey ? { "x-api-key": apiKey } : {},
+      credentials: "include",
+    });
+    if (!r.ok) throw new Error("Failed");
+    await loadMissions();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function createMission() {
+  const name     = (document.getElementById("mission-name").value || "").trim();
+  const text     = (document.getElementById("mission-text").value || "").trim();
+  const preset   = document.getElementById("mission-schedule-preset").value;
+  const cronExpr = preset === "custom"
+    ? (document.getElementById("mission-cron-custom").value || "").trim()
+    : preset;
+  const msgEl    = document.getElementById("mission-create-msg");
+  const btn      = document.getElementById("mission-create-btn");
+  msgEl.style.color = "var(--red)";
+
+  if (!name) { msgEl.textContent = "Mission name is required."; return; }
+  if (!text) { msgEl.textContent = "Instructions are required."; return; }
+  if (!cronExpr) { msgEl.textContent = "Please enter a schedule expression."; return; }
+
+  btn.disabled = true; btn.textContent = "Creating…";
+  try {
+    const r = await fetch(`${BASE}/pro/agents/${encodeURIComponent(_missionsDid)}/missions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(apiKey ? { "x-api-key": apiKey } : {}) },
+      credentials: "include",
+      body: JSON.stringify({ name, mission_text: text, cron_expr: cronExpr }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+    document.getElementById("mission-name").value = "";
+    document.getElementById("mission-text").value = "";
+    document.getElementById("mission-schedule-preset").value = "every:24h";
+    document.getElementById("mission-cron-custom").style.display = "none";
+    msgEl.style.color = "var(--green)"; msgEl.textContent = "✓ Mission created!";
+    setTimeout(() => { msgEl.textContent = ""; }, 2500);
+    await loadMissions();
+  } catch(e) {
+    msgEl.textContent = e.message || "Failed to create mission.";
+  } finally {
+    btn.disabled = false; btn.textContent = "Create Mission";
+  }
+}
+
 // ── AGENT ROW ACTION DELEGATION ───────────────────────────────────────────────
 document.getElementById("agents-container").addEventListener("click", e => {
   const btn = e.target.closest(".agent-action-btn[data-action]");
@@ -1364,6 +1700,8 @@ document.getElementById("agents-container").addEventListener("click", e => {
   if (action === "webhook")   openWebhook(did, name);
   if (action === "aireply")   openAiReply(did, name);
   if (action === "storekey")  openStoreKey(did, name);
+  if (action === "brain")     openBrain(did, name);
+  if (action === "missions")  openMissions(did, name);
 });
 
 // ── Webhook modal ─────────────────────────────────────────────────────────────

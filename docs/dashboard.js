@@ -7806,4 +7806,117 @@ document.addEventListener("DOMContentLoaded", () => {
   _initFootprintTab();
   _initEnterpriseTab();
   _initEuComplianceTab();
+  _initApprovalsSection();
 });
+
+// ── ACP APPROVALS ─────────────────────────────────────────────────────────────
+function _initApprovalsSection() {
+  const refreshBtn = document.getElementById("approvals-refresh-btn");
+  const statusFilter = document.getElementById("approvals-status-filter");
+  if (refreshBtn)    refreshBtn.addEventListener("click", _loadApprovals);
+  if (statusFilter)  statusFilter.addEventListener("change", _loadApprovals);
+  _loadApprovals();
+}
+
+async function _loadApprovals() {
+  const listEl = document.getElementById("approvals-list");
+  const countEl = document.getElementById("approvals-count-label");
+  const badgeEl = document.getElementById("approvals-badge");
+  if (!listEl) return;
+
+  const status = document.getElementById("approvals-status-filter")?.value || "pending";
+  listEl.innerHTML = `<div style="text-align:center;color:var(--muted);padding:2rem 0;font-size:0.85rem;">Loading…</div>`;
+
+  try {
+    const params = new URLSearchParams({ limit: 50 });
+    if (status) params.set("status", status);
+    const data = await apiFetch(`/pro/acp/queue?${params}`);
+    const items = data.items || data.approvals || (Array.isArray(data) ? data : []);
+
+    if (countEl) countEl.textContent = `${items.length} item${items.length !== 1 ? "s" : ""}`;
+
+    // Update sidebar badge for pending
+    if (badgeEl && status === "pending") {
+      if (items.length > 0) {
+        badgeEl.textContent = items.length > 99 ? "99+" : String(items.length);
+        badgeEl.style.display = "inline-block";
+      } else {
+        badgeEl.style.display = "none";
+      }
+    }
+
+    if (!items.length) {
+      const msg = status === "pending"
+        ? "No pending approvals. Your agents are running without human checkpoints, or all actions were auto-approved."
+        : `No ${status} approvals found.`;
+      listEl.innerHTML = `<div style="text-align:center;color:var(--muted);padding:2rem 1rem;font-size:0.85rem;">${esc(msg)}</div>`;
+      return;
+    }
+
+    listEl.innerHTML = items.map(item => {
+      const ts = item.created_at ? new Date(item.created_at).toLocaleString() : "—";
+      const resolvedAt = item.resolved_at ? new Date(item.resolved_at).toLocaleString() : null;
+      const statusColor = item.status === "approved" ? "var(--green)" : item.status === "denied" ? "var(--red)" : "var(--yellow)";
+      const statusLabel = item.status === "approved" ? "✓ Approved" : item.status === "denied" ? "✗ Denied" : "⏳ Pending";
+      const category = item.action_category || "—";
+      let payloadPreview = "";
+      try {
+        const p = typeof item.action_payload === "string" ? JSON.parse(item.action_payload) : item.action_payload;
+        payloadPreview = JSON.stringify(p, null, 2);
+      } catch(_) {
+        payloadPreview = String(item.action_payload || "");
+      }
+
+      const agentShort = (item.agent_did || "").slice(-20);
+      const isPending = item.status === "pending";
+
+      return `<div style="border-bottom:1px solid var(--border);padding:1rem 1.25rem;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.35rem;flex-wrap:wrap;">
+              <span style="font-size:0.82rem;font-weight:700;color:var(--text);">${esc(category)}</span>
+              <span style="font-size:0.72rem;font-weight:700;color:${statusColor};">${esc(statusLabel)}</span>
+              <span style="font-size:0.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">…${esc(agentShort)}</span>
+            </div>
+            <details style="margin-bottom:0.4rem;">
+              <summary style="font-size:0.76rem;color:var(--accent);cursor:pointer;user-select:none;">View payload</summary>
+              <pre style="margin-top:0.35rem;font-size:0.72rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.65rem;overflow:auto;max-height:160px;white-space:pre-wrap;word-break:break-word;color:var(--text-2);">${esc(payloadPreview)}</pre>
+            </details>
+            ${item.reviewer_note ? `<div style="font-size:0.78rem;color:var(--text-2);margin-bottom:0.2rem;"><b>Note:</b> ${esc(item.reviewer_note)}</div>` : ""}
+            <div style="font-size:0.71rem;color:var(--muted);">Requested ${esc(ts)}${resolvedAt ? ` · Resolved ${esc(resolvedAt)}` : ""}</div>
+          </div>
+          ${isPending ? `
+          <div style="display:flex;flex-direction:column;gap:0.35rem;flex-shrink:0;min-width:120px;">
+            <textarea id="note-${esc(item.id)}" rows="2" placeholder="Optional reviewer note…" style="width:100%;padding:0.35rem 0.55rem;border:1px solid var(--border-dark);border-radius:6px;font-size:0.76rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;resize:none;box-sizing:border-box;"></textarea>
+            <button onclick="_approveAction('${esc(item.id)}')" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✓ Approve</button>
+            <button onclick="_denyAction('${esc(item.id)}')" style="padding:0.3rem 0.7rem;border-radius:6px;border:1px solid var(--red);background:var(--red-bg);color:var(--red);font-size:0.76rem;font-weight:600;cursor:pointer;font-family:inherit;">✗ Deny</button>
+          </div>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    listEl.innerHTML = `<div style="text-align:center;color:var(--red);padding:2rem 1rem;font-size:0.85rem;">${esc(String(e))}</div>`;
+  }
+}
+
+async function _approveAction(id) {
+  const note = document.getElementById(`note-${id}`)?.value?.trim() || "";
+  try {
+    const r = await apiFetch(`/pro/approvals/${encodeURIComponent(id)}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ reviewer_note: note }),
+    });
+    _loadApprovals();
+  } catch(e) { alert("Error approving: " + e.message); }
+}
+
+async function _denyAction(id) {
+  const note = document.getElementById(`note-${id}`)?.value?.trim() || "";
+  try {
+    const r = await apiFetch(`/pro/approvals/${encodeURIComponent(id)}/deny`, {
+      method: "POST",
+      body: JSON.stringify({ reviewer_note: note }),
+    });
+    _loadApprovals();
+  } catch(e) { alert("Error denying: " + e.message); }
+}
