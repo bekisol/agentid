@@ -774,9 +774,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // If the key is stale, the first API call will 401 and we show the wall then.
     _showApp("");
   } else {
-    document.getElementById("auth-wall").style.display = "flex";
-    document.getElementById("contracts-content").style.display = "none";
-    document.getElementById("topbar-email").textContent = "";
+    // No session — send to the main sign-in page, which will redirect back here.
+    location.href = "index.html?redirect=contracts.html";
   }
 });
 </script>

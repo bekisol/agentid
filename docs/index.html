@@ -1001,6 +1001,9 @@ document.getElementById("auth-key-btn").addEventListener("click", async () => {
       localStorage.setItem("agentid_persisted_key", key);
       document.getElementById("nav-user").textContent = me.email || "";
       document.getElementById("auth-wall").style.display = "none";
+      // If another page redirected here for auth, send the user back.
+      const redirect = new URLSearchParams(location.search).get("redirect");
+      if (redirect) { location.href = redirect; return; }
       boot();
     } else {
       errEl.textContent = "Invalid API key — check and try again.";
