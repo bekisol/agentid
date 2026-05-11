@@ -1323,9 +1323,12 @@ function renderFeed() {
   const headerActions = document.getElementById("header-right-actions");
   if (headerActions) headerActions.innerHTML = "";
 
-  // Chat panel auto-opens via selectAgent(); hide the manual button
+  // Show "Chat with Agent" only when panel is closed and an agent is selected
   const chatBtn = document.getElementById("chat-open-btn");
-  if (chatBtn) chatBtn.style.display = "none";
+  if (chatBtn) {
+    const panelOpen = document.getElementById("chat-panel").classList.contains("open");
+    chatBtn.style.display = (_selectedDid && !panelOpen) ? "" : "none";
+  }
   _refreshStopButton();
 
   // Group view is self-contained: showGroupView() owns feed-scroll and
@@ -1852,6 +1855,8 @@ async function _openChatForAgent(agentDid) {
   document.getElementById("chat-panel-subtitle").textContent = "AI-powered · your agent";
   document.getElementById("chat-panel").classList.add("open");
   document.body.classList.add("chat-open");
+  const chatBtn = document.getElementById("chat-open-btn");
+  if (chatBtn) chatBtn.style.display = "none";
   if (switching) {
     // Clear old messages immediately when switching agents so stale content isn't shown
     document.getElementById("chat-panel-messages").innerHTML =
@@ -1870,6 +1875,10 @@ function closeChat() {
   document.getElementById("chat-panel").classList.remove("open");
   document.body.classList.remove("chat-open");
   _stopChatPoll();
+  if (_selectedDid) {
+    const chatBtn = document.getElementById("chat-open-btn");
+    if (chatBtn) chatBtn.style.display = "";
+  }
 }
 
 let _chatPollTimer = null;
