@@ -8172,6 +8172,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // Download button
   document.getElementById("rpt-download-btn")?.addEventListener("click", _submitReportDownload);
 
+  // "Select all sections" checkbox
+  document.getElementById("rpt-select-all")?.addEventListener("change", function() {
+    _rptToggleAll(this.checked);
+  });
+
+  // Agent scope radio buttons — also handled here so inline onchange is a fallback only
+  document.getElementById("rpt-agents-all")?.addEventListener("change", () => _rptToggleAgentScope("all"));
+  document.getElementById("rpt-agents-specific")?.addEventListener("change", () => _rptToggleAgentScope("specific"));
+
   // Escape key
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && mo.style.display !== "none") _closeReportModal();
@@ -8186,7 +8195,7 @@ async function _loadReportAgentList() {
     const data = await apiFetch("/agents?mine=true&limit=200");
     const agents = data.agents || data.items || (Array.isArray(data) ? data : []);
     if (!agents.length) {
-      wrap.innerHTML = '<span style="color:var(--muted);font-size:0.8rem;">No agents found.</span>';
+      wrap.innerHTML = '<span style="color:var(--muted);font-size:0.8rem;">No agents registered yet.</span>';
       return;
     }
     wrap.innerHTML = agents.map(a => {
@@ -8200,7 +8209,9 @@ async function _loadReportAgentList() {
       </label>`;
     }).join("");
   } catch(e) {
-    wrap.innerHTML = '<span style="color:var(--red);font-size:0.8rem;">Could not load agents.</span>';
+    const msg = (e && e.message) ? e.message : "unknown error";
+    console.error("[AgentID] _loadReportAgentList failed:", msg);
+    wrap.innerHTML = `<span style="color:var(--red);font-size:0.8rem;">Could not load agents: ${msg}</span>`;
   }
 }
 
@@ -8250,21 +8261,21 @@ async function _submitReportDownload() {
   btn.disabled = true;
   btn.textContent = "Generating…";
 
+  // 120-second timeout — PDF generation can take a while for large accounts
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000);
+
   try {
-    // Use same auth chain as apiFetch/authFetch: in-memory → session → local persisted → local key
-    const _rptKey = apiKey
-                 || sessionStorage.getItem("agentid_key")
-                 || localStorage.getItem("agentid_persisted_key")
-                 || localStorage.getItem("agentid_key")
-                 || "";
-    const _rptHeaders = { "Content-Type": "application/json" };
-    if (_rptKey) _rptHeaders["x-api-key"] = _rptKey;
-    const res = await fetch(BASE + "/pro/reports/pdf", {
+    // _fetchAuth handles the full auth chain (API key + session cookie)
+    // and always adds credentials: "include" so both auth modes work.
+    const res = await _fetchAuth(BASE + "/pro/reports/pdf", {
       method: "POST",
-      credentials: "include",       // cookie auth (session-mode users)
-      headers: _rptHeaders,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sections, agent_dids, title, date_range }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
+
     if (res.status === 403) throw new Error("PDF reports require a Pro or Enterprise plan.");
     if (!res.ok) {
       let msg = `Server error ${res.status}`;
@@ -8281,7 +8292,12 @@ async function _submitReportDownload() {
     URL.revokeObjectURL(url);
     _closeReportModal();
   } catch(e) {
-    errEl.textContent = e.message || "Download failed. Please try again.";
+    clearTimeout(timeoutId);
+    const msg = e.name === "AbortError"
+      ? "Request timed out — PDF generation took too long. Try fewer sections."
+      : (e.message || "Download failed. Please try again.");
+    console.error("[AgentID] PDF download error:", msg);
+    errEl.textContent = msg;
   } finally {
     btn.disabled = false;
     btn.textContent = "⬇ Download PDF";
