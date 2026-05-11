@@ -77,18 +77,41 @@
     .layout { display:flex; height:100%; }
 
     /* Sidebar */
-    .sidebar { width:220px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
-    .sidebar-header { padding:1rem 1.1rem 0.75rem; border-bottom:1px solid var(--border); flex-shrink:0; }
-    .sidebar-title { font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); }
-    .sidebar-list { overflow-y:auto; flex:1; padding:0.5rem 0; min-height:80px; }
-    .sidebar-item { display:flex; align-items:center; justify-content:space-between; padding:0.6rem 1.1rem; cursor:pointer; border-radius:0; border-left:3px solid transparent; transition:background 0.1s; user-select:none; }
+    .sidebar { width:268px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+    .sidebar-header { padding:0.85rem 1rem 0.75rem; border-bottom:1px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:space-between; }
+    .sidebar-title { font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); }
+    .sidebar-compose-btn { background:none; border:1px solid var(--border-dark); border-radius:7px; padding:0.26rem 0.55rem; cursor:pointer; color:var(--muted); font-size:0.88rem; line-height:1; font-family:inherit; transition:color 0.12s,border-color 0.12s; }
+    .sidebar-compose-btn:hover { color:var(--accent); border-color:var(--accent); }
+
+    /* ── Thread list ── */
+    .thread-list { overflow-y:auto; flex:1; padding:0.2rem 0; min-height:0; }
+    .thread-item { display:flex; align-items:flex-start; padding:0.62rem 0.85rem; cursor:pointer; gap:0.6rem; border-left:3px solid transparent; transition:background 0.1s; user-select:none; }
+    .thread-item:hover { background:var(--surface2); }
+    .thread-item.active { background:var(--accent-light); border-left-color:var(--accent); }
+    .thread-avatar { width:35px; height:35px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:0.82rem; font-weight:700; color:var(--text-2); flex-shrink:0; text-transform:uppercase; }
+    .thread-item.active .thread-avatar { background:var(--accent-light); border-color:var(--accent-border); color:var(--accent); }
+    .thread-item.all-item .thread-avatar { font-size:0.7rem; }
+    .thread-info { flex:1; min-width:0; }
+    .thread-top { display:flex; align-items:baseline; justify-content:space-between; gap:0.2rem; margin-bottom:0.16rem; }
+    .thread-name { font-size:0.84rem; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+    .thread-item.active .thread-name { color:var(--accent); }
+    .thread-item.all-item .thread-name { font-weight:500; color:var(--muted); }
+    .thread-item.all-item.active .thread-name { color:var(--text-2); font-weight:600; }
+    .thread-time { font-size:0.62rem; color:var(--muted); flex-shrink:0; white-space:nowrap; }
+    .thread-sub { font-size:0.7rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.4; }
+    .thread-sub .via { color:var(--text-2); font-weight:500; }
+    .thread-badge { background:var(--accent); color:#fff; font-size:0.6rem; font-weight:700; padding:0.1rem 0.38rem; border-radius:999px; flex-shrink:0; align-self:center; min-width:17px; text-align:center; margin-left:0.2rem; }
+    .thread-sep { height:1px; background:var(--border); margin:0.3rem 0; }
+
+    /* Keep sidebar-item styles for groups/deals */
+    .sidebar-item { display:flex; align-items:center; justify-content:space-between; padding:0.55rem 1rem; cursor:pointer; border-left:3px solid transparent; transition:background 0.1s; user-select:none; }
     .sidebar-item:hover { background:var(--surface2); }
     .sidebar-item.active { background:var(--accent-light); border-left-color:var(--accent); }
-    .sidebar-item-name { font-size:0.85rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+    .sidebar-item-name { font-size:0.84rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
     .sidebar-item.active .sidebar-item-name { color:var(--accent); font-weight:600; }
-    .sidebar-badge { background:var(--accent); color:#fff; font-size:0.65rem; font-weight:700; padding:0.1rem 0.45rem; border-radius:999px; flex-shrink:0; margin-left:0.4rem; }
-    .sidebar-badge-zero { background:var(--surface2); color:var(--muted); font-size:0.65rem; font-weight:600; padding:0.1rem 0.45rem; border-radius:999px; flex-shrink:0; margin-left:0.4rem; }
-    .sidebar-sep { height:1px; background:var(--border); margin:0.4rem 0; }
+    .sidebar-badge { background:var(--accent); color:#fff; font-size:0.65rem; font-weight:700; padding:0.1rem 0.42rem; border-radius:999px; flex-shrink:0; margin-left:0.4rem; }
+    .sidebar-badge-zero { background:var(--surface2); color:var(--muted); font-size:0.65rem; font-weight:600; padding:0.1rem 0.42rem; border-radius:999px; flex-shrink:0; margin-left:0.4rem; }
+    .sidebar-sep { height:1px; background:var(--border); margin:0.3rem 0; }
 
     /* Feed */
     .feed-wrap { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
@@ -371,26 +394,10 @@
     .file-chip-meta { font-size:0.68rem; color:var(--muted); }
     .file-chip-dl { font-size:0.8rem; color:var(--muted); flex-shrink:0; }
 
-    /* ── Conversations sub-sidebar ── */
-    .conv-sidebar-wrap { display:none; flex-direction:column; border-top:1px solid var(--border); flex-shrink:0; }
-    .conv-sidebar-wrap.visible { display:flex; }
-    .conv-sidebar-label { padding:0.5rem 1.1rem 0.3rem; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); display:flex; align-items:center; justify-content:space-between; }
-    .conv-sb-list { overflow-y:auto; max-height:220px; }
-    .conv-sb-item { display:flex; align-items:center; padding:0.5rem 1.1rem 0.5rem 1.4rem; cursor:pointer; border-left:3px solid transparent; transition:background 0.1s; user-select:none; gap:0.5rem; }
-    .conv-sb-item:hover { background:var(--surface2); }
-    .conv-sb-item.active { background:var(--blue-light); border-left-color:var(--blue); }
-    .conv-sb-item.all-item { border-left-color:transparent; padding-left:1.1rem; font-style:italic; }
-    .conv-sb-item.all-item.active { background:var(--surface2); border-left-color:var(--border-dark); font-style:normal; }
-    .conv-sb-info { flex:1; min-width:0; }
-    .conv-sb-name { font-size:0.82rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .conv-sb-item.active .conv-sb-name { color:var(--blue); font-weight:600; }
-    .conv-sb-item.all-item .conv-sb-name { color:var(--muted); }
-    .conv-sb-item.all-item.active .conv-sb-name { color:var(--text-2); }
-    .conv-sb-preview { font-size:0.7rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:0.05rem; }
-    .conv-sb-badge { background:var(--accent); color:#fff; font-size:0.62rem; font-weight:700; padding:0.08rem 0.42rem; border-radius:999px; flex-shrink:0; min-width:18px; text-align:center; }
-    .conv-sb-badge-count { background:var(--surface2); color:var(--muted); font-size:0.62rem; font-weight:600; padding:0.08rem 0.42rem; border-radius:999px; flex-shrink:0; }
-    /* Hide the horizontal chip filter bar — sidebar list replaces it */
+    /* conv-filter-bar hidden — thread list replaces it */
     .conv-filter-bar { display:none !important; }
+    /* conv-sidebar-wrap hidden — no longer used */
+    .conv-sidebar-wrap { display:none !important; }
   </style>
 </head>
 <body>
@@ -480,24 +487,18 @@ document.addEventListener("DOMContentLoaded", () => {
 <div id="app">
   <div class="layout">
 
-    <!-- Sidebar -->
+    <!-- Sidebar — flat thread list (WhatsApp-style) -->
     <div class="sidebar">
       <div class="sidebar-header">
-        <div class="sidebar-title">My Agents</div>
+        <div class="sidebar-title">Messages</div>
+        <button class="sidebar-compose-btn" onclick="openCompose()" title="New message">✏</button>
       </div>
       <div class="sidebar-search">
-        <input type="text" id="sidebar-search-input" placeholder="Search agents…" oninput="_filterSidebar(this.value)" autocomplete="off" />
+        <input type="text" id="sidebar-search-input" placeholder="Search conversations…" oninput="_filterSidebar(this.value)" autocomplete="off" />
       </div>
-      <div class="sidebar-list" id="sidebar-list">
-        <div style="padding:1rem;text-align:center;"><div class="spinner"></div></div>
-      </div>
-
-      <!-- Conversations sub-panel: shown when a specific agent is selected -->
-      <div class="conv-sidebar-wrap" id="conv-sidebar-wrap">
-        <div class="conv-sidebar-label">
-          <span>Conversations</span>
-        </div>
-        <div class="conv-sb-list" id="conv-sidebar-list"></div>
+      <!-- Thread list: all conversations sorted by recency -->
+      <div class="thread-list" id="thread-list">
+        <div style="padding:1.5rem;text-align:center;"><div class="spinner"></div></div>
       </div>
 
       <div class="sidebar-sep"></div>
@@ -508,13 +509,10 @@ document.addEventListener("DOMContentLoaded", () => {
       <div id="sidebar-groups-list"></div>
 
       <div class="sidebar-sep"></div>
-      <div class="sidebar-section"><span>Files</span></div>
+      <div class="sidebar-section"><span>Files &amp; Deals</span></div>
       <div class="sidebar-item-deal" id="sidebar-files-btn" onclick="showFilesView()">
-        📁 My Files <span id="sidebar-files-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
+        📁 Files <span id="sidebar-files-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
       </div>
-
-      <div class="sidebar-sep"></div>
-      <div class="sidebar-section"><span>Deals</span></div>
       <div class="sidebar-item-deal" id="sidebar-deals-btn" onclick="showDealsView()">
         📋 Agent Ledger <span id="sidebar-deals-count" style="margin-left:auto;font-size:0.72rem;color:var(--muted);"></span>
       </div>
@@ -692,8 +690,8 @@ document.addEventListener("DOMContentLoaded", () => {
     </div>
     <div style="padding:1.25rem;display:grid;gap:0.85rem;">
       <div>
-        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">From (your agent DID)</label>
-        <input id="compose-from" type="text" readonly style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:8px;font-size:0.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);background:var(--surface2);outline:none;" />
+        <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">From (your agent)</label>
+        <select id="compose-from" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border-dark);border-radius:8px;font-size:0.84rem;font-family:inherit;color:var(--text);background:var(--surface);outline:none;cursor:pointer;"></select>
       </div>
       <div>
         <label style="display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;">To (recipient DID)</label>
@@ -913,7 +911,6 @@ async function loadAll(silent = false) {
   try {
     // 1. Fetch agent list
     _agents = await fetchAgents();
-    renderSidebar();
 
     // 2. Fetch messages for all agents in parallel
     const results = await Promise.allSettled(
@@ -938,8 +935,10 @@ async function loadAll(silent = false) {
     _messages = [..._msgMap.values()]
       .sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
 
-    renderSidebar();
-    renderFeed();
+    renderThreadList();
+    // Auto-open most relevant thread on first load so chat is immediately visible
+    if (!silent) _autoSelectFirst();
+    else renderFeed();
 
     // Fetch group rooms (fire-and-forget)
     fetch(`${BASE}/pro/chat/rooms`, { headers: apiHeaders(), credentials: "include" })
@@ -968,109 +967,207 @@ function setFeedLoading() {
     '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading messages…</div></div>';
 }
 
-// ── SIDEBAR ───────────────────────────────────────────────────────────────────
-let _sidebarQuery = '';
+// ── THREAD LIST ───────────────────────────────────────────────────────────────
+let _threadQuery = '';
 
 function _filterSidebar(q) {
-  _sidebarQuery = q.trim().toLowerCase();
-  renderSidebar();
+  _threadQuery = q.trim().toLowerCase();
+  renderThreadList();
 }
 
-function renderSidebar() {
-  const list = document.getElementById("sidebar-list");
-
-  // Count unread per agent
-  const unreadMap = {};
-  _messages.forEach(m => {
-    if (!m.read) unreadMap[m._agentDid] = (unreadMap[m._agentDid] || 0) + 1;
+// Build sorted list of unique conversation threads from all messages
+function buildThreadList(messages) {
+  const threads = new Map(); // key: `${agentDid}:::${partnerDid}`
+  for (const m of messages) {
+    const partnerDid  = m.direction === "sent" ? m.to_did   : m.from_did;
+    const partnerName = m.direction === "sent"
+      ? (m.to_name   || m.to_did   || "")
+      : (m.sender_name || m.from_did || "");
+    if (!partnerDid) continue;
+    const key = `${m._agentDid}:::${partnerDid}`;
+    if (!threads.has(key)) {
+      threads.set(key, {
+        agentDid:   m._agentDid,
+        agentName:  m._agentName || m._agentDid.slice(-8),
+        partnerDid,
+        partnerName,
+        unread:     0,
+        total:      0,
+        lastMsg:    "",
+        lastTime:   null,
+      });
+    }
+    const t = threads.get(key);
+    t.total++;
+    if (!m.read && m.direction !== "sent") t.unread++;
+    if (!t.lastTime || new Date(m.sent_at) > new Date(t.lastTime)) {
+      t.lastMsg  = (m.body || "").replace(/\s+/g, " ").slice(0, 55);
+      t.lastTime = m.sent_at;
+    }
+  }
+  // Sort: unread threads first, then by recency
+  return [...threads.values()].sort((a, b) => {
+    if (b.unread !== a.unread) return b.unread - a.unread;
+    return new Date(b.lastTime || 0) - new Date(a.lastTime || 0);
   });
-  const totalUnread = Object.values(unreadMap).reduce((a, b) => a + b, 0);
+}
 
-  const q = _sidebarQuery;
-  const filtered = q
-    ? _agents.filter(a => (a.name || '').toLowerCase().includes(q) || a.did.toLowerCase().includes(q))
-    : _agents;
+function renderThreadList() {
+  const list = document.getElementById("thread-list");
+  if (!list) return;
 
-  let html = '';
-  if (!q) {
-    html += `
-      <div class="sidebar-item${_selectedDid === "" ? " active" : ""}" data-did="">
-        <span class="sidebar-item-name">All agents</span>
-        ${totalUnread > 0
-          ? `<span class="sidebar-badge">${totalUnread}</span>`
-          : `<span class="sidebar-badge-zero">${_messages.length}</span>`}
-      </div>
-      <div class="sidebar-sep"></div>
-    `;
+  let threads = buildThreadList(_messages);
+
+  // Apply search filter
+  const q = _threadQuery;
+  if (q) {
+    threads = threads.filter(t =>
+      (t.partnerName || "").toLowerCase().includes(q) ||
+      (t.agentName   || "").toLowerCase().includes(q) ||
+      (t.lastMsg     || "").toLowerCase().includes(q) ||
+      t.partnerDid.toLowerCase().includes(q)
+    );
   }
 
-  if (!filtered.length) {
-    html += `<div style="padding:1rem;text-align:center;font-size:0.8rem;color:var(--muted);">${q ? 'No matches' : 'No agents yet'}</div>`;
+  const totalUnread = _messages.filter(m => !m.read && m.direction !== "sent").length;
+  const allActive   = (!_selectedDid && !_convFilter) ? " active" : "";
+
+  let html = "";
+
+  // "All messages" catch-all at top (only show when no search)
+  if (!q) {
+    html += `
+      <div class="thread-item all-item${allActive}" onclick="selectThread('',null)">
+        <div class="thread-avatar" style="font-size:0.72rem;">✉</div>
+        <div class="thread-info">
+          <div class="thread-top">
+            <span class="thread-name">All messages</span>
+            ${totalUnread > 0
+              ? `<span class="thread-time" style="color:var(--accent);font-weight:700;">${totalUnread} unread</span>`
+              : `<span class="thread-time">${_messages.length} total</span>`}
+          </div>
+          <div class="thread-sub">Every agent · every conversation</div>
+        </div>
+      </div>
+      <div class="thread-sep"></div>`;
+  }
+
+  if (!threads.length) {
+    html += `<div style="padding:1.5rem 1rem;text-align:center;font-size:0.8rem;color:var(--muted);">${q ? "No matching conversations" : "No messages yet"}</div>`;
   } else {
-    filtered.forEach(a => {
-      const u = unreadMap[a.did] || 0;
-      const total = _messages.filter(m => m._agentDid === a.did).length;
-      const active = _selectedDid === a.did;
-      const label = esc(a.name || a.did.slice(-12));
-      const highlighted = q ? label.replace(new RegExp(`(${esc(q)})`, 'gi'), '<mark style="background:var(--accent-light);color:var(--accent);border-radius:2px;">$1</mark>') : label;
+    for (const t of threads) {
+      const isActive = (_selectedDid === t.agentDid && _convFilter === t.partnerDid);
+      const initials = (t.partnerName || t.partnerDid || "?")[0].toUpperCase();
+      // Display name: partner name if available, else short DID
+      const displayName = t.partnerName
+        ? (t.partnerName.length > 24 ? t.partnerName.slice(0, 22) + "…" : t.partnerName)
+        : (t.partnerDid.length > 22 ? t.partnerDid.slice(0, 9) + "…" + t.partnerDid.slice(-7) : t.partnerDid);
+      const timeStr  = t.lastTime ? relativeTime(t.lastTime) : "";
+      const preview  = t.lastMsg ? esc(t.lastMsg) : '<em style="color:var(--muted)">No messages</em>';
+      const safeADid = t.agentDid.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+      const safePDid = t.partnerDid.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+
+      // Highlight search matches
+      let nameHtml = esc(displayName);
+      if (q) {
+        nameHtml = nameHtml.replace(new RegExp(`(${esc(q)})`, "gi"),
+          '<mark style="background:var(--accent-light);color:var(--accent);border-radius:2px;">$1</mark>');
+      }
+
       html += `
-        <div class="sidebar-item${active ? " active" : ""}" data-did="${esc(a.did)}" data-name="${esc(a.name || "")}">
-          <span class="sidebar-item-name" title="${esc(a.name || a.did)}">${highlighted}</span>
-          ${u > 0
-            ? `<span class="sidebar-badge">${u}</span>`
-            : `<span class="sidebar-badge-zero">${total}</span>`}
+        <div class="thread-item${isActive ? " active" : ""}"
+             onclick="selectThread('${safeADid}','${safePDid}')"
+             title="${esc(t.partnerDid)}">
+          <div class="thread-avatar">${esc(initials)}</div>
+          <div class="thread-info">
+            <div class="thread-top">
+              <span class="thread-name">${nameHtml}</span>
+              <span class="thread-time">${esc(timeStr)}</span>
+            </div>
+            <div class="thread-sub">
+              <span class="via">${esc(t.agentName)}</span> · ${preview}
+            </div>
+          </div>
+          ${t.unread > 0 ? `<span class="thread-badge">${t.unread}</span>` : ""}
         </div>`;
-    });
+    }
   }
 
   list.innerHTML = html;
+}
 
-  list.querySelectorAll(".sidebar-item").forEach(el => {
-    el.addEventListener("click", () => {
-      _lastRenderKey = "";  // force re-render so deals HTML doesn't linger
-      _dealsView = false;
-      _filesView = false;
-      _activeRoomId = null;
-      _stopGroupPoll();
-      _selectedDid = el.dataset.did;
-      list.querySelectorAll(".sidebar-item").forEach(e => e.classList.remove("active"));
-      el.classList.add("active");
-      document.getElementById("sidebar-deals-btn").classList.remove("active");
-      document.getElementById("sidebar-files-btn").classList.remove("active");
-      document.getElementById("deal-search-bar").style.display = "none";
-      document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
-      _activeStops = [];   // clear until fetched so button shows Force Stop, not stale state
-      _convFilter  = null; // reset conversation filter when switching agents
-      renderFeed();
-      // Silently refresh this agent's messages so newly-received messages appear immediately
-      const clickedDid = el.dataset.did;
-      // Load active stops for this agent and update the header button
-      fetch(`${BASE}/pro/agents/comm-stops`, { headers: apiHeaders(), credentials: "include" })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => {
-          if (d && _selectedDid === clickedDid) {
-            _activeStops = (d.stops || []).filter(s => s.did_a === clickedDid || s.did_b === clickedDid);
-            _refreshStopButton();
-          }
-        }).catch(() => {});
-      fetchMessages(clickedDid).then(fresh => {
-        const freshMapped = fresh.map(m => ({ ...m, _agentDid: clickedDid, _agentName: el.dataset.name || clickedDid.slice(-10) }));
-        freshMapped.forEach(m => {
-          const key = `${m.id}:${m._agentDid}`;
-          if (!_messages.some(x => x.id === m.id && x._agentDid === m._agentDid)) _messages.push(m);
-        });
-        _messages.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
-        if (_selectedDid === clickedDid) { _lastRenderKey = ""; renderFeed(); }
-      }).catch(() => {});
+// Called when user clicks a thread item
+function selectThread(agentDid, partnerDid) {
+  _dealsView    = false;
+  _filesView    = false;
+  _activeRoomId = null;
+  _stopGroupPoll();
+  _lastRenderKey = "";
+  _selectedDid   = agentDid  || "";
+  _convFilter    = partnerDid || null;
+  _activeStops   = [];
+
+  document.getElementById("sidebar-deals-btn")?.classList.remove("active");
+  document.getElementById("sidebar-files-btn")?.classList.remove("active");
+  document.getElementById("deal-search-bar").style.display = "none";
+  document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
+
+  renderFeed();
+  renderThreadList(); // sync active highlight
+
+  if (!agentDid) return; // "All messages" view — no per-agent refresh needed
+
+  // Load comm-stops for this agent
+  const capturedDid = agentDid;
+  fetch(`${BASE}/pro/agents/comm-stops`, { headers: apiHeaders(), credentials: "include" })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (d && _selectedDid === capturedDid) {
+        _activeStops = (d.stops || []).filter(s => s.did_a === capturedDid || s.did_b === capturedDid);
+        _refreshStopButton();
+      }
+    }).catch(() => {});
+
+  // Silently refresh this agent's messages
+  const agentObj  = _agents.find(a => a.did === agentDid);
+  const agentName = agentObj?.name || agentDid.slice(-10);
+  fetchMessages(agentDid).then(fresh => {
+    const freshMapped = fresh.map(m => ({ ...m, _agentDid: agentDid, _agentName: agentName }));
+    freshMapped.forEach(m => {
+      if (!_messages.some(x => x.id === m.id && x._agentDid === m._agentDid)) _messages.push(m);
     });
-  });
+    _messages.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
+    if (_selectedDid === agentDid && _convFilter === partnerDid) {
+      _lastRenderKey = "";
+      renderFeed();
+      renderThreadList();
+    }
+  }).catch(() => {});
+}
+
+// Also keep renderSidebar as an alias so any other call sites don't break
+function renderSidebar() { renderThreadList(); }
+
+// Auto-select the best thread after first load (most unread, else most recent)
+function _autoSelectFirst() {
+  if (_selectedDid || _convFilter) return; // already selected
+  const threads = buildThreadList(_messages);
+  if (!threads.length) return;
+  const best = threads.find(t => t.unread > 0) || threads[0];
+  selectThread(best.agentDid, best.partnerDid);
 }
 
 // ── COMPOSE ───────────────────────────────────────────────────────────────────
 function openCompose() {
-  const agent = _agents.find(a => a.did === _selectedDid);
-  if (!agent) return;
-  document.getElementById("compose-from").value    = agent.did;
+  // Populate agent dropdown with all owned agents
+  const sel = document.getElementById("compose-from");
+  sel.innerHTML = _agents.map(a =>
+    `<option value="${esc(a.did)}">${esc(a.name || a.did.slice(-14))}</option>`
+  ).join('');
+  // Pre-select current agent if one is in context
+  if (_selectedDid && _agents.find(a => a.did === _selectedDid)) {
+    sel.value = _selectedDid;
+  }
   document.getElementById("compose-to").value      = "";
   document.getElementById("compose-subject").value = "";
   document.getElementById("compose-body").value    = "";
@@ -1152,109 +1249,13 @@ function trustColor(score) {
 // Track last render to avoid unnecessary DOM rebuilds (fixes flickering)
 let _lastRenderKey = "";
 
-function renderConvFilter(msgs) {
-  const wrap = document.getElementById("conv-sidebar-wrap");
-  const list = document.getElementById("conv-sidebar-list");
-  if (!wrap || !list) return;
-
-  // Only show when viewing a specific agent (not "all" or special views)
-  if (!_selectedDid || _selectedDid === "__deals__" || _selectedDid === "__group__" || _selectedDid === "__files__") {
-    wrap.classList.remove("visible");
-    list.innerHTML = "";
-    return;
-  }
-
-  // Collect unique conversation partners with metadata
-  const partnerMap = new Map(); // did → {name, unread, total, lastMsg}
-  for (const m of msgs) {
-    // For sent messages: the partner is to_did; for received: from_did
-    const partnerDid  = m.direction === "sent" ? m.to_did   : m.from_did;
-    const partnerName = m.direction === "sent"
-      ? (m.to_name || m.to_did || "")
-      : (m.sender_name || m.from_did || "");
-    if (!partnerDid) continue;
-    if (!partnerMap.has(partnerDid)) {
-      partnerMap.set(partnerDid, { name: partnerName, unread: 0, total: 0, lastMsg: "" });
-    }
-    const entry = partnerMap.get(partnerDid);
-    entry.total++;
-    if (!m.read && m.direction !== "sent") entry.unread++;
-    // Track the most recent message snippet
-    if (!entry.lastMsg && m.body) {
-      entry.lastMsg = m.body.slice(0, 48) + (m.body.length > 48 ? "…" : "");
-    }
-  }
-
-  // Hide panel if no partners
-  if (partnerMap.size === 0) {
-    wrap.classList.remove("visible");
-    list.innerHTML = "";
-    return;
-  }
-
-  wrap.classList.add("visible");
-
-  // Build sidebar list
-  const totalUnread = msgs.filter(m => !m.read && m.direction !== "sent").length;
-  const allActive = !_convFilter ? " active" : "";
-
-  let html = `
-    <div class="conv-sb-item all-item${allActive}" onclick="setConvFilter(null)">
-      <div class="conv-sb-info">
-        <div class="conv-sb-name">All threads</div>
-      </div>
-      ${totalUnread > 0
-        ? `<span class="conv-sb-badge">${totalUnread}</span>`
-        : `<span class="conv-sb-badge-count">${msgs.length}</span>`}
-    </div>`;
-
-  // Sort: unread first, then by total desc
-  const sorted = [...partnerMap.entries()]
-    .sort((a, b) => (b[1].unread - a[1].unread) || (b[1].total - a[1].total));
-
-  for (const [did, info] of sorted) {
-    const active = _convFilter === did ? " active" : "";
-    const displayName = info.name
-      ? (info.name.length > 24 ? info.name.slice(0, 22) + "…" : info.name)
-      : (did.length > 20 ? did.slice(0, 8) + "…" + did.slice(-6) : did);
-    const safeDid = did.replace(/'/g, "\\'");
-    const previewHtml = info.lastMsg ? `<div class="conv-sb-preview">${esc(info.lastMsg)}</div>` : "";
-
-    html += `
-      <div class="conv-sb-item${active}" onclick="setConvFilter('${safeDid}')" title="${esc(did)}">
-        <div class="conv-sb-info">
-          <div class="conv-sb-name">${esc(displayName)}</div>
-          ${previewHtml}
-        </div>
-        ${info.unread > 0
-          ? `<span class="conv-sb-badge">${info.unread}</span>`
-          : `<span class="conv-sb-badge-count">${info.total}</span>`}
-      </div>`;
-  }
-
-  list.innerHTML = html;
-}
+// renderConvFilter is now a no-op — the thread list sidebar handles all conversation filtering.
+// The function is kept to avoid breaking the renderFeed() call site.
+function renderConvFilter(msgs) { /* no-op */ }
 
 function setConvFilter(did) {
-  _convFilter = did;
-  _lastRenderKey = "";  // force full re-render
-  // Sync active state in sidebar list without full re-render
-  const list = document.getElementById("conv-sidebar-list");
-  if (list) {
-    list.querySelectorAll(".conv-sb-item").forEach(el => el.classList.remove("active"));
-    if (did === null) {
-      const allItem = list.querySelector(".conv-sb-item.all-item");
-      if (allItem) allItem.classList.add("active");
-    } else {
-      // Find by onclick attribute match
-      list.querySelectorAll(".conv-sb-item:not(.all-item)").forEach(el => {
-        if (el.getAttribute("onclick") && el.getAttribute("onclick").includes(did.replace(/'/g, "\\'"))) {
-          el.classList.add("active");
-        }
-      });
-    }
-  }
-  renderFeed();
+  // Legacy helper — delegates to selectThread so old call sites still work
+  selectThread(_selectedDid, did);
 }
 
 function renderFeed() {
