@@ -5878,6 +5878,15 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => tryOpen(10), 500);
   })();
 
+  // Runtime hashchange handler — fires when sidebar Settings link is clicked.
+  // The IIFE above only handles the initial page load; this catches navigations.
+  window.addEventListener("hashchange", () => {
+    const m = location.hash.match(/^#settings(?:\/([a-z0-9-]+))?$/);
+    if (!m) return;
+    const tab = m[1] || "account";
+    openSettings(tab);
+  });
+
   // URL-fragment driven flows: #reset-password=TOKEN  or  #verify-email=TOKEN
   (function _handleAuthFragment() {
     const m = location.hash.match(/^#(reset-password|verify-email)=([\w-]+)/);
