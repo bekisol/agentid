@@ -868,7 +868,6 @@ async function loadDashboard() {
     loadSigningActivity().catch(e => console.error("loadSigningActivity:", e));
     loadDiscoveryStats().catch(e => console.error("loadDiscoveryStats:", e));
     loadAnomalies().catch(e => console.error("loadAnomalies:", e));
-    _loadApprovals().catch(e => console.warn("loadApprovals:", e));
     _loadGroups().catch?.(e => console.error("loadGroups:", e));
     _initNetworkObserver();
 
@@ -890,6 +889,9 @@ async function loadDashboard() {
   // yet, auto-mint a starter key and surface it with copy-paste snippets.
   // No-op for existing accounts.
   _maybeShowWelcome();
+
+  // Approvals — runs for all tiers (ACP queue is tier-free; review-queue gracefully 403s)
+  _loadApprovals().catch(e => console.warn("loadApprovals:", e));
 
   // Home inbox — load for all tiers (works with free too)
   loadHome().catch(e => console.warn("loadHome:", e));

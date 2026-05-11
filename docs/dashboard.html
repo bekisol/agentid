@@ -4,16 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AgentID — Home</title>
-  <!-- Auth boot: hide login card instantly if session key is stored, prevents flash -->
-  <script>
-    if (sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key")) {
-      document.documentElement.classList.add("authed-boot");
-    }
-  </script>
-  <style>
-    .authed-boot #login-screen { display: none !important; }
-    .authed-boot #dashboard    { display: flex !important; }
-  </style>
   <!-- SEC: frame-ancestors prevents clickjacking; connect-src locks fetch targets -->
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self';
