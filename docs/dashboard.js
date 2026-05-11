@@ -8245,14 +8245,39 @@ function _showOversightPicker(anchor, did, current) {
   const rect   = anchor.getBoundingClientRect();
   const picker = document.createElement("div");
   picker.id    = "oversight-picker";
-  picker.style.cssText = `position:fixed;z-index:9999;background:var(--card-bg,#fff);border:1px solid var(--border-dark);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.13);padding:0.35rem 0;min-width:230px;top:${rect.bottom + 4}px;left:${rect.left}px;`;
+  // Use CSS variables so the popup inherits the active theme automatically
+  picker.style.cssText = [
+    "position:fixed",
+    "z-index:9999",
+    "background:var(--surface)",
+    "border:1px solid var(--border-dark)",
+    "border-radius:10px",
+    "box-shadow:0 4px 24px rgba(0,0,0,0.22)",
+    "padding:0.35rem 0",
+    "min-width:240px",
+    `top:${rect.bottom + 4}px`,
+    `left:${Math.min(rect.left, window.innerWidth - 250)}px`,
+  ].join(";");
 
   picker.innerHTML = _OVERSIGHT_CYCLE.map(level => {
     const isCur = level === current;
-    return `<div data-level="${level}" style="padding:0.45rem 0.85rem;font-size:0.82rem;cursor:pointer;color:${isCur ? "var(--accent)" : "var(--text)"};font-weight:${isCur ? "700" : "400"};display:flex;align-items:center;gap:0.5rem;">
-      ${isCur ? "✓" : " "}&nbsp;${_OVERSIGHT_LABELS[level]}
+    return `<div data-level="${esc(level)}"
+      style="padding:0.5rem 0.9rem;font-size:0.82rem;cursor:pointer;
+             color:${isCur ? "var(--accent)" : "var(--text)"};
+             font-weight:${isCur ? "700" : "400"};
+             display:flex;align-items:center;gap:0.5rem;
+             border-radius:6px;margin:0 0.25rem;
+             transition:background 0.1s;">
+      <span style="width:1rem;flex-shrink:0;color:var(--accent);">${isCur ? "✓" : ""}</span>
+      ${esc(_OVERSIGHT_LABELS[level])}
     </div>`;
   }).join("");
+
+  // Hover highlight using JS (works in both themes)
+  picker.querySelectorAll("[data-level]").forEach(row => {
+    row.addEventListener("mouseenter", () => { row.style.background = "var(--surface2)"; });
+    row.addEventListener("mouseleave", () => { row.style.background = ""; });
+  });
 
   picker.addEventListener("click", async e => {
     const row = e.target.closest("[data-level]");
@@ -8264,7 +8289,12 @@ function _showOversightPicker(anchor, did, current) {
 
   document.body.appendChild(picker);
   // Close on outside click
-  const close = e => { if (!picker.contains(e.target) && e.target !== anchor) { picker.remove(); document.removeEventListener("click", close, true); } };
+  const close = e => {
+    if (!picker.contains(e.target) && e.target !== anchor) {
+      picker.remove();
+      document.removeEventListener("click", close, true);
+    }
+  };
   setTimeout(() => document.addEventListener("click", close, true), 10);
 }
 
