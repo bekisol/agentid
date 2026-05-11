@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "mcp-agentid"
+version = "0.1.0"
+description = "Drop-in identity and trust layer for MCP servers — @secure decorator with DID-based caller verification, trust score gating, and append-only audit logs."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "AgentID Protocol", email = "hello@agentid-protocol.com" }
+]
+keywords = [
+    "mcp", "model-context-protocol", "agentid", "did",
+    "trust", "identity", "security", "audit", "ai-agents"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Internet :: WWW/HTTP",
+]
+requires-python = ">=3.11"
+dependencies = [
+    # Core AgentID SDK for crypto signing (optional — only needed for sign_response=True)
+    # Listed as optional extras so servers that don't need signing stay light.
+]
+
+[project.optional-dependencies]
+signing = [
+    "agentid-protocol>=0.6.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.urls]
+Homepage    = "https://agentid-protocol.com"
+Repository  = "https://github.com/agentid-protocol/agentid"
+Documentation = "https://docs.agentid-protocol.com/mcp"
+"Bug Tracker" = "https://github.com/agentid-protocol/agentid/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mcp_agentid*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

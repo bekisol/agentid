@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "dev", "feature/**"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test-python-sdk:
+    name: Python SDK tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd sdk/python
+          pip install -e ".[test]" || pip install -e .
+          pip install pytest pytest-asyncio cryptography httpx
+
+      - name: Run cross-SDK + unit tests
+        run: |
+          cd sdk/python
+          python -m pytest tests/test_agent.py tests/test_cross_sdk.py -v --tb=short
+
+      - name: Verify 8-symbol public API
+        run: |
+          cd sdk/python
+          python3 -c "
+          from agentid import Agent, signed, verify, find, attest, RemoteAgent, Receipt, TrustScore
+          import agentid
+          required = {'Agent','signed','verify','find','attest','RemoteAgent','Receipt','TrustScore'}
+          actual = set(agentid.__all__)
+          assert actual == required, f'__all__ mismatch: {actual}'
+          print('Public API OK:', sorted(actual))
+          "
+
+      - name: Verify envelope format
+        run: |
+          cd sdk/python
+          python3 -c "
+          from agentid.crypto import sign
+          from agentid.identity import generate_keypair
+          priv, _ = generate_keypair()
+          env = sign(priv, {'test': 1})
+          assert isinstance(env, dict), 'sign() must return dict'
+          assert 'algSuite' in env
+          assert 'version' in env
+          assert 'signature' in env
+          print('Envelope format OK:', list(env.keys()))
+          "
+
+      - name: Verify timestamp is seconds (not milliseconds)
+        run: |
+          cd sdk/python
+          python3 -c "
+          import time, tempfile
+          from agentid import Agent
+          with tempfile.TemporaryDirectory() as d:
+              a = Agent.create('ts-check', [], 'test@x.com', registry_path=d)
+              msg = a.sign({'probe': True})
+              ts = msg['payload']['timestamp']
+              now = int(time.time())
+              assert abs(ts - now) < 5, f'Timestamp {ts} looks like ms (too large for seconds)'
+              print(f'Timestamp OK: {ts} (Unix seconds)')
+          "
