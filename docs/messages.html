@@ -77,10 +77,10 @@
     .layout { display:flex; height:100%; }
 
     /* Sidebar */
-    .sidebar { width:208px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+    .sidebar { width:220px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
     .sidebar-header { padding:1rem 1.1rem 0.75rem; border-bottom:1px solid var(--border); flex-shrink:0; }
     .sidebar-title { font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); }
-    .sidebar-list { overflow-y:auto; flex:1; padding:0.5rem 0; }
+    .sidebar-list { overflow-y:auto; flex:1; padding:0.5rem 0; min-height:80px; }
     .sidebar-item { display:flex; align-items:center; justify-content:space-between; padding:0.6rem 1.1rem; cursor:pointer; border-radius:0; border-left:3px solid transparent; transition:background 0.1s; user-select:none; }
     .sidebar-item:hover { background:var(--surface2); }
     .sidebar-item.active { background:var(--accent-light); border-left-color:var(--accent); }
@@ -370,6 +370,27 @@
     .file-chip-name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .file-chip-meta { font-size:0.68rem; color:var(--muted); }
     .file-chip-dl { font-size:0.8rem; color:var(--muted); flex-shrink:0; }
+
+    /* ── Conversations sub-sidebar ── */
+    .conv-sidebar-wrap { display:none; flex-direction:column; border-top:1px solid var(--border); flex-shrink:0; }
+    .conv-sidebar-wrap.visible { display:flex; }
+    .conv-sidebar-label { padding:0.5rem 1.1rem 0.3rem; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); display:flex; align-items:center; justify-content:space-between; }
+    .conv-sb-list { overflow-y:auto; max-height:220px; }
+    .conv-sb-item { display:flex; align-items:center; padding:0.5rem 1.1rem 0.5rem 1.4rem; cursor:pointer; border-left:3px solid transparent; transition:background 0.1s; user-select:none; gap:0.5rem; }
+    .conv-sb-item:hover { background:var(--surface2); }
+    .conv-sb-item.active { background:var(--blue-light); border-left-color:var(--blue); }
+    .conv-sb-item.all-item { border-left-color:transparent; padding-left:1.1rem; font-style:italic; }
+    .conv-sb-item.all-item.active { background:var(--surface2); border-left-color:var(--border-dark); font-style:normal; }
+    .conv-sb-info { flex:1; min-width:0; }
+    .conv-sb-name { font-size:0.82rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .conv-sb-item.active .conv-sb-name { color:var(--blue); font-weight:600; }
+    .conv-sb-item.all-item .conv-sb-name { color:var(--muted); }
+    .conv-sb-item.all-item.active .conv-sb-name { color:var(--text-2); }
+    .conv-sb-preview { font-size:0.7rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:0.05rem; }
+    .conv-sb-badge { background:var(--accent); color:#fff; font-size:0.62rem; font-weight:700; padding:0.08rem 0.42rem; border-radius:999px; flex-shrink:0; min-width:18px; text-align:center; }
+    .conv-sb-badge-count { background:var(--surface2); color:var(--muted); font-size:0.62rem; font-weight:600; padding:0.08rem 0.42rem; border-radius:999px; flex-shrink:0; }
+    /* Hide the horizontal chip filter bar — sidebar list replaces it */
+    .conv-filter-bar { display:none !important; }
   </style>
 </head>
 <body>
@@ -377,8 +398,9 @@
 <div class="topbar">
   <div class="topbar-brand">Agent<span>ID</span></div>
   <div class="topbar-nav">
-    <a href="dashboard.html">Dashboard</a>
-    <a href="my-agents.html">My Agents</a>
+    <a href="dashboard.html">← Dashboard</a>
+    <a href="messages.html" style="color:var(--text);font-weight:700;">Messages</a>
+    <a href="tasks.html">Tasks</a>
     <a href="contracts.html">Contracts</a>
     <a href="network.html">Network</a>
   </div>
@@ -469,6 +491,15 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="sidebar-list" id="sidebar-list">
         <div style="padding:1rem;text-align:center;"><div class="spinner"></div></div>
       </div>
+
+      <!-- Conversations sub-panel: shown when a specific agent is selected -->
+      <div class="conv-sidebar-wrap" id="conv-sidebar-wrap">
+        <div class="conv-sidebar-label">
+          <span>Conversations</span>
+        </div>
+        <div class="conv-sb-list" id="conv-sidebar-list"></div>
+      </div>
+
       <div class="sidebar-sep"></div>
       <div class="sidebar-section">
         <span>Groups</span>
@@ -1122,55 +1153,107 @@ function trustColor(score) {
 let _lastRenderKey = "";
 
 function renderConvFilter(msgs) {
-  const bar = document.getElementById("conv-filter-bar");
-  if (!bar) return;
+  const wrap = document.getElementById("conv-sidebar-wrap");
+  const list = document.getElementById("conv-sidebar-list");
+  if (!wrap || !list) return;
 
   // Only show when viewing a specific agent (not "all" or special views)
   if (!_selectedDid || _selectedDid === "__deals__" || _selectedDid === "__group__" || _selectedDid === "__files__") {
-    bar.className = "conv-filter-bar";
-    bar.innerHTML = "";
+    wrap.classList.remove("visible");
+    list.innerHTML = "";
     return;
   }
 
-  // Collect unique conversation partners
-  const partnerMap = new Map(); // did → {name, unread}
+  // Collect unique conversation partners with metadata
+  const partnerMap = new Map(); // did → {name, unread, total, lastMsg}
   for (const m of msgs) {
+    // For sent messages: the partner is to_did; for received: from_did
     const partnerDid  = m.direction === "sent" ? m.to_did   : m.from_did;
-    const partnerName = m.direction === "sent" ? (m.sender_name || m.to_did) : (m.sender_name || m.from_did);
+    const partnerName = m.direction === "sent"
+      ? (m.to_name || m.to_did || "")
+      : (m.sender_name || m.from_did || "");
     if (!partnerDid) continue;
-    if (!partnerMap.has(partnerDid)) partnerMap.set(partnerDid, { name: partnerName, unread: 0 });
-    if (!m.read && m.direction !== "sent") partnerMap.get(partnerDid).unread++;
+    if (!partnerMap.has(partnerDid)) {
+      partnerMap.set(partnerDid, { name: partnerName, unread: 0, total: 0, lastMsg: "" });
+    }
+    const entry = partnerMap.get(partnerDid);
+    entry.total++;
+    if (!m.read && m.direction !== "sent") entry.unread++;
+    // Track the most recent message snippet
+    if (!entry.lastMsg && m.body) {
+      entry.lastMsg = m.body.slice(0, 48) + (m.body.length > 48 ? "…" : "");
+    }
   }
 
-  // Hide bar if only one or zero partners
-  if (partnerMap.size <= 1) {
-    bar.className = "conv-filter-bar";
-    bar.innerHTML = "";
-    if (_convFilter) { _convFilter = null; }
+  // Hide panel if no partners
+  if (partnerMap.size === 0) {
+    wrap.classList.remove("visible");
+    list.innerHTML = "";
     return;
   }
 
-  bar.className = "conv-filter-bar visible";
+  wrap.classList.add("visible");
 
-  // Build chips: "All" + one per partner
+  // Build sidebar list
   const totalUnread = msgs.filter(m => !m.read && m.direction !== "sent").length;
-  const allActive   = !_convFilter ? " active" : "";
-  let html = `<span class="conv-chip${allActive}" onclick="setConvFilter(null)">All${totalUnread && _convFilter ? ` <span class='conv-unread'>${totalUnread}</span>` : ""}</span>`;
+  const allActive = !_convFilter ? " active" : "";
 
-  for (const [did, info] of partnerMap) {
-    const active  = _convFilter === did ? " active" : "";
-    const shortName = info.name ? info.name.slice(0, 22) : did.slice(-10);
-    const unreadHtml = info.unread ? ` <span class='conv-unread'>${info.unread}</span>` : "";
-    html += `<span class="conv-chip${active}" onclick="setConvFilter('${did.replace(/'/g,"\\'")}')">
-      ${esc(shortName)}${unreadHtml}
-    </span>`;
+  let html = `
+    <div class="conv-sb-item all-item${allActive}" onclick="setConvFilter(null)">
+      <div class="conv-sb-info">
+        <div class="conv-sb-name">All threads</div>
+      </div>
+      ${totalUnread > 0
+        ? `<span class="conv-sb-badge">${totalUnread}</span>`
+        : `<span class="conv-sb-badge-count">${msgs.length}</span>`}
+    </div>`;
+
+  // Sort: unread first, then by total desc
+  const sorted = [...partnerMap.entries()]
+    .sort((a, b) => (b[1].unread - a[1].unread) || (b[1].total - a[1].total));
+
+  for (const [did, info] of sorted) {
+    const active = _convFilter === did ? " active" : "";
+    const displayName = info.name
+      ? (info.name.length > 24 ? info.name.slice(0, 22) + "…" : info.name)
+      : (did.length > 20 ? did.slice(0, 8) + "…" + did.slice(-6) : did);
+    const safeDid = did.replace(/'/g, "\\'");
+    const previewHtml = info.lastMsg ? `<div class="conv-sb-preview">${esc(info.lastMsg)}</div>` : "";
+
+    html += `
+      <div class="conv-sb-item${active}" onclick="setConvFilter('${safeDid}')" title="${esc(did)}">
+        <div class="conv-sb-info">
+          <div class="conv-sb-name">${esc(displayName)}</div>
+          ${previewHtml}
+        </div>
+        ${info.unread > 0
+          ? `<span class="conv-sb-badge">${info.unread}</span>`
+          : `<span class="conv-sb-badge-count">${info.total}</span>`}
+      </div>`;
   }
-  bar.innerHTML = html;
+
+  list.innerHTML = html;
 }
 
 function setConvFilter(did) {
   _convFilter = did;
   _lastRenderKey = "";  // force full re-render
+  // Sync active state in sidebar list without full re-render
+  const list = document.getElementById("conv-sidebar-list");
+  if (list) {
+    list.querySelectorAll(".conv-sb-item").forEach(el => el.classList.remove("active"));
+    if (did === null) {
+      const allItem = list.querySelector(".conv-sb-item.all-item");
+      if (allItem) allItem.classList.add("active");
+    } else {
+      // Find by onclick attribute match
+      list.querySelectorAll(".conv-sb-item:not(.all-item)").forEach(el => {
+        if (el.getAttribute("onclick") && el.getAttribute("onclick").includes(did.replace(/'/g, "\\'"))) {
+          el.classList.add("active");
+        }
+      });
+    }
+  }
   renderFeed();
 }
 
