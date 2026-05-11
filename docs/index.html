@@ -972,6 +972,12 @@ async function initAuth() {
     if (r.ok) {
       const me = await r.json();
       document.getElementById("nav-user").textContent = me.email || "";
+      // Mark the session so other pages (contracts, messages, etc.) know the
+      // user is authenticated even without an API key (OAuth cookie session).
+      sessionStorage.setItem("agentid_authed", "1");
+      // If another page redirected here for auth, send the user back now.
+      const redirect = new URLSearchParams(location.search).get("redirect");
+      if (redirect) { location.href = redirect; return; }
       boot();
       return;
     }

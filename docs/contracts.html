@@ -400,7 +400,7 @@ function _esc(s) {
 }
 
 async function _call(path, opts = {}) {
-  const headers = Object.assign({ "x-api-key": _apiKey }, opts.headers || {});
+  const headers = Object.assign(_apiKey ? { "x-api-key": _apiKey } : {}, opts.headers || {});
   if (opts.body) headers["content-type"] = "application/json";
   const r = await fetch(BASE + path, { ...opts, headers, credentials: "include" });
   const text = await r.text();
@@ -768,10 +768,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  if (_apiKey) {
-    // Key from storage — use it directly, no validation round-trip needed.
-    // Same pattern as messages.html and every other page in the app.
-    // If the key is stale, the first API call will 401 and we show the wall then.
+  const _authed = _apiKey || sessionStorage.getItem("agentid_authed");
+  if (_authed) {
+    // Key from storage or active OAuth session — proceed directly.
+    // If stale, the first API call will 401.
     _showApp("");
   } else {
     // No session — send to the main sign-in page, which will redirect back here.
