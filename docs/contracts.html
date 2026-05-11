@@ -691,22 +691,28 @@ async function submitPublish() {
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────
+// Called only when the user manually types a key into the auth wall form.
+// For keys already in storage, we skip validation and go straight to boot().
 async function doAuth(key) {
   if (!key) return;
   _apiKey = key.trim();
-  sessionStorage.setItem("agentid_key", _apiKey);
   try {
     const info = await _call("/pro/keys/me");
-    const email = info.owner || "—";
-    document.getElementById("topbar-email").textContent = email;
-    document.getElementById("sidebar-footer").textContent = email;
-    document.getElementById("auth-wall").style.display = "none";
-    document.getElementById("contracts-content").style.display = "block";
-    await loadMyContracts();
+    sessionStorage.setItem("agentid_key", _apiKey);
+    localStorage.setItem("agentid_persisted_key", _apiKey);
+    _showApp(info.owner || "");
   } catch(e) {
     document.getElementById("auth-err").textContent = "Invalid API key.";
     _apiKey = "";
   }
+}
+
+function _showApp(email) {
+  document.getElementById("topbar-email").textContent = email || "";
+  document.getElementById("sidebar-footer").textContent = email || "";
+  document.getElementById("auth-wall").style.display = "none";
+  document.getElementById("contracts-content").style.display = "block";
+  loadMyContracts();
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────
@@ -722,7 +728,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Publish button
   document.getElementById("publish-btn").addEventListener("click", openPublishModal);
 
-  // Auth submit
+  // Auth submit (manual key entry — validate before allowing in)
   document.getElementById("auth-btn").addEventListener("click", () => {
     doAuth(document.getElementById("auth-key-input").value);
   });
@@ -743,7 +749,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.key === "Enter") searchMarket();
   });
 
-  // Check for existing key; if missing, ask sibling tabs via BroadcastChannel
+  // If no key in storage, ask sibling tabs via BroadcastChannel (same mechanism
+  // as dashboard.js). Dashboard responds within ~100ms when open in another tab.
   if (!_apiKey && typeof BroadcastChannel !== "undefined") {
     _apiKey = await new Promise(resolve => {
       const bc = new BroadcastChannel("agentid_session");
@@ -762,7 +769,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   if (_apiKey) {
-    await doAuth(_apiKey);
+    // Key from storage — use it directly, no validation round-trip needed.
+    // Same pattern as messages.html and every other page in the app.
+    // If the key is stale, the first API call will 401 and we show the wall then.
+    _showApp("");
   } else {
     document.getElementById("auth-wall").style.display = "flex";
     document.getElementById("contracts-content").style.display = "none";
