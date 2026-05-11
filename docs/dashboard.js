@@ -8154,6 +8154,13 @@ function _closeReportModal() {
   const mo = document.getElementById("report-modal");
   if (mo) mo.style.display = "none";
 }
+// Close report modal on Escape key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const mo = document.getElementById("report-modal");
+    if (mo && mo.style.display !== "none") { e.stopPropagation(); _closeReportModal(); }
+  }
+});
 
 async function _loadReportAgentList() {
   const wrap = document.getElementById("rpt-agent-checkboxes");
