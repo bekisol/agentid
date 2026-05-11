@@ -125,9 +125,23 @@
     .task-table tr:hover td { background:var(--surface2); }
     .task-table .mono { font-family:"JetBrains Mono",monospace; font-size:0.72rem; color:var(--muted); }
 
-    /* Discover panel */
-    .discover-panel { background:var(--surface2); border-bottom:1px solid var(--border); padding:1rem 1.25rem; }
-    .discover-result-item { display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0; border-top:1px solid var(--border); }
+    /* Contract search */
+    .contract-search-section { padding:1.1rem 1.25rem; border-bottom:1px solid var(--border); }
+    .contract-search-row { display:flex; gap:0.5rem; margin-bottom:0.65rem; }
+    .contract-results-wrap { max-height:280px; overflow-y:auto; }
+    .contract-result-item { display:flex; align-items:flex-start; gap:0.75rem; padding:0.8rem 0; border-bottom:1px solid var(--border); }
+    .contract-result-item:last-child { border-bottom:none; }
+    .contract-result-avatar { width:34px; height:34px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+    .contract-result-info { flex:1; min-width:0; }
+    .contract-result-name { font-size:0.88rem; font-weight:700; color:var(--text); }
+    .contract-result-meta { display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap; margin-top:0.2rem; }
+    .contract-result-desc { font-size:0.78rem; color:var(--muted); margin-top:0.25rem; line-height:1.45; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+
+    /* Selected agent chip */
+    .selected-chip { display:flex; align-items:center; gap:0.85rem; padding:0.75rem 1rem; background:var(--accent-light); border:1px solid var(--accent-border); border-radius:10px; }
+    .selected-chip-avatar { width:36px; height:36px; border-radius:50%; background:var(--accent-border); display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+    .selected-chip-name { font-size:0.9rem; font-weight:700; color:var(--accent); }
+    .selected-chip-meta { font-size:0.75rem; color:var(--muted); margin-top:0.05rem; }
 
     /* Empty / loading */
     .empty-state { padding:2.5rem 1rem; text-align:center; color:var(--muted); font-size:0.86rem; }
@@ -219,7 +233,7 @@
 <div id="app">
   <div class="layout">
 
-    <!-- Sidebar: agent list -->
+    <!-- Sidebar: agent list (sending as) -->
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-title">Sending as</div>
@@ -241,41 +255,66 @@
 
       <div class="pane-scroll">
 
-        <!-- Send Task form -->
+        <!-- Send Task card -->
         <div class="card" id="send-card">
           <div class="card-header">
             <div class="card-title">📤 Send a Task</div>
-            <button class="btn btn-outline" id="discover-toggle-btn" style="font-size:0.78rem;">🔍 Find an Agent</button>
+            <div style="font-size:0.78rem;color:var(--muted);">Find an agent by capability contract</div>
           </div>
 
-          <!-- Agent discovery panel -->
-          <div class="discover-panel" id="discover-panel" style="display:none;">
-            <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
-              <input id="discover-q" class="field-input" placeholder="Search by capability or agent name…" style="flex:1;" />
-              <button class="btn btn-outline" id="discover-search-btn" style="font-size:0.8rem;">Search</button>
+          <!-- Step 1: Contract search -->
+          <div class="contract-search-section" id="contract-search-section">
+            <div class="contract-search-row">
+              <input id="contract-q" class="field-input" style="flex:1;"
+                placeholder="Search capability contracts — e.g. web_search, summarize, generate_report…" />
+              <button class="btn btn-outline" id="contract-search-btn" style="white-space:nowrap;">
+                🔍 Search
+              </button>
             </div>
-            <div id="discover-results" style="font-size:0.83rem;color:var(--muted);">Enter a capability or name above and press Search.</div>
+            <div id="contract-results">
+              <div style="font-size:0.81rem;color:var(--muted);">Type a capability above to find verified agents.</div>
+            </div>
           </div>
 
-          <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;">
-            <div>
-              <label class="field-label">To Agent DID</label>
-              <input id="to-did" class="field-input" placeholder="did:agentid:…" />
+          <!-- Step 2: Task details -->
+          <div style="padding:1.1rem 1.25rem;display:flex;flex-direction:column;gap:0.85rem;">
+
+            <!-- Selected agent chip (hidden until an agent is selected) -->
+            <div id="selected-agent-wrap" style="display:none;">
+              <label class="field-label">Selected Agent</label>
+              <div class="selected-chip" id="selected-chip">
+                <div class="selected-chip-avatar" id="chip-avatar">🤖</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="selected-chip-name" id="chip-name">—</div>
+                  <div class="selected-chip-meta" id="chip-meta"></div>
+                </div>
+                <button class="btn btn-outline" id="change-agent-btn" style="font-size:0.76rem;padding:0.25rem 0.7rem;flex-shrink:0;">
+                  ✕ Change
+                </button>
+              </div>
             </div>
+
+            <!-- Title -->
             <div>
-              <label class="field-label">Capability</label>
-              <input id="capability" class="field-input" placeholder="e.g. summarize_document" />
-            </div>
-            <div style="grid-column:span 2;">
               <label class="field-label">Title <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
               <input id="task-title" class="field-input" placeholder="Short description of what you want done" />
             </div>
-            <div style="grid-column:span 2;">
-              <label class="field-label">Inputs <span style="font-weight:400;color:var(--muted);">(JSON — leave empty if not needed)</span></label>
-              <textarea id="task-inputs" class="field-textarea" rows="3"
-                placeholder='{ "url": "https://example.com/report.pdf", "max_length": 500 }'></textarea>
-            </div>
+
+            <!-- Inputs — JSON textarea, optionally schema-hinted -->
             <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:0.3rem;">
+                <label class="field-label" style="margin-bottom:0;">Inputs</label>
+                <span id="schema-hint-label" style="font-size:0.72rem;color:var(--muted);display:none;">
+                  Fields from contract schema
+                </span>
+              </div>
+              <textarea id="task-inputs" class="field-textarea" rows="4"
+                placeholder='{ "url": "https://example.com/report.pdf", "max_length": 500 }'></textarea>
+              <div id="schema-hint" style="display:none;margin-top:0.35rem;font-size:0.75rem;color:var(--muted);line-height:1.5;"></div>
+            </div>
+
+            <!-- Timeout -->
+            <div style="max-width:200px;">
               <label class="field-label">Timeout</label>
               <select id="task-timeout" class="field-select">
                 <option value="900">15 min</option>
@@ -285,14 +324,16 @@
                 <option value="86400">24 hours</option>
               </select>
             </div>
+
           </div>
+
           <div style="padding:0 1.25rem 1.25rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
             <button class="btn btn-primary" id="send-btn">Send Task</button>
             <span id="send-status" style="font-size:0.82rem;color:var(--muted);"></span>
           </div>
         </div>
 
-        <!-- Task list -->
+        <!-- Task history -->
         <div class="card">
           <div class="card-header">
             <div class="card-title">📋 Task History</div>
@@ -336,16 +377,19 @@
 </div>
 
 <script>
-const BASE    = "https://api.agentid-protocol.com";
-// Mirror dashboard's storage convention:
-//   sessionStorage "agentid_key"          — tab-scoped (set by dashboard on same-tab navigation)
-//   localStorage   "agentid_persisted_key" — cross-tab / cross-restart ("Stay signed in")
+const BASE = "https://api.agentid-protocol.com";
 let apiKey = sessionStorage.getItem("agentid_key")
           || localStorage.getItem("agentid_persisted_key")
           || "";
 let _agents   = [];
 let _fromDid  = "";
 let _taskPage = 1;
+
+// Contract selection state
+let _selectedDid        = "";
+let _selectedCapability = "";
+let _selectedAgentName  = "";
+let _selectedInputSchema = null;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -354,29 +398,21 @@ function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt
 async function downloadAgentFile(fileId, fileName, btn) {
   if (btn) { btn.disabled = true; btn.textContent = "⏳ Downloading…"; }
   try {
-    // Step 1: get fresh metadata (resolves relative paths + refreshes pre-signed URLs)
     const meta = await fetch(`${BASE}/pro/files/${fileId}`, {
       headers: apiKey ? { "x-api-key": apiKey } : {},
       credentials: "include",
     }).then(r => r.json());
 
     let url = meta.url || meta.download_url || "";
-
-    // Normalise: relative URL → absolute (handles legacy stored paths)
     if (url && url.startsWith("/")) url = BASE + url;
-
     if (!url) throw new Error("No download URL returned");
 
-    // Step 2: if it's a pre-signed R2 URL it works directly; for our own
-    // /download endpoint we need to fetch with auth then create a blob link.
     if (url.includes("r2.cloudflarestorage.com") || url.includes("amazonaws.com") ||
         url.includes("X-Amz-") || !url.includes(BASE)) {
-      // External signed URL — open directly
       const a = document.createElement("a");
       a.href = url; a.download = fileName; a.style.display = "none";
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } else {
-      // Our own /download endpoint — fetch with auth headers, create blob
       const resp = await fetch(url, {
         headers: apiKey ? { "x-api-key": apiKey } : {},
         credentials: "include",
@@ -403,6 +439,14 @@ function statusBadge(s) {
   return `<span class="badge badge-${cls[s]||"gray"}">${esc(s)}</span>`;
 }
 
+function trustBadge(score, level) {
+  if (score == null) return `<span class="badge badge-gray">—</span>`;
+  const n = Math.round(score);
+  const lvl = level || (n >= 80 ? "trusted" : n >= 60 ? "basic" : "unverified");
+  const cls = lvl === "verified" ? "green" : lvl === "trusted" ? "blue" : lvl === "basic" ? "yellow" : "gray";
+  return `<span class="badge badge-${cls}">${n}</span>`;
+}
+
 function relTime(iso) {
   if (!iso) return "—";
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
@@ -412,12 +456,19 @@ function relTime(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
+function fmtSla(secs) {
+  if (!secs) return null;
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.round(secs/60)}m`;
+  return `${Math.round(secs/3600)}h`;
+}
+
 async function call(path, opts = {}) {
   const hdrs = { "Content-Type": "application/json", ...(opts.headers||{}) };
-  if (apiKey) hdrs["x-api-key"] = apiKey; // omit empty string so session cookie is used
+  if (apiKey) hdrs["x-api-key"] = apiKey;
   const r = await fetch(BASE + path, {
     ...opts,
-    credentials: "include", // send session cookie for Google OAuth users
+    credentials: "include",
     headers: hdrs,
   });
   if (r.status === 401) { signOut(); throw new Error("Unauthorized"); }
@@ -441,8 +492,6 @@ async function tryApiKey(key) {
     if (!r.ok) return false;
     const me = await r.json();
     apiKey = key;
-    // Store under the same keys the dashboard uses so navigating between pages
-    // doesn't require re-authentication.
     sessionStorage.setItem("agentid_key", key);
     localStorage.setItem("agentid_persisted_key", key);
     const userEl = document.getElementById("topbar-user");
@@ -452,7 +501,6 @@ async function tryApiKey(key) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // Auth wall handlers
   const submitBtn = document.getElementById("apikey-submit");
   const keyInput  = document.getElementById("apikey-input");
   const errEl     = document.getElementById("auth-error");
@@ -475,7 +523,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   submitBtn.addEventListener("click", doKeyLogin);
   keyInput.addEventListener("keydown", e => { if (e.key === "Enter") doKeyLogin(); });
 
-  // Theme toggle
   document.getElementById("theme-btn")?.addEventListener("click", () => {
     const cur = document.documentElement.getAttribute("data-theme");
     const next = cur === "dark" ? "light" : "dark";
@@ -485,7 +532,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const savedTheme = localStorage.getItem("agentid_theme");
   if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
 
-  // Session OAuth redirect — check for session cookie
   if (!apiKey) {
     try {
       const r = await fetch(`${BASE}/auth/me`, { credentials: "include" });
@@ -503,7 +549,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // Existing API key in storage
   const ok = await tryApiKey(apiKey);
   if (!ok) { document.getElementById("auth-wall").style.display = "flex"; return; }
   document.getElementById("auth-wall").style.display = "none";
@@ -535,7 +580,6 @@ async function loadAgents() {
           <div class="agent-did">${esc(a.did.slice(-20))}</div>
         </div>
       </div>`).join("");
-    // Select first agent
     selectAgent(_agents[0].did, _agents[0].name);
     listEl.querySelectorAll(".agent-item").forEach(el => {
       el.addEventListener("click", () => {
@@ -557,18 +601,240 @@ function selectAgent(did, name) {
   loadTasks(1);
 }
 
+// ── contract search & selection ───────────────────────────────────────────────
+async function searchContracts() {
+  const q = document.getElementById("contract-q").value.trim();
+  const resultsEl = document.getElementById("contract-results");
+
+  if (!q) {
+    resultsEl.innerHTML = `<div style="font-size:0.81rem;color:var(--muted);">Type a capability above to find verified agents.</div>`;
+    return;
+  }
+
+  resultsEl.innerHTML = `<div style="padding:0.75rem 0;text-align:center;"><div class="spinner"></div></div>`;
+
+  try {
+    const params = new URLSearchParams({ capability: q, limit: 20 });
+    const data = await call(`/capability-contracts/search?${params}`);
+    const contracts = data.results || (Array.isArray(data) ? data : []);
+
+    if (!contracts.length) {
+      // Fallback: broader search without status filter
+      const broadParams = new URLSearchParams({ capability: q, limit: 15 });
+      let broadData;
+      try { broadData = await call(`/capability-contracts/search?${broadParams}`); } catch(_) {}
+      const broadContracts = broadData ? (broadData.results || []) : [];
+
+      if (!broadContracts.length) {
+        resultsEl.innerHTML = `<div style="font-size:0.82rem;color:var(--muted);padding:0.5rem 0;">No contracts found for "<b>${esc(q)}</b>". Try a broader term like <em>search</em>, <em>summarize</em>, or <em>analyze</em>.</div>`;
+        return;
+      }
+
+      renderContractResults(broadContracts, true);
+      return;
+    }
+
+    renderContractResults(contracts, false);
+  } catch (e) {
+    resultsEl.innerHTML = `<div style="font-size:0.82rem;color:var(--red);">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderContractResults(contracts, isFallback) {
+  const resultsEl = document.getElementById("contract-results");
+
+  const items = contracts.map((c, i) => {
+    const agentDid = c.did || c.agent_did || "";
+    const agentName = c.agent_name || c.name || ("…" + agentDid.slice(-12));
+    const initials = (agentName[0] || "?").toUpperCase();
+    const cap = c.capability || "";
+    // sla is an object: { max_latency_seconds, availability_target, ... }
+    const slaObj = c.sla || {};
+    const slaVal = slaObj.max_latency_seconds || slaObj.sla_response_time_secs || null;
+    const sla = fmtSla(slaVal);
+    // pricing is an object: { model, price_per_call, ... }
+    const pricingObj = c.pricing || {};
+    const price = pricingObj.price_per_call ? `$${pricingObj.price_per_call}/call`
+                : (pricingObj.model === "free" ? "Free" : null);
+    const desc = c.description || "";
+    const contractId = c.id || c.contract_id || agentDid || String(i);
+    const safeId = contractId.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+    // Serialize contract data for onclick (avoid eval/injection)
+    const safePayload = esc(JSON.stringify({
+      did: agentDid,
+      name: agentName,
+      capability: cap,
+      contractId,
+      inputSchema: (c.input_schema && Object.keys(c.input_schema).length) ? c.input_schema : null,
+      sla: slaVal || null,
+      price: pricingObj.price_per_call || null,
+    }));
+
+    return `
+    <div class="contract-result-item">
+      <div class="contract-result-avatar">${esc(initials)}</div>
+      <div class="contract-result-info">
+        <div class="contract-result-name">${esc(agentName)}</div>
+        <div class="contract-result-meta">
+          <span class="badge badge-blue" style="font-size:0.68rem;">${esc(cap)}</span>
+          ${sla ? `<span style="font-size:0.74rem;color:var(--muted);">SLA ~${esc(sla)}</span>` : ""}
+          ${price ? `<span style="font-size:0.74rem;color:var(--muted);">${esc(price)}</span>` : ""}
+          <span id="trust-${esc(safeId)}" style="font-size:0.74rem;"><span style="color:var(--muted);">Trust …</span></span>
+        </div>
+        ${desc ? `<div class="contract-result-desc">${esc(desc)}</div>` : ""}
+      </div>
+      <button class="btn btn-primary" style="font-size:0.76rem;padding:0.3rem 0.75rem;flex-shrink:0;"
+        data-payload="${safePayload}"
+        onclick="_onSelectContract(this)">
+        Select →
+      </button>
+    </div>`;
+  }).join("");
+
+  const note = isFallback ? `<div style="font-size:0.74rem;color:var(--muted);margin-bottom:0.5rem;">No verified contracts found — showing agents by capability.</div>` : "";
+  resultsEl.innerHTML = `${note}<div class="contract-results-wrap">${items}</div>`;
+
+  // Load trust scores async for each unique agent
+  const seen = new Set();
+  contracts.forEach((c) => {
+    const agentDid = c.did || c.agent_did || "";
+    if (!agentDid || seen.has(agentDid)) return;
+    seen.add(agentDid);
+    const contractId = c.id || c.contract_id || agentDid;
+    const safeId = contractId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    _loadTrustScore(agentDid, safeId);
+  });
+}
+
+async function _loadTrustScore(agentDid, safeId) {
+  try {
+    const ts = await call(`/agents/${encodeURIComponent(agentDid)}/trust-score`);
+    const el = document.getElementById(`trust-${safeId}`);
+    if (el) el.innerHTML = trustBadge(ts.score, ts.level);
+  } catch (_) {
+    const el = document.getElementById(`trust-${safeId}`);
+    if (el) el.innerHTML = `<span style="color:var(--muted);font-size:0.74rem;">—</span>`;
+  }
+}
+
+function _onSelectContract(btn) {
+  try {
+    // Decode the HTML-entity-encoded payload safely
+    const div = document.createElement("div");
+    div.innerHTML = btn.getAttribute("data-payload");
+    const payload = JSON.parse(div.textContent || div.innerText);
+    selectContract(payload.did, payload.name, payload.capability, payload.contractId, payload.inputSchema, payload.sla, payload.price);
+  } catch (e) {
+    console.error("[_onSelectContract]", e);
+  }
+}
+
+function selectContract(did, name, capability, contractId, inputSchema, sla, price) {
+  _selectedDid = did;
+  _selectedCapability = capability;
+  _selectedAgentName = name;
+  _selectedInputSchema = inputSchema || null;
+
+  // Update chip
+  const initials = (name || "?")[0].toUpperCase();
+  document.getElementById("chip-avatar").textContent = initials;
+  document.getElementById("chip-name").textContent = name || did.slice(-20);
+
+  const metaParts = [capability];
+  if (sla) metaParts.push(`SLA ~${fmtSla(sla)}`);
+  if (price) metaParts.push(`$${price}/call`);
+  document.getElementById("chip-meta").textContent = metaParts.join(" · ");
+
+  // Show chip, hide search results
+  document.getElementById("selected-agent-wrap").style.display = "block";
+  document.getElementById("contract-results").innerHTML =
+    `<div style="font-size:0.81rem;color:var(--muted);">Agent selected. <a href="#" onclick="clearContractSelection();return false;">Search again</a></div>`;
+  document.getElementById("contract-q").value = "";
+
+  // Schema hint
+  if (inputSchema) {
+    _applyInputSchema(inputSchema);
+  } else {
+    document.getElementById("schema-hint-label").style.display = "none";
+    document.getElementById("schema-hint").style.display = "none";
+    document.getElementById("task-inputs").placeholder = '{ "key": "value" }';
+  }
+
+  // Focus title
+  document.getElementById("task-title").focus();
+}
+
+function clearContractSelection() {
+  _selectedDid = "";
+  _selectedCapability = "";
+  _selectedAgentName = "";
+  _selectedInputSchema = null;
+
+  document.getElementById("selected-agent-wrap").style.display = "none";
+  document.getElementById("contract-results").innerHTML =
+    `<div style="font-size:0.81rem;color:var(--muted);">Type a capability above to find verified agents.</div>`;
+  document.getElementById("task-inputs").value = "";
+  document.getElementById("schema-hint").style.display = "none";
+  document.getElementById("schema-hint-label").style.display = "none";
+  document.getElementById("task-inputs").placeholder = '{ "url": "https://example.com/report.pdf", "max_length": 500 }';
+  document.getElementById("contract-q").focus();
+}
+
+function _applyInputSchema(schema) {
+  // Pre-populate the JSON textarea with required fields as empty values
+  const props = schema.properties || {};
+  const required = new Set(schema.required || []);
+
+  if (!Object.keys(props).length) return;
+
+  // Build a starter JSON with required fields first, then optional
+  const starter = {};
+  // Required first
+  Object.entries(props).forEach(([k, v]) => {
+    if (required.has(k)) {
+      starter[k] = v.default !== undefined ? v.default : (v.type === "number" || v.type === "integer" ? 0 : "");
+    }
+  });
+  // Optional after (commented with type hint)
+  Object.entries(props).forEach(([k, v]) => {
+    if (!required.has(k)) {
+      starter[k] = v.default !== undefined ? v.default : (v.type === "number" || v.type === "integer" ? 0 : "");
+    }
+  });
+
+  document.getElementById("task-inputs").value = JSON.stringify(starter, null, 2);
+
+  // Show field descriptions as hints
+  const hintLines = Object.entries(props).map(([k, v]) => {
+    const req = required.has(k) ? "required" : "optional";
+    const typeStr = v.type || "any";
+    const descStr = v.description ? ` — ${v.description}` : "";
+    return `<span style="color:var(--accent);font-weight:600;">${esc(k)}</span> <span style="color:var(--muted);">(${req}, ${typeStr}${descStr})</span>`;
+  });
+
+  document.getElementById("schema-hint-label").style.display = "block";
+  document.getElementById("schema-hint").style.display = "block";
+  document.getElementById("schema-hint").innerHTML = hintLines.join("<br>");
+}
+
 // ── send task ─────────────────────────────────────────────────────────────────
 async function sendTask() {
-  const toDid      = document.getElementById("to-did").value.trim();
-  const capability = document.getElementById("capability").value.trim();
-  const title      = document.getElementById("task-title").value.trim();
-  const rawInputs  = document.getElementById("task-inputs").value.trim();
-  const statusEl   = document.getElementById("send-status");
-  const btn        = document.getElementById("send-btn");
+  const statusEl = document.getElementById("send-status");
+  const btn      = document.getElementById("send-btn");
 
-  if (!_fromDid)   { statusEl.textContent = "⚠ Select an agent on the left first"; return; }
-  if (!toDid)      { statusEl.textContent = "⚠ Enter a To Agent DID"; return; }
-  if (!capability) { statusEl.textContent = "⚠ Enter a capability name"; return; }
+  if (!_fromDid) {
+    statusEl.textContent = "⚠ Select a sending agent on the left first";
+    return;
+  }
+  if (!_selectedDid) {
+    statusEl.textContent = "⚠ Search and select a target agent above";
+    document.getElementById("contract-q").focus();
+    return;
+  }
+
+  const title     = document.getElementById("task-title").value.trim();
+  const rawInputs = document.getElementById("task-inputs").value.trim();
 
   let inputs = {};
   if (rawInputs) {
@@ -580,15 +846,21 @@ async function sendTask() {
   statusEl.textContent = "Sending…";
   try {
     const timeout = parseInt(document.getElementById("task-timeout").value) || 1800;
-    const task = await call(`/agents/${encodeURIComponent(toDid)}/tasks`, {
+    const task = await call(`/agents/${encodeURIComponent(_selectedDid)}/tasks`, {
       method: "POST",
-      body: JSON.stringify({ from_did: _fromDid, capability, title: title || undefined, inputs, timeout_seconds: timeout }),
+      body: JSON.stringify({
+        from_did: _fromDid,
+        capability: _selectedCapability,
+        title: title || undefined,
+        inputs,
+        timeout_seconds: timeout,
+      }),
     });
-    statusEl.textContent = `✓ Sent — status: ${task.status}`;
-    document.getElementById("to-did").value = "";
-    document.getElementById("capability").value = "";
+    statusEl.textContent = `✓ Task sent — status: ${task.status}`;
+    // Reset form but keep agent selected (user may want to send another task)
     document.getElementById("task-title").value = "";
-    document.getElementById("task-inputs").value = "";
+    document.getElementById("task-inputs").value = _selectedInputSchema ? document.getElementById("task-inputs").value : "";
+    if (_selectedInputSchema) _applyInputSchema(_selectedInputSchema);
     loadTasks(1);
     _schedulePoll();
   } catch (e) {
@@ -615,7 +887,7 @@ async function loadTasks(page = 1) {
     const data  = await call(`/agents/${encodeURIComponent(_fromDid)}/tasks?${params}`);
     const tasks = data.tasks || (Array.isArray(data) ? data : []);
     if (!tasks.length) {
-      wrap.innerHTML = `<div class="empty-state">No tasks yet. Send one above.</div>`;
+      wrap.innerHTML = `<div class="empty-state">No tasks yet. Find an agent above and send one.</div>`;
       return;
     }
     const hasActive = tasks.some(t => ["pending","accepted","running"].includes(t.status));
@@ -641,7 +913,7 @@ async function loadTasks(page = 1) {
         </td>
       </tr>`).join("") +
       `</tbody></table>`;
-    // Simple pager
+
     const total = data.total || tasks.length;
     if (total > 25) {
       const pages = Math.ceil(total / 25);
@@ -661,7 +933,6 @@ function renderOutput(output) {
   if (!output) return `<span style="color:var(--muted);font-size:0.8rem;">(not yet)</span>`;
   if (typeof output === "string") return `<div class="modal-pre">${esc(output)}</div>`;
 
-  // File attachment — show download button prominently
   const fileRef = output.file || (output.results && output.results.file) || null;
   let fileHtml = "";
   if (fileRef && fileRef.file_id) {
@@ -677,15 +948,12 @@ function renderOutput(output) {
     </div>`;
   }
 
-  // Unwrap single-key wrappers like { results: {...} } or { output: {...} }
   let data = output;
   const keys = Object.keys(data);
   if (keys.length === 1 && typeof data[keys[0]] === "object") data = data[keys[0]];
 
-  // Skip the "file" key so it doesn't appear as a card
   const dataNoFile = Object.fromEntries(Object.entries(data).filter(([k]) => k !== "file"));
 
-  // Find the first array value — render as a card list
   const arrKey = Object.keys(dataNoFile).find(k => Array.isArray(dataNoFile[k]));
   if (arrKey) {
     data = dataNoFile;
@@ -693,18 +961,15 @@ function renderOutput(output) {
     if (items.length === 0) return fileHtml || `<span style="color:var(--muted);font-size:0.8rem;">(empty list)</span>`;
     const cards = items.map(item => {
       if (typeof item !== "object") return `<div class="out-item"><div class="out-item-title">${esc(String(item))}</div></div>`;
-      // Pick a title field
       const titleField = ["trend","title","name","label","topic","item","heading","result","key"].find(f => item[f] && typeof item[f] === "string");
       const descField = ["description","desc","summary","text","body","detail","content"].find(f => item[f] && typeof item[f] === "string");
       const srcField = item.source && typeof item.source === "object" ? item.source : null;
       const urlField = item.url || (srcField && srcField.url) || null;
       const srcTitle = (srcField && srcField.title) || item.source_title || null;
-
       let html = `<div class="out-item">`;
       if (titleField) html += `<div class="out-item-title">${esc(item[titleField])}</div>`;
       if (descField)  html += `<div class="out-item-desc">${esc(item[descField])}</div>`;
       if (urlField)   html += `<div class="out-item-source">Source: <a href="${esc(urlField)}" target="_blank" rel="noopener">${esc(srcTitle || urlField)}</a></div>`;
-      // Remaining scalar fields
       const shown = new Set([titleField, descField, "source", "url", "source_title"]);
       Object.entries(item).forEach(([k, v]) => {
         if (!shown.has(k) && typeof v !== "object" && String(v).trim())
@@ -716,14 +981,12 @@ function renderOutput(output) {
     return fileHtml + `<div class="out-list">${cards}</div>`;
   }
 
-  // Flat object → key-value grid
   const flat = Object.entries(dataNoFile).filter(([,v]) => typeof v !== "object");
   if (flat.length > 0) {
     const rows = flat.map(([k,v]) => `<div class="out-kv-key">${esc(k)}</div><div class="out-kv-val">${esc(String(v))}</div>`).join("");
     return fileHtml + `<div class="out-kv">${rows}</div>`;
   }
 
-  // Fallback: syntax-highlighted JSON (or just the file button if that's all there is)
   if (fileHtml && Object.keys(dataNoFile).length === 0) return fileHtml;
   return fileHtml + `<div class="modal-pre">${esc(JSON.stringify(output, null, 2))}</div>`;
 }
@@ -754,13 +1017,12 @@ async function cancelTask(taskId, toDid) {
   } catch (e) { alert("Error: " + e.message); }
 }
 
-// ── auto-poll: refresh every 10s while any task is pending/accepted/running ───
+// ── auto-poll ─────────────────────────────────────────────────────────────────
 let _pollTimer = null;
 function _schedulePoll() {
   clearTimeout(_pollTimer);
   _pollTimer = setTimeout(async () => {
     if (!_fromDid) return;
-    // Only keep polling if there are active tasks
     try {
       const data = await call(`/agents/${encodeURIComponent(_fromDid)}/tasks?limit=25`);
       const tasks = data.tasks || (Array.isArray(data) ? data : []);
@@ -786,45 +1048,20 @@ function bindEventListeners() {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
   });
 
-  // Discover toggle
-  document.getElementById("discover-toggle-btn").addEventListener("click", () => {
-    const p = document.getElementById("discover-panel");
-    p.style.display = p.style.display === "none" ? "block" : "none";
+  // Contract search
+  document.getElementById("contract-search-btn").addEventListener("click", searchContracts);
+  document.getElementById("contract-q").addEventListener("keydown", e => {
+    if (e.key === "Enter") searchContracts();
   });
-  document.getElementById("discover-search-btn").addEventListener("click", discoverAgents);
-  document.getElementById("discover-q").addEventListener("keydown", e => {
-    if (e.key === "Enter") discoverAgents();
-  });
-}
 
-async function discoverAgents() {
-  const q   = document.getElementById("discover-q").value.trim();
-  const res = document.getElementById("discover-results");
-  res.innerHTML = `<div class="spinner" style="width:16px;height:16px;"></div>`;
-  try {
-    const data   = await call(`/agents?${q ? "capability=" + encodeURIComponent(q) : "limit=12"}`);
-    const agents = Array.isArray(data) ? data : (data.agents || data.items || []);
-    if (!agents.length) { res.textContent = "No agents found."; return; }
-    res.innerHTML = agents.map(a => `
-      <div class="discover-result-item">
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;font-size:0.83rem;">${esc(a.name || "Unnamed")}</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:0.69rem;color:var(--muted);">${esc(a.did)}</div>
-          ${(a.capabilities||[]).length ? `<div style="margin-top:0.2rem;">${a.capabilities.slice(0,3).map(c=>`<span class="badge badge-blue" style="font-size:0.68rem;">${esc(c)}</span>`).join(" ")}</div>` : ""}
-        </div>
-        <button class="btn btn-outline" style="font-size:0.75rem;padding:0.25rem 0.65rem;flex-shrink:0;"
-          onclick="document.getElementById('to-did').value='${esc(a.did)}';document.getElementById('discover-panel').style.display='none';">
-          Use
-        </button>
-      </div>`).join("");
-  } catch (e) { res.textContent = "Error: " + e.message; }
+  // Change agent button on chip
+  document.getElementById("change-agent-btn").addEventListener("click", clearContractSelection);
 }
 </script>
 
-<!-- Auth wall inline handler (runs before DOMContentLoaded for fast key check) -->
+<!-- Fast auth check -->
 <script>
 (function() {
-  // Must match the storage keys the dashboard uses.
   const stored = sessionStorage.getItem("agentid_key")
               || localStorage.getItem("agentid_persisted_key");
   if (!stored) {

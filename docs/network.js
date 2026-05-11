@@ -1070,12 +1070,25 @@ function renderDetailPanel(node){
     <button id="dp-copy" style="flex:0 0 auto;padding:0.48rem 0.55rem;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:7px;color:#94a3b8;font-size:0.68rem;cursor:pointer;" title="Copy DID">📋</button>
   </div>`;
 
-  // Load full trust data — also re-fetch if prefetch ran but dimensions are missing
-  if(!_trustScoreCache[node.did]||_trustScoreCache[node.did].dimensions===undefined){
-    _authFetch(`/agents/${encodeURIComponent(node.did)}/trust-score`)
+  // Load full trust data with dimensions — re-fetch if not yet fetched with details
+  const _cached=_trustScoreCache[node.did];
+  const _needsFetch=!_cached||(_cached.dimensions==null&&!_cached._detailFetched);
+  if(_needsFetch){
+    // Mark as in-progress to prevent duplicate fetches
+    _trustScoreCache[node.did]=Object.assign({},_cached,{_detailFetched:true});
+    // Owned agent → use pro endpoint (always has full breakdown)
+    // External agent → use public endpoint with ?detailed=true
+    const _tsPath=node.external
+      ?`/agents/${encodeURIComponent(node.did)}/trust-score?detailed=true`
+      :`/pro/agents/${encodeURIComponent(node.did)}/trust-score`;
+    _authFetch(_tsPath)
       .then(r=>r.ok?r.json():null).then(data=>{
         if(data&&typeof data.score==="number"){
-          _trustScoreCache[node.did]={score:data.score,level:data.level,dimensions:data.dimensions||null};
+          _trustScoreCache[node.did]={
+            score:data.score,level:data.level,
+            dimensions:data.dimensions||null,
+            _detailFetched:true,
+          };
           if(_net.selected===node.did)renderDetailPanel(node);
           draw();
         }
@@ -1261,16 +1274,19 @@ async function loadNetwork(){
   // Start physics — runs until settled
   startSimulation(1);
 
-  // Prefetch trust scores for owned agents in background
-  agents.slice(0,20).forEach(ag=>{
-    if(_trustScoreCache[ag.did])return;
-    _authFetch(`/agents/${encodeURIComponent(ag.did)}/trust-score`)
-      .then(r=>r.ok?r.json():null).then(data=>{
-        if(data&&typeof data.score==="number"){
-          _trustScoreCache[ag.did]={score:data.score,level:data.level,dimensions:data.dimensions||null};
-        }
-      }).catch(()=>{});
-  });
+  // Prefetch trust scores for ALL owned agents in ONE call (dimensions included)
+  _authFetch("/pro/trust-scores")
+    .then(r=>r.ok?r.json():null).then(bulk=>{
+      if(!bulk||!Array.isArray(bulk.agents))return;
+      bulk.agents.forEach(a=>{
+        _trustScoreCache[a.did]={
+          score:a.score, level:a.level,
+          dimensions:a.dimensions||null,
+          _detailFetched:true,
+        };
+      });
+      draw(); // refresh node colors with real trust data
+    }).catch(()=>{});
 }
 
 // ── Auth wall helpers ──────────────────────────────────────────────────────
