@@ -99,6 +99,11 @@ if (apiKey && !sessionStorage.getItem("agentid_key")) {
 let trendChart, capChart;
 let _anomalyTimer = null;
 
+// Module-level slot for _loadGroups — assigned by the DOMContentLoaded
+// setup block so loadDashboard() (a top-level function) can call it.
+// Use _loadGroups?.() at all call sites so it no-ops if setup hasn't run yet.
+let _loadGroups = null;
+
 // ── auto-poll ─────────────────────────────────────────────────────────────────
 let _pollTimer   = null;
 let _lastRefresh = 0;
@@ -895,7 +900,7 @@ async function loadDashboard() {
     loadSigningActivity().catch(e => console.error("loadSigningActivity:", e));
     loadDiscoveryStats().catch(e => console.error("loadDiscoveryStats:", e));
     loadAnomalies().catch(e => console.error("loadAnomalies:", e));
-    _loadGroups().catch?.(e => console.error("loadGroups:", e));
+    _loadGroups?.().catch(e => console.error("loadGroups:", e));
     _initNetworkObserver();
 
     // Start real-time SSE feed (or restart if already running)
@@ -6999,7 +7004,8 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
 
   let _editingGroupId = null;
 
-  async function _loadGroups() {
+  // Assign to module-level slot so loadDashboard() can call it
+  _loadGroups = async function _loadGroupsFn() {
     const container = document.getElementById("groups-list");
     const empty     = document.getElementById("groups-empty");
     if (!container) return;
