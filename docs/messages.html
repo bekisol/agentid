@@ -81,50 +81,53 @@
 
     /* Top panel — FROM (sender = my agent) */
     .sb-panel { display:flex; flex-direction:column; overflow:hidden; }
-    .sb-panel-from { flex:0 0 auto; max-height:48%; border-bottom:2px solid var(--border-dark); }
+    .sb-panel-from { flex:0 0 auto; max-height:52%; border-bottom:2px solid var(--border-dark); }
     .sb-panel-to   { flex:1; min-height:0; }
-    .sb-panel-hdr  { padding:0.5rem 1rem 0.35rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
-    .sb-panel-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; }
-    .sb-panel-from .sb-panel-label { color:var(--accent); }
-    .sb-panel-to   .sb-panel-label { color:var(--blue); }
-    .sb-panel-count { font-size:0.65rem; color:var(--muted); font-weight:500; }
-    .sb-panel-compose { background:none; border:1px solid var(--border-dark); border-radius:6px; padding:0.2rem 0.45rem; cursor:pointer; color:var(--muted); font-size:0.82rem; line-height:1; font-family:inherit; transition:color 0.1s,border-color 0.1s; }
+    .sb-panel-hdr  { padding:0.45rem 0.85rem 0.3rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .sb-panel-label { font-size:0.58rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); }
+    .sb-panel-compose { background:none; border:1px solid var(--border-dark); border-radius:6px; padding:0.18rem 0.42rem; cursor:pointer; color:var(--muted); font-size:0.75rem; line-height:1; font-family:inherit; transition:color 0.1s,border-color 0.1s; }
     .sb-panel-compose:hover { color:var(--accent); border-color:var(--accent); }
-    .sb-search { padding:0 0.75rem 0.4rem; flex-shrink:0; }
-    .sb-search input { width:100%; box-sizing:border-box; padding:0.3rem 0.55rem; border-radius:7px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:0.78rem; font-family:inherit; outline:none; }
+    .sb-search { padding:0 0.65rem 0.35rem; flex-shrink:0; }
+    .sb-search input { width:100%; box-sizing:border-box; padding:0.28rem 0.5rem; border-radius:7px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:0.76rem; font-family:inherit; outline:none; }
     .sb-search input::placeholder { color:var(--muted); }
     .sb-search input:focus { border-color:var(--accent); }
-    .sb-list { overflow-y:auto; flex:1; padding:0.2rem 0; }
+    .sb-list { overflow-y:auto; flex:1; padding:0.1rem 0; }
 
-    /* Shared row styles */
-    .sb-row { display:flex; align-items:center; padding:0.5rem 1rem; cursor:pointer; border-left:3px solid transparent; gap:0.5rem; transition:background 0.1s; user-select:none; }
-    .sb-row:hover { background:var(--surface2); }
-    .sb-row-name { font-size:0.84rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+    /* ── FROM panel: square avatar agent rows ── */
+    .sb-agent-row { display:flex; align-items:center; gap:0.55rem; padding:0.45rem 0.85rem; cursor:pointer; border-left:3px solid transparent; transition:background 0.1s; user-select:none; }
+    .sb-agent-row:hover { background:var(--surface2); }
+    .sb-agent-row.active { background:var(--accent-light); border-left-color:var(--accent); }
+    .sb-agent-sq { width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#fff; flex-shrink:0; letter-spacing:0.01em; }
+    .sb-agent-name { font-size:0.82rem; font-weight:500; color:var(--text-2); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sb-agent-row.active .sb-agent-name { color:var(--accent); font-weight:600; }
+    .sb-agent-badge { font-size:0.6rem; font-weight:700; padding:0.08rem 0.38rem; border-radius:999px; flex-shrink:0; min-width:16px; text-align:center; background:var(--accent); color:#fff; }
+
+    /* ── Channels section inside FROM panel ── */
+    .sb-channels-label { padding:0.35rem 0.85rem 0.15rem; font-size:0.58rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+    .sb-channel-item { display:flex; align-items:center; gap:0.5rem; padding:0.38rem 0.85rem; cursor:pointer; font-size:0.8rem; color:var(--text-2); transition:background 0.1s; user-select:none; }
+    .sb-channel-item:hover { background:var(--surface2); }
+    .sb-channel-item.active { color:var(--accent); background:var(--accent-light); font-weight:600; }
+    .sb-channel-count { margin-left:auto; font-size:0.65rem; font-weight:600; color:var(--muted); }
+
+    /* Shared badge (kept for groups) */
     .sb-row-badge { font-size:0.62rem; font-weight:700; padding:0.08rem 0.4rem; border-radius:999px; flex-shrink:0; min-width:17px; text-align:center; }
     .sb-row-badge.unread { background:var(--accent); color:#fff; }
     .sb-row-badge.zero   { background:var(--surface2); color:var(--muted); }
 
-    /* FROM active row */
-    .sb-panel-from .sb-row.active { background:var(--accent-light); border-left-color:var(--accent); }
-    .sb-panel-from .sb-row.active .sb-row-name { color:var(--accent); font-weight:600; }
-
-    /* TO active row */
-    .sb-panel-to .sb-row.active { background:var(--blue-light); border-left-color:var(--blue); }
-    .sb-panel-to .sb-row.active .sb-row-name { color:var(--blue); font-weight:600; }
-
-    /* TO empty/placeholder state */
+    /* ── TO panel: wireframe thread rows ── */
     .sb-to-placeholder { padding:1.5rem 1rem; text-align:center; font-size:0.78rem; color:var(--muted); line-height:1.6; }
+    .thread-row { padding:0.6rem 0.85rem 0.5rem; cursor:pointer; border-left:3px solid transparent; border-bottom:1px solid var(--border); transition:background 0.1s; user-select:none; }
+    .thread-row:hover { background:var(--surface2); }
+    .thread-row.active { background:var(--accent-light); border-left-color:var(--accent); }
+    .thread-row-top { display:flex; align-items:baseline; justify-content:space-between; gap:0.3rem; margin-bottom:0.18rem; }
+    .thread-row-name { font-size:0.83rem; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+    .thread-row.active .thread-row-name { color:var(--accent); }
+    .thread-row-time { font-size:0.63rem; color:var(--muted); flex-shrink:0; }
+    .thread-row-preview { font-size:0.73rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-bottom:0.22rem; line-height:1.4; }
+    .thread-row-chips { display:flex; gap:0.3rem; flex-wrap:wrap; align-items:center; }
 
-    /* Partner row extras: preview line */
-    .sb-partner-wrap { flex:1; min-width:0; }
-    .sb-partner-name { font-size:0.84rem; font-weight:500; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .sb-partner-preview { font-size:0.68rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:0.06rem; }
-    .sb-panel-to .sb-row.active .sb-partner-name { color:var(--blue); font-weight:600; }
-    .sb-panel-to .sb-row { padding:0.5rem 1rem 0.5rem 1.1rem; align-items:flex-start; }
-    .sb-panel-to .sb-row .sb-row-badge { align-self:center; }
-
-    /* Footer strip for groups/files/deals */
-    .sb-footer { border-top:1px solid var(--border); flex-shrink:0; padding:0.3rem 0; }
+    /* Footer strip for groups/files/deals (kept for JS compatibility) */
+    .sb-footer { display:none; }
     .sb-footer-item { display:flex; align-items:center; gap:0.45rem; padding:0.38rem 1rem; cursor:pointer; font-size:0.8rem; color:var(--muted); transition:background 0.1s; }
     .sb-footer-item:hover { background:var(--surface2); color:var(--text-2); }
     .sb-footer-item.active { color:var(--accent); background:var(--accent-light); }
@@ -558,40 +561,49 @@ document.addEventListener("DOMContentLoaded", () => {
     <!-- Sidebar — two-panel FROM → TO selector -->
     <div class="sidebar">
 
-      <!-- TOP PANEL: FROM — pick your agent (sender) -->
+      <!-- TOP PANEL: FROM — my agents + channels -->
       <div class="sb-panel sb-panel-from">
         <div class="sb-panel-hdr">
-          <span class="sb-panel-label">From</span>
-          <button class="sb-panel-compose" onclick="openCompose()" title="New message">✏ New</button>
-        </div>
-        <div class="sb-search">
-          <input type="text" id="sidebar-search-input" placeholder="Search agents…" oninput="_filterSidebar(this.value)" autocomplete="off" />
+          <span class="sb-panel-label">From (my agents)</span>
         </div>
         <div class="sb-list" id="sb-agents-list">
           <div style="padding:1rem;text-align:center;"><div class="spinner"></div></div>
         </div>
+        <!-- Channels section -->
+        <div style="border-top:1px solid var(--border);flex-shrink:0;">
+          <div class="sb-channels-label">Channels</div>
+          <div class="sb-channel-item" id="sidebar-inbox-btn" onclick="_showInboxView()">
+            <span>📥</span><span>Inbox</span><span class="sb-channel-count" id="sidebar-inbox-count"></span>
+          </div>
+          <div id="sidebar-groups-list" style="padding:0;"></div>
+          <div class="sb-channel-item" id="sidebar-files-btn" onclick="showFilesView()">
+            <span>📁</span><span>Files</span><span class="sb-channel-count" id="sidebar-files-count"></span>
+          </div>
+          <div class="sb-channel-item" id="sidebar-deals-btn" onclick="showDealsView()">
+            <span>📋</span><span>Ledger</span><span class="sb-channel-count" id="sidebar-deals-count"></span>
+          </div>
+        </div>
       </div>
 
-      <!-- BOTTOM PANEL: TO — pick conversation partner (receiver) -->
+      <!-- BOTTOM PANEL: TO — thread list -->
       <div class="sb-panel sb-panel-to">
         <div class="sb-panel-hdr">
-          <span class="sb-panel-label">To</span>
-          <span class="sb-panel-count" id="sb-to-count"></span>
+          <span class="sb-panel-label" id="sb-threads-label">Threads</span>
+          <button class="sb-panel-compose" onclick="openCompose()" title="New message">← new</button>
+        </div>
+        <div class="sb-search">
+          <input type="text" id="sidebar-search-input" placeholder="Search threads…" oninput="_filterSidebar(this.value)" autocomplete="off" />
         </div>
         <div class="sb-list" id="sb-partners-list">
-          <div class="sb-to-placeholder">← Select an agent<br>to see conversations</div>
+          <div class="sb-to-placeholder">← Select an agent<br>to see threads</div>
         </div>
       </div>
 
-      <!-- Footer: groups, files, deals -->
+      <!-- Footer: kept for JS compatibility, hidden via CSS -->
       <div class="sb-footer">
-        <div id="sidebar-groups-list" style="padding:0;"></div>
-        <div class="sb-footer-item" id="sidebar-files-btn" onclick="showFilesView()">
-          📁 Files <span id="sidebar-files-count" style="margin-left:auto;font-size:0.7rem;"></span>
-        </div>
-        <div class="sb-footer-item" id="sidebar-deals-btn" onclick="showDealsView()">
-          📋 Agent Ledger <span id="sidebar-deals-count" style="margin-left:auto;font-size:0.7rem;"></span>
-        </div>
+        <div id="sb-footer-groups-compat" style="display:none;"></div>
+        <div class="sb-footer-item" id="sidebar-files-btn-compat"></div>
+        <div class="sb-footer-item" id="sidebar-deals-btn-compat"></div>
       </div>
 
     </div>
@@ -1080,18 +1092,27 @@ function renderAgentsList() {
     return;
   }
 
-  list.innerHTML = filtered.map(a => {
-    const u     = unreadMap[a.did] || 0;
-    const total = _messages.filter(m => m._agentDid === a.did).length;
+  const _avatarColors = ['#C2410C','#2563EB','#059669','#7C3AED','#0891B2','#B45309','#DB2777','#4F46E5','#0F766E','#9333EA'];
+
+  list.innerHTML = filtered.map((a, idx) => {
+    const u      = unreadMap[a.did] || 0;
     const active = _selectedDid === a.did ? " active" : "";
-    const label  = esc(a.name || a.did.slice(-12));
+    const label  = a.name || a.did.slice(-12);
+    const initials = label.split(/[\s\-_]+/).map(w => w[0] || '').slice(0,2).join('').toUpperCase() || '?';
+    const color  = _avatarColors[idx % _avatarColors.length];
     const safeD  = a.did.replace(/'/g, "\\'");
     return `
-      <div class="sb-row${active}" onclick="selectAgent('${safeD}')" title="${esc(a.did)}">
-        <span class="sb-row-name">${label}</span>
-        <span class="sb-row-badge ${u > 0 ? 'unread' : 'zero'}">${u > 0 ? u : total}</span>
+      <div class="sb-agent-row${active}" onclick="selectAgent('${safeD}')" title="${esc(a.did)}">
+        <div class="sb-agent-sq" style="background:${color}">${esc(initials)}</div>
+        <span class="sb-agent-name">${esc(label)}</span>
+        ${u > 0 ? `<span class="sb-agent-badge">${u}</span>` : ''}
       </div>`;
   }).join('');
+
+  // Update inbox unread count
+  const totalUnread = Object.values(unreadMap).reduce((s, n) => s + n, 0);
+  const inboxCount = document.getElementById("sidebar-inbox-count");
+  if (inboxCount) inboxCount.textContent = totalUnread > 0 ? totalUnread : '';
 }
 
 // Render BOTTOM panel: conversation partners for the selected agent (TO)
@@ -1140,26 +1161,35 @@ function renderPartnersList() {
     (b[1].unread - a[1].unread) || (new Date(b[1].lastTime || 0) - new Date(a[1].lastTime || 0))
   );
 
+  // Update threads header label
+  const labelEl = document.getElementById("sb-threads-label");
+  if (labelEl) labelEl.textContent = `${partnerMap.size} thread${partnerMap.size !== 1 ? 's' : ''} · unread first`;
+
   list.innerHTML = sorted.map(([did, info]) => {
     const active  = _convFilter === did ? " active" : "";
     const display = info.name
-      ? (info.name.length > 22 ? info.name.slice(0, 20) + "…" : info.name)
+      ? (info.name.length > 24 ? info.name.slice(0, 22) + "…" : info.name)
       : (did.length > 20 ? did.slice(0, 8) + "…" + did.slice(-6) : did);
     const safeDid = did.replace(/'/g, "\\'");
-    const preview = info.lastMsg ? esc(info.lastMsg) : "";
-    let sigChip = '';
-    if (info.lastMsgType === 'accept') sigChip = '<span class="sig-tc deal">✓ deal</span>';
-    else if (info.lastMsgType === 'counter') sigChip = '<span class="sig-tc neg">counter</span>';
-    else if (info.lastMsgType === 'reject') sigChip = '<span class="sig-tc fail">✗ reject</span>';
-    else if (info.sigStatus === 'ok') sigChip = '<span class="sig-tc ok">✓ sig</span>';
+    const preview = (info.lastMsg || '').replace(/---\s*✓ Signed[\s\S]*$/, '').replace(/\s+/g, ' ').trim();
+
+    let chips = '';
+    if (info.lastMsgType === 'accept') chips += '<span class="sig-tc deal">✓ deal</span>';
+    else if (info.lastMsgType === 'counter') chips += '<span class="sig-tc neg">counter</span>';
+    else if (info.lastMsgType === 'reject') chips += '<span class="sig-tc fail">✗ reject</span>';
+    else if (info.sigStatus === 'ok') chips += '<span class="sig-tc ok">✓ sig</span>';
+    if (info.unread > 0) chips += `<span class="sig-tc" style="background:var(--accent);color:#fff;border-color:var(--accent);">${info.unread} unread</span>`;
+
+    const timeStr = info.lastTime ? relativeTime(info.lastTime) : '';
+
     return `
-      <div class="sb-row${active}" onclick="selectThread('${_selectedDid.replace(/'/g,"\\'")}','${safeDid}')" title="${esc(did)}">
-        <div class="sb-partner-wrap">
-          <div class="sb-partner-name">${esc(display)}</div>
-          ${preview ? `<div class="sb-partner-preview">${preview}</div>` : ""}
-          ${sigChip ? `<div style="margin-top:0.15rem">${sigChip}</div>` : ""}
+      <div class="thread-row${active}" onclick="selectThread('${_selectedDid.replace(/'/g,"\\'")}','${safeDid}')" title="${esc(did)}">
+        <div class="thread-row-top">
+          <span class="thread-row-name">${esc(display)}</span>
+          <span class="thread-row-time">${esc(timeStr)}</span>
         </div>
-        <span class="sb-row-badge ${info.unread > 0 ? 'unread' : 'zero'}">${info.unread > 0 ? info.unread : info.total}</span>
+        ${preview ? `<div class="thread-row-preview">${esc(preview)}</div>` : ''}
+        ${chips ? `<div class="thread-row-chips">${chips}</div>` : ''}
       </div>`;
   }).join('');
 }
@@ -2296,16 +2326,37 @@ document.getElementById("stop-modal").addEventListener("click", function(e) {
 let _filesView = false;
 let _files = [];
 
+function _clearChannelActive() {
+  document.querySelectorAll(".sb-channel-item").forEach(e => e.classList.remove("active"));
+  document.querySelectorAll(".sb-agent-row").forEach(e => e.classList.remove("active"));
+}
+
+function _showInboxView() {
+  _dealsView = false;
+  _filesView = false;
+  _activeRoomId = null;
+  _stopGroupPoll();
+  _selectedDid = "";
+  _convFilter = null;
+  _clearChannelActive();
+  document.getElementById("sidebar-inbox-btn")?.classList.add("active");
+  document.getElementById("deal-search-bar").style.display = "none";
+  document.getElementById("agent-info").style.display = "none";
+  const labelEl = document.getElementById("sb-threads-label");
+  if (labelEl) labelEl.textContent = "Threads";
+  document.getElementById("sb-partners-list").innerHTML =
+    '<div class="sb-to-placeholder">← Select an agent<br>to see threads</div>';
+  renderFeed();
+}
+
 async function showFilesView() {
   _filesView = true;
   _dealsView = false;
   _activeRoomId = null;
   _stopGroupPoll();
   _selectedDid = "__files__";
-  document.querySelectorAll(".sb-row").forEach(e => e.classList.remove("active"));
-  document.querySelectorAll(".sidebar-item-group").forEach(e => e.classList.remove("active"));
+  _clearChannelActive();
   document.getElementById("sidebar-files-btn").classList.add("active");
-  document.getElementById("sidebar-deals-btn").classList.remove("active");
   document.getElementById("stop-btn").style.display = "none";
   document.getElementById("feed-title").textContent = "My Files";
   document.getElementById("feed-meta").textContent = "";
@@ -2479,7 +2530,7 @@ async function showDealsView(view) {
   if (view) _ledgerView = view;
   _dealsView = true;
   _selectedDid = "__deals__";
-  document.querySelectorAll(".sb-row").forEach(e => e.classList.remove("active"));
+  _clearChannelActive();
   document.getElementById("sidebar-deals-btn").classList.add("active");
   document.getElementById("stop-btn").style.display = "none";
   document.getElementById("feed-title").textContent = "Agent Ledger";
@@ -2970,10 +3021,7 @@ function renderDealModal() {}
 function renderGroupsSidebar() {
   const el = document.getElementById("sidebar-groups-list");
   if (!el) return;
-  if (!_rooms.length) {
-    el.innerHTML = `<div style="padding:0.4rem 1.1rem;font-size:0.78rem;color:var(--muted);">No groups yet</div>`;
-    return;
-  }
+  if (!_rooms.length) { el.innerHTML = ''; return; }
   el.innerHTML = _rooms.map(r => {
     const active = _activeRoomId === r.id;
     const hasPending = r.pending_invites > 0;
