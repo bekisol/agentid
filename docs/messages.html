@@ -1437,7 +1437,11 @@ function renderFeed() {
           document.getElementById("feed-meta").textContent =
             `${_interactions.length} interaction${_interactions.length !== 1 ? "s" : ""}` +
             (dealCount ? ` · ${dealCount} signed deal${dealCount !== 1 ? "s" : ""}` : "");
-          renderDealsView();
+          if (_ledgerView === 'receipts') {
+            _renderReceiptsTable(_messages);
+          } else {
+            renderDealsView();
+          }
           const el = document.getElementById("sidebar-deals-count");
           if (el) el.textContent = _interactions.length > 0 ? _interactions.length : "";
         }
