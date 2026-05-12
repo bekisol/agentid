@@ -896,7 +896,7 @@ async function loadDashboard() {
   // Home inbox — load for all tiers (works with free too)
   loadHome().catch(e => console.warn("loadHome:", e));
 
-  // New execution-layer sections (pro only — errors are silently swallowed for free tier)
+  // New execution-layer sections (pro only)
   if (isPro()) {
     loadRuns().catch(e => console.warn("loadRuns:", e));
     loadHandoffs().catch(e => console.warn("loadHandoffs:", e));
@@ -904,6 +904,17 @@ async function loadDashboard() {
     loadBudget().catch(e => console.warn("loadBudget:", e));
     loadDelegation().catch(e => console.warn("loadDelegation:", e));
     loadCredentials().catch(e => console.warn("loadCredentials:", e));
+  } else {
+    // Free tier — replace static HTML spinners so the page doesn't spin forever
+    const _freeMsg = '<div style="padding:1.1rem 1.25rem;color:var(--muted);font-size:0.83rem;">Available on Pro plan.</div>';
+    ['runs-list','handoffs-list','policy-list','delegation-list','credentials-list'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = _freeMsg;
+    });
+    const bd = document.getElementById('budget-daily');
+    if (bd) bd.innerHTML = '<span style="font-size:0.82rem;color:var(--muted);">Available on Pro plan.</span>';
+    const bp = document.getElementById('budget-risk-policies');
+    if (bp) bp.innerHTML = '<span style="font-size:0.8rem;color:var(--muted);">Available on Pro plan.</span>';
   }
 
   // Start 5s auto-poll after first successful load
@@ -9291,7 +9302,7 @@ async function loadRuns() {
   if (!list) return;
   list.innerHTML = '<div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>';
   try {
-    const data = await apiFetch('/pro/runs?per_page=25');
+    const data = await apiFetch('/pro/runs?limit=25');
     const runs = data.runs || [];
     if (count) count.textContent = data.total ?? runs.length;
     if (!runs.length) {
@@ -9310,12 +9321,12 @@ async function loadRuns() {
       </tr></thead>
       <tbody>${runs.map((r, i) => `
         <tr style="${i % 2 ? 'background:var(--surface2,var(--surface));' : ''}border-bottom:1px solid var(--border);">
-          <td style="padding:0.5rem 1rem;font-family:'JetBrains Mono',monospace;font-size:0.73rem;color:var(--muted);">${_esc(r.id?.slice(0,8))}…</td>
+          <td style="padding:0.5rem 1rem;font-family:'JetBrains Mono',monospace;font-size:0.73rem;color:var(--muted);">${_esc((r.run_id||r.id||'')?.slice(0,8))}…</td>
           <td style="padding:0.5rem 1rem;font-size:0.8rem;">${_esc(r.agent_did?.split(':').pop().slice(0,8))}…</td>
           <td style="padding:0.5rem 1rem;">${_esc(r.capability || '—')}</td>
           <td style="padding:0.5rem 1rem;"><span style="color:${statusColor(r.status)};font-weight:600;">${_esc(r.status || '—')}</span></td>
           <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;">${r.started_at ? new Date(r.started_at).toLocaleString() : '—'}</td>
-          <td style="padding:0.5rem 1rem;"><button class="btn btn-outline" style="font-size:0.72rem;padding:0.2rem 0.55rem;" onclick="_viewRunEvidence('${_esc(r.id)}')">Evidence</button></td>
+          <td style="padding:0.5rem 1rem;"><button class="btn btn-outline" style="font-size:0.72rem;padding:0.2rem 0.55rem;" onclick="_viewRunEvidence('${_esc(r.run_id||r.id||'')}')">Evidence</button></td>
         </tr>`).join('')}
       </tbody></table>`;
   } catch(e) {
@@ -9353,11 +9364,11 @@ async function loadHandoffs() {
   if (!list) return;
   list.innerHTML = '<div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>';
   try {
-    const role   = document.getElementById('handoff-role-filter')?.value || '';
-    const status = document.getElementById('handoff-status-filter')?.value || '';
-    let qs = '/pro/handoffs?per_page=25';
-    if (role)   qs += `&role=${role}`;
-    if (status) qs += `&status=${status}`;
+    const direction = document.getElementById('handoff-role-filter')?.value || '';
+    const status    = document.getElementById('handoff-status-filter')?.value || '';
+    let qs = '/pro/handoffs?limit=25';
+    if (direction) qs += `&direction=${direction}`;
+    if (status)    qs += `&status=${status}`;
     const data     = await apiFetch(qs);
     const handoffs = data.handoffs || [];
     if (count) count.textContent = data.total ?? handoffs.length;
@@ -9371,18 +9382,18 @@ async function loadHandoffs() {
         <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">From</th>
         <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">To</th>
         <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Status</th>
-        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Budget left</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Run</th>
         <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Initiated</th>
-        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Signed</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Reason</th>
       </tr></thead>
       <tbody>${handoffs.map((h, i) => `
         <tr style="${i % 2 ? 'background:var(--surface2,var(--surface));' : ''}border-bottom:1px solid var(--border);">
           <td style="padding:0.5rem 1rem;font-size:0.78rem;font-family:'JetBrains Mono',monospace;">${_esc(h.from_did?.split(':').pop().slice(0,8))}…</td>
           <td style="padding:0.5rem 1rem;font-size:0.78rem;font-family:'JetBrains Mono',monospace;">${_esc(h.to_did?.split(':').pop().slice(0,8))}…</td>
           <td style="padding:0.5rem 1rem;"><span style="color:${statusColor(h.status)};font-weight:600;">${_esc(h.status || '—')}</span></td>
-          <td style="padding:0.5rem 1rem;">${h.budget_remaining != null ? h.budget_remaining : '—'}</td>
+          <td style="padding:0.5rem 1rem;font-size:0.72rem;font-family:'JetBrains Mono',monospace;color:var(--muted);">${_esc((h.run_id||'—')?.slice(0,8))}${h.run_id?'…':''}</td>
           <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;">${h.initiated_at ? new Date(h.initiated_at).toLocaleString() : '—'}</td>
-          <td style="padding:0.5rem 1rem;text-align:center;">${h.from_signature ? '✓' : '—'}</td>
+          <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(h.stop_reason || '—')}</td>
         </tr>`).join('')}
       </tbody></table>`;
   } catch(e) {
@@ -9399,7 +9410,7 @@ async function loadPolicyDecisions() {
   list.innerHTML = '<div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>';
   try {
     const decision = document.getElementById('policy-decision-filter')?.value || '';
-    let qs = '/pro/policy/decisions?per_page=30';
+    let qs = '/pro/policy/decisions?limit=30';
     if (decision) qs += `&decision=${decision}`;
     const data      = await apiFetch(qs);
     const decisions = data.decisions || [];
@@ -9468,9 +9479,8 @@ async function _submitPolicyCheck() {
 // ── BUDGET ───────────────────────────────────────────────────────────────────
 
 async function loadBudget() {
-  const daily   = document.getElementById('budget-daily');
+  const daily    = document.getElementById('budget-daily');
   const policies = document.getElementById('budget-risk-policies');
-  const holds   = document.getElementById('budget-holds-list');
 
   // Daily usage
   if (daily) {
