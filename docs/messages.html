@@ -77,11 +77,11 @@
     .layout { display:flex; height:100%; }
 
     /* ── Sidebar: two-panel sender→receiver selector ── */
-    .sidebar { width:390px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:row; overflow:hidden; }
+    .sidebar { width:430px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:row; overflow:hidden; }
 
     /* Side-by-side panels — FROM (agents) | TO (threads) */
     .sb-panel { display:flex; flex-direction:column; overflow:hidden; height:100%; }
-    .sb-panel-from { flex:0 0 160px; border-right:1px solid var(--border-dark); }
+    .sb-panel-from { flex:0 0 190px; border-right:1px solid var(--border-dark); }
     .sb-panel-to   { flex:1; min-width:0; }
     .sb-panel-hdr  { padding:0.45rem 0.85rem 0.3rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
     .sb-panel-label { font-size:0.58rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); }
@@ -103,11 +103,14 @@
     .sb-agent-badge { font-size:0.6rem; font-weight:700; padding:0.08rem 0.38rem; border-radius:999px; flex-shrink:0; min-width:16px; text-align:center; background:var(--accent); color:#fff; }
 
     /* ── Channels section inside FROM panel ── */
-    .sb-channels-label { padding:0.35rem 0.85rem 0.15rem; font-size:0.58rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
-    .sb-channel-item { display:flex; align-items:center; gap:0.5rem; padding:0.38rem 0.85rem; cursor:pointer; font-size:0.8rem; color:var(--text-2); transition:background 0.1s; user-select:none; }
-    .sb-channel-item:hover { background:var(--surface2); }
-    .sb-channel-item.active { color:var(--accent); background:var(--accent-light); font-weight:600; }
-    .sb-channel-count { margin-left:auto; font-size:0.65rem; font-weight:600; color:var(--muted); }
+    .sb-channels-wrap { border-top:1px solid var(--border); flex-shrink:0; background:var(--surface2); }
+    .sb-channels-label { padding:0.5rem 0.9rem 0.25rem; font-size:0.6rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); }
+    .sb-channel-item { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 0.9rem; cursor:pointer; font-size:0.82rem; font-weight:500; color:var(--text-2); transition:background 0.1s; user-select:none; border-left:3px solid transparent; }
+    .sb-channel-item:hover { background:var(--surface); }
+    .sb-channel-item.active { color:var(--accent); background:var(--accent-light); font-weight:600; border-left-color:var(--accent); }
+    .sb-channel-icon { font-size:1rem; flex-shrink:0; line-height:1; }
+    .sb-channel-count { margin-left:auto; font-size:0.68rem; font-weight:700; color:#fff; background:var(--accent); border-radius:999px; padding:0.05rem 0.42rem; min-width:18px; text-align:center; }
+    .sb-channel-count:empty { display:none; }
 
     /* Shared badge (kept for groups) */
     .sb-row-badge { font-size:0.62rem; font-weight:700; padding:0.08rem 0.4rem; border-radius:999px; flex-shrink:0; min-width:17px; text-align:center; }
@@ -289,8 +292,8 @@
     .sidebar-item-deal.active { background:var(--green-bg); color:#15803d; font-weight:600; }
 
     /* Group items in sidebar */
-    .sidebar-item-group { padding:0.5rem 1.1rem; cursor:pointer; font-size:0.84rem; font-weight:500; color:var(--text-2); display:flex; align-items:center; gap:0.5rem; border-left:3px solid transparent; }
-    .sidebar-item-group:hover { background:var(--surface2); }
+    .sidebar-item-group { padding:0.55rem 0.9rem; cursor:pointer; font-size:0.82rem; font-weight:500; color:var(--text-2); display:flex; align-items:center; gap:0.6rem; border-left:3px solid transparent; }
+    .sidebar-item-group:hover { background:var(--surface); }
     .sidebar-item-group.active { background:rgba(59,130,246,0.1); border-left-color:var(--blue); color:var(--blue); font-weight:600; }
     .sidebar-item-group.pending { border-left-color:#f59e0b; }
     .group-badge { font-size:0.65rem; font-weight:700; padding:0.1rem 0.4rem; border-radius:999px; flex-shrink:0; margin-left:auto; }
@@ -570,17 +573,17 @@ document.addEventListener("DOMContentLoaded", () => {
           <div style="padding:1rem;text-align:center;"><div class="spinner"></div></div>
         </div>
         <!-- Channels section -->
-        <div style="border-top:1px solid var(--border);flex-shrink:0;">
+        <div class="sb-channels-wrap">
           <div class="sb-channels-label">Channels</div>
           <div class="sb-channel-item" id="sidebar-inbox-btn" onclick="_showInboxView()">
-            <span>📥</span><span>Inbox</span><span class="sb-channel-count" id="sidebar-inbox-count"></span>
+            <span class="sb-channel-icon">📥</span><span>Inbox</span><span class="sb-channel-count" id="sidebar-inbox-count"></span>
           </div>
           <div id="sidebar-groups-list" style="padding:0;"></div>
           <div class="sb-channel-item" id="sidebar-files-btn" onclick="showFilesView()">
-            <span>📁</span><span>Files</span><span class="sb-channel-count" id="sidebar-files-count"></span>
+            <span class="sb-channel-icon">📁</span><span>Files</span><span class="sb-channel-count" id="sidebar-files-count"></span>
           </div>
           <div class="sb-channel-item" id="sidebar-deals-btn" onclick="showDealsView()">
-            <span>📋</span><span>Ledger</span><span class="sb-channel-count" id="sidebar-deals-count"></span>
+            <span class="sb-channel-icon">📋</span><span>Ledger</span><span class="sb-channel-count" id="sidebar-deals-count"></span>
           </div>
         </div>
       </div>
