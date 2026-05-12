@@ -2729,18 +2729,27 @@ function _setSseDot(connected) {
 }
 
 async function startSse() {
-  if (!apiKey) return;
   stopSse();
 
-  // Exchange the real API key for a short-lived SSE token so the API key
-  // never appears in the EventSource URL (browser history, access logs).
-  let url = `${BASE}/pro/stream?api_key=${encodeURIComponent(apiKey)}`;
+  // Always try to get a short-lived SSE token via apiFetch — works for BOTH
+  // api-key users AND session/cookie-auth (email+password) users because
+  // apiFetch sends credentials: "include" plus x-api-key when available.
+  // EventSource doesn't support custom headers so we must use a URL token.
+  let url = null;
+
+  // Fallback: raw api_key in URL (only when key exists — never expose empty string)
+  if (apiKey) {
+    url = `${BASE}/pro/stream?api_key=${encodeURIComponent(apiKey)}`;
+  }
+
   try {
     const tok = await apiFetch("/pro/sse-token", { method: "POST" });
-    if (tok && tok.sse_token) {
+    if (tok?.sse_token) {
       url = `${BASE}/pro/stream?sse_token=${encodeURIComponent(tok.sse_token)}`;
     }
-  } catch { /* fall back to api_key param */ }
+  } catch { /* use api_key fallback, or skip SSE if neither is available */ }
+
+  if (!url) return; // No auth available — skip SSE silently
 
   _sseSource = new EventSource(url);
 
@@ -4564,14 +4573,19 @@ async function loadNetworkGraph() {
   if (_net.animId) { cancelAnimationFrame(_net.animId); _net.animId = null; }
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
-  let agents = [], logs = [];
+  let agents = [], logs = [], logsAccessible = true;
   try {
     const [ar, lr] = await Promise.all([
       _authFetch("/agents?mine=true&limit=500"),
       _authFetch("/pro/audit-log/json?limit=500"),
     ]);
     if (ar.ok) agents = (await ar.json()) || [];
-    if (lr.ok) logs   = ((await lr.json()).logs) || [];
+    if (lr.ok) {
+      logs = ((await lr.json()).logs) || [];
+    } else {
+      // 403 = free tier or missing feature; still show agent nodes, note no edge data
+      logsAccessible = (lr.status !== 403);
+    }
   } catch (_) {
     if (pill) { pill.className = "status-pill status-pill-red"; pill.textContent = "error"; }
     return;
@@ -4694,8 +4708,13 @@ async function loadNetworkGraph() {
 
   // ── Pill ──────────────────────────────────────────────────────────────────
   if (pill) {
-    pill.className   = "status-pill status-pill-green";
-    pill.textContent = `${windowLogs.length} events · ${nodeDids.length} agents`;
+    if (!logsAccessible) {
+      pill.className   = "status-pill status-pill-muted";
+      pill.textContent = `${nodeDids.length} agent${nodeDids.length !== 1 ? "s" : ""} · interaction history requires Pro`;
+    } else {
+      pill.className   = "status-pill status-pill-green";
+      pill.textContent = `${windowLogs.length} events · ${nodeDids.length} agents`;
+    }
   }
 
   // ── Run force simulation → animate ───────────────────────────────────────
