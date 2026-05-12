@@ -896,6 +896,16 @@ async function loadDashboard() {
   // Home inbox — load for all tiers (works with free too)
   loadHome().catch(e => console.warn("loadHome:", e));
 
+  // New execution-layer sections (pro only — errors are silently swallowed for free tier)
+  if (isPro()) {
+    loadRuns().catch(e => console.warn("loadRuns:", e));
+    loadHandoffs().catch(e => console.warn("loadHandoffs:", e));
+    loadPolicyDecisions().catch(e => console.warn("loadPolicyDecisions:", e));
+    loadBudget().catch(e => console.warn("loadBudget:", e));
+    loadDelegation().catch(e => console.warn("loadDelegation:", e));
+    loadCredentials().catch(e => console.warn("loadCredentials:", e));
+  }
+
   // Start 5s auto-poll after first successful load
   startPolling();
 }
@@ -7197,7 +7207,7 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
 });
 
 
-const _NAV_SECTIONS = ['home','overview','agents','analytics','network','audit','signing','playground','approvals'];
+const _NAV_SECTIONS = ['home','overview','agents','analytics','network','audit','signing','playground','approvals','runs','handoffs','policy','budget','delegation','credentials'];
 
 function _scrollToSection(nav) {
   const main = document.getElementById('dash-main');
@@ -9271,4 +9281,368 @@ function _esc(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+// ── RUNS ─────────────────────────────────────────────────────────────────────
+
+async function loadRuns() {
+  const list  = document.getElementById('runs-list');
+  const count = document.getElementById('runs-count');
+  if (!list) return;
+  list.innerHTML = '<div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>';
+  try {
+    const data = await apiFetch('/pro/runs?per_page=25');
+    const runs = data.runs || [];
+    if (count) count.textContent = data.total ?? runs.length;
+    if (!runs.length) {
+      list.innerHTML = '<div style="padding:1.1rem 1.25rem;color:var(--muted);font-size:0.83rem;">No runs yet.</div>';
+      return;
+    }
+    const statusColor = s => s === 'completed' ? 'var(--green)' : s === 'running' ? 'var(--accent)' : s === 'failed' ? 'var(--red)' : 'var(--muted)';
+    list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <thead><tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:0.75rem;">
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Run ID</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Agent</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Capability</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Status</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Started</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;"></th>
+      </tr></thead>
+      <tbody>${runs.map((r, i) => `
+        <tr style="${i % 2 ? 'background:var(--surface2,var(--surface));' : ''}border-bottom:1px solid var(--border);">
+          <td style="padding:0.5rem 1rem;font-family:'JetBrains Mono',monospace;font-size:0.73rem;color:var(--muted);">${_esc(r.id?.slice(0,8))}…</td>
+          <td style="padding:0.5rem 1rem;font-size:0.8rem;">${_esc(r.agent_did?.split(':').pop().slice(0,8))}…</td>
+          <td style="padding:0.5rem 1rem;">${_esc(r.capability || '—')}</td>
+          <td style="padding:0.5rem 1rem;"><span style="color:${statusColor(r.status)};font-weight:600;">${_esc(r.status || '—')}</span></td>
+          <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;">${r.started_at ? new Date(r.started_at).toLocaleString() : '—'}</td>
+          <td style="padding:0.5rem 1rem;"><button class="btn btn-outline" style="font-size:0.72rem;padding:0.2rem 0.55rem;" onclick="_viewRunEvidence('${_esc(r.id)}')">Evidence</button></td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) {
+    list.innerHTML = `<div style="padding:1rem;color:var(--muted);font-size:0.82rem;">Could not load runs — ${_esc(String(e?.message || e))}</div>`;
+  }
+}
+
+async function _viewRunEvidence(runId) {
+  const modal = document.getElementById('run-evidence-modal');
+  const body  = document.getElementById('run-evidence-body');
+  if (!modal || !body) return;
+  modal.style.display = 'flex';
+  body.textContent = 'Loading evidence pack…';
+  try {
+    const data = await apiFetch(`/pro/runs/${runId}/evidence`);
+    body.textContent = JSON.stringify(data, null, 2);
+    const dlBtn = document.getElementById('run-evidence-dl-btn');
+    if (dlBtn) dlBtn.onclick = () => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `run_evidence_${runId.slice(0,8)}.json`;
+      a.click();
+    };
+  } catch(e) {
+    body.textContent = `Error: ${e?.message || e}`;
+  }
+}
+
+// ── HANDOFFS ─────────────────────────────────────────────────────────────────
+
+async function loadHandoffs() {
+  const list  = document.getElementById('handoffs-list');
+  const count = document.getElementById('handoffs-count');
+  if (!list) return;
+  list.innerHTML = '<div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>';
+  try {
+    const role   = document.getElementById('handoff-role-filter')?.value || '';
+    const status = document.getElementById('handoff-status-filter')?.value || '';
+    let qs = '/pro/handoffs?per_page=25';
+    if (role)   qs += `&role=${role}`;
+    if (status) qs += `&status=${status}`;
+    const data     = await apiFetch(qs);
+    const handoffs = data.handoffs || [];
+    if (count) count.textContent = data.total ?? handoffs.length;
+    if (!handoffs.length) {
+      list.innerHTML = '<div style="padding:1.1rem 1.25rem;color:var(--muted);font-size:0.83rem;">No handoffs found.</div>';
+      return;
+    }
+    const statusColor = s => s === 'acknowledged' ? 'var(--green)' : s === 'pending' ? 'var(--accent)' : s === 'rejected' ? 'var(--red)' : 'var(--muted)';
+    list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <thead><tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:0.75rem;">
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">From</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">To</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Status</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Budget left</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Initiated</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Signed</th>
+      </tr></thead>
+      <tbody>${handoffs.map((h, i) => `
+        <tr style="${i % 2 ? 'background:var(--surface2,var(--surface));' : ''}border-bottom:1px solid var(--border);">
+          <td style="padding:0.5rem 1rem;font-size:0.78rem;font-family:'JetBrains Mono',monospace;">${_esc(h.from_did?.split(':').pop().slice(0,8))}…</td>
+          <td style="padding:0.5rem 1rem;font-size:0.78rem;font-family:'JetBrains Mono',monospace;">${_esc(h.to_did?.split(':').pop().slice(0,8))}…</td>
+          <td style="padding:0.5rem 1rem;"><span style="color:${statusColor(h.status)};font-weight:600;">${_esc(h.status || '—')}</span></td>
+          <td style="padding:0.5rem 1rem;">${h.budget_remaining != null ? h.budget_remaining : '—'}</td>
+          <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;">${h.initiated_at ? new Date(h.initiated_at).toLocaleString() : '—'}</td>
+          <td style="padding:0.5rem 1rem;text-align:center;">${h.from_signature ? '✓' : '—'}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) {
+    list.innerHTML = `<div style="padding:1rem;color:var(--muted);font-size:0.82rem;">Could not load handoffs — ${_esc(String(e?.message || e))}</div>`;
+  }
+}
+
+// ── POLICY DECISIONS ─────────────────────────────────────────────────────────
+
+async function loadPolicyDecisions() {
+  const list  = document.getElementById('policy-list');
+  const count = document.getElementById('policy-count');
+  if (!list) return;
+  list.innerHTML = '<div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>';
+  try {
+    const decision = document.getElementById('policy-decision-filter')?.value || '';
+    let qs = '/pro/policy/decisions?per_page=30';
+    if (decision) qs += `&decision=${decision}`;
+    const data      = await apiFetch(qs);
+    const decisions = data.decisions || [];
+    if (count) count.textContent = data.total ?? decisions.length;
+    if (!decisions.length) {
+      list.innerHTML = '<div style="padding:1.1rem 1.25rem;color:var(--muted);font-size:0.83rem;">No policy decisions recorded yet.</div>';
+      return;
+    }
+    const decColor = d => d === 'allow' ? 'var(--green)' : d === 'deny' ? 'var(--red)' : d === 'require_approval' ? 'var(--accent)' : 'var(--muted)';
+    list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <thead><tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:0.75rem;">
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Agent</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Capability</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Decision</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Reason</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">When</th>
+      </tr></thead>
+      <tbody>${decisions.map((d, i) => `
+        <tr style="${i % 2 ? 'background:var(--surface2,var(--surface));' : ''}border-bottom:1px solid var(--border);">
+          <td style="padding:0.5rem 1rem;font-size:0.78rem;font-family:'JetBrains Mono',monospace;">${_esc(d.agent_did?.split(':').pop().slice(0,8))}…</td>
+          <td style="padding:0.5rem 1rem;">${_esc(d.capability || '—')}</td>
+          <td style="padding:0.5rem 1rem;"><span style="color:${decColor(d.decision)};font-weight:700;">${_esc(d.decision || '—')}</span></td>
+          <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(d.reason||'')}">${_esc((d.reason||'—').slice(0,60))}</td>
+          <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;">${d.decided_at ? new Date(d.decided_at).toLocaleString() : '—'}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) {
+    list.innerHTML = `<div style="padding:1rem;color:var(--muted);font-size:0.82rem;">Could not load decisions — ${_esc(String(e?.message || e))}</div>`;
+  }
+}
+
+function _openPolicyCheck() {
+  document.getElementById('policy-check-modal').style.display = 'flex';
+  document.getElementById('pc-result').style.display = 'none';
+  document.getElementById('pc-error').textContent = '';
+}
+
+async function _submitPolicyCheck() {
+  const btn = document.getElementById('pc-submit-btn');
+  const resultEl = document.getElementById('pc-result');
+  const errorEl  = document.getElementById('pc-error');
+  btn.disabled = true;
+  errorEl.textContent = '';
+  resultEl.style.display = 'none';
+  try {
+    const body = {
+      agent_did:        document.getElementById('pc-did').value.trim(),
+      capability:       document.getElementById('pc-capability').value.trim(),
+      tool:             document.getElementById('pc-tool').value.trim() || undefined,
+      budget_remaining: document.getElementById('pc-budget').value ? Number(document.getElementById('pc-budget').value) : undefined,
+      data_sensitivity: document.getElementById('pc-sensitivity').value || undefined,
+      run_id:           document.getElementById('pc-run-id').value.trim() || undefined,
+    };
+    if (!body.agent_did || !body.capability) { errorEl.textContent = 'Agent DID and capability are required.'; return; }
+    const data = await apiFetch('/pro/policy/check', { method: 'POST', body: JSON.stringify(body) });
+    resultEl.textContent = JSON.stringify(data, null, 2);
+    resultEl.style.display = 'block';
+    loadPolicyDecisions();
+  } catch(e) {
+    errorEl.textContent = e?.message || String(e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── BUDGET ───────────────────────────────────────────────────────────────────
+
+async function loadBudget() {
+  const daily   = document.getElementById('budget-daily');
+  const policies = document.getElementById('budget-risk-policies');
+  const holds   = document.getElementById('budget-holds-list');
+
+  // Daily usage
+  if (daily) {
+    try {
+      const data = await apiFetch('/pro/budget/daily-usage');
+      const agents = data.agents || [];
+      if (!agents.length) {
+        daily.innerHTML = '<span style="font-size:0.82rem;color:var(--muted);">No budget activity today.</span>';
+      } else {
+        daily.innerHTML = agents.map(a => {
+          const pct = a.daily_cap ? Math.min(100, Math.round(100 * a.total_spent / a.daily_cap)) : null;
+          return `<div style="min-width:160px;">
+            <div style="font-size:0.72rem;color:var(--muted);margin-bottom:2px;">${_esc(a.agent_did?.split(':').pop().slice(0,10))}…</div>
+            <div style="font-size:1.05rem;font-weight:700;">$${Number(a.total_spent).toFixed(2)}</div>
+            <div style="font-size:0.72rem;color:var(--muted);">of ${a.daily_cap != null ? '$'+Number(a.daily_cap).toFixed(2) : '∞'} daily cap${pct != null ? ' · '+pct+'%' : ''}</div>
+            ${pct != null ? `<div style="height:4px;background:var(--border);border-radius:3px;margin-top:4px;"><div style="height:4px;width:${pct}%;background:${pct>80?'var(--red)':'var(--accent)'};border-radius:3px;"></div></div>` : ''}
+          </div>`;
+        }).join('');
+      }
+    } catch(e) {
+      if (daily) daily.innerHTML = `<span style="font-size:0.82rem;color:var(--muted);">Could not load — ${_esc(String(e?.message||e))}</span>`;
+    }
+  }
+
+  // Risk policies
+  if (policies) {
+    try {
+      const data = await apiFetch('/pro/budget/risk-policy');
+      const ps   = data.policies || [];
+      if (!ps.length) {
+        policies.innerHTML = '<span style="font-size:0.8rem;color:var(--muted);">No risk-band caps set. Click "Edit caps" to configure.</span>';
+      } else {
+        policies.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-bottom:0.5rem;">
+          <thead><tr style="color:var(--muted);font-size:0.72rem;">
+            <th style="text-align:left;padding:0.3rem 0.5rem;">Band</th>
+            <th style="text-align:left;padding:0.3rem 0.5rem;">Per run</th>
+            <th style="text-align:left;padding:0.3rem 0.5rem;">Per day</th>
+            <th style="text-align:left;padding:0.3rem 0.5rem;">Per capability</th>
+            <th style="text-align:left;padding:0.3rem 0.5rem;">Hard cap</th>
+          </tr></thead>
+          <tbody>${ps.map(p => `<tr style="border-top:1px solid var(--border);">
+            <td style="padding:0.35rem 0.5rem;font-weight:600;">${_esc(p.risk_band)}</td>
+            <td style="padding:0.35rem 0.5rem;">${p.max_budget_per_run != null ? '$'+p.max_budget_per_run : '—'}</td>
+            <td style="padding:0.35rem 0.5rem;">${p.max_budget_per_day != null ? '$'+p.max_budget_per_day : '—'}</td>
+            <td style="padding:0.35rem 0.5rem;">${p.max_spend_per_capability != null ? '$'+p.max_spend_per_capability : '—'}</td>
+            <td style="padding:0.35rem 0.5rem;">${p.enforce_hard_cap ? '✓' : '—'}</td>
+          </tr>`).join('')}</tbody>
+        </table>`;
+      }
+    } catch(e) {
+      if (policies) policies.innerHTML = `<span style="font-size:0.8rem;color:var(--muted);">Could not load — ${_esc(String(e?.message||e))}</span>`;
+    }
+  }
+}
+
+function _openBudgetPolicyEditor() {
+  document.getElementById('budget-policy-modal').style.display = 'flex';
+  document.getElementById('bp-msg').textContent = '';
+}
+
+async function _saveBudgetPolicy() {
+  const msgEl = document.getElementById('bp-msg');
+  msgEl.textContent = '';
+  try {
+    const body = {
+      risk_band:                document.getElementById('bp-band').value,
+      max_budget_per_run:       document.getElementById('bp-per-run').value ? Number(document.getElementById('bp-per-run').value) : null,
+      max_budget_per_day:       document.getElementById('bp-per-day').value ? Number(document.getElementById('bp-per-day').value) : null,
+      max_spend_per_capability: document.getElementById('bp-per-cap').value ? Number(document.getElementById('bp-per-cap').value) : null,
+      enforce_hard_cap:         document.getElementById('bp-hard-cap').checked,
+    };
+    await apiFetch('/pro/budget/risk-policy', { method: 'PUT', body: JSON.stringify(body) });
+    msgEl.textContent = 'Saved.';
+    msgEl.style.color = 'var(--green)';
+    setTimeout(() => { document.getElementById('budget-policy-modal').style.display = 'none'; loadBudget(); }, 800);
+  } catch(e) {
+    msgEl.textContent = e?.message || String(e);
+    msgEl.style.color = 'var(--red)';
+  }
+}
+
+// ── DELEGATION TOKENS ─────────────────────────────────────────────────────────
+
+async function loadDelegation() {
+  const list  = document.getElementById('delegation-list');
+  const count = document.getElementById('delegation-count');
+  if (!list) return;
+  list.innerHTML = '<div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>';
+  try {
+    const data   = await apiFetch('/pro/delegation?per_page=25');
+    const tokens = data.tokens || [];
+    if (count) count.textContent = data.total ?? tokens.length;
+    if (!tokens.length) {
+      list.innerHTML = '<div style="padding:1.1rem 1.25rem;color:var(--muted);font-size:0.83rem;">No delegation tokens issued yet.</div>';
+      return;
+    }
+    const statusColor = s => s === 'active' ? 'var(--green)' : s === 'revoked' ? 'var(--red)' : 'var(--muted)';
+    list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <thead><tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:0.75rem;">
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Delegator</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Delegate</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Capabilities</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Budget cap</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Status</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Expires</th>
+        <th style="padding:0.55rem 1rem;"></th>
+      </tr></thead>
+      <tbody>${tokens.map((t, i) => `
+        <tr style="${i % 2 ? 'background:var(--surface2,var(--surface));' : ''}border-bottom:1px solid var(--border);">
+          <td style="padding:0.5rem 1rem;font-size:0.75rem;font-family:'JetBrains Mono',monospace;">${_esc(t.delegator_did?.split(':').pop().slice(0,8))}…</td>
+          <td style="padding:0.5rem 1rem;font-size:0.75rem;font-family:'JetBrains Mono',monospace;">${_esc(t.delegate_did?.split(':').pop().slice(0,8))}…</td>
+          <td style="padding:0.5rem 1rem;font-size:0.78rem;">${t.allowed_capabilities?.length ? _esc(t.allowed_capabilities.slice(0,2).join(', ')) + (t.allowed_capabilities.length > 2 ? '…' : '') : '<span style="color:var(--muted)">Any</span>'}</td>
+          <td style="padding:0.5rem 1rem;">${t.budget_cap != null ? '$'+t.budget_cap : '—'}</td>
+          <td style="padding:0.5rem 1rem;"><span style="color:${statusColor(t.status)};font-weight:600;">${_esc(t.status)}</span></td>
+          <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;">${t.expires_at ? new Date(t.expires_at).toLocaleString() : '—'}</td>
+          <td style="padding:0.5rem 1rem;">${t.status === 'active' ? `<button class="btn btn-outline" style="font-size:0.72rem;padding:0.2rem 0.5rem;color:var(--red);border-color:var(--red);" onclick="_revokeToken('delegation','${_esc(t.jti)}')">Revoke</button>` : ''}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) {
+    list.innerHTML = `<div style="padding:1rem;color:var(--muted);font-size:0.82rem;">Could not load — ${_esc(String(e?.message || e))}</div>`;
+  }
+}
+
+// ── TASK CREDENTIALS ─────────────────────────────────────────────────────────
+
+async function loadCredentials() {
+  const list  = document.getElementById('credentials-list');
+  const count = document.getElementById('credentials-count');
+  if (!list) return;
+  list.innerHTML = '<div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>';
+  try {
+    const data  = await apiFetch('/pro/task-identity?per_page=25');
+    const creds = data.credentials || [];
+    if (count) count.textContent = data.total ?? creds.length;
+    if (!creds.length) {
+      list.innerHTML = '<div style="padding:1.1rem 1.25rem;color:var(--muted);font-size:0.83rem;">No task credentials issued yet.</div>';
+      return;
+    }
+    const statusColor = s => s === 'active' ? 'var(--green)' : s === 'revoked' ? 'var(--red)' : 'var(--muted)';
+    list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <thead><tr style="border-bottom:1px solid var(--border);color:var(--muted);font-size:0.75rem;">
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Agent</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Run ID</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Sensitivity</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Status</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Issued</th>
+        <th style="padding:0.55rem 1rem;text-align:left;font-weight:600;">Expires</th>
+        <th style="padding:0.55rem 1rem;"></th>
+      </tr></thead>
+      <tbody>${creds.map((c, i) => `
+        <tr style="${i % 2 ? 'background:var(--surface2,var(--surface));' : ''}border-bottom:1px solid var(--border);">
+          <td style="padding:0.5rem 1rem;font-size:0.75rem;font-family:'JetBrains Mono',monospace;">${_esc(c.agent_did?.split(':').pop().slice(0,8))}…</td>
+          <td style="padding:0.5rem 1rem;font-size:0.75rem;font-family:'JetBrains Mono',monospace;">${c.run_id ? _esc(c.run_id.slice(0,8))+'…' : '—'}</td>
+          <td style="padding:0.5rem 1rem;font-size:0.78rem;">${_esc(c.data_sensitivity || '—')}</td>
+          <td style="padding:0.5rem 1rem;"><span style="color:${statusColor(c.status)};font-weight:600;">${_esc(c.status)}</span></td>
+          <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;">${c.issued_at ? new Date(c.issued_at).toLocaleString() : '—'}</td>
+          <td style="padding:0.5rem 1rem;color:var(--muted);font-size:0.78rem;">${c.expires_at ? new Date(c.expires_at).toLocaleString() : '—'}</td>
+          <td style="padding:0.5rem 1rem;">${c.status === 'active' ? `<button class="btn btn-outline" style="font-size:0.72rem;padding:0.2rem 0.5rem;color:var(--red);border-color:var(--red);" onclick="_revokeToken('task-identity','${_esc(c.jti)}')">Revoke</button>` : ''}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) {
+    list.innerHTML = `<div style="padding:1rem;color:var(--muted);font-size:0.82rem;">Could not load — ${_esc(String(e?.message || e))}</div>`;
+  }
+}
+
+async function _revokeToken(type, jti) {
+  if (!confirm('Revoke this token? This cannot be undone.')) return;
+  try {
+    await apiFetch(`/pro/${type}/${jti}`, { method: 'DELETE' });
+    if (type === 'delegation') loadDelegation();
+    else loadCredentials();
+  } catch(e) {
+    alert(e?.message || String(e));
+  }
 }

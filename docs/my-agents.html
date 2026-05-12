@@ -760,6 +760,32 @@
   </div>
 </div>
 
+<!-- Delegation tokens modal -->
+<div id="delegation-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <span class="modal-title">🔐 Delegation — <span id="delegation-modal-name"></span></span>
+      <button class="modal-close" id="delegation-modal-close">✕</button>
+    </div>
+    <div id="delegation-modal-body" style="padding:1.25rem;min-height:120px;">
+      <div style="text-align:center;color:var(--muted);padding:2rem 0;">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Task credentials modal -->
+<div id="taskcreds-modal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <span class="modal-title">🎫 Task Credentials — <span id="taskcreds-modal-name"></span></span>
+      <button class="modal-close" id="taskcreds-modal-close">✕</button>
+    </div>
+    <div id="taskcreds-modal-body" style="padding:1.25rem;min-height:120px;">
+      <div style="text-align:center;color:var(--muted);padding:2rem 0;">Loading…</div>
+    </div>
+  </div>
+</div>
+
 <script>
 const BASE = "https://api.agentid-protocol.com";
 
@@ -935,6 +961,8 @@ function renderAgentRow(a) {
       <button class="agent-action-btn" data-action="aireply" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Let this agent automatically reply to messages using AI">🤖 Auto-Reply</button>
       <button class="agent-action-btn" data-action="brain" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Edit bootstrap files that shape this agent's personality (SOUL, MISSION, STYLE, TOOLS)">🧬 Brain</button>
       <button class="agent-action-btn" data-action="missions" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="Manage recurring scheduled missions for this agent">⏰ Missions</button>
+      <button class="agent-action-btn" data-action="delegation" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="View delegation tokens issued by or granted to this agent">🔐 Delegation</button>
+      <button class="agent-action-btn" data-action="taskcreds" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;" title="View task-scoped identity credentials for this agent">🎫 Credentials</button>
       <button class="agent-action-btn" data-action="snippets" data-did="${esc(a.did||"")}" data-name="${esc(a.name||"")}" style="margin-left:0.25rem;">&lt;/&gt;</button>
     </td>
   </tr>`;
@@ -1704,8 +1732,10 @@ document.getElementById("agents-container").addEventListener("click", e => {
   if (action === "webhook")   openWebhook(did, name);
   if (action === "aireply")   openAiReply(did, name);
   if (action === "storekey")  openStoreKey(did, name);
-  if (action === "brain")     openBrain(did, name);
-  if (action === "missions")  openMissions(did, name);
+  if (action === "brain")       openBrain(did, name);
+  if (action === "missions")    openMissions(did, name);
+  if (action === "delegation")  openDelegationModal(did, name);
+  if (action === "taskcreds")   openTaskCredsModal(did, name);
 });
 
 // ── Webhook modal ─────────────────────────────────────────────────────────────
@@ -2136,6 +2166,148 @@ document.getElementById("aireply-modal").addEventListener("click", function(e) {
     });
   }
 })();
+
+// ── DELEGATION TOKENS MODAL ───────────────────────────────────────────────────
+let _delegationDid = "";
+
+async function openDelegationModal(did, name) {
+  _delegationDid = did;
+  document.getElementById("delegation-modal-name").textContent = name;
+  document.getElementById("delegation-modal-body").innerHTML =
+    '<div style="text-align:center;color:var(--muted);padding:2rem 0;"><div class="spinner" style="margin:0 auto 0.5rem;"></div>Loading…</div>';
+  document.getElementById("delegation-modal").style.display = "flex";
+
+  try {
+    const r = await fetch(`${BASE}/pro/delegation/list?agent_did=${encodeURIComponent(did)}&limit=100`, { credentials: "include" });
+    if (!r.ok) throw new Error(`Error ${r.status}`);
+    const data = await r.json();
+    const tokens = data.tokens || [];
+    if (!tokens.length) {
+      document.getElementById("delegation-modal-body").innerHTML =
+        '<div style="text-align:center;color:var(--muted);padding:2rem 0;">No delegation tokens found for this agent.</div>';
+      return;
+    }
+    const rows = tokens.map(t => {
+      const exp = t.expires_at ? new Date(t.expires_at).toLocaleString(undefined, { month:"short", day:"numeric", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
+      const rev = t.revoked ? '<span style="color:#ef4444;font-weight:700;">revoked</span>' : '<span style="color:#22c55e;font-weight:700;">active</span>';
+      return `<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;">${esc((t.jti||"").slice(0,14))}…</td>
+        <td style="font-size:0.73rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.delegatee_did||"—")}</td>
+        <td style="font-size:0.73rem;">${esc((t.scope||[]).join(", ")||"—")}</td>
+        <td>${rev}</td>
+        <td style="font-size:0.72rem;color:var(--muted);">${esc(exp)}</td>
+        <td>${t.revoked ? "" : `<button class="agent-action-btn" onclick="_revokeDelegation('${esc(t.jti)}')">Revoke</button>`}</td>
+      </tr>`;
+    }).join("");
+    document.getElementById("delegation-modal-body").innerHTML = `
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+          <thead><tr style="background:var(--surface2);">
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">JTI</th>
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Delegatee</th>
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Scope</th>
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Status</th>
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Expires</th>
+            <th style="padding:0.45rem 0.7rem;"></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    document.getElementById("delegation-modal-body").innerHTML =
+      `<div style="color:#ef4444;padding:1rem;">${esc(e.message)}</div>`;
+  }
+}
+
+async function _revokeDelegation(jti) {
+  if (!confirm("Revoke this delegation token?")) return;
+  try {
+    const r = await fetch(`${BASE}/pro/delegation/${encodeURIComponent(jti)}`, {
+      method: "DELETE", credentials: "include"
+    });
+    if (!r.ok) throw new Error(`Error ${r.status}`);
+    openDelegationModal(_delegationDid, document.getElementById("delegation-modal-name").textContent);
+  } catch(e) { alert("Revoke failed: " + e.message); }
+}
+
+document.getElementById("delegation-modal-close").addEventListener("click", () => {
+  document.getElementById("delegation-modal").style.display = "none";
+});
+document.getElementById("delegation-modal").addEventListener("click", function(e) {
+  if (e.target === this) this.style.display = "none";
+});
+
+// ── TASK CREDENTIALS MODAL ────────────────────────────────────────────────────
+let _taskCredsDid = "";
+
+async function openTaskCredsModal(did, name) {
+  _taskCredsDid = did;
+  document.getElementById("taskcreds-modal-name").textContent = name;
+  document.getElementById("taskcreds-modal-body").innerHTML =
+    '<div style="text-align:center;color:var(--muted);padding:2rem 0;"><div class="spinner" style="margin:0 auto 0.5rem;"></div>Loading…</div>';
+  document.getElementById("taskcreds-modal").style.display = "flex";
+
+  try {
+    const r = await fetch(`${BASE}/pro/task-identity?agent_did=${encodeURIComponent(did)}&limit=100`, { credentials: "include" });
+    if (!r.ok) throw new Error(`Error ${r.status}`);
+    const data = await r.json();
+    const creds = data.credentials || [];
+    if (!creds.length) {
+      document.getElementById("taskcreds-modal-body").innerHTML =
+        '<div style="text-align:center;color:var(--muted);padding:2rem 0;">No task credentials found for this agent.</div>';
+      return;
+    }
+    const sensitivityColor = { public:"#22c55e", internal:"#3b82f6", confidential:"#f59e0b", restricted:"#f97316", secret:"#ef4444" };
+    const rows = creds.map(c => {
+      const exp = c.expires_at ? new Date(c.expires_at).toLocaleString(undefined, { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
+      const rev = c.revoked ? '<span style="color:#ef4444;font-weight:700;">revoked</span>' : '<span style="color:#22c55e;font-weight:700;">active</span>';
+      const sc = sensitivityColor[c.data_sensitivity] || "#9ca3af";
+      return `<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;">${esc((c.jti||"").slice(0,14))}…</td>
+        <td style="font-size:0.73rem;">${esc(c.run_id||"—")}</td>
+        <td><span style="font-size:0.65rem;font-weight:700;background:${sc}22;color:${sc};border-radius:6px;padding:0.1rem 0.4rem;">${esc(c.data_sensitivity||"—")}</span></td>
+        <td>${rev}</td>
+        <td style="font-size:0.72rem;color:var(--muted);">${esc(exp)}</td>
+        <td>${c.revoked ? "" : `<button class="agent-action-btn" onclick="_revokeTaskCred('${esc(c.jti)}')">Revoke</button>`}</td>
+      </tr>`;
+    }).join("");
+    document.getElementById("taskcreds-modal-body").innerHTML = `
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+          <thead><tr style="background:var(--surface2);">
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">JTI</th>
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Run ID</th>
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Sensitivity</th>
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Status</th>
+            <th style="padding:0.45rem 0.7rem;text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Expires</th>
+            <th style="padding:0.45rem 0.7rem;"></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    document.getElementById("taskcreds-modal-body").innerHTML =
+      `<div style="color:#ef4444;padding:1rem;">${esc(e.message)}</div>`;
+  }
+}
+
+async function _revokeTaskCred(jti) {
+  if (!confirm("Revoke this task credential?")) return;
+  try {
+    const r = await fetch(`${BASE}/pro/task-identity/${encodeURIComponent(jti)}`, {
+      method: "DELETE", credentials: "include"
+    });
+    if (!r.ok) throw new Error(`Error ${r.status}`);
+    openTaskCredsModal(_taskCredsDid, document.getElementById("taskcreds-modal-name").textContent);
+  } catch(e) { alert("Revoke failed: " + e.message); }
+}
+
+document.getElementById("taskcreds-modal-close").addEventListener("click", () => {
+  document.getElementById("taskcreds-modal").style.display = "none";
+});
+document.getElementById("taskcreds-modal").addEventListener("click", function(e) {
+  if (e.target === this) this.style.display = "none";
+});
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 function boot() {

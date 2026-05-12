@@ -593,6 +593,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="sb-channel-item" id="sidebar-deals-btn" onclick="showDealsView()">
             <span class="sb-channel-icon">📋</span><span>Ledger</span><span class="sb-channel-count" id="sidebar-deals-count"></span>
           </div>
+          <div class="sb-channel-item" id="sidebar-handoffs-btn" onclick="showHandoffsView()">
+            <span class="sb-channel-icon">🔀</span><span>Handoffs</span><span class="sb-channel-count" id="sidebar-handoffs-count"></span>
+          </div>
         </div>
       </div>
 
@@ -1217,6 +1220,7 @@ function renderSidebar()    { renderAgentsList(); renderPartnersList(); }
 function selectAgent(agentDid) {
   _dealsView      = false;
   _filesView      = false;
+  _handoffsView   = false;
   _groupsListView = false;
   _activeRoomId   = null;
   _stopGroupPoll();
@@ -1272,9 +1276,10 @@ function selectThread(agentDid, partnerDid) {
     _selectedDid = agentDid;
     renderAgentsList();
   }
-  _dealsView    = false;
-  _filesView    = false;
-  _activeRoomId = null;
+  _dealsView      = false;
+  _filesView      = false;
+  _handoffsView   = false;
+  _activeRoomId   = null;
   _stopGroupPoll();
   _lastRenderKey = "";
   _convFilter    = partnerDid || null;
@@ -2408,6 +2413,7 @@ function _clearChannelActive() {
 function _showInboxView() {
   _dealsView = false;
   _filesView = false;
+  _handoffsView = false;
   _activeRoomId = null;
   _stopGroupPoll();
   _selectedDid = "";
@@ -2426,6 +2432,7 @@ function _showInboxView() {
 async function showFilesView() {
   _filesView = true;
   _dealsView = false;
+  _handoffsView = false;
   _activeRoomId = null;
   _stopGroupPoll();
   _selectedDid = "__files__";
@@ -2603,6 +2610,7 @@ let _ledgerView       = 'deals';     // 'deals' | 'receipts'
 async function showDealsView(view) {
   if (view) _ledgerView = view;
   _dealsView = true;
+  _handoffsView = false;
   _selectedDid = "__deals__";
   _clearChannelActive();
   document.getElementById("sidebar-deals-btn").classList.add("active");
@@ -3096,6 +3104,7 @@ let _groupsListView = false;
 function showGroupsListView() {
   _activeRoomId = null;
   _dealsView = false;
+  _handoffsView = false;
   _selectedDid = "__groups__";
   _stopGroupPoll();
 
@@ -3170,6 +3179,7 @@ async function showGroupView(roomId) {
   _gcmdRoomId   = roomId;   // set early so ⚡ Direct button works immediately
   _selectedDid = "__groups__";
   _dealsView = false;
+  _handoffsView = false;
 
   // Highlight: keep Group Chat channel active, highlight the specific group row
   _clearChannelActive();          // resets _groupsListView — must set AFTER
@@ -3889,6 +3899,78 @@ function _gcmdAppend(msg) {
     thread.appendChild(meta);
   }
   thread.scrollTop = thread.scrollHeight;
+}
+
+// ── HANDOFFS VIEW ─────────────────────────────────────────────────────────────
+let _handoffsView = false;
+let _handoffs = [];
+
+async function showHandoffsView() {
+  _handoffsView = true;
+  _dealsView = false;
+  _filesView = false;
+  _activeRoomId = null;
+  _stopGroupPoll();
+  _selectedDid = "__handoffs__";
+  _clearChannelActive();
+  document.getElementById("sidebar-handoffs-btn").classList.add("active");
+  document.getElementById("stop-btn").style.display = "none";
+  document.getElementById("feed-title").textContent = "Handoffs";
+  document.getElementById("feed-meta").textContent = "";
+  document.getElementById("agent-info").style.display = "none";
+  document.getElementById("deal-search-bar").style.display = "none";
+  document.getElementById("header-right-actions").innerHTML = "";
+
+  const scroll = document.getElementById("feed-scroll");
+  scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading handoffs…</div></div>';
+
+  try {
+    const r = await fetch(`${BASE}/pro/handoffs/list?limit=200`, { headers: apiHeaders(), credentials: "include" });
+    if (!r.ok) throw new Error(`Error ${r.status}`);
+    const data = await r.json();
+    _handoffs = data.handoffs || [];
+    document.getElementById("feed-meta").textContent =
+      `${_handoffs.length} handoff${_handoffs.length !== 1 ? "s" : ""}`;
+    const countEl = document.getElementById("sidebar-handoffs-count");
+    if (countEl) countEl.textContent = _handoffs.length > 0 ? _handoffs.length : "";
+    _renderHandoffsTable();
+  } catch(e) {
+    scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load handoffs</div><div class="state-sub">${esc(e.message)}</div></div>`;
+  }
+}
+
+function _renderHandoffsTable() {
+  const scroll = document.getElementById("feed-scroll");
+  if (!_handoffs.length) {
+    scroll.innerHTML = '<div class="state-box"><div class="state-icon">🔀</div><div class="state-title">No handoffs yet</div><div class="state-sub">Handoffs appear when one agent transfers a task or conversation to another.</div></div>';
+    return;
+  }
+
+  const statusColor = { pending:"#f59e0b", accepted:"#22c55e", rejected:"#ef4444", completed:"#6366f1", expired:"#9ca3af" };
+  const rows = _handoffs.map(h => {
+    const ts = h.created_at ? new Date(h.created_at).toLocaleString(undefined, { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
+    const sc = statusColor[h.status] || "#9ca3af";
+    return `<tr>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;">${esc((h.id||"").slice(0,12))}…</td>
+      <td style="font-size:0.75rem;">${esc(h.from_did||"")}</td>
+      <td style="font-size:0.75rem;">${esc(h.to_did||"")}</td>
+      <td><span style="font-size:0.65rem;font-weight:700;background:${sc}22;color:${sc};border-radius:6px;padding:0.1rem 0.45rem;">${esc(h.status||"")}</span></td>
+      <td style="font-size:0.72rem;color:var(--muted);">${esc(ts)}</td>
+      <td style="font-size:0.75rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(h.reason||"—")}</td>
+    </tr>`;
+  }).join("");
+
+  scroll.innerHTML = `
+    <div style="padding:1rem 1.25rem;">
+      <div class="rcpt-table-wrap">
+        <table class="rcpt-table">
+          <thead><tr>
+            <th>ID</th><th>From</th><th>To</th><th>Status</th><th>Created</th><th>Reason</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 // ── THEME ─────────────────────────────────────────────────────────────────────

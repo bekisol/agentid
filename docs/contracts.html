@@ -294,6 +294,7 @@
                   <option value="inactive">Inactive</option>
                 </select>
                 <button class="btn btn-outline btn-sm" onclick="loadMyContracts()">↺ Refresh</button>
+                <button class="btn btn-outline btn-sm" id="evidence-bundle-btn" onclick="_openEvidenceBundleModal()" title="Download EU AI Act compliance bundle">⬇ Compliance PDF</button>
               </div>
             </div>
             <div id="mine-body">
@@ -802,6 +803,108 @@ document.addEventListener("DOMContentLoaded", async () => {
     location.href = "index.html?redirect=contracts.html";
   }
 });
+
+// ── Evidence bundle modal ─────────────────────────────────────────────────────
+function _openEvidenceBundleModal() {
+  let modal = document.getElementById('eb-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'eb-modal';
+    modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9000;align-items:center;justify-content:center;';
+    modal.innerHTML = `
+      <div style="background:var(--surface);border-radius:14px;width:min(480px,95vw);box-shadow:0 24px 60px rgba(0,0,0,0.3);">
+        <div style="padding:1.1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.75rem;">
+          <div style="font-weight:700;font-size:1rem;">Download Compliance Bundle</div>
+          <button onclick="document.getElementById('eb-modal').style.display='none'" style="margin-left:auto;background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--muted);">✕</button>
+        </div>
+        <div style="padding:1.1rem 1.5rem;display:flex;flex-direction:column;gap:0.75rem;">
+          <p style="font-size:0.83rem;color:var(--muted);margin:0;">Downloads an EU AI Act Article 12 evidence bundle for one of your agents, signed by the agent's key.</p>
+          <div>
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:0.3rem;">Agent DID</label>
+            <select id="eb-did-select" style="width:100%;padding:0.4rem 0.6rem;border:1px solid var(--border-dark);border-radius:7px;background:var(--bg,#f9f9f9);color:var(--text);font-size:0.83rem;outline:none;">
+              <option value="">Loading agents…</option>
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;">
+            <div>
+              <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:0.3rem;">Audit window (days)</label>
+              <input id="eb-days" type="number" value="30" min="1" max="90" style="width:100%;padding:0.4rem 0.6rem;border:1px solid var(--border-dark);border-radius:7px;background:var(--bg,#f9f9f9);color:var(--text);font-size:0.83rem;outline:none;box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:0.3rem;">Format</label>
+              <select id="eb-format" style="width:100%;padding:0.4rem 0.6rem;border:1px solid var(--border-dark);border-radius:7px;background:var(--bg,#f9f9f9);color:var(--text);font-size:0.83rem;outline:none;">
+                <option value="pdf">PDF (auditor-ready)</option>
+                <option value="json">JSON (machine-readable)</option>
+              </select>
+            </div>
+          </div>
+          <div id="eb-error" style="font-size:0.8rem;color:var(--red,#dc2626);min-height:1rem;"></div>
+        </div>
+        <div style="padding:0.85rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:0.65rem;">
+          <button onclick="document.getElementById('eb-modal').style.display='none'" class="btn btn-outline" style="font-size:0.82rem;">Cancel</button>
+          <button class="btn btn-primary" id="eb-download-btn" style="font-size:0.82rem;" onclick="_downloadEvidenceBundle()">⬇ Download</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    _populateEbAgents();
+  } else {
+    modal.style.display = 'flex';
+  }
+}
+
+async function _populateEbAgents() {
+  const sel = document.getElementById('eb-did-select');
+  if (!sel) return;
+  try {
+    const base = 'https://api.agentid-protocol.com';
+    const key  = sessionStorage.getItem('agentid_key') || localStorage.getItem('agentid_key') || '';
+    const res  = await fetch(`${base}/pro/agents/list?per_page=50`, { headers: { 'X-API-Key': key } });
+    const data = await res.json();
+    const agents = (data.agents || data.items || []);
+    sel.innerHTML = agents.length
+      ? agents.map(a => `<option value="${a.did}">${a.name || a.did}</option>`).join('')
+      : '<option value="">No agents found</option>';
+  } catch(e) {
+    sel.innerHTML = '<option value="">Could not load agents</option>';
+  }
+}
+
+async function _downloadEvidenceBundle() {
+  const did    = document.getElementById('eb-did-select')?.value;
+  const days   = document.getElementById('eb-days')?.value || '30';
+  const format = document.getElementById('eb-format')?.value || 'pdf';
+  const errEl  = document.getElementById('eb-error');
+  const btn    = document.getElementById('eb-download-btn');
+  errEl.textContent = '';
+  if (!did) { errEl.textContent = 'Select an agent first.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = '…Generating';
+  try {
+    const base = 'https://api.agentid-protocol.com';
+    const key  = sessionStorage.getItem('agentid_key') || localStorage.getItem('agentid_key') || '';
+    const url  = `${base}/pro/agents/${encodeURIComponent(did)}/compliance/evidence-bundle?days=${days}&format=${format}&sign=true`;
+    const res  = await fetch(url, { headers: { 'X-API-Key': key } });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const blob     = await res.blob();
+    const ext      = format === 'pdf' ? 'pdf' : 'json';
+    const shortDid = did.split(':').pop().slice(0, 8);
+    const filename = `compliance_bundle_${shortDid}_${new Date().toISOString().slice(0,10)}.${ext}`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    document.getElementById('eb-modal').style.display = 'none';
+  } catch(e) {
+    errEl.textContent = e.message || String(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇ Download';
+  }
+}
 </script>
 </body>
 </html>
