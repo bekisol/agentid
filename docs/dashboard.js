@@ -3553,8 +3553,8 @@ async function _openInspector(did, name) {
 
       <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${esc(rawDid)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy DID',1500)})">Copy DID</button>
-        <button class="btn btn-ghost btn-sm" data-action="verify" data-did="${esc(rawDid)}" data-name="${esc(a.name||"")}" onclick="_openTestVerify('${esc(rawDid)}','${esc(a.name||"")}')">Test Verify</button>
-        <button class="btn btn-ghost btn-sm" data-action="snippets" data-did="${esc(rawDid)}" data-name="${esc(a.name||"")}" onclick="_openSnippets('${esc(rawDid)}','${esc(a.name||"")}')">Code &lt;/&gt;</button>
+        <button class="btn btn-ghost btn-sm" data-action="verify" data-did="${esc(rawDid)}" data-name="${esc(a.name||"")}">Test Verify</button>
+        <button class="btn btn-ghost btn-sm" data-action="snippets" data-did="${esc(rawDid)}" data-name="${esc(a.name||"")}">Code &lt;/&gt;</button>
       </div>
       ${data.recent_activity?.length ? `
       <div style="margin-top:0.9rem;">
@@ -6852,6 +6852,15 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
     if (!btn) return;
     const { action, did, name } = btn.dataset;
     if (action === "details")  _openInspector(did, name);
+    if (action === "verify")   _openTestVerify(did, name);
+    if (action === "snippets") _openSnippets(did, name);
+  });
+
+  // ── Inspector pane action delegation ─────────────────────────────────────────
+  document.getElementById("ag-insp-body")?.addEventListener("click", e => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const { action, did, name } = btn.dataset;
     if (action === "verify")   _openTestVerify(did, name);
     if (action === "snippets") _openSnippets(did, name);
   });
