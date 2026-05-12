@@ -9754,3 +9754,81 @@ async function _revokeToken(type, jti) {
     alert(e?.message || String(e));
   }
 }
+
+// ── CSP-safe wiring: replace all inline onclick/onchange in dashboard.html ───
+// script-src has no 'unsafe-inline', so onclick= attributes are silently blocked
+// by the browser. All wiring must go through addEventListener here.
+document.addEventListener("DOMContentLoaded", () => {
+  // Sub-accounts / team members
+  document.getElementById("add-member-open-btn")?.addEventListener("click", _openAddMember);
+  document.getElementById("add-member-submit-btn")?.addEventListener("click", _submitAddMember);
+  document.getElementById("add-member-cancel-btn")?.addEventListener("click", () => {
+    document.getElementById("add-member-form").style.display = "none";
+  });
+  document.getElementById("new-member-key-copy-btn")?.addEventListener("click", function () {
+    const val = document.getElementById("new-member-key-value")?.textContent || "";
+    navigator.clipboard.writeText(val).then(() => {
+      this.textContent = "Copied!";
+      setTimeout(() => { this.textContent = "Copy"; }, 1500);
+    }).catch(() => {});
+  });
+  document.getElementById("new-member-key-dismiss-btn")?.addEventListener("click", () => {
+    const box = document.getElementById("new-member-key-box");
+    if (box) box.style.display = "none";
+    _loadSubAccounts();
+  });
+
+  // Execution Runs
+  document.getElementById("runs-refresh-btn")?.addEventListener("click", () => loadRuns());
+  document.getElementById("run-evidence-close-x")?.addEventListener("click", () => {
+    document.getElementById("run-evidence-modal").style.display = "none";
+  });
+  document.getElementById("run-evidence-close-btn")?.addEventListener("click", () => {
+    document.getElementById("run-evidence-modal").style.display = "none";
+  });
+
+  // Agent Handoffs
+  document.getElementById("handoffs-refresh-btn")?.addEventListener("click", () => loadHandoffs());
+  document.getElementById("handoff-role-filter")?.addEventListener("change", () => loadHandoffs());
+  document.getElementById("handoff-status-filter")?.addEventListener("change", () => loadHandoffs());
+
+  // Policy Decisions
+  document.getElementById("policy-refresh-btn")?.addEventListener("click", () => loadPolicyDecisions());
+  document.getElementById("policy-decision-filter")?.addEventListener("change", () => loadPolicyDecisions());
+  document.getElementById("policy-check-btn")?.addEventListener("click", _openPolicyCheck);
+  document.getElementById("policy-modal-close-x")?.addEventListener("click", () => {
+    document.getElementById("policy-check-modal").style.display = "none";
+  });
+  document.getElementById("policy-modal-cancel-btn")?.addEventListener("click", () => {
+    document.getElementById("policy-check-modal").style.display = "none";
+  });
+  document.getElementById("pc-submit-btn")?.addEventListener("click", _submitPolicyCheck);
+
+  // Budget
+  document.getElementById("budget-refresh-btn")?.addEventListener("click", () => loadBudget());
+  document.getElementById("budget-edit-caps-btn")?.addEventListener("click", _openBudgetPolicyEditor);
+  document.getElementById("budget-modal-close-x")?.addEventListener("click", () => {
+    document.getElementById("budget-policy-modal").style.display = "none";
+  });
+  document.getElementById("budget-modal-cancel-btn")?.addEventListener("click", () => {
+    document.getElementById("budget-policy-modal").style.display = "none";
+  });
+  document.getElementById("bp-save-btn")?.addEventListener("click", _saveBudgetPolicy);
+
+  // Delegation & Credentials
+  document.getElementById("delegation-refresh-btn")?.addEventListener("click", () => loadDelegation());
+  document.getElementById("credentials-refresh-btn")?.addEventListener("click", () => loadCredentials());
+
+  // Audit log "View all" — scroll the audit list into view
+  document.getElementById("audit-open-full")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    document.getElementById("audit-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  // Report builder — select-all checkbox and agent scope radio buttons
+  document.getElementById("rpt-select-all")?.addEventListener("change", function () {
+    _rptToggleAll(this.checked);
+  });
+  document.getElementById("rpt-agents-all")?.addEventListener("change", () => _rptToggleAgentScope("all"));
+  document.getElementById("rpt-agents-specific")?.addEventListener("change", () => _rptToggleAgentScope("specific"));
+});
