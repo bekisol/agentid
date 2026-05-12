@@ -336,12 +336,11 @@ async function apiFetch(path, options = {}) {
       const j = await res.json();
       msg = j.detail || j.message || msg;
     } catch (_) {}
-    // 401 self-recovery: surface a session-drop banner — but only after
-    // we've confirmed there's actually nothing the user can do. Skip it
-    // during a 5-second grace window after login (so background requests
-    // racing with cookie propagation don't spam a "session dropped"
-    // banner on what is in fact a brand-new session).
-    if (res.status === 401 && _shouldTriggerSessionDrop()) {
+    // 401 self-recovery: only trigger a global session drop for core auth
+    // endpoints. Widget/analytics 401s (e.g. a single flaky Pro endpoint)
+    // should fail gracefully without killing the entire dashboard session.
+    const _coreAuthPath = path.startsWith("/auth/") || path === "/pro/keys/me";
+    if (res.status === 401 && _coreAuthPath && _shouldTriggerSessionDrop()) {
       _triggerSessionDrop(msg);
     }
     throw new Error(msg);
@@ -389,10 +388,15 @@ function _triggerSessionDrop(detail) {
   if (_sessionDropFired) return;
   _sessionDropFired = true;
   console.warn("[apiFetch] session dropped — clearing stale auth state.", detail);
-  // Clear ALL auth artefacts so the next page load can never repeat this.
+  // Clear ALL auth artefacts across EVERY storage layer so the stale key
+  // cannot be resurrected by the rehydrate path in apiFetch() on the next call.
   sessionStorage.removeItem("agentid_key");
   sessionStorage.removeItem("agentid_login_ts");
   sessionStorage.removeItem("agentid_auth_mode");
+  sessionStorage.removeItem("agentid_owner");
+  localStorage.removeItem("agentid_key");
+  localStorage.removeItem("agentid_persisted_key");
+  localStorage.removeItem("agentid_tab_sync");
   apiKey = "";
   authMode = "session";
   // If the dashboard is currently visible, slide a banner across the top
@@ -7220,13 +7224,19 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
     } catch (_) { /* network failure */ }
 
     if (sessionOk) {
-      // loadDashboard errors (e.g. a pro endpoint 401) must NOT show the login
-      // screen — the user IS authenticated; the dashboard already revealed itself.
+      // loadDashboard errors must NOT show the login screen — the user IS
+      // authenticated. But we must not leave spinners hanging forever either.
       try {
         await loadDashboard();
         scheduleSessionExpiry();
       } catch (e) {
         console.warn("loadDashboard error (session auth):", e);
+        // Replace any lingering spinners with a visible error + retry button
+        document.querySelectorAll('.loading').forEach(el => {
+          el.innerHTML = '<span style="color:var(--muted);font-size:0.82rem;">Failed to load — <button onclick="location.reload()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.82rem;font-family:inherit;padding:0;">retry</button></span>';
+        });
+        // Show inline banner with the actual error so it's not invisible
+        _showInlineSessionBanner(`Dashboard failed to load: ${e?.message || e}. Try refreshing.`);
       }
       return;
     }
