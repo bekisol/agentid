@@ -3041,13 +3041,13 @@ function renderDealModal() {}
 let _groupsListView = false;
 
 function showGroupsListView() {
-  _groupsListView = true;
   _activeRoomId = null;
   _dealsView = false;
   _selectedDid = "__groups__";
   _stopGroupPoll();
 
-  _clearChannelActive();
+  _clearChannelActive();          // resets _groupsListView — must set AFTER
+  _groupsListView = true;
   document.getElementById("sidebar-groups-btn")?.classList.add("active");
 
   const labelEl = document.getElementById("sb-threads-label");
@@ -3116,11 +3116,11 @@ async function showGroupView(roomId) {
   _activeRoomId = roomId;
   _gcmdRoomId   = roomId;   // set early so ⚡ Direct button works immediately
   _selectedDid = "__groups__";
-  _groupsListView = true;
   _dealsView = false;
 
   // Highlight: keep Group Chat channel active, highlight the specific group row
-  _clearChannelActive();
+  _clearChannelActive();          // resets _groupsListView — must set AFTER
+  _groupsListView = true;
   document.getElementById("sidebar-groups-btn")?.classList.add("active");
   document.querySelectorAll(".sidebar-item-group").forEach(e => {
     e.classList.toggle("active", parseInt(e.dataset.roomId) === roomId);
