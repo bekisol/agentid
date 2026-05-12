@@ -288,23 +288,23 @@ let authMode = sessionStorage.getItem("agentid_auth_mode") || (apiKey ? "apikey"
 async function apiFetch(path, options = {}) {
   const headers = { ...options.headers };
 
-  // Belt-and-suspenders auth: send WHATEVER credentials we have, regardless
-  // of the declared authMode. The server tries session cookie first, then
-  // x-api-key — so passing both costs nothing and recovers cleanly when
-  // the cookie is missing (cross-subdomain edge cases) or when the
-  // session has expired but a stored API key is still valid.
-  // Fallback chain: in-memory → sessionStorage (this tab) → localStorage
-  // (set by "stay signed in" toggle, persists across refresh + close).
-  const storedKey = apiKey
-                  || sessionStorage.getItem("agentid_key")
-                  || localStorage.getItem("agentid_persisted_key")
-                  || localStorage.getItem("agentid_key");
-  if (storedKey) {
-    apiKey = storedKey;            // re-hydrate in-memory copy
-    if (!sessionStorage.getItem("agentid_key")) {
-      sessionStorage.setItem("agentid_key", storedKey);
+  // Auth strategy: session mode uses the cookie only — never add an API key
+  // header, even if a stale one is found in storage. Mixing a bad API key
+  // with a valid cookie causes backends to reject on the bad key first.
+  // API-key mode rehydrates from storage as before.
+  const currentAuthMode = authMode || sessionStorage.getItem("agentid_auth_mode") || "session";
+  if (currentAuthMode !== "session") {
+    const storedKey = apiKey
+                    || sessionStorage.getItem("agentid_key")
+                    || localStorage.getItem("agentid_persisted_key")
+                    || localStorage.getItem("agentid_key");
+    if (storedKey) {
+      apiKey = storedKey;          // re-hydrate in-memory copy
+      if (!sessionStorage.getItem("agentid_key")) {
+        sessionStorage.setItem("agentid_key", storedKey);
+      }
+      headers["x-api-key"] = storedKey;
     }
-    headers["x-api-key"] = storedKey;
   }
   if (options.body && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
@@ -492,7 +492,11 @@ async function accountLogin() {
     sessionStorage.setItem("agentid_auth_mode", "session");
     sessionStorage.setItem("agentid_login_ts", String(Date.now()));
     apiKey = "";   // we don't carry a raw key in this mode
+    // Clear ALL stored keys so apiFetch never rehydrates a stale API key
+    // and sends it alongside the valid cookie (which would cause a 401).
     sessionStorage.removeItem("agentid_key");
+    localStorage.removeItem("agentid_key");
+    localStorage.removeItem("agentid_persisted_key");
     _markFreshLogin();   // 5s grace window so racing 401s don't spam a banner
 
     await loadDashboard();
@@ -7216,6 +7220,11 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
         sessionStorage.setItem("agentid_auth_mode", "session");
         sessionStorage.setItem("agentid_login_ts",
           sessionStorage.getItem("agentid_login_ts") || String(Date.now()));
+        // Clear any stale API key so it never gets sent alongside the cookie
+        apiKey = "";
+        sessionStorage.removeItem("agentid_key");
+        localStorage.removeItem("agentid_key");
+        localStorage.removeItem("agentid_persisted_key");
         _markFreshLogin();
         sessionOk = true;
       } else if (previouslyLoggedIn) {
