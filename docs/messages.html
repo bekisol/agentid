@@ -3053,7 +3053,7 @@ function showGroupsListView() {
   const labelEl = document.getElementById("sb-threads-label");
   if (labelEl) labelEl.textContent = "Groups";
   const composeBtn = document.querySelector(".sb-panel-compose");
-  if (composeBtn) { composeBtn.textContent = "+ new"; composeBtn.onclick = openCreateGroupModal; }
+  if (composeBtn) { composeBtn.textContent = "+ new"; composeBtn.onclick = openNewGroupModal; }
 
   document.getElementById("deal-search-bar").style.display = "none";
   document.getElementById("agent-info").style.display = "none";
