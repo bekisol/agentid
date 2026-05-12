@@ -51,6 +51,7 @@ if (apiKey && !sessionStorage.getItem("agentid_key")) {
           sessionStorage.setItem("agentid_key", key);
           sessionStorage.setItem("agentid_login_ts",
             sessionStorage.getItem("agentid_login_ts") || String(ts));
+          _markFreshLogin();  // grace window: cross-tab load should not immediately 401-drop
           loadDashboard().then(() => scheduleSessionExpiry());
         }
       }
@@ -80,6 +81,7 @@ if (apiKey && !sessionStorage.getItem("agentid_key")) {
             sessionStorage.setItem("agentid_key", key);
             sessionStorage.setItem("agentid_login_ts",
               sessionStorage.getItem("agentid_login_ts") || String(ts));
+            _markFreshLogin();  // grace window: cross-tab load should not immediately 401-drop
             loadDashboard().then(() => scheduleSessionExpiry());
           }
         } catch { /* malformed — ignore */ }
@@ -336,10 +338,12 @@ async function apiFetch(path, options = {}) {
       const j = await res.json();
       msg = j.detail || j.message || msg;
     } catch (_) {}
-    // 401 self-recovery: only trigger a global session drop for core auth
-    // endpoints. Widget/analytics 401s (e.g. a single flaky Pro endpoint)
-    // should fail gracefully without killing the entire dashboard session.
-    const _coreAuthPath = path.startsWith("/auth/") || path === "/pro/keys/me";
+    // 401 self-recovery: only trigger a global session drop when the
+    // session-validation endpoints specifically reject the credential.
+    // NOT for every /auth/* call — /auth/welcome, /auth/keys, /auth/sessions,
+    // /auth/change-password etc. can legitimately 401 for feature-access or
+    // input-validation reasons and must NOT kill the dashboard session.
+    const _coreAuthPath = path === "/auth/me" || path === "/pro/keys/me";
     if (res.status === 401 && _coreAuthPath && _shouldTriggerSessionDrop()) {
       _triggerSessionDrop(msg);
     }
@@ -379,7 +383,7 @@ function _shouldTriggerSessionDrop() {
   return true;
 }
 
-function _markFreshLogin(graceMs = 5000) {
+function _markFreshLogin(graceMs = 15000) {
   _sessionDropFired = false;
   _loginGraceUntil = Date.now() + graceMs;
 }
@@ -497,7 +501,7 @@ async function accountLogin() {
     sessionStorage.removeItem("agentid_key");
     localStorage.removeItem("agentid_key");
     localStorage.removeItem("agentid_persisted_key");
-    _markFreshLogin();   // 5s grace window so racing 401s don't spam a banner
+    _markFreshLogin();   // 15s grace window — covers Railway cold-start latency
 
     await loadDashboard();
     scheduleSessionExpiry();
@@ -548,7 +552,7 @@ async function accountSignup() {
     sessionStorage.setItem("agentid_login_ts", String(Date.now()));
     apiKey = "";
     sessionStorage.removeItem("agentid_key");
-    _markFreshLogin();   // 5s grace window so racing 401s don't spam a banner
+    _markFreshLogin();   // 15s grace window — covers Railway cold-start latency
 
     await loadDashboard();
     scheduleSessionExpiry();
@@ -7244,8 +7248,34 @@ curl -X POST https://api.agentid-protocol.com/agents/${did}/verify \\
         document.querySelectorAll('.loading').forEach(el => {
           el.innerHTML = '<span style="color:var(--muted);font-size:0.82rem;">Failed to load — <button onclick="location.reload()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.82rem;font-family:inherit;padding:0;">retry</button></span>';
         });
-        // Show inline banner with the actual error so it's not invisible
-        _showInlineSessionBanner(`Dashboard failed to load: ${e?.message || e}. Try refreshing.`);
+        // Show a yellow warning banner — NOT the red "session dropped" banner.
+        // A dashboard load failure is often a transient network/cold-start issue,
+        // not a real auth problem. Using "session dropped" misleads the user into
+        // thinking they need to re-login when a simple refresh would fix it.
+        const _existing = document.getElementById("load-warn-banner");
+        if (!_existing) {
+          const _b = document.createElement("div");
+          _b.id = "load-warn-banner";
+          _b.style.cssText = [
+            "position:fixed;top:0;left:0;right:0;",
+            "background:#fef3c7;color:#92400e;",
+            "padding:0.75rem 1.4rem;font-size:0.87rem;",
+            "border-bottom:1px solid #fde68a;z-index:10000;",
+            "display:flex;align-items:center;gap:0.85rem;justify-content:center;",
+            "box-shadow:0 2px 6px rgba(0,0,0,0.05);",
+          ].join("");
+          _b.innerHTML = [
+            "<strong>⚠ Dashboard could not fully load.</strong>",
+            `<span style="opacity:0.85;">${e?.message || "Network error"} — try refreshing.</span>`,
+            '<button onclick="location.reload()" style="background:#92400e;color:white;border:none;',
+            'border-radius:5px;padding:0.4rem 0.9rem;font-size:0.82rem;cursor:pointer;font-weight:600;">',
+            "Reload</button>",
+            '<button id="lwb-dismiss" style="background:none;border:none;cursor:pointer;',
+            'color:#92400e;opacity:0.6;font-size:1rem;">✕</button>',
+          ].join("");
+          document.body.appendChild(_b);
+          document.getElementById("lwb-dismiss")?.addEventListener("click", () => _b.remove());
+        }
       }
       return;
     }
