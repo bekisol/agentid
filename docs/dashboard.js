@@ -736,6 +736,16 @@ async function loadDashboard() {
     data = { owner: me.owner, tier: CURRENT_TIER, usage: {}, activity_last_7d: [] };
   }
 
+  // ── Defensive normalisation ───────────────────────────────────────────────
+  // The analytics endpoint may return a different shape (or null fields) if it
+  // is cold-starting or the schema has evolved. Normalise once here so the
+  // rendering code below can use plain property access without crashing.
+  if (!data || typeof data !== "object") data = {};
+  data.owner           = data.owner           || me.owner || "";
+  data.tier            = data.tier            || CURRENT_TIER;
+  data.usage           = (data.usage && typeof data.usage === "object") ? data.usage : {};
+  data.activity_last_7d = Array.isArray(data.activity_last_7d) ? data.activity_last_7d : [];
+
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("dashboard").style.display = "flex";
   document.getElementById("logout-btn").style.display = "flex";
@@ -753,27 +763,29 @@ async function loadDashboard() {
   applyTierLocks(tier);
 
   // Header
-  document.getElementById("dash-title").textContent = data.owner;
-  document.getElementById("dash-sub").textContent =
+  const _dashTitle = document.getElementById("dash-title");
+  if (_dashTitle) _dashTitle.textContent = data.owner;
+  const _dashSub = document.getElementById("dash-sub");
+  if (_dashSub) _dashSub.textContent =
     isPro() ? "Pro analytics dashboard" : "Free tier — agent registry";
 
   const tierEl = document.createElement("span");
   tierEl.className = "tier-badge " + tierClass(tier);
   tierEl.textContent = tier;
   const tierWrap = document.getElementById("tier-badge-wrap");
-  tierWrap.textContent = "";
-  tierWrap.appendChild(tierEl);
+  if (tierWrap) { tierWrap.textContent = ""; tierWrap.appendChild(tierEl); }
 
-  // Stats
+  // Stats — data.usage is guaranteed to be an object (normalised above)
   const agentsReg   = Number(data.usage.agents_registered) || 0;
   const auditEvents = Number(data.usage.audit_events) || 0;
-  const totalActivity = (data.activity_last_7d || []).reduce((s, r) => s + r.count, 0);
+  const totalActivity = data.activity_last_7d.reduce((s, r) => s + r.count, 0);
 
   // Discovery = resolves + verifies from searches endpoint (load async)
-  document.getElementById("stat-agents").textContent = agentsReg;
-  document.getElementById("stat-events").textContent = auditEvents.toLocaleString();
-  document.getElementById("stat-active").textContent = totalActivity.toLocaleString();
-  document.getElementById("stat-discovery").textContent = "…";
+  const _setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  _setText("stat-agents",    agentsReg);
+  _setText("stat-events",    auditEvents.toLocaleString());
+  _setText("stat-active",    totalActivity.toLocaleString());
+  _setText("stat-discovery", "…");
 
   // ── Premium stat card sparklines / trend chips ──────────────────────────────
   // Build a 7-day activity sparkline using the activity_last_7d data
@@ -821,17 +833,20 @@ async function loadDashboard() {
   const limit = TIER_LIMITS[tier] ?? 100;
   const pct   = limit === Infinity ? 0 : Math.min(100, Math.round((agentsReg / limit) * 100));
 
-  document.getElementById("usage-tier-label").className = "tier-badge " + tierClass(tier);
-  document.getElementById("usage-tier-label").textContent = tier;
-  document.getElementById("usage-label").textContent =
-    limit === Infinity
-      ? `${agentsReg.toLocaleString()} agents (unlimited)`
-      : `${agentsReg.toLocaleString()} / ${limit.toLocaleString()} agents`;
-  document.getElementById("usage-pct").textContent = limit === Infinity ? "∞" : `${pct}%`;
+  const _uTierLabel = document.getElementById("usage-tier-label");
+  if (_uTierLabel) { _uTierLabel.className = "tier-badge " + tierClass(tier); _uTierLabel.textContent = tier; }
+  const _uLabel = document.getElementById("usage-label");
+  if (_uLabel) _uLabel.textContent = limit === Infinity
+    ? `${agentsReg.toLocaleString()} agents (unlimited)`
+    : `${agentsReg.toLocaleString()} / ${limit.toLocaleString()} agents`;
+  const _uPct = document.getElementById("usage-pct");
+  if (_uPct) _uPct.textContent = limit === Infinity ? "∞" : `${pct}%`;
 
   const fill = document.getElementById("usage-fill");
-  fill.style.width = (limit === Infinity ? 2 : pct) + "%";
-  fill.style.background = pct > 90 ? "var(--red)" : pct > 70 ? "var(--yellow)" : "var(--accent)";
+  if (fill) {
+    fill.style.width = (limit === Infinity ? 2 : pct) + "%";
+    fill.style.background = pct > 90 ? "var(--red)" : pct > 70 ? "var(--yellow)" : "var(--accent)";
+  }
 
   // ROI framing — ~2 min saved per verification vs manual
   const verifyCount = (data.activity_last_7d || []).find(r => r.operation === "verify");
