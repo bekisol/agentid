@@ -356,6 +356,12 @@
     .chat-activity { font-size:0.72rem; color:var(--muted); background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:0.4rem 0.65rem; margin:0.1rem 0; line-height:1.5; align-self:stretch; max-height:260px; overflow-y:auto; }
     .chat-activity div { margin:0.05rem 0; }
     .chat-panel-input { border-top:1px solid var(--border); padding:0.6rem 0.75rem; display:flex; gap:0.5rem; flex-shrink:0; }
+    .chat-agent-switcher { display:none; padding:0.45rem 0.9rem; border-bottom:1px solid var(--border); background:var(--surface); gap:0.4rem; flex-wrap:wrap; align-items:center; }
+    .chat-agent-switcher.visible { display:flex; }
+    .chat-agent-chip { display:flex; align-items:center; gap:0.35rem; padding:0.22rem 0.55rem; border-radius:20px; border:1px solid var(--border-dark); background:var(--surface2); cursor:pointer; font-size:0.74rem; font-weight:500; color:var(--text-2); transition:all 0.1s; user-select:none; }
+    .chat-agent-chip:hover { border-color:var(--accent); color:var(--accent); }
+    .chat-agent-chip.active { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+    .chat-agent-chip-sq { width:16px; height:16px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.58rem; font-weight:700; color:#fff; flex-shrink:0; }
     .chat-panel-input textarea { flex:1; resize:none; border:1px solid var(--border-dark); border-radius:8px; padding:0.45rem 0.65rem; font-size:0.84rem; font-family:inherit; outline:none; max-height:80px; line-height:1.4; }
     .chat-panel-input textarea:focus { border-color:var(--accent); }
     .chat-send-btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:0.45rem 0.75rem; font-size:0.82rem; font-weight:600; cursor:pointer; font-family:inherit; flex-shrink:0; }
@@ -836,6 +842,7 @@ document.addEventListener("DOMContentLoaded", () => {
     </div>
     <button onclick="closeChat()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;">✕</button>
   </div>
+  <div class="chat-agent-switcher" id="chat-agent-switcher"></div>
   <div class="chat-panel-messages" id="chat-panel-messages">
     <div style="text-align:center;padding:2rem 1rem;color:var(--muted);font-size:0.82rem;">
       Send a message to start chatting with your agent.
@@ -1213,6 +1220,7 @@ function selectAgent(agentDid) {
   _groupsListView = false;
   _activeRoomId   = null;
   _stopGroupPoll();
+  _hideChatAgentSwitcher();
   _lastRenderKey = "";
   _selectedDid   = agentDid;
   _convFilter    = null;     // reset TO selection when FROM changes
@@ -1979,10 +1987,55 @@ async function openChat() {
   await _openChatForAgent(_selectedDid);
 }
 
+const _avatarColorsChat = ['#C2410C','#2563EB','#059669','#7C3AED','#0891B2','#B45309','#DB2777','#4F46E5','#0F766E','#9333EA'];
+
+function _mirrorChatToGroup(members) {
+  const myAgentsInGroup = (members || [])
+    .filter(m => m.status === "active" && _agents.some(a => a.did === m.did))
+    .map(m => _agents.find(a => a.did === m.did));
+
+  if (!myAgentsInGroup.length) return; // no own agents in group — leave chat as-is
+
+  if (myAgentsInGroup.length === 1) {
+    // Single agent — silently switch, no switcher needed
+    _hideChatAgentSwitcher();
+    _openChatForAgent(myAgentsInGroup[0].did);
+    return;
+  }
+
+  // Multiple agents — show switcher chips, open first by default
+  const switcher = document.getElementById("chat-agent-switcher");
+  if (!switcher) return;
+  switcher.innerHTML = myAgentsInGroup.map((a, i) => {
+    const label = a.name || a.did.slice(-10);
+    const initials = label.split(/[\s\-_]+/).map(w => w[0] || '').slice(0,2).join('').toUpperCase() || '?';
+    const color = _avatarColorsChat[i % _avatarColorsChat.length];
+    const safeD = a.did.replace(/'/g, "\\'");
+    return `<span class="chat-agent-chip${i === 0 ? ' active' : ''}" onclick="_switchChatAgent('${safeD}',this)">
+      <span class="chat-agent-chip-sq" style="background:${color}">${esc(initials)}</span>
+      ${esc(label)}
+    </span>`;
+  }).join('');
+  switcher.classList.add('visible');
+  _openChatForAgent(myAgentsInGroup[0].did);
+}
+
+function _switchChatAgent(did, chipEl) {
+  document.querySelectorAll('.chat-agent-chip').forEach(c => c.classList.remove('active'));
+  chipEl.classList.add('active');
+  _openChatForAgent(did);
+}
+
+function _hideChatAgentSwitcher() {
+  const s = document.getElementById("chat-agent-switcher");
+  if (s) { s.classList.remove('visible'); s.innerHTML = ''; }
+}
+
 function closeChat() {
   document.getElementById("chat-panel").classList.remove("open");
   document.body.classList.remove("chat-open");
   _stopChatPoll();
+  _hideChatAgentSwitcher();
   if (_selectedDid) {
     const chatBtn = document.getElementById("chat-open-btn");
     if (chatBtn) chatBtn.style.display = "";
@@ -3219,6 +3272,9 @@ async function showGroupView(roomId) {
       </div>
     `;
     scroll.scrollTop = scroll.scrollHeight;
+
+    // Mirror chat panel to the agent(s) in this group
+    _mirrorChatToGroup(detail.members || []);
 
     // Group reply box (replaces normal compose)
     _renderGroupReplyBox(roomId, detail.members || []);
