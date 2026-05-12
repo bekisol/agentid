@@ -2178,10 +2178,12 @@ async function openDelegationModal(did, name) {
   document.getElementById("delegation-modal").style.display = "flex";
 
   try {
-    const r = await fetch(`${BASE}/pro/delegation/list?agent_did=${encodeURIComponent(did)}&limit=100`, { credentials: "include" });
+    // GET /pro/delegation returns all tokens for the account; filter client-side by delegator DID
+    const r = await fetch(`${BASE}/pro/delegation?per_page=100`, { credentials: "include" });
     if (!r.ok) throw new Error(`Error ${r.status}`);
     const data = await r.json();
-    const tokens = data.tokens || [];
+    const allTokens = data.tokens || [];
+    const tokens = allTokens.filter(t => t.delegator_did === did || t.delegate_did === did);
     if (!tokens.length) {
       document.getElementById("delegation-modal-body").innerHTML =
         '<div style="text-align:center;color:var(--muted);padding:2rem 0;">No delegation tokens found for this agent.</div>';
@@ -2189,14 +2191,17 @@ async function openDelegationModal(did, name) {
     }
     const rows = tokens.map(t => {
       const exp = t.expires_at ? new Date(t.expires_at).toLocaleString(undefined, { month:"short", day:"numeric", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
-      const rev = t.revoked ? '<span style="color:#ef4444;font-weight:700;">revoked</span>' : '<span style="color:#22c55e;font-weight:700;">active</span>';
+      const rev = t.revoked ? '<span style="color:#ef4444;font-weight:700;">revoked</span>'
+                : t.status === "expired" ? '<span style="color:#9ca3af;font-weight:700;">expired</span>'
+                : '<span style="color:#22c55e;font-weight:700;">active</span>';
+      const caps = (t.allowed_capabilities||[]).join(", ") || "—";
       return `<tr>
         <td style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;">${esc((t.jti||"").slice(0,14))}…</td>
-        <td style="font-size:0.73rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.delegatee_did||"—")}</td>
-        <td style="font-size:0.73rem;">${esc((t.scope||[]).join(", ")||"—")}</td>
+        <td style="font-size:0.73rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(t.delegate_did||"")}">${esc(t.delegate_did||"—")}</td>
+        <td style="font-size:0.73rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(caps)}</td>
         <td>${rev}</td>
         <td style="font-size:0.72rem;color:var(--muted);">${esc(exp)}</td>
-        <td>${t.revoked ? "" : `<button class="agent-action-btn" onclick="_revokeDelegation('${esc(t.jti)}')">Revoke</button>`}</td>
+        <td>${(t.revoked || t.status === "expired") ? "" : `<button class="agent-action-btn" onclick="_revokeDelegation('${esc(t.jti)}')">Revoke</button>`}</td>
       </tr>`;
     }).join("");
     document.getElementById("delegation-modal-body").innerHTML = `
@@ -2248,7 +2253,7 @@ async function openTaskCredsModal(did, name) {
   document.getElementById("taskcreds-modal").style.display = "flex";
 
   try {
-    const r = await fetch(`${BASE}/pro/task-identity?agent_did=${encodeURIComponent(did)}&limit=100`, { credentials: "include" });
+    const r = await fetch(`${BASE}/pro/task-identity?agent_did=${encodeURIComponent(did)}&per_page=100`, { credentials: "include" });
     if (!r.ok) throw new Error(`Error ${r.status}`);
     const data = await r.json();
     const creds = data.credentials || [];
