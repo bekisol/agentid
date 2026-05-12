@@ -578,7 +578,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="sb-channel-item" id="sidebar-inbox-btn" onclick="_showInboxView()">
             <span class="sb-channel-icon">📥</span><span>Inbox</span><span class="sb-channel-count" id="sidebar-inbox-count"></span>
           </div>
-          <div id="sidebar-groups-list" style="padding:0;"></div>
+          <div class="sb-channel-item" id="sidebar-groups-btn" onclick="showGroupsListView()">
+            <span class="sb-channel-icon">👥</span><span>Group Chat</span><span class="sb-channel-count" id="sidebar-groups-count"></span>
+          </div>
           <div class="sb-channel-item" id="sidebar-files-btn" onclick="showFilesView()">
             <span class="sb-channel-icon">📁</span><span>Files</span><span class="sb-channel-count" id="sidebar-files-count"></span>
           </div>
@@ -1124,6 +1126,9 @@ function renderPartnersList() {
   const countEl = document.getElementById("sb-to-count");
   if (!list) return;
 
+  // Groups list view owns the thread panel — don't overwrite it
+  if (_groupsListView) { _renderGroupsInThreadPanel(); return; }
+
   if (!_selectedDid) {
     list.innerHTML = '<div class="sb-to-placeholder">← Select an agent<br>to see conversations</div>';
     if (countEl) countEl.textContent = "";
@@ -1203,9 +1208,10 @@ function renderSidebar()    { renderAgentsList(); renderPartnersList(); }
 
 // Step 1: user picks the FROM agent — populates the TO panel, keeps any prior convFilter
 function selectAgent(agentDid) {
-  _dealsView    = false;
-  _filesView    = false;
-  _activeRoomId = null;
+  _dealsView      = false;
+  _filesView      = false;
+  _groupsListView = false;
+  _activeRoomId   = null;
   _stopGroupPoll();
   _lastRenderKey = "";
   _selectedDid   = agentDid;
@@ -2336,6 +2342,14 @@ let _files = [];
 function _clearChannelActive() {
   document.querySelectorAll(".sb-channel-item").forEach(e => e.classList.remove("active"));
   document.querySelectorAll(".sb-agent-row").forEach(e => e.classList.remove("active"));
+  // Restore thread panel header when leaving groups view
+  if (_groupsListView) {
+    _groupsListView = false;
+    const labelEl = document.getElementById("sb-threads-label");
+    if (labelEl) labelEl.textContent = "Threads";
+    const composeBtn = document.querySelector(".sb-panel-compose");
+    if (composeBtn) { composeBtn.textContent = "← new"; composeBtn.onclick = openCompose; }
+  }
 }
 
 function _showInboxView() {
@@ -3024,29 +3038,58 @@ function renderDealModal() {}
 
 // ── GROUP CHAT ────────────────────────────────────────────────────────────────
 
-// Render the groups list in the sidebar
-function renderGroupsSidebar() {
-  const el = document.getElementById("sidebar-groups-list");
-  if (!el) return;
-  if (!_rooms.length) { el.innerHTML = ''; return; }
-  el.innerHTML = _rooms.map(r => {
+let _groupsListView = false;
+
+function showGroupsListView() {
+  _groupsListView = true;
+  _activeRoomId = null;
+  _dealsView = false;
+  _selectedDid = "__groups__";
+  _stopGroupPoll();
+
+  _clearChannelActive();
+  document.getElementById("sidebar-groups-btn")?.classList.add("active");
+
+  const labelEl = document.getElementById("sb-threads-label");
+  if (labelEl) labelEl.textContent = "Groups";
+  const composeBtn = document.querySelector(".sb-panel-compose");
+  if (composeBtn) { composeBtn.textContent = "+ new"; composeBtn.onclick = openCreateGroupModal; }
+
+  document.getElementById("deal-search-bar").style.display = "none";
+  document.getElementById("agent-info").style.display = "none";
+  document.getElementById("stop-btn").style.display = "none";
+  document.getElementById("feed-title").textContent = "Group Chat";
+  document.getElementById("feed-meta").textContent = `${_rooms.length} group${_rooms.length !== 1 ? "s" : ""}`;
+  document.getElementById("feed-scroll").innerHTML = '<div class="state-box"><div class="state-icon">👥</div><div class="state-title">Select a group</div><div class="state-sub">Pick a group from the list to open the conversation</div></div>';
+
+  _renderGroupsInThreadPanel();
+}
+
+function _renderGroupsInThreadPanel() {
+  const list = document.getElementById("sb-partners-list");
+  if (!list) return;
+  if (!_rooms.length) {
+    list.innerHTML = '<div style="padding:1.2rem 0.9rem;font-size:0.8rem;color:var(--muted);">No groups yet — create one above</div>';
+    return;
+  }
+  list.innerHTML = _rooms.map(r => {
     const active = _activeRoomId === r.id;
     const hasPending = r.pending_invites > 0;
-    const badge = hasPending
-      ? `<span class="group-badge invite">Invite</span>`
-      : `<span class="group-badge count">${r.active_members}</span>`;
+    const memberText = `${r.active_members} member${r.active_members !== 1 ? "s" : ""}`;
     const removeLabel = r.is_owner ? "Delete group" : "Leave group";
-    return `<div class="sidebar-item-group${active ? " active" : ""}${hasPending ? " pending" : ""}"
+    return `<div class="thread-row sidebar-item-group${active ? " active" : ""}${hasPending ? " pending" : ""}"
               data-room-id="${r.id}" onclick="showGroupView(${r.id})" style="position:relative">
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">👥 ${esc(r.name)}</span>
-      ${badge}
+      <div class="thread-row-top">
+        <span class="thread-row-name">👥 ${esc(r.name)}</span>
+        ${hasPending ? '<span class="sig-tc neg">Invite</span>' : ''}
+      </div>
+      <div class="thread-row-preview">${memberText}</div>
       <span title="${removeLabel}" onclick="event.stopPropagation();openLeaveModal(${r.id})"
-        style="margin-left:0.25rem;opacity:0;font-size:0.8rem;color:var(--muted);cursor:pointer;transition:opacity 0.15s"
+        style="position:absolute;right:0.6rem;top:50%;transform:translateY(-50%);opacity:0;font-size:0.8rem;color:var(--muted);cursor:pointer;transition:opacity 0.15s"
         class="group-remove-btn">✕</span>
     </div>`;
   }).join('');
-  // Show × on hover
-  el.querySelectorAll(".sidebar-item-group").forEach(item => {
+  list.querySelectorAll(".sidebar-item-group").forEach(item => {
     const btn = item.querySelector(".group-remove-btn");
     if (!btn) return;
     item.addEventListener("mouseenter", () => btn.style.opacity = "0.7");
@@ -3054,19 +3097,35 @@ function renderGroupsSidebar() {
   });
 }
 
+function renderGroupsSidebar() {
+  // Update channel badge
+  const countEl = document.getElementById("sidebar-groups-count");
+  if (countEl) {
+    const pending = _rooms.filter(r => r.pending_invites > 0).length;
+    countEl.textContent = pending > 0 ? pending : (_rooms.length > 0 ? _rooms.length : "");
+  }
+  // Re-render thread panel if currently showing groups list
+  if (_groupsListView && _selectedDid === "__groups__") {
+    _renderGroupsInThreadPanel();
+    document.getElementById("feed-meta").textContent = `${_rooms.length} group${_rooms.length !== 1 ? "s" : ""}`;
+  }
+}
+
 // Load and display a group room thread
 async function showGroupView(roomId) {
   _activeRoomId = roomId;
   _gcmdRoomId   = roomId;   // set early so ⚡ Direct button works immediately
-  _selectedDid = "__group__";
+  _selectedDid = "__groups__";
+  _groupsListView = true;
   _dealsView = false;
 
-  // Highlight sidebar
-  document.querySelectorAll(".sb-row").forEach(e => e.classList.remove("active"));
+  // Highlight: keep Group Chat channel active, highlight the specific group row
+  _clearChannelActive();
+  document.getElementById("sidebar-groups-btn")?.classList.add("active");
   document.querySelectorAll(".sidebar-item-group").forEach(e => {
     e.classList.toggle("active", parseInt(e.dataset.roomId) === roomId);
   });
-  document.getElementById("sidebar-deals-btn").classList.remove("active");
+  document.getElementById("sidebar-deals-btn")?.classList.remove("active");
   document.getElementById("deal-search-bar").style.display = "none";
 
   const room = _rooms.find(r => r.id === roomId);
