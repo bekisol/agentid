@@ -564,7 +564,9 @@ async function accountSignup() {
     scheduleSessionExpiry();
   } catch (e) {
     const msg = String(e.message || "");
-    _showAuthError(_authMessageForStatus(msg) || msg);
+    const _authResult = _authMessageForStatus(msg);
+    if (typeof _authResult === "object" && _authResult?.html) _showAuthError(_authResult.html, true);
+    else _showAuthError(_authResult || msg);
   } finally {
     btn.textContent = "Create account";
     btn.disabled = false;

@@ -1126,6 +1126,13 @@ let _groupPendingFile   = null;  // { file, fileRef } for group reply bar
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function _strErr(data, fallback) {
+  const raw = data?.detail ?? data?.error ?? data?.message ?? fallback;
+  if (raw == null) return String(fallback);
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw)) return raw.map(e => e?.msg || JSON.stringify(e)).join("; ");
+  return raw?.message || raw?.error || JSON.stringify(raw);
+}
 
 // Render agent/synthesis output: unwrap JSON structures to readable prose, escape the rest
 function _fmtOutput(raw) {
@@ -1961,7 +1968,7 @@ async function _uploadFileToBE(file, fromDid) {
     credentials: "include",
     body: form,
   });
-  if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+  if (!r.ok) { const d = await r.json(); throw new Error(_strErr(d, r.status)); }
   return r.json();
 }
 
@@ -2487,7 +2494,7 @@ async function stopCurrentConversation() {
       body: JSON.stringify({ did_a: _selectedDid, did_b: _convFilter }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data.detail || `Error ${r.status}`);
+    if (!r.ok) throw new Error(_strErr(data, `Error ${r.status}`));
     _activeStops.push({ did_a: data.did_a, did_b: data.did_b, name_a: null, name_b: null });
   } catch(e) {
     alert("Failed to stop: " + (e.message || "Unknown error"));
@@ -2554,7 +2561,7 @@ async function submitStop() {
       body: JSON.stringify({ did_a: didA, did_b: didB }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data.detail || `Error ${r.status}`);
+    if (!r.ok) throw new Error(_strErr(data, `Error ${r.status}`));
     succEl.textContent = "✓ Auto-reply traffic stopped. The chain will not restart.";
     succEl.style.display = "block";
     document.getElementById("stop-did-b").value = "";
@@ -2803,7 +2810,7 @@ async function _shareFile(fileId, idx) {
         file_ref: { file_id: file.id, name: file.name, mime_type: file.mime_type, size: file.size },
       }),
     });
-    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    if (!r.ok) { const d = await r.json(); throw new Error(_strErr(d, r.status)); }
     const toAgent = _agents.find(a => a.did === toDid);
     alert(`✓ Sent "${file.name}" to ${toAgent?.name || toDid.slice(-12)}`);
     sel.value = "";
@@ -2820,7 +2827,7 @@ async function _deleteFile(fileId) {
       headers: apiHeaders(),
       credentials: "include",
     });
-    if (!r.ok && r.status !== 204) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    if (!r.ok && r.status !== 204) { const d = await r.json(); throw new Error(_strErr(d, r.status)); }
     _files = _files.filter(f => f.id !== fileId);
     _renderFilesView();
   } catch(e) {
@@ -3603,7 +3610,7 @@ async function acceptInvite(roomId, did) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ did }),
     });
-    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    if (!r.ok) { const d = await r.json(); throw new Error(_strErr(d, r.status)); }
     // Refresh rooms list and reload thread
     const roomsRes = await fetch(`${BASE}/pro/chat/rooms`, { headers: apiHeaders(), credentials: "include" });
     if (roomsRes.ok) { const d = await roomsRes.json(); _rooms = d.rooms || []; renderGroupsSidebar(); }
@@ -3679,7 +3686,7 @@ async function _sendGroupMessage(roomId, fromDid, inputEl) {
       credentials: "include",
       body: JSON.stringify({ from_did: fromDid, body: body || `[File: ${fileRef?.name}]`, file_ref: fileRef }),
     });
-    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    if (!r.ok) { const d = await r.json(); throw new Error(_strErr(d, r.status)); }
     // Optimistically append to DOM — register ID first so the poll won't re-append it
     const data = await r.json();
     if (data && data.id) {
@@ -3725,7 +3732,7 @@ async function submitNewGroup() {
       credentials: "include",
       body: JSON.stringify(body),
     });
-    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    if (!r.ok) { const d = await r.json(); throw new Error(_strErr(d, r.status)); }
     const newRoom = await r.json();
     closeNewGroupModal();
     // Refresh rooms list then open the new room
@@ -3769,7 +3776,7 @@ async function submitInvite() {
       credentials: "include",
       body: JSON.stringify({ did, from_did: fromDid, message: document.getElementById("inv-msg").value.trim() }),
     });
-    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    if (!r.ok) { const d = await r.json(); throw new Error(_strErr(d, r.status)); }
     closeInviteModal();
     alert(`Invite sent to ${did.slice(-16)}`);
   } catch(e) {
@@ -4073,7 +4080,7 @@ async function _gcmdSend() {
       body: JSON.stringify({ message: instruction }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data.detail || `Error ${r.status}`);
+    if (!r.ok) throw new Error(_strErr(data, `Error ${r.status}`));
     return { agentName, reply: data.reply, activity: data.activity };
   }));
 
@@ -4802,7 +4809,7 @@ async function _teamsSubmitClarification() {
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      throw new Error(d.detail || `Error ${r.status}`);
+      throw new Error(_strErr(d, `Error ${r.status}`));
     }
     document.getElementById("clarify-input").value = "";
     document.getElementById("clarify-bar").classList.remove("visible");

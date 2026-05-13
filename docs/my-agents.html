@@ -899,8 +899,21 @@ async function apiFetch(path, opts = {}) {
   if (apiKey) h["x-api-key"] = apiKey;
   const res = await fetch(BASE + path, { ...opts, credentials: "include", headers: h });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const raw = data.detail ?? data.message ?? `HTTP ${res.status}`;
+    throw new Error(typeof raw === "object" ? (raw?.message || raw?.error || JSON.stringify(raw)) : String(raw));
+  }
   return data;
+}
+
+// Safely extract a string error message from an API response body.
+// FastAPI detail can be a string, array, or object — all produce [object Object] naively.
+function _strErr(data, fallback) {
+  const raw = data?.detail ?? data?.error ?? data?.message ?? fallback;
+  if (raw == null) return String(fallback);
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw)) return raw.map(e => e?.msg || JSON.stringify(e)).join("; ");
+  return raw?.message || raw?.error || JSON.stringify(raw);
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -1561,7 +1574,7 @@ async function saveBrainTab() {
       body: JSON.stringify({ content }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+    if (!r.ok) throw new Error(_strErr(data, `Error ${r.status}`));
     savedEl.textContent = `✓ ${_brainTab} saved.`;
     savedEl.style.display = "block";
     setTimeout(() => { savedEl.style.display = "none"; }, 2500);
@@ -1662,7 +1675,7 @@ async function fireMissionNow(id) {
       headers: apiKey ? { "x-api-key": apiKey } : {},
       credentials: "include",
     });
-    if (!r.ok) { const d = await r.json(); throw new Error(d?.detail || "Failed"); }
+    if (!r.ok) { const d = await r.json(); throw new Error(_strErr(d, "Failed")); }
     alert("✓ Mission fired — your agent will receive a mission_tick shortly.");
     await loadMissions();
   } catch(e) { alert("Error: " + e.message); }
@@ -1705,7 +1718,7 @@ async function createMission() {
       body: JSON.stringify({ name, mission_text: text, cron_expr: cronExpr }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+    if (!r.ok) throw new Error(_strErr(data, `Error ${r.status}`));
     document.getElementById("mission-name").value = "";
     document.getElementById("mission-text").value = "";
     document.getElementById("mission-schedule-preset").value = "every:24h";
@@ -1783,7 +1796,7 @@ async function saveWebhook() {
       body: JSON.stringify({ url, secret }),
     });
     const d = await r.json();
-    if (!r.ok) throw new Error(d?.detail || d?.error || `Error ${r.status}`);
+    if (!r.ok) throw new Error(_strErr(d, `Error ${r.status}`));
     document.getElementById("webhook-modal").style.display = "none";
   } catch(e) {
     errDiv.textContent = e.message || "Failed to save webhook.";
@@ -1848,7 +1861,7 @@ async function createAgentKey() {
       body: JSON.stringify({ label, agent_did: _agentKeyDid }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+    if (!r.ok) throw new Error(_strErr(data, `Error ${r.status}`));
 
     document.getElementById("agentkey-value").textContent     = data.key;
     document.getElementById("agentkey-scoped-did").textContent = data.agent_did || _agentKeyDid;
@@ -1982,7 +1995,7 @@ async function saveStoreKey() {
       body: JSON.stringify({ private_key_b64: raw }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+    if (!r.ok) throw new Error(_strErr(data, `Error ${r.status}`));
 
     document.getElementById("storekey-active-banner").style.display = "flex";
     document.getElementById("storekey-key-input").value = "";
@@ -2092,7 +2105,7 @@ async function saveAiReply() {
       body: JSON.stringify({ openai_key: key, system_prompt: prompt, model, enabled: true }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data?.detail || data?.error || `Error ${r.status}`);
+    if (!r.ok) throw new Error(_strErr(data, `Error ${r.status}`));
 
     saveBtn.textContent = "✓ Saved!";
     saveBtn.disabled = false;
