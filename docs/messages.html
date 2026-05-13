@@ -548,6 +548,53 @@
     .cp-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
     #teams-chat-pane { display:none; flex:1; flex-direction:column; overflow:hidden; }
     #teams-chat-pane.active { display:flex; }
+    /* ── Monitor pane ─────────────────────────────────────────────────── */
+    #monitor-pane { display:none; flex:1; overflow-y:auto; flex-direction:column; background:var(--bg); }
+    #monitor-pane.active { display:flex; }
+    #monitor-board { padding:0.75rem; display:flex; flex-direction:column; gap:0.75rem; }
+    .mon-phase-bar { display:flex; align-items:center; gap:0; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface2); flex-shrink:0; }
+    .mon-phase { flex:1; padding:0.35rem 0.2rem; text-align:center; font-size:0.65rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; border-right:1px solid var(--border); transition:background 0.3s,color 0.3s; white-space:nowrap; }
+    .mon-phase:last-child { border-right:none; }
+    .mon-phase.done  { background:#d1fae5; color:#065f46; }
+    .mon-phase.active { background:#dbeafe; color:#1e40af; }
+    .mon-run-header { display:flex; align-items:center; justify-content:space-between; font-size:0.78rem; flex-shrink:0; }
+    .mon-run-status { font-weight:700; font-size:0.72rem; padding:0.18rem 0.55rem; border-radius:99px; }
+    .mon-run-status.planning    { background:#f3f4f6; color:#374151; }
+    .mon-run-status.running     { background:#dbeafe; color:#1e40af; }
+    .mon-run-status.synthesizing{ background:#ede9fe; color:#5b21b6; }
+    .mon-run-status.completed   { background:#d1fae5; color:#065f46; }
+    .mon-run-status.failed      { background:#fee2e2; color:#991b1b; }
+    .mon-run-status.paused_for_user { background:#fef3c7; color:#92400e; }
+    .mon-run-status.paused_for_approval { background:#dbeafe; color:#1e40af; }
+    .mon-run-status.cancelled   { background:#f3f4f6; color:#6b7280; }
+    .mon-agents-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:0.6rem; }
+    .mon-agent-card { border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface); display:flex; flex-direction:column; transition:box-shadow 0.2s; }
+    .mon-agent-card.working { border-color:var(--accent); box-shadow:0 0 0 2px rgba(99,102,241,0.12); }
+    .mon-agent-card.completed { border-color:#6ee7b7; }
+    .mon-agent-card.rejected  { border-color:#fcd34d; }
+    .mon-agent-card.failed    { border-color:#fca5a5; }
+    .mon-agent-head { padding:0.5rem 0.65rem 0.35rem; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); background:var(--surface2); }
+    .mon-agent-name { font-size:0.8rem; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100px; }
+    .mon-agent-badges { display:flex; gap:0.25rem; align-items:center; flex-shrink:0; }
+    .mon-agent-body { padding:0.5rem 0.65rem; flex:1; display:flex; flex-direction:column; gap:0.35rem; }
+    .mon-subtask { font-size:0.75rem; color:var(--text-2); line-height:1.4; }
+    .mon-status-row { display:flex; align-items:center; gap:0.4rem; font-size:0.72rem; font-weight:700; }
+    .mon-status-row .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+    .dot-idle    { background:#d1d5db; }
+    .dot-working { background:#3b82f6; animation:mon-pulse 1.2s ease-in-out infinite; }
+    .dot-done    { background:#10b981; }
+    .dot-reject  { background:#f59e0b; }
+    .dot-fail    { background:#ef4444; }
+    @keyframes mon-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+    .mon-elapsed { font-size:0.68rem; color:var(--muted); font-weight:400; }
+    .mon-context-line { font-size:0.68rem; color:#2563eb; background:#eff6ff; border-radius:4px; padding:0.15rem 0.35rem; display:flex; align-items:center; gap:0.25rem; }
+    .mon-reject-reason { font-size:0.68rem; color:#92400e; background:#fef3c7; border-radius:4px; padding:0.15rem 0.35rem; line-height:1.35; }
+    .mon-quality-wrap { display:flex; align-items:center; gap:0.4rem; }
+    .mon-q-bar { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+    .mon-q-fill { height:100%; border-radius:2px; transition:width 0.6s; }
+    .mon-q-label { font-size:0.68rem; font-weight:700; flex-shrink:0; min-width:28px; text-align:right; }
+    .mon-output-preview { font-size:0.7rem; color:var(--muted); line-height:1.4; max-height:3.6em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
+    .mon-rationale { font-size:0.67rem; color:var(--muted); font-style:italic; }
     #teams-chat-msgs { flex:1; overflow-y:auto; padding:0.75rem 1rem; display:flex; flex-direction:column; gap:0.5rem; }
     .tc-bubble { max-width:86%; border-radius:12px; padding:0.5rem 0.8rem; font-size:0.82rem; line-height:1.55; word-break:break-word; white-space:pre-wrap; }
     .tc-bubble.user { align-self:flex-end; background:var(--accent); color:#fff; border-bottom-right-radius:3px; }
@@ -1009,7 +1056,8 @@ document.addEventListener("DOMContentLoaded", () => {
   </div>
   <!-- Tab bar — only visible in teams mode -->
   <div class="cp-tabs" id="cp-tabs">
-    <button class="cp-tab active" id="cp-tab-run" onclick="_cpSwitchTab('run')">⚡ Run Thread</button>
+    <button class="cp-tab active" id="cp-tab-run" onclick="_cpSwitchTab('run')">⚡ Activity</button>
+    <button class="cp-tab" id="cp-tab-monitor" onclick="_cpSwitchTab('monitor')">📡 Monitor</button>
     <button class="cp-tab" id="cp-tab-chat" onclick="_cpSwitchTab('chat')">💬 Chat</button>
     <button id="cp-stop-btn" onclick="_teamsCancelRun()" title="Stop the current run"
       style="display:none;margin-left:auto;margin-right:0.5rem;background:var(--red,#ef4444);color:#fff;border:none;border-radius:6px;padding:0.2rem 0.65rem;font-size:0.75rem;font-weight:700;cursor:pointer;font-family:inherit;align-self:center;">⏹ Stop</button>
@@ -1032,6 +1080,13 @@ document.addEventListener("DOMContentLoaded", () => {
       <button id="teams-chat-send" onclick="_teamsChatSend()">Send</button>
     </div>
   </div>
+  <!-- ── Monitor pane ──────────────────────────────────────────────────── -->
+  <div id="monitor-pane">
+    <div id="monitor-board">
+      <div style="text-align:center;padding:2rem 1rem;color:var(--muted);font-size:0.82rem;">Start a run to see live agent monitoring.</div>
+    </div>
+  </div>
+
   <div class="chat-panel-input">
     <textarea id="chat-input" rows="1" placeholder="Message your agent…" oninput="autoResizeChatInput(this)" onkeydown="chatKeydown(event)"></textarea>
     <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()">Send</button>
@@ -4251,6 +4306,12 @@ let _teamGroupRuns      = [];        // recent runs list for current group
 let _teamsChatHistory   = [];        // [{role, content}] conversation with governing LLM
 let _teamRunLastEventId = 0;         // cursor: highest event id seen — passed as ?since_id on reconnect
 
+// ── Monitor tab state ──────────────────────────────────────────────────────────
+// Keyed by agent DID
+let _monitorState      = {};   // did → { name, subtask, status, startedAt, completedAt, quality, outputPreview, rejectionReason, retryCount, contextSources, riskLevel, trustScore, rationale }
+let _monitorRunState   = {};   // { phase, startedAt, agentCount, completedCount, planCount, elapsedDisplay }
+let _monitorTimerInt   = null; // interval id for live elapsed-time tick
+
 const _RUN_TERMINAL = new Set(["completed","failed","cancelled"]);
 
 // Load agent groups from /pro/groups
@@ -4282,6 +4343,7 @@ function showTeamsListView() {
   _selectedDid     = "__teams__";
   _stopGroupPoll();
   _stopTeamRunSSE();
+  if (_monitorTimerInt) { clearInterval(_monitorTimerInt); _monitorTimerInt = null; }
 
   _clearChannelActive();
   _teamsListView = true;
@@ -4504,6 +4566,12 @@ async function openRunThread(runId, groupId) {
   _teamRunLastEventId = 0;  // reset cursor — events replayed from preload set it as they arrive
   _stopTeamRunSSE();
 
+  // Reset monitor state for the new run
+  _monitorState    = {};
+  _monitorRunState = { phase: "planning", startedAt: Date.now(), agentCount: 0, completedCount: 0, planCount: 0 };
+  if (_monitorTimerInt) { clearInterval(_monitorTimerInt); _monitorTimerInt = null; }
+  _monitorTimerInt = setInterval(_monitorTick, 1000);
+
   if (_activeTeamId !== groupId) {
     _activeTeamId = groupId;
     document.querySelectorAll(".sidebar-item-team").forEach(el => {
@@ -4528,11 +4596,13 @@ async function openRunThread(runId, groupId) {
   cpMsgs.style.display = "";
   if (cpInput)  cpInput.style.display  = "none";
   if (cpSwitch) cpSwitch.style.display = "none";
-  // Show tab bar, default to Run Thread tab
+  // Show tab bar, default to Activity tab
   document.getElementById("cp-tabs").classList.add("visible");
   document.getElementById("teams-chat-pane").classList.remove("active");
+  document.getElementById("monitor-pane")?.classList.remove("active");
   document.getElementById("cp-tab-run").classList.add("active");
   document.getElementById("cp-tab-chat").classList.remove("active");
+  document.getElementById("cp-tab-monitor")?.classList.remove("active");
   cp.dataset.teamsMode = "1";
   cp.classList.add("open");
 
@@ -4679,6 +4749,9 @@ function _handleRunEvent(ev, isReplay) {
 
   // Keep cursor in sync so SSE reconnects start exactly where replay ended
   if (ev.id && ev.id > _teamRunLastEventId) _teamRunLastEventId = ev.id;
+
+  // Feed monitor in parallel — keeps both views in sync
+  _updateMonitorFromEvent(ev);
 
   const ts   = ev.ts ? relativeTime(ev.ts) : "";
   const data = ev.data || ev.event_data || {};
@@ -5311,25 +5384,364 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+// ── MONITOR TAB ────────────────────────────────────────────────────────────────
+
+/**
+ * Update the in-memory monitor model from one run event.
+ * Called for every event (both replay and live) before Activity tab rendering.
+ * We never touch the DOM here — _renderMonitorBoard() does all DOM work.
+ */
+function _updateMonitorFromEvent(ev) {
+  const type = ev.event_type;
+  const data = ev.event_data || ev.data || {};
+  const did  = ev.agent_did || data.agent_did || null;
+  const ts   = ev.ts ? new Date(ev.ts).getTime() : Date.now();
+
+  switch (type) {
+
+    case "orchestrator_plan": {
+      const assignments = data.plan || data.assignments || [];
+      _monitorRunState.phase      = "running";
+      _monitorRunState.planCount  = assignments.length;
+      _monitorRunState.agentCount = assignments.length;
+      // Pre-populate cards so agents appear immediately, before agent_assigned fires
+      assignments.forEach(a => {
+        const adid = a.agent_did;
+        if (!adid) return;
+        if (!_monitorState[adid]) _monitorState[adid] = { status: "pending", retryCount: 0, contextSources: [] };
+        Object.assign(_monitorState[adid], {
+          name:        _agentNameForDid(adid),
+          subtask:     a.subtask || "",
+          riskLevel:   a.risk_level || "",
+          rationale:   a.rationale || "",
+          trustScore:  a.trust_score != null ? Math.round(a.trust_score) : null,
+        });
+      });
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "agent_assigned": {
+      if (!did) break;
+      if (!_monitorState[did]) _monitorState[did] = { status: "pending", retryCount: 0, contextSources: [] };
+      Object.assign(_monitorState[did], {
+        name:        _agentNameForDid(did),
+        subtask:     data.subtask || _monitorState[did].subtask || "",
+        riskLevel:   data.risk_level || _monitorState[did].riskLevel || "",
+        trustScore:  data.trust_score != null ? Math.round(data.trust_score) : _monitorState[did].trustScore,
+        rationale:   data.rationale || _monitorState[did].rationale || "",
+        status:      "assigned",
+        assignedAt:  ts,
+      });
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "agent_started": {
+      if (!did) break;
+      if (!_monitorState[did]) _monitorState[did] = { retryCount: 0, contextSources: [] };
+      _monitorState[did].status    = "working";
+      _monitorState[did].startedAt = ts;
+      if (!_monitorState[did].name) _monitorState[did].name = _agentNameForDid(did);
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "context_written": {
+      // Another agent wrote context — find who could read it (all others)
+      const key   = data.context_key || "";
+      const byDid = data.agent_did || did || "";
+      const byName = _agentNameForDid(byDid);
+      // Add to all other running agents' contextSources so they show "reading from X"
+      Object.entries(_monitorState).forEach(([d, s]) => {
+        if (d === byDid) return;
+        if (!s.contextSources) s.contextSources = [];
+        const already = s.contextSources.find(c => c.key === key && c.by === byName);
+        if (!already) s.contextSources.push({ key, by: byName, at: ts });
+      });
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "agent_completed": {
+      if (!did) break;
+      if (!_monitorState[did]) _monitorState[did] = { retryCount: 0, contextSources: [] };
+      const rawScore = data.score ?? data.quality_score;
+      const rawOut   = data.output_preview || data.output || "";
+      const outStr   = typeof rawOut === "string" ? rawOut : JSON.stringify(rawOut);
+      Object.assign(_monitorState[did], {
+        status:        "completed",
+        completedAt:   ts,
+        quality:       rawScore != null ? Math.round(rawScore * 100) : null,
+        outputPreview: outStr.slice(0, 180),
+      });
+      _monitorRunState.completedCount = Object.values(_monitorState).filter(s => s.status === "completed").length;
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "orchestrator_rejected": {
+      if (!did) break;
+      if (!_monitorState[did]) _monitorState[did] = { retryCount: 0, contextSources: [] };
+      _monitorState[did].status          = "rejected";
+      _monitorState[did].rejectionReason = data.reason || "Quality below threshold";
+      _monitorState[did].retryCount      = (_monitorState[did].retryCount || 0) + 1;
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "agent_reassigned": {
+      const fromDid = data.from_agent;
+      const toDid   = ev.agent_did || data.to_agent;
+      if (fromDid && _monitorState[fromDid]) {
+        _monitorState[fromDid].status = "reassigned";
+      }
+      if (toDid) {
+        if (!_monitorState[toDid]) _monitorState[toDid] = { retryCount: 0, contextSources: [] };
+        _monitorState[toDid].status     = "assigned";
+        _monitorState[toDid].subtask    = data.subtask || (_monitorState[fromDid]?.subtask || "");
+        _monitorState[toDid].name       = _agentNameForDid(toDid);
+        _monitorState[toDid].assignedAt = ts;
+        _monitorRunState.agentCount     = Object.keys(_monitorState).length;
+      }
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "synthesis_started": {
+      _monitorRunState.phase = "synthesizing";
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "synthesis_completed":
+    case "run_completed": {
+      _monitorRunState.phase       = "completed";
+      _monitorRunState.completedAt = ts;
+      if (_monitorTimerInt) { clearInterval(_monitorTimerInt); _monitorTimerInt = null; }
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "run_failed": {
+      _monitorRunState.phase = "failed";
+      if (_monitorTimerInt) { clearInterval(_monitorTimerInt); _monitorTimerInt = null; }
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "run_cancelled": {
+      _monitorRunState.phase = "cancelled";
+      if (_monitorTimerInt) { clearInterval(_monitorTimerInt); _monitorTimerInt = null; }
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "clarification_requested": {
+      _monitorRunState.phase = "paused_for_user";
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+
+    case "clarification_received": {
+      _monitorRunState.phase = "running";
+      _renderMonitorBoardIfVisible();
+      break;
+    }
+  }
+}
+
+/** Only re-render if the Monitor tab is currently visible — avoids unnecessary DOM work. */
+function _renderMonitorBoardIfVisible() {
+  const monPane = document.getElementById("monitor-pane");
+  if (monPane && monPane.classList.contains("active")) {
+    _renderMonitorBoard();
+  }
+}
+
+/** Live timer tick — updates elapsed times on visible agent cards. */
+function _monitorTick() {
+  // Update run-level elapsed
+  if (_monitorRunState.startedAt) {
+    const elSec = Math.floor((Date.now() - _monitorRunState.startedAt) / 1000);
+    _monitorRunState.elapsedDisplay = _fmtDuration(elSec);
+  }
+  // Only re-render if monitor tab is active
+  _renderMonitorBoardIfVisible();
+}
+
+function _fmtDuration(sec) {
+  if (sec < 60)  return sec + "s";
+  if (sec < 3600) return Math.floor(sec / 60) + "m " + (sec % 60) + "s";
+  return Math.floor(sec / 3600) + "h " + Math.floor((sec % 3600) / 60) + "m";
+}
+
+/**
+ * Full render of the monitor board from current _monitorState / _monitorRunState.
+ * Replaces innerHTML of #monitor-board — intentionally full re-render for simplicity.
+ */
+function _renderMonitorBoard() {
+  const board = document.getElementById("monitor-board");
+  if (!board) return;
+
+  const rs    = _monitorRunState;
+  const phase = rs.phase || "planning";
+  const agents = Object.entries(_monitorState);
+
+  // ── Empty state ──
+  if (!agents.length && phase === "planning") {
+    board.innerHTML = `<div style="text-align:center;padding:2.5rem 1rem;color:var(--muted);font-size:0.82rem;">
+      <div style="font-size:1.5rem;margin-bottom:0.5rem;">📡</div>
+      Start a run to see live agent monitoring.
+    </div>`;
+    return;
+  }
+
+  // ── Phase progress bar ──
+  const phases = ["planning","running","synthesizing","completed"];
+  const phaseLabels = { planning:"Planning", running:"Executing", synthesizing:"Synthesizing", completed:"Done" };
+  const currentPhaseIdx = phases.indexOf(phase === "failed" || phase === "cancelled" ? "completed" : phase);
+  const phaseBar = phases.map((p, i) => {
+    const cls = i < currentPhaseIdx ? "done" : (i === currentPhaseIdx ? "active" : "");
+    return `<div class="mon-phase ${cls}">${phaseLabels[p]}</div>`;
+  }).join("");
+
+  // ── Run header ──
+  const statusCls = phase.replace(/_/g,"-");
+  let statusLabel = phase.replace(/_/g," ");
+  if (phase === "running" && rs.planCount > 0) {
+    statusLabel = `${rs.completedCount || 0} / ${rs.planCount} done`;
+  }
+  const elapsed = rs.elapsedDisplay || (rs.startedAt ? _fmtDuration(Math.floor((Date.now() - rs.startedAt) / 1000)) : "");
+
+  const runHeader = `
+    <div class="mon-run-header">
+      <span style="font-weight:700;font-size:0.8rem;color:var(--text);">Run Overview</span>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        ${elapsed ? `<span style="font-size:0.7rem;color:var(--muted);">⏱ ${esc(elapsed)}</span>` : ""}
+        <span class="mon-run-status ${phase}">${esc(statusLabel)}</span>
+      </div>
+    </div>`;
+
+  // ── Agent cards ──
+  const agentCards = agents.map(([did, s]) => {
+    const statusMap = {
+      pending:    { dot: "dot-idle",    label: "Waiting",    cls: "" },
+      assigned:   { dot: "dot-idle",    label: "Assigned",   cls: "" },
+      working:    { dot: "dot-working", label: "Working…",   cls: "working" },
+      completed:  { dot: "dot-done",    label: "Done",       cls: "completed" },
+      rejected:   { dot: "dot-reject",  label: "Rejected",   cls: "rejected" },
+      reassigned: { dot: "dot-reject",  label: "Reassigned", cls: "rejected" },
+      failed:     { dot: "dot-fail",    label: "Failed",     cls: "failed" },
+    };
+    const st = statusMap[s.status] || statusMap.pending;
+
+    // Risk badge
+    const riskBadge = s.riskLevel
+      ? `<span class="orch-risk-badge ${s.riskLevel}" style="font-size:0.6rem;">${esc(s.riskLevel)}</span>` : "";
+
+    // Trust score mini badge
+    const trustBadge = s.trustScore != null
+      ? `<span style="font-size:0.62rem;background:var(--surface);border:1px solid var(--border);border-radius:99px;padding:0.1rem 0.35rem;color:var(--muted);">T:${s.trustScore}</span>` : "";
+
+    // Retry count badge
+    const retryBadge = s.retryCount > 0
+      ? `<span style="font-size:0.6rem;background:#fef3c7;color:#92400e;border-radius:99px;padding:0.1rem 0.35rem;">↺${s.retryCount}</span>` : "";
+
+    // Elapsed for this agent
+    let agentElapsed = "";
+    if (s.startedAt) {
+      const endMs = s.completedAt || Date.now();
+      agentElapsed = _fmtDuration(Math.floor((endMs - s.startedAt) / 1000));
+    }
+
+    // Quality bar
+    let qualHtml = "";
+    if (s.quality != null) {
+      const pct   = s.quality;
+      const color = pct >= 60 ? "#10b981" : "#f59e0b";
+      qualHtml = `<div class="mon-quality-wrap">
+        <div class="mon-q-bar"><div class="mon-q-fill" style="width:${pct}%;background:${color};"></div></div>
+        <span class="mon-q-label" style="color:${color};">${pct}%</span>
+      </div>`;
+    }
+
+    // Context reading badges (last 2 shown)
+    const ctxLines = (s.contextSources || []).slice(-2).map(c =>
+      `<div class="mon-context-line">🔗 reading from <strong>${esc(c.by)}</strong></div>`
+    ).join("");
+
+    // Rejection reason
+    const rejectHtml = s.rejectionReason
+      ? `<div class="mon-reject-reason">⚠ ${esc(s.rejectionReason.slice(0, 120))}</div>` : "";
+
+    // Output preview
+    const outHtml = s.outputPreview && s.status === "completed"
+      ? `<div class="mon-output-preview">${esc(s.outputPreview)}</div>` : "";
+
+    // Rationale (subtle)
+    const ratHtml = s.rationale && s.status !== "working"
+      ? `<div class="mon-rationale">${esc(s.rationale.slice(0, 100))}</div>` : "";
+
+    return `<div class="mon-agent-card ${st.cls}">
+      <div class="mon-agent-head">
+        <span class="mon-agent-name" title="${esc(s.name || did)}">${esc((s.name || did).slice(0, 18))}</span>
+        <div class="mon-agent-badges">${riskBadge}${trustBadge}${retryBadge}</div>
+      </div>
+      <div class="mon-agent-body">
+        <div class="mon-subtask">${esc((s.subtask || "").slice(0, 120))}</div>
+        <div class="mon-status-row">
+          <span class="dot ${st.dot}"></span>
+          <span>${st.label}</span>
+          ${agentElapsed ? `<span class="mon-elapsed">· ${esc(agentElapsed)}</span>` : ""}
+        </div>
+        ${qualHtml}
+        ${ctxLines}
+        ${rejectHtml}
+        ${outHtml}
+        ${ratHtml}
+      </div>
+    </div>`;
+  }).join("");
+
+  // ── Assemble ──
+  board.innerHTML = `
+    <div class="mon-phase-bar">${phaseBar}</div>
+    ${runHeader}
+    ${agentCards ? `<div class="mon-agents-grid">${agentCards}</div>` : ""}
+    ${phase === "synthesizing" ? `<div style="text-align:center;padding:0.75rem;font-size:0.78rem;color:#7c3aed;font-weight:600;">🔀 Synthesizing — weaving agent outputs together…</div>` : ""}
+    ${phase === "paused_for_user" ? `<div style="text-align:center;padding:0.75rem;font-size:0.78rem;color:#92400e;background:#fef3c7;border-radius:8px;font-weight:600;">❓ Run paused — waiting for your input in Activity tab</div>` : ""}
+    ${phase === "completed" ? `<div style="text-align:center;padding:0.6rem;font-size:0.78rem;color:#065f46;background:#d1fae5;border-radius:8px;font-weight:600;">✅ Run complete — switch to Activity tab to view the final answer</div>` : ""}
+    ${phase === "failed"    ? `<div style="text-align:center;padding:0.6rem;font-size:0.78rem;color:#991b1b;background:#fee2e2;border-radius:8px;font-weight:600;">❌ Run failed</div>` : ""}
+  `;
+}
+
 // ── GOVERNING LLM CHAT ────────────────────────────────────────────────────────
 
 function _cpSwitchTab(tab) {
-  const runTab    = document.getElementById("cp-tab-run");
-  const chatTab   = document.getElementById("cp-tab-chat");
-  const cpMsgs    = document.getElementById("chat-panel-messages");
-  const chatPane  = document.getElementById("teams-chat-pane");
+  const runTab     = document.getElementById("cp-tab-run");
+  const chatTab    = document.getElementById("cp-tab-chat");
+  const monTab     = document.getElementById("cp-tab-monitor");
+  const cpMsgs     = document.getElementById("chat-panel-messages");
+  const chatPane   = document.getElementById("teams-chat-pane");
+  const monPane    = document.getElementById("monitor-pane");
+
+  // Reset all
+  [runTab, chatTab, monTab].forEach(t => t?.classList.remove("active"));
+  cpMsgs.style.display = "none";
+  chatPane.classList.remove("active");
+  monPane?.classList.remove("active");
 
   if (tab === "run") {
-    runTab.classList.add("active");
-    chatTab.classList.remove("active");
-    cpMsgs.style.display  = "";
-    chatPane.classList.remove("active");
+    runTab?.classList.add("active");
+    cpMsgs.style.display = "";
+  } else if (tab === "monitor") {
+    monTab?.classList.add("active");
+    monPane?.classList.add("active");
+    _renderMonitorBoard();   // refresh board on tab open
   } else {
-    chatTab.classList.add("active");
-    runTab.classList.remove("active");
-    cpMsgs.style.display  = "none";
+    chatTab?.classList.add("active");
     chatPane.classList.add("active");
-    // Focus input
     setTimeout(() => document.getElementById("teams-chat-input")?.focus(), 50);
   }
 }
