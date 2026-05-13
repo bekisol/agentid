@@ -535,6 +535,23 @@
     #teams-task-bar.visible { display:flex; }
     .teams-task-input { flex:1; resize:none; border:1px solid var(--border-dark); border-radius:8px; padding:0.5rem 0.75rem; font-size:0.84rem; font-family:inherit; outline:none; max-height:100px; line-height:1.45; background:var(--surface); color:var(--text); }
     .teams-task-input:focus { border-color:var(--green); }
+    /* Governing LLM chat (right panel, teams mode) */
+    .cp-tabs { display:none; flex-shrink:0; border-bottom:1px solid var(--border); background:var(--surface2); }
+    .cp-tabs.visible { display:flex; }
+    .cp-tab { flex:1; padding:0.45rem 0; font-size:0.78rem; font-weight:600; color:var(--muted); background:none; border:none; cursor:pointer; border-bottom:2px solid transparent; transition:color 0.15s,border-color 0.15s; }
+    .cp-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    #teams-chat-pane { display:none; flex:1; flex-direction:column; overflow:hidden; }
+    #teams-chat-pane.active { display:flex; }
+    #teams-chat-msgs { flex:1; overflow-y:auto; padding:0.75rem 1rem; display:flex; flex-direction:column; gap:0.5rem; }
+    .tc-bubble { max-width:86%; border-radius:12px; padding:0.5rem 0.8rem; font-size:0.82rem; line-height:1.55; word-break:break-word; white-space:pre-wrap; }
+    .tc-bubble.user { align-self:flex-end; background:var(--accent); color:#fff; border-bottom-right-radius:3px; }
+    .tc-bubble.assistant { align-self:flex-start; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-bottom-left-radius:3px; }
+    .tc-bubble.typing { color:var(--muted); font-style:italic; }
+    #teams-chat-input-row { border-top:1px solid var(--border); padding:0.55rem 0.75rem; display:flex; gap:0.5rem; flex-shrink:0; background:var(--surface); }
+    #teams-chat-input { flex:1; resize:none; border:1px solid var(--border-dark); border-radius:8px; padding:0.4rem 0.6rem; font-size:0.83rem; font-family:inherit; outline:none; max-height:80px; line-height:1.4; }
+    #teams-chat-input:focus { border-color:var(--accent); }
+    #teams-chat-send { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:0.4rem 0.75rem; font-size:0.82rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+    #teams-chat-send:disabled { opacity:0.5; cursor:default; }
     /* Clarification input bar */
     #clarify-bar { display:none; padding:0.75rem 1rem; background:#fef3c7; border-top:2px solid #fcd34d; flex-direction:column; gap:0.45rem; flex-shrink:0; }
     #clarify-bar.visible { display:flex; }
@@ -965,10 +982,27 @@ document.addEventListener("DOMContentLoaded", () => {
     </div>
     <button onclick="closeChat()" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.4rem;border-radius:4px;">✕</button>
   </div>
+  <!-- Tab bar — only visible in teams mode -->
+  <div class="cp-tabs" id="cp-tabs">
+    <button class="cp-tab active" id="cp-tab-run" onclick="_cpSwitchTab('run')">⚡ Run Thread</button>
+    <button class="cp-tab" id="cp-tab-chat" onclick="_cpSwitchTab('chat')">💬 Chat</button>
+  </div>
   <div class="chat-agent-switcher" id="chat-agent-switcher"></div>
   <div class="chat-panel-messages" id="chat-panel-messages">
     <div style="text-align:center;padding:2rem 1rem;color:var(--muted);font-size:0.82rem;">
       Send a message to start chatting with your agent.
+    </div>
+  </div>
+  <!-- Governing LLM chat pane (teams mode only) -->
+  <div id="teams-chat-pane">
+    <div id="teams-chat-msgs">
+      <div style="text-align:center;padding:2rem 1rem;color:var(--muted);font-size:0.82rem;">
+        Ask the orchestrator anything about this team — task planning, agent capabilities, past results, or strategy.
+      </div>
+    </div>
+    <div id="teams-chat-input-row">
+      <textarea id="teams-chat-input" rows="1" placeholder="Ask the orchestrator…" oninput="autoResizeChatInput(this)" onkeydown="_teamsChatKeydown(event)"></textarea>
+      <button id="teams-chat-send" onclick="_teamsChatSend()">Send</button>
     </div>
   </div>
   <div class="chat-panel-input">
@@ -2551,6 +2585,11 @@ function _clearChannelActive() {
       if (cpInput)  cpInput.style.display  = "";
       if (cpSwitch) cpSwitch.style.display = "";
     }
+    // Hide tab bar + chat pane
+    document.getElementById("cp-tabs")?.classList.remove("visible");
+    document.getElementById("teams-chat-pane")?.classList.remove("active");
+    document.getElementById("chat-panel-messages")?.style.removeProperty("display");
+    _teamsChatHistory = [];
   }
 }
 
@@ -4126,6 +4165,7 @@ let _activeTeamRun    = null;      // {id, status, pause_question} of current ru
 let _teamRunSSE       = null;      // EventSource for live run stream
 let _teamRunEvents    = [];        // rendered event ids this session
 let _teamGroupRuns    = [];        // recent runs list for current group
+let _teamsChatHistory = [];        // [{role, content}] conversation with governing LLM
 
 const _RUN_TERMINAL = new Set(["completed","failed","cancelled"]);
 
@@ -4358,10 +4398,16 @@ async function openRunThread(runId, groupId) {
   const cpSwitch  = document.getElementById("chat-agent-switcher");
   const group     = _agentGroups ? _agentGroups.find(g => g.id === groupId) : null;
   cpTitle.textContent  = "⚡ " + (group ? group.name : "Team run");
-  cpSub.textContent    = "Orchestration thread";
+  cpSub.textContent    = "";
   cpMsgs.innerHTML     = `<div class="orch-thread" id="orch-thread"></div>`;
+  cpMsgs.style.display = "";
   if (cpInput)  cpInput.style.display  = "none";
   if (cpSwitch) cpSwitch.style.display = "none";
+  // Show tab bar, default to Run Thread tab
+  document.getElementById("cp-tabs").classList.add("visible");
+  document.getElementById("teams-chat-pane").classList.remove("active");
+  document.getElementById("cp-tab-run").classList.add("active");
+  document.getElementById("cp-tab-chat").classList.remove("active");
   cp.dataset.teamsMode = "1";
   cp.classList.add("open");
 
@@ -4899,6 +4945,99 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+// ── GOVERNING LLM CHAT ────────────────────────────────────────────────────────
+
+function _cpSwitchTab(tab) {
+  const runTab    = document.getElementById("cp-tab-run");
+  const chatTab   = document.getElementById("cp-tab-chat");
+  const cpMsgs    = document.getElementById("chat-panel-messages");
+  const chatPane  = document.getElementById("teams-chat-pane");
+
+  if (tab === "run") {
+    runTab.classList.add("active");
+    chatTab.classList.remove("active");
+    cpMsgs.style.display  = "";
+    chatPane.classList.remove("active");
+  } else {
+    chatTab.classList.add("active");
+    runTab.classList.remove("active");
+    cpMsgs.style.display  = "none";
+    chatPane.classList.add("active");
+    // Focus input
+    setTimeout(() => document.getElementById("teams-chat-input")?.focus(), 50);
+  }
+}
+
+function _teamsChatKeydown(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    _teamsChatSend();
+  }
+  autoResizeChatInput(e.target);
+}
+
+async function _teamsChatSend() {
+  const input = document.getElementById("teams-chat-input");
+  const sendBtn = document.getElementById("teams-chat-send");
+  const message = (input?.value || "").trim();
+  if (!message || !_activeTeamId) return;
+
+  input.value = "";
+  input.style.height = "";
+  sendBtn.disabled = true;
+
+  // Append user bubble
+  _appendTcBubble("user", message);
+
+  // Append typing indicator
+  const typingId = "tc-typing-" + Date.now();
+  _appendTcBubble("assistant typing", "…", typingId);
+
+  // Add to history
+  _teamsChatHistory.push({ role: "user", content: message });
+
+  try {
+    const r = await fetch(`${BASE}/pro/groups/${_activeTeamId}/chat`, {
+      method: "POST",
+      headers: { ...apiHeaders(), "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ message, history: _teamsChatHistory.slice(0, -1) }),
+    });
+
+    // Remove typing indicator
+    document.getElementById(typingId)?.remove();
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      const msg = err.detail || err.message || `Error ${r.status}`;
+      _teamsChatHistory.pop(); // remove user message on failure
+      _appendTcBubble("assistant", `⚠️ ${typeof msg === "object" ? JSON.stringify(msg) : msg}`);
+    } else {
+      const d = await r.json();
+      const reply = d.reply || "(no reply)";
+      _teamsChatHistory.push({ role: "assistant", content: reply });
+      _appendTcBubble("assistant", reply);
+    }
+  } catch(e) {
+    document.getElementById(typingId)?.remove();
+    _teamsChatHistory.pop();
+    _appendTcBubble("assistant", `⚠️ ${e.message || "Request failed"}`);
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+function _appendTcBubble(role, text, id) {
+  const msgs = document.getElementById("teams-chat-msgs");
+  if (!msgs) return;
+  const div = document.createElement("div");
+  div.className = `tc-bubble ${role}`;
+  if (id) div.id = id;
+  div.textContent = text;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
 (function() {
