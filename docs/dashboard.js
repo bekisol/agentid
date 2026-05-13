@@ -10084,13 +10084,54 @@ async function openRunDrilldown(runId, groupId) {
       }
     } catch(_) {}
 
+    // Fetch cross-run analytics for this group
+    let analyticsHtml = "";
+    try {
+      const analyticsBase = `${window.BASE || ""}/pro/groups/${run._groupId}/analytics`;
+      const an = await apiFetch(`/pro/groups/${run._groupId}/analytics`);
+      const ar = an.runs || {};
+      const aa = an.assignments || {};
+      const compRate = ar.completion_rate != null ? Math.round(ar.completion_rate * 100) : null;
+      const accRate  = aa.acceptance_rate  != null ? Math.round(aa.acceptance_rate  * 100) : null;
+      const avgQ     = aa.avg_quality      != null ? Math.round(aa.avg_quality      * 100) : null;
+      const avgDur   = ar.avg_duration_sec != null ? (ar.avg_duration_sec < 60
+        ? `${Math.round(ar.avg_duration_sec)}s`
+        : `${Math.floor(ar.avg_duration_sec/60)}m ${Math.round(ar.avg_duration_sec%60)}s`) : "—";
+      const statCell = (label, val, sub) =>
+        `<div style="text-align:center;padding:0.5rem 0.3rem;">
+           <div style="font-size:1rem;font-weight:800;color:var(--text);">${val}</div>
+           <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);font-weight:600;">${label}</div>
+           ${sub ? `<div style="font-size:0.62rem;color:var(--muted);">${sub}</div>` : ""}
+         </div>`;
+      analyticsHtml = `
+        <div style="margin-bottom:1.25rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+            <div style="font-size:0.8rem;font-weight:700;color:var(--text-2);">Team analytics (all runs)</div>
+            <span style="font-size:0.72rem;color:var(--muted);">${ar.total} run${ar.total === 1 ? "" : "s"} total</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.3rem;border:1px solid var(--border);border-radius:8px;padding:0.4rem;background:var(--surface);">
+            ${statCell("Completion", compRate != null ? compRate + "%" : "—", `${ar.completed} done`)}
+            ${statCell("Avg duration", avgDur, "")}
+            ${statCell("Acceptance", accRate != null ? accRate + "%" : "—", `${aa.accepted} accepted`)}
+            ${statCell("Avg quality", avgQ != null ? avgQ + "%" : "—", "")}
+            ${statCell("Trust-routed", aa.trust_influenced != null ? aa.trust_influenced : "—", "assignments")}
+          </div>
+        </div>`;
+    } catch(_) {}
+
     body.innerHTML = `
       ${run.final_output ? `
-        <div style="background:var(--green-bg);border:1px solid #6ee7b7;border-radius:10px;padding:0.85rem 1rem;margin-bottom:1.25rem;">
-          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--green);margin-bottom:0.4rem;">✨ Final Answer</div>
+        <div style="background:var(--green-bg);border:1px solid #6ee7b7;border-radius:10px;padding:0.85rem 1rem;margin-bottom:1rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--green);">✨ Final Answer</div>
+            <a href="${(window.BASE||"")}/pro/groups/runs/${runId}/report" download
+               style="font-size:0.72rem;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid var(--accent);border-radius:6px;padding:0.15rem 0.5rem;">📄 Download .md</a>
+          </div>
           <div style="font-size:0.84rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;">${_esc(run.final_output)}</div>
           ${run.run_summary ? `<div style="margin-top:0.5rem;font-size:0.72rem;color:var(--muted);font-style:italic;border-top:1px solid #a7f3d0;padding-top:0.4rem;">${_esc(run.run_summary)}</div>` : ""}
         </div>` : ""}
+
+      ${analyticsHtml}
 
       ${assignments.length ? `
         <div style="margin-bottom:1.25rem;">

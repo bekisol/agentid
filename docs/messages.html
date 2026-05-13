@@ -564,6 +564,10 @@
     .clarify-question { font-size:0.8rem; font-weight:600; color:#92400e; }
     .clarify-input { resize:none; border:1px solid #fcd34d; border-radius:8px; padding:0.45rem 0.7rem; font-size:0.84rem; font-family:inherit; outline:none; background:#fff; color:var(--text); }
     .clarify-input:focus { border-color:#d97706; }
+    /* Plan approval bar */
+    #approval-bar { display:none; padding:0.75rem 1rem; background:#dbeafe; border-top:2px solid #93c5fd; flex-direction:column; gap:0.35rem; flex-shrink:0; }
+    #approval-bar.visible { display:flex; }
+    .run-status-badge.paused_for_approval { background:#dbeafe; color:#1e40af; }
   </style>
 </head>
 <body>
@@ -856,6 +860,18 @@ document.addEventListener("DOMContentLoaded", () => {
             style="background:none;border:1px solid #fcd34d;border-radius:7px;padding:0.35rem 0.75rem;font-size:0.8rem;font-weight:600;cursor:pointer;color:#92400e;font-family:inherit;">Cancel run</button>
           <button onclick="_teamsSubmitClarification()"
             style="background:#d97706;color:#fff;border:none;border-radius:7px;padding:0.35rem 0.85rem;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:inherit;">Send answer</button>
+        </div>
+      </div>
+
+      <!-- Approval bar — shown when a run is paused_for_approval (plan review gate) -->
+      <div id="approval-bar">
+        <div style="font-size:0.8rem;font-weight:700;color:#1e40af;">🔒 Plan review required</div>
+        <div style="font-size:0.78rem;color:#1e3a8a;" id="approval-summary">Review the orchestrator's plan above before execution begins.</div>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.25rem;">
+          <button onclick="_teamsCancelRun()"
+            style="background:none;border:1px solid #93c5fd;border-radius:7px;padding:0.35rem 0.75rem;font-size:0.8rem;font-weight:600;cursor:pointer;color:#1e40af;font-family:inherit;">Cancel run</button>
+          <button id="approval-approve-btn" onclick="_teamsApprovePlan()"
+            style="background:#2563eb;color:#fff;border:none;border-radius:7px;padding:0.35rem 0.85rem;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:inherit;">✓ Approve &amp; Execute</button>
         </div>
       </div>
 
@@ -2636,6 +2652,7 @@ function _clearChannelActive() {
     _stopTeamRunSSE();
     document.getElementById("teams-task-bar")?.classList.remove("visible");
     document.getElementById("clarify-bar")?.classList.remove("visible");
+    document.getElementById("approval-bar")?.classList.remove("visible");
     const labelEl = document.getElementById("sb-threads-label");
     if (labelEl) labelEl.textContent = "Threads";
     const composeBtn = document.querySelector(".sb-panel-compose");
@@ -4284,6 +4301,7 @@ function showTeamsListView() {
   document.getElementById("chat-bar").style.display           = "none";
   document.getElementById("teams-task-bar").classList.remove("visible");
   document.getElementById("clarify-bar").classList.remove("visible");
+      document.getElementById("approval-bar").classList.remove("visible");
 
   document.getElementById("feed-scroll").innerHTML =
     '<div class="state-box"><div class="state-icon">⚡</div><div class="state-title">Select a team</div><div class="state-sub">Pick a team from the list to send it a task</div></div>';
@@ -4340,6 +4358,7 @@ async function showTeamGroupView(groupId) {
   document.getElementById("deal-search-bar").style.display = "none";
   document.getElementById("chat-bar").style.display     = "none";
   document.getElementById("clarify-bar").classList.remove("visible");
+      document.getElementById("approval-bar").classList.remove("visible");
 
   // Header actions
   document.getElementById("header-right-actions").innerHTML =
@@ -4493,6 +4512,7 @@ async function openRunThread(runId, groupId) {
   }
 
   document.getElementById("clarify-bar").classList.remove("visible");
+      document.getElementById("approval-bar").classList.remove("visible");
 
   // Show run thread in the right chat panel; keep center for the run list
   const cp        = document.getElementById("chat-panel");
@@ -4534,9 +4554,13 @@ async function openRunThread(runId, groupId) {
       // Replay all past events
       (run.events || []).forEach(ev => _handleRunEvent(ev, true));
 
-      // If paused, show clarification bar
+      // If paused for clarification, show clarification bar
       if (run.status === "paused_for_user" && run.pause_question) {
         _showClarifyBar(runId, run.pause_question);
+      }
+      // If paused for plan approval, show approval bar
+      if (run.status === "paused_for_approval") {
+        document.getElementById("approval-bar").classList.add("visible");
       }
     }
   } catch(_) {}
@@ -4795,6 +4819,7 @@ function _handleRunEvent(ev, isReplay) {
         <div class="orch-card-body">${esc(data.clarification || "")}</div>
       </div>`);
       document.getElementById("clarify-bar").classList.remove("visible");
+      document.getElementById("approval-bar").classList.remove("visible");
       // Show spinner while agents resume
       _appendOrchCard(`<div class="orch-card" id="orch-planning-spinner" style="border-left:3px solid var(--muted);">
         <div class="planning-pulse">
@@ -4821,19 +4846,72 @@ function _handleRunEvent(ev, isReplay) {
       break;
     }
 
+    case "approval_requested": {
+      _activeTeamRun = { ..._activeTeamRun, status: "paused_for_approval" };
+      const planItems = data.plan_summary || [];
+      const planHtml = planItems.map(p => {
+        const rl = p.risk_level || "medium";
+        return `<div class="orch-subtask">
+          <span class="orch-subtask-agent">${esc(_agentNameForDid(p.agent_did))}<span class="orch-risk-badge ${rl}" style="margin-left:0.3rem;">${esc(rl)}</span></span>
+          <span class="orch-subtask-text">${esc(p.subtask || "")}</span>
+        </div>`;
+      }).join("");
+      _appendOrchCard(`<div class="orch-card" style="border-left:3px solid #2563eb;background:#eff6ff;">
+        <div class="orch-card-head" style="background:#dbeafe;border-bottom-color:#93c5fd;">
+          <span class="orch-card-icon">🔒</span>
+          <span class="orch-card-label">Plan approval required before execution</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        ${planHtml ? `<div class="orch-subtask-list">${planHtml}</div>` : ""}
+      </div>`);
+      if (!isReplay) {
+        document.getElementById("approval-bar").classList.add("visible");
+      }
+      break;
+    }
+
+    case "approval_granted": {
+      document.getElementById("approval-bar").classList.remove("visible");
+      _appendOrchCard(`<div class="orch-card" style="border-left:3px solid var(--green);opacity:0.85;">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">✅</span>
+          <span class="orch-card-label">Plan approved — execution starting</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+      </div>`);
+      _appendOrchCard(`<div class="orch-card" id="orch-planning-spinner" style="border-left:3px solid var(--muted);">
+        <div class="planning-pulse">
+          <div class="dot-pulse"><span></span><span></span><span></span></div>
+          Agents working…
+        </div>
+      </div>`);
+      break;
+    }
+
     case "synthesis_completed":
     case "run_completed": {
       document.getElementById("orch-planning-spinner")?.remove();
       document.getElementById("clarify-bar").classList.remove("visible");
+      document.getElementById("approval-bar").classList.remove("visible");
+      document.getElementById("approval-bar").classList.remove("visible");
       const finalOutput  = data.final_output || data.output || "";
       const summary      = data.run_summary || "";
       const fileId       = data.output_file_id || "";
-      const preview      = finalOutput.slice(0, 300) + (finalOutput.length > 300 ? "…" : "");
+      const runIdForDl   = _activeTeamRun?.id || "";
+      // Show up to 800 chars, with expand handled by the full run detail
+      const preview      = finalOutput.slice(0, 800) + (finalOutput.length > 800 ? "\n…" : "");
       const dlBtn = fileId
         ? `<button onclick="_downloadFile('${esc(fileId)}','report.pdf')"
              style="display:flex;align-items:center;gap:0.4rem;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:0.5rem 1rem;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;margin-top:0.5rem;">
-             📥 Download Report (PDF)
+             📥 Download PDF Report
            </button>`
+        : "";
+      const mdDlBtn = runIdForDl
+        ? `<a href="${BASE}/pro/groups/runs/${runIdForDl}/report"
+              download
+              style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--surface2);color:var(--text-2);border:1px solid var(--border);border-radius:8px;padding:0.45rem 0.9rem;font-size:0.79rem;font-weight:600;cursor:pointer;font-family:inherit;margin-top:0.4rem;text-decoration:none;">
+              📄 Download Report (.md)
+            </a>`
         : "";
       _appendOrchCard(`<div class="orch-card final-answer">
         <div class="orch-card-head">
@@ -4841,8 +4919,10 @@ function _handleRunEvent(ev, isReplay) {
           <span class="orch-card-label">Run complete</span>
           <span class="orch-card-time">${esc(ts)}</span>
         </div>
-        <div class="orch-card-body" style="white-space:pre-wrap;font-size:0.82rem;color:var(--muted);">${esc(preview)}</div>
-        ${dlBtn}
+        <div class="orch-card-body" style="white-space:pre-wrap;">${esc(preview)}</div>
+        <div style="padding:0.3rem 0.85rem 0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+          ${dlBtn}${mdDlBtn}
+        </div>
         ${summary ? `<div style="padding:0.4rem 0.85rem 0.6rem;font-size:0.72rem;color:var(--muted);border-top:1px solid var(--border);font-style:italic;margin-top:0.4rem;">${esc(summary)}</div>` : ""}
       </div>`);
       _activeTeamRun = { ..._activeTeamRun, status: "completed" };
@@ -4877,6 +4957,7 @@ function _handleRunEvent(ev, isReplay) {
     case "run_cancelled": {
       document.getElementById("orch-planning-spinner")?.remove();
       document.getElementById("clarify-bar").classList.remove("visible");
+      document.getElementById("approval-bar").classList.remove("visible");
       _appendOrchCard(`<div class="orch-card" style="border-left:3px solid var(--muted);">
         <div class="orch-card-head"><span class="orch-card-icon">⏹</span><span class="orch-card-label">Run cancelled</span><span class="orch-card-time">${esc(ts)}</span></div>
       </div>`);
@@ -4940,6 +5021,7 @@ async function _teamsSubmitClarification() {
     }
     document.getElementById("clarify-input").value = "";
     document.getElementById("clarify-bar").classList.remove("visible");
+      document.getElementById("approval-bar").classList.remove("visible");
     // Re-open SSE if it was closed
     if (!_teamRunSSE) _openTeamRunSSE(runId);
   } catch(e) {
@@ -4956,11 +5038,36 @@ async function _teamsCancelClarify() {
       method: "POST", headers: apiHeaders(), credentials: "include",
     });
     document.getElementById("clarify-bar").classList.remove("visible");
+      document.getElementById("approval-bar").classList.remove("visible");
     _stopTeamRunSSE();
     _activeTeamRun = { ..._activeTeamRun, status: "cancelled" };
     _refreshTeamRuns();
   } catch(e) {
     alert("Could not cancel: " + e.message);
+  }
+}
+
+// ── Plan approval gate ────────────────────────────────────────────────────────
+
+async function _teamsApprovePlan() {
+  const runId = _activeTeamRun?.id;
+  if (!runId) return;
+  const btn = document.getElementById("approval-approve-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Approving…"; }
+  try {
+    const r = await fetch(`${BASE}/pro/groups/runs/${runId}/approve-plan`, {
+      method: "POST", headers: apiHeaders(), credentials: "include",
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(_strErr(d, `Error ${r.status}`));
+    }
+    document.getElementById("approval-bar").classList.remove("visible");
+    _activeTeamRun = { ..._activeTeamRun, status: "running" };
+    if (!_teamRunSSE) _openTeamRunSSE(runId);
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = "✓ Approve & Execute"; }
+    alert("Could not approve plan: " + e.message);
   }
 }
 
