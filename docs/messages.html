@@ -4582,7 +4582,7 @@ function _handleRunEvent(ev, isReplay) {
 
   switch (type) {
     case "orchestrator_plan": {
-      const subtasks = (data.assignments || []).map(a => {
+      const subtasks = (data.plan || data.assignments || []).map(a => {
         const agentName = _agentNameForDid(a.agent_did);
         return `<div class="orch-subtask">
           <span class="orch-subtask-agent">${esc(agentName)}</span>
@@ -4774,7 +4774,19 @@ function _handleRunEvent(ev, isReplay) {
       break;
     }
 
-    // agent_started, context_written — silent (no card needed)
+    case "agent_started": {
+      // Mark the agent as "working" on its existing assignment card
+      const agentName = _agentNameForDid(ev.agent_did);
+      _appendOrchCard(`<div class="orch-card" style="border-left:3px solid var(--accent);opacity:0.7;">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">⚙️</span>
+          <span class="orch-card-label">${esc(agentName)} — working…</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+      </div>`);
+      break;
+    }
+    // context_written — silent (no card needed)
   }
 }
 
