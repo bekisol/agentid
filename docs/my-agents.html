@@ -399,12 +399,12 @@
         <div class="step-label">Step 1 of 2 — Configure</div>
         <div class="field">
           <label>Agent name <span style="color:var(--red)">*</span></label>
-          <input id="reg-name" type="text" placeholder="e.g. Billing Agent" maxlength="128" autocomplete="off" />
+          <input id="reg-name" type="text" placeholder="e.g. Nova, Echo — Content Writer" maxlength="128" autocomplete="off" />
         </div>
         <div class="field">
           <label>Capabilities</label>
           <div class="field-row">
-            <input id="reg-caps-input" type="text" placeholder="e.g. invoice-approval" autocomplete="off" spellcheck="false" />
+            <input id="reg-caps-input" type="text" placeholder="e.g. web_search, code_review (comma to add multiple)" autocomplete="off" spellcheck="false" />
             <button class="btn btn-outline" id="reg-caps-add-btn" style="white-space:nowrap;padding:0.5rem 0.75rem;">+ Add</button>
           </div>
           <div id="reg-caps-pills" style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-top:0.4rem;"></div>
@@ -1236,9 +1236,23 @@ function renderCapPills() {
 }
 function addCap() {
   const inp = document.getElementById("reg-caps-input");
-  const val = (inp?.value || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
-  if (!val || _reg.capsArr.includes(val)) { if (inp) inp.value = ""; return; }
-  _reg.capsArr.push(val); if (inp) inp.value = ""; renderCapPills();
+  const raw = (inp?.value || "").trim();
+  if (!raw) return;
+  // Support comma-separated paste: "web_search, code_review, fact_checking"
+  const parts = raw.split(",").map(p =>
+    p.trim()
+     .toLowerCase()
+     .replace(/[\s.]+/g, "_")     // spaces and dots → underscores
+     .replace(/[^a-z0-9_-]/g, "") // strip anything else invalid
+     .replace(/_{2,}/g, "_")      // collapse consecutive underscores
+     .replace(/^_+|_+$/g, "")     // trim leading/trailing underscores
+  ).filter(p => p.length > 0);
+  let added = false;
+  for (const p of parts) {
+    if (p && !_reg.capsArr.includes(p)) { _reg.capsArr.push(p); added = true; }
+  }
+  if (inp) inp.value = "";
+  if (added) renderCapPills();
 }
 function regReset() {
   Object.assign(_reg, { capsArr: [], downloaded: true });
