@@ -4761,16 +4761,25 @@ function _handleRunEvent(ev, isReplay) {
     case "run_completed": {
       document.getElementById("orch-planning-spinner")?.remove();
       document.getElementById("clarify-bar").classList.remove("visible");
-      const finalOutput = data.final_output || data.output || "";
-      const summary     = data.run_summary || "";
+      const finalOutput  = data.final_output || data.output || "";
+      const summary      = data.run_summary || "";
+      const fileId       = data.output_file_id || "";
+      const preview      = finalOutput.slice(0, 300) + (finalOutput.length > 300 ? "…" : "");
+      const dlBtn = fileId
+        ? `<button onclick="_downloadFile('${esc(fileId)}','report.pdf')"
+             style="display:flex;align-items:center;gap:0.4rem;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:0.5rem 1rem;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;margin-top:0.5rem;">
+             📥 Download Report (PDF)
+           </button>`
+        : "";
       _appendOrchCard(`<div class="orch-card final-answer">
         <div class="orch-card-head">
           <span class="orch-card-icon">✨</span>
-          <span class="orch-card-label">Final answer</span>
+          <span class="orch-card-label">Run complete</span>
           <span class="orch-card-time">${esc(ts)}</span>
         </div>
-        <div class="orch-card-body">${_fmtOutput(finalOutput)}</div>
-        ${summary ? `<div style="padding:0.4rem 0.85rem 0.6rem;font-size:0.72rem;color:var(--muted);border-top:1px solid var(--border);font-style:italic;">${esc(summary)}</div>` : ""}
+        <div class="orch-card-body" style="white-space:pre-wrap;font-size:0.82rem;color:var(--muted);">${esc(preview)}</div>
+        ${dlBtn}
+        ${summary ? `<div style="padding:0.4rem 0.85rem 0.6rem;font-size:0.72rem;color:var(--muted);border-top:1px solid var(--border);font-style:italic;margin-top:0.4rem;">${esc(summary)}</div>` : ""}
       </div>`);
       _activeTeamRun = { ..._activeTeamRun, status: "completed" };
       _showStopBtn(false);
