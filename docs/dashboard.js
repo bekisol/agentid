@@ -341,7 +341,8 @@ async function apiFetch(path, options = {}) {
     let msg = res.status;
     try {
       const j = await res.json();
-      msg = j.detail || j.message || msg;
+      const raw = j.detail ?? j.message ?? msg;
+      msg = typeof raw === "object" ? (raw?.message || raw?.error || JSON.stringify(raw)) : raw;
     } catch (_) {}
     // 401 self-recovery: only trigger a global session drop when the
     // session-validation endpoints specifically reject the credential.
