@@ -1901,16 +1901,33 @@ function _renderFileChip(f) {
 
 async function _downloadFile(fileId, filename) {
   try {
-    const r = await fetch(`${BASE}/pro/files/${fileId}/download`, { headers: apiHeaders() });
-    if (!r.ok) { alert('Download failed: ' + r.status); return; }
-    const blob = await r.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    // Fetch fresh metadata — includes a signed URL (R2/S3) or local /download URL
+    const meta = await apiFetch(`/pro/files/${fileId}`);
+    const url  = meta?.url;
+    if (!url) throw new Error('No download URL returned');
+
+    if (url.includes('/pro/files/') && url.includes('/download')) {
+      // Local storage path — must send API key header, can't use bare <a>
+      const r = await fetch(url, { headers: apiHeaders() });
+      if (!r.ok) throw new Error(`${r.status}`);
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename || meta.name || fileId;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } else {
+      // R2/S3 pre-signed URL — browser can fetch it directly, no auth header needed
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || meta.name || fileId;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   } catch(e) {
-    alert('Download error: ' + e.message);
+    alert('Download failed: ' + e.message);
   }
 }
 
