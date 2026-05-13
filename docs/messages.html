@@ -1909,7 +1909,9 @@ function _renderFileChip(f) {
 async function _downloadFile(fileId, filename) {
   try {
     // Fetch fresh metadata — includes a signed URL (R2/S3) or local /download URL
-    const meta = await apiFetch(`/pro/files/${fileId}`);
+    const _fmr = await fetch(`${BASE}/pro/files/${fileId}`, { headers: apiHeaders() });
+    if (!_fmr.ok) throw new Error(`${_fmr.status}`);
+    const meta = await _fmr.json();
     const url  = meta?.url;
     if (!url) throw new Error('No download URL returned');
 
