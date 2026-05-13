@@ -10145,19 +10145,63 @@ async function openRunDrilldown(runId, groupId) {
            <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);font-weight:600;">${label}</div>
            ${sub ? `<div style="font-size:0.62rem;color:var(--muted);">${sub}</div>` : ""}
          </div>`;
+      // Per-agent reliability table
+      const anAgents = an.agents || [];
+      const relRows = anAgents.map(a => {
+        const rejRate = a.rejection_rate != null ? Math.round(a.rejection_rate * 100) : null;
+        const relScore = a.reliability_score != null ? Math.round(a.reliability_score) : null;
+        const avgQStr  = a.avg_quality != null ? Math.round(a.avg_quality * 100) + "%" : "—";
+        // Reliability bar colour
+        const relCol = relScore == null ? "var(--muted)"
+          : relScore >= 80 ? "#10b981" : relScore >= 50 ? "#f59e0b" : "#ef4444";
+        const relBar = relScore != null
+          ? `<div style="display:flex;align-items:center;gap:0.3rem;">
+               <div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+                 <div style="width:${relScore}%;height:100%;background:${relCol};border-radius:3px;"></div>
+               </div>
+               <span style="font-size:0.7rem;font-weight:700;color:${relCol};">${relScore}</span>
+             </div>` : `<span style="color:var(--muted);">—</span>`;
+        const rejBadge = rejRate != null
+          ? `<span style="font-size:0.7rem;font-weight:700;color:${rejRate === 0 ? "var(--green)" : rejRate < 30 ? "var(--text)" : "#b45309"};">${rejRate}%</span>`
+          : "—";
+        return `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:0.38rem 0.6rem;font-size:0.77rem;font-weight:600;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(a.name || (a.did||"").slice(-14))}</td>
+          <td style="padding:0.38rem 0.6rem;font-size:0.77rem;text-align:center;">${a.assigned}</td>
+          <td style="padding:0.38rem 0.6rem;font-size:0.77rem;text-align:center;color:var(--green);">${a.completed}</td>
+          <td style="padding:0.38rem 0.6rem;text-align:center;">${rejBadge}</td>
+          <td style="padding:0.38rem 0.6rem;font-size:0.77rem;text-align:center;">${avgQStr}</td>
+          <td style="padding:0.38rem 0.6rem;min-width:90px;">${relBar}</td>
+        </tr>`;
+      }).join("");
+
       analyticsHtml = `
         <div style="margin-bottom:1.25rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
             <div style="font-size:0.8rem;font-weight:700;color:var(--text-2);">Team analytics (all runs)</div>
             <span style="font-size:0.72rem;color:var(--muted);">${ar.total} run${ar.total === 1 ? "" : "s"} total</span>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.3rem;border:1px solid var(--border);border-radius:8px;padding:0.4rem;background:var(--surface);">
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.3rem;border:1px solid var(--border);border-radius:8px;padding:0.4rem;background:var(--surface);margin-bottom:0.75rem;">
             ${statCell("Completion", compRate != null ? compRate + "%" : "—", `${ar.completed} done`)}
             ${statCell("Avg duration", avgDur, "")}
             ${statCell("Acceptance", accRate != null ? accRate + "%" : "—", `${aa.accepted} accepted`)}
             ${statCell("Avg quality", avgQ != null ? avgQ + "%" : "—", "")}
             ${statCell("Trust-routed", aa.trust_influenced != null ? aa.trust_influenced : "—", "assignments")}
           </div>
+          ${relRows ? `
+          <div style="font-size:0.74rem;font-weight:700;color:var(--text-2);margin-bottom:0.3rem;">Agent reliability across all runs</div>
+          <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:var(--surface2);border-bottom:1px solid var(--border);">
+                <th style="text-align:left;padding:0.35rem 0.6rem;font-size:0.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Agent</th>
+                <th style="text-align:center;padding:0.35rem 0.6rem;font-size:0.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Assigned</th>
+                <th style="text-align:center;padding:0.35rem 0.6rem;font-size:0.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Done</th>
+                <th style="text-align:center;padding:0.35rem 0.6rem;font-size:0.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Rej.%</th>
+                <th style="text-align:center;padding:0.35rem 0.6rem;font-size:0.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Avg Q</th>
+                <th style="padding:0.35rem 0.6rem;font-size:0.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Reliability</th>
+              </tr></thead>
+              <tbody>${relRows}</tbody>
+            </table>
+          </div>` : ""}
         </div>`;
     } catch(_) {}
 
@@ -10174,6 +10218,53 @@ async function openRunDrilldown(runId, groupId) {
         </div>` : ""}
 
       ${analyticsHtml}
+
+      ${(() => {
+        const contribs = run.contributions || [];
+        if (!contribs.length) return "";
+        const medals = ["🥇","🥈","🥉"];
+        const barRows = contribs.map((c, i) => {
+          const agentName = (() => {
+            const a = assignments.find(x => x.agent_did === c.did);
+            return a ? (a.agent_did || c.did).slice(-14) : (c.did || "").slice(-14);
+          })();
+          const medal = medals[i] || `#${c.rank}`;
+          // Stacked bar segments: quality / reuse / reliability / completion
+          const maxRaw = contribs[0].raw_score || 1;
+          const qW  = (c.quality_pts      / maxRaw * 100).toFixed(1);
+          const rW  = (c.reuse_pts        / maxRaw * 100).toFixed(1);
+          const rlW = (c.reliability_pts  / maxRaw * 100).toFixed(1);
+          const cpW = (c.completion_pts   / maxRaw * 100).toFixed(1);
+          const reuseNote = c.reuse_count > 0
+            ? `<span style="font-size:0.65rem;color:#2563eb;margin-left:0.35rem;">↑ used by ${c.reuse_count} agent${c.reuse_count>1?"s":""}</span>` : "";
+          return `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:0.78rem;min-width:20px;text-align:center;">${medal}</span>
+            <span style="font-size:0.78rem;font-weight:600;min-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(c.did)}">${_esc(agentName)}</span>
+            <div style="flex:1;height:14px;border-radius:3px;overflow:hidden;display:flex;background:var(--border);">
+              <div style="width:${qW}%;background:#6366f1;" title="Quality: ${c.quality_pts}pts"></div>
+              <div style="width:${rW}%;background:#2563eb;" title="Reuse: ${c.reuse_pts}pts"></div>
+              <div style="width:${rlW}%;background:#10b981;" title="Reliability: ${c.reliability_pts}pts"></div>
+              <div style="width:${cpW}%;background:#f59e0b;" title="Completion: ${c.completion_pts}pts"></div>
+            </div>
+            <span style="font-size:0.8rem;font-weight:800;min-width:36px;text-align:right;color:var(--text);">${c.score}%</span>
+            ${reuseNote}
+          </div>`;
+        }).join("");
+        return `<div style="margin-bottom:1.25rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+            <div style="font-size:0.8rem;font-weight:700;color:var(--text-2);">🏆 Run Contribution Ranking</div>
+            <div style="display:flex;gap:0.6rem;font-size:0.62rem;color:var(--muted);">
+              <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#6366f1;margin-right:2px;"></span>Quality</span>
+              <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#2563eb;margin-right:2px;"></span>Reuse</span>
+              <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#10b981;margin-right:2px;"></span>Reliability</span>
+              <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#f59e0b;margin-right:2px;"></span>Completion</span>
+            </div>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:8px;padding:0.3rem 0.75rem;">
+            ${barRows}
+          </div>
+        </div>`;
+      })()}
 
       ${assignments.length ? `
         <div style="margin-bottom:1.25rem;">
