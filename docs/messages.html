@@ -818,6 +818,7 @@ document.addEventListener("DOMContentLoaded", () => {
             style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:0.5rem 0.85rem;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;height:2.4rem;"
             onclick="_teamsStartRun()">Run</button>
         </div>
+        <div id="teams-task-err" style="display:none;font-size:0.77rem;color:var(--red);margin-top:0.2rem;"></div>
       </div>
 
       <!-- Clarification bar — shown when a run pauses for user input -->
@@ -2540,6 +2541,16 @@ function _clearChannelActive() {
     if (labelEl) labelEl.textContent = "Threads";
     const composeBtn = document.querySelector(".sb-panel-compose");
     if (composeBtn) { composeBtn.textContent = "← new"; composeBtn.onclick = openCompose; }
+    // Close the teams run-thread panel and restore normal chat panel state
+    const cp = document.getElementById("chat-panel");
+    if (cp && cp.dataset.teamsMode) {
+      cp.classList.remove("open");
+      delete cp.dataset.teamsMode;
+      const cpInput  = cp.querySelector(".chat-panel-input");
+      const cpSwitch = document.getElementById("chat-agent-switcher");
+      if (cpInput)  cpInput.style.display  = "";
+      if (cpSwitch) cpSwitch.style.display = "";
+    }
   }
 }
 
@@ -4228,11 +4239,18 @@ async function showTeamGroupView(groupId) {
     `<button class="btn btn-outline" style="font-size:0.78rem" onclick="_refreshTeamRuns()">↻ Runs</button>
      <button class="btn btn-outline" style="font-size:0.78rem" onclick="_toggleMemoryPanel()">📋 Memory</button>`;
 
+  // Close any open agent chat panel — teams uses the right panel for run threads
+  const cp = document.getElementById("chat-panel");
+  cp.classList.remove("open");
+  delete cp.dataset.teamsMode;
+
   // Show task input
   const taskLabel = document.getElementById("teams-task-label");
   if (taskLabel) taskLabel.textContent = `Send a task to ${name}…`;
   document.getElementById("teams-task-bar").classList.add("visible");
   document.getElementById("teams-task-input").value = "";
+  const errEl = document.getElementById("teams-task-err");
+  if (errEl) errEl.style.display = "none";
 
   const scroll = document.getElementById("feed-scroll");
   scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading runs…</div></div>';
@@ -4267,7 +4285,7 @@ function _renderTeamRunsList(groupId) {
     const badge = `<span class="run-status-badge ${run.status}">${run.status.replace(/_/g," ")}</span>`;
     const preview = (run.user_task || "").slice(0, 80) + ((run.user_task||"").length > 80 ? "…" : "");
     const t = run.started_at ? relativeTime(run.started_at) : "";
-    return `<div class="team-run-row" onclick="openRunThread('${run.id}', ${groupId})" style="padding:0.6rem 0.9rem;">
+    return `<div class="team-run-row" data-run-id="${run.id}" onclick="openRunThread('${run.id}', ${groupId})" style="padding:0.6rem 0.9rem;">
       <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.2rem;">
         ${badge}
         <span style="font-size:0.65rem;color:var(--muted);">${esc(t)}</span>
@@ -4297,13 +4315,19 @@ async function _teamsStartRun() {
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      throw new Error(d.detail || `Error ${r.status}`);
+      const detail = d.detail;
+      const msg = typeof detail === "object"
+        ? (detail?.message || detail?.error || JSON.stringify(detail))
+        : (detail || `Error ${r.status}`);
+      throw new Error(msg);
     }
     const d = await r.json();
     input.value = "";
     await openRunThread(d.run_id, _activeTeamId);
   } catch(e) {
-    alert("Could not start run: " + e.message);
+    const errEl = document.getElementById("teams-task-err");
+    if (errEl) { errEl.textContent = e.message; errEl.style.display = "block"; setTimeout(() => { errEl.style.display = "none"; }, 6000); }
+    else alert("Could not start run: " + e.message);
   } finally {
     btn.disabled = false; btn.textContent = "Run";
     input.disabled = false;
@@ -4325,8 +4349,26 @@ async function openRunThread(runId, groupId) {
 
   document.getElementById("clarify-bar").classList.remove("visible");
 
-  const scroll = document.getElementById("feed-scroll");
-  scroll.innerHTML = `<div class="orch-thread" id="orch-thread"></div>`;
+  // Show run thread in the right chat panel; keep center for the run list
+  const cp        = document.getElementById("chat-panel");
+  const cpTitle   = document.getElementById("chat-panel-title");
+  const cpSub     = document.getElementById("chat-panel-subtitle");
+  const cpMsgs    = document.getElementById("chat-panel-messages");
+  const cpInput   = cp.querySelector(".chat-panel-input");
+  const cpSwitch  = document.getElementById("chat-agent-switcher");
+  const group     = _agentGroups ? _agentGroups.find(g => g.id === groupId) : null;
+  cpTitle.textContent  = "⚡ " + (group ? group.name : "Team run");
+  cpSub.textContent    = "Orchestration thread";
+  cpMsgs.innerHTML     = `<div class="orch-thread" id="orch-thread"></div>`;
+  if (cpInput)  cpInput.style.display  = "none";
+  if (cpSwitch) cpSwitch.style.display = "none";
+  cp.dataset.teamsMode = "1";
+  cp.classList.add("open");
+
+  // Highlight active run in run list (keep center showing list)
+  document.querySelectorAll(".team-run-row").forEach(el => {
+    el.style.background = el.dataset.runId === runId ? "var(--accent-light)" : "";
+  });
 
   // Load existing run data first
   try {
@@ -4353,7 +4395,7 @@ async function openRunThread(runId, groupId) {
     _openTeamRunSSE(runId);
   }
 
-  scroll.scrollTop = scroll.scrollHeight;
+  cpMsgs.scrollTop = cpMsgs.scrollHeight;
 }
 
 function _buildUserTaskCard(task) {
@@ -4370,8 +4412,12 @@ function _appendOrchCard(html) {
   const thread = document.getElementById("orch-thread");
   if (thread) {
     thread.insertAdjacentHTML("beforeend", html);
-    const scroll = document.getElementById("feed-scroll");
-    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+    // Thread lives in the chat panel in teams mode; fall back to feed-scroll
+    const cp = document.getElementById("chat-panel");
+    const scroller = (cp && cp.dataset.teamsMode)
+      ? document.getElementById("chat-panel-messages")
+      : document.getElementById("feed-scroll");
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
   }
 }
 
