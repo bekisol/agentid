@@ -989,6 +989,8 @@ document.addEventListener("DOMContentLoaded", () => {
   <div class="cp-tabs" id="cp-tabs">
     <button class="cp-tab active" id="cp-tab-run" onclick="_cpSwitchTab('run')">⚡ Run Thread</button>
     <button class="cp-tab" id="cp-tab-chat" onclick="_cpSwitchTab('chat')">💬 Chat</button>
+    <button id="cp-stop-btn" onclick="_teamsCancelRun()" title="Stop the current run"
+      style="display:none;margin-left:auto;margin-right:0.5rem;background:var(--red,#ef4444);color:#fff;border:none;border-radius:6px;padding:0.2rem 0.65rem;font-size:0.75rem;font-weight:700;cursor:pointer;font-family:inherit;align-self:center;">⏹ Stop</button>
   </div>
   <div class="chat-agent-switcher" id="chat-agent-switcher"></div>
   <div class="chat-panel-messages" id="chat-panel-messages">
@@ -4434,11 +4436,12 @@ async function _teamsStartRun() {
 }
 
 function _showStopBtn(show) {
-  const stop = document.getElementById("teams-stop-btn");
-  const run  = document.getElementById("teams-task-send-btn");
-  if (!stop) return;
-  stop.style.display = show ? "block" : "none";
-  if (run) run.style.display = show ? "none" : "block";
+  const stop   = document.getElementById("teams-stop-btn");
+  const cpStop = document.getElementById("cp-stop-btn");
+  const run    = document.getElementById("teams-task-send-btn");
+  if (stop)   stop.style.display   = show ? "block" : "none";
+  if (cpStop) cpStop.style.display = show ? "inline-flex" : "none";
+  if (run)    run.style.display    = show ? "none"  : "block";
 }
 
 async function _teamsCancelRun() {
