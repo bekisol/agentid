@@ -1127,6 +1127,34 @@ let _groupPendingFile   = null;  // { file, fileRef } for group reply bar
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
+// Render agent/synthesis output: unwrap JSON structures to readable prose, escape the rest
+function _fmtOutput(raw) {
+  if (!raw) return "";
+  const s = String(raw).trim();
+  // Try to parse as JSON — agents sometimes return structured JSON despite instructions
+  if ((s.startsWith("[") || s.startsWith("{")) ) {
+    try {
+      const parsed = JSON.parse(s);
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      return items.map(item => {
+        if (typeof item === "string") return esc(item);
+        let html = "";
+        if (item.heading) html += `<strong>${esc(item.heading)}</strong>\n`;
+        if (item.body)    html += esc(item.body) + "\n";
+        if (item.summary) html += esc(item.summary) + "\n";
+        if (Array.isArray(item.bullets)) {
+          html += item.bullets.map(b => `• ${esc(b)}`).join("\n") + "\n";
+        }
+        if (Array.isArray(item.points)) {
+          html += item.points.map(b => `• ${esc(b)}`).join("\n") + "\n";
+        }
+        return html.trim();
+      }).join("\n\n");
+    } catch (_) { /* fall through to plain text */ }
+  }
+  return esc(s);
+}
+
 // Encode a DID for use as a URL *path* segment.
 // encodeURIComponent() encodes colons (%3A) which breaks routing on some proxies.
 // DIDs contain only [a-z0-9:] so we only need to encode the genuinely unsafe chars.
@@ -4566,24 +4594,27 @@ function _handleRunEvent(ev, isReplay) {
     }
 
     case "agent_completed": {
-      const agentName = _agentNameForDid(ev.agent_did);
-      const score     = data.quality_score != null ? Math.round(data.quality_score * 100) : null;
-      const barWidth  = score != null ? `${score}%` : "0%";
-      const barColor  = score != null && score >= 60 ? "var(--green)" : "var(--yellow)";
-      const scoreHtml = score != null
+      const agentName  = _agentNameForDid(ev.agent_did);
+      const rawScore   = data.score ?? data.quality_score;
+      const score      = rawScore != null ? Math.round(rawScore * 100) : null;
+      const barWidth   = score != null ? `${score}%` : "0%";
+      const barColor   = score != null && score >= 60 ? "var(--green)" : "var(--yellow)";
+      const scoreHtml  = score != null
         ? `<div class="orch-quality-bar">
             <div class="orch-quality-fill" style="width:${barWidth};background:${barColor};transition:width 0.5s;"></div>
             <span class="orch-quality-label">Quality: ${score}%</span>
           </div>`
         : "";
-      const output = typeof data.output === "string" ? data.output : JSON.stringify(data.output || {}, null, 2);
+      const rawOutput  = data.output_preview || data.output || "";
+      const outputStr  = typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput);
+      const preview    = outputStr.slice(0, 600) + (outputStr.length > 600 ? "\n…" : "");
       _appendOrchCard(`<div class="orch-card agent-completed">
         <div class="orch-card-head">
           <span class="orch-card-icon">✅</span>
           <span class="orch-card-label">${esc(agentName)} — completed</span>
           <span class="orch-card-time">${esc(ts)}</span>
         </div>
-        <div class="orch-card-body">${esc(output.slice(0, 600))}${output.length > 600 ? "\n…" : ""}</div>
+        <div class="orch-card-body">${_fmtOutput(preview)}</div>
         ${scoreHtml}
       </div>`);
       break;
@@ -4679,7 +4710,7 @@ function _handleRunEvent(ev, isReplay) {
           <span class="orch-card-label">Final answer</span>
           <span class="orch-card-time">${esc(ts)}</span>
         </div>
-        <div class="orch-card-body">${esc(finalOutput)}</div>
+        <div class="orch-card-body">${_fmtOutput(finalOutput)}</div>
         ${summary ? `<div style="padding:0.4rem 0.85rem 0.6rem;font-size:0.72rem;color:var(--muted);border-top:1px solid var(--border);font-style:italic;">${esc(summary)}</div>` : ""}
       </div>`);
       _activeTeamRun = { ..._activeTeamRun, status: "completed" };
@@ -4696,7 +4727,7 @@ function _handleRunEvent(ev, isReplay) {
           <span class="orch-card-label">Run failed</span>
           <span class="orch-card-time">${esc(ts)}</span>
         </div>
-        <div class="orch-card-body" style="color:var(--red);">${esc(data.error || "Unknown error")}</div>
+        <div class="orch-card-body" style="color:var(--red);">${esc(data.reason || data.error || "Unknown error")}</div>
       </div>`);
       _activeTeamRun = { ..._activeTeamRun, status: "failed" };
       _stopTeamRunSSE();
