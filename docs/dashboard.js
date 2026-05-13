@@ -8909,7 +8909,7 @@ async function _loadSubAccounts() {
       const role = _roleFromPermissions(perms);
       const lastUsed = m.last_used_at ? timeAgo(m.last_used_at) : "Never";
       const dotColor = m.is_active ? "var(--green)" : "var(--border-dark)";
-      return `<div class="member-row">
+      return `<div class="member-row" data-mid="${esc(m.id)}">
         <div class="member-avatar">${esc(initials)}</div>
         <div class="member-info">
           <div class="member-email">${esc(m.email)}</div>
@@ -8918,15 +8918,20 @@ async function _loadSubAccounts() {
             ${m.is_active ? "Active" : "Disabled"}
             &middot; Last used: ${esc(lastUsed)}
           </div>
+          <div class="member-action-err" style="font-size:0.74rem;color:var(--red);min-height:0;margin-top:0.15rem;"></div>
         </div>
         ${_roleChip(role)}
         <div class="member-actions">
           <button class="btn btn-ghost btn-sm" onclick="_rotateMemberKey('${esc(m.id)}')" title="Rotate API key">↻ Key</button>
-          <button class="btn btn-ghost btn-sm" onclick="_toggleMember('${esc(m.id)}',${!m.is_active})">${m.is_active ? "Disable" : "Enable"}</button>
-          <button class="btn btn-danger btn-sm" onclick="_deleteMember('${esc(m.id)}','${esc(m.email)}')">Remove</button>
+          <button class="btn btn-ghost btn-sm" onclick="_toggleMember(this,'${esc(m.id)}',${!m.is_active})">${m.is_active ? "Disable" : "Enable"}</button>
+          <button class="btn btn-danger btn-sm" onclick="_confirmRemoveMember(this,'${esc(m.id)}')">Remove</button>
         </div>
       </div>`;
     }).join("");
+    // Wire data-mid onto each row so event-delegated handlers can find it
+    listEl.querySelectorAll('.member-row').forEach((row, i) => {
+      row._memberData = members[i];
+    });
   } catch(e) {
     if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:1rem;color:var(--red);font-size:0.82rem;">${esc(String(e))}</div>`;
   }
@@ -8966,32 +8971,76 @@ async function _submitAddMember() {
 }
 
 async function _rotateMemberKey(id) {
-  if (!confirm("Rotate API key? The old key will stop working immediately.")) return;
-  try {
-    const data = await apiFetch(`/pro/account/members/${encodeURIComponent(id)}/rotate-key`, { method: "POST" });
-    const keyBox = document.getElementById("new-member-key-box");
-    document.getElementById("new-member-key-value").textContent = data.api_key || "";
-    keyBox.style.display = "block";
-    keyBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  } catch(e) { alert("Error rotating key: " + e.message); }
+  const btn = document.querySelector(`.member-row[data-mid="${CSS.escape(id)}"] [title="Rotate API key"]`);
+  if (!btn) return;
+  const orig = btn.textContent;
+  // Inline confirm: first click arms, second click fires
+  if (btn.dataset.armed) {
+    btn.disabled = true; btn.textContent = "Rotating…";
+    try {
+      const data = await apiFetch(`/pro/account/members/${encodeURIComponent(id)}/rotate-key`, { method: "POST" });
+      const keyBox = document.getElementById("new-member-key-box");
+      document.getElementById("new-member-key-value").textContent = data.api_key || "";
+      keyBox.style.display = "block";
+      keyBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch(e) {
+      _showMemberErr(id, "Key rotation failed: " + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = orig; delete btn.dataset.armed;
+    }
+  } else {
+    btn.dataset.armed = "1"; btn.textContent = "Confirm?";
+    setTimeout(() => { if (btn.dataset.armed) { btn.textContent = orig; delete btn.dataset.armed; } }, 3000);
+  }
 }
 
-async function _toggleMember(id, setActive) {
+async function _toggleMember(btn, id, setActive) {
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = setActive ? "Enabling…" : "Disabling…";
+  _showMemberErr(id, "");
   try {
     await apiFetch(`/pro/account/members/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: JSON.stringify({ is_active: setActive }),
     });
     await _loadSubAccounts();
-  } catch(e) { alert("Error: " + e.message); }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = origText;
+    _showMemberErr(id, e.message || "Failed to update");
+  }
 }
 
-async function _deleteMember(id, email) {
-  if (!confirm(`Remove sub-account for ${email}? Their API key will stop working immediately.`)) return;
+function _confirmRemoveMember(btn, id) {
+  const actionsEl = btn.closest('.member-actions');
+  _showMemberErr(id, "");
+  actionsEl.innerHTML = `
+    <span style="font-size:0.75rem;color:var(--red);font-weight:600;white-space:nowrap;">Sure?</span>
+    <button class="btn btn-danger btn-sm" id="confirm-remove-yes-${esc(id)}">Yes, Remove</button>
+    <button class="btn btn-outline btn-sm" id="confirm-remove-no-${esc(id)}">Cancel</button>
+  `;
+  document.getElementById(`confirm-remove-yes-${id}`).addEventListener("click", () => _deleteMember(id, actionsEl));
+  document.getElementById(`confirm-remove-no-${id}`).addEventListener("click", () => _loadSubAccounts());
+}
+
+async function _deleteMember(id, actionsEl) {
+  const yesBtn = actionsEl?.querySelector(`#confirm-remove-yes-${id}`);
+  if (yesBtn) { yesBtn.disabled = true; yesBtn.textContent = "Removing…"; }
   try {
     await apiFetch(`/pro/account/members/${encodeURIComponent(id)}`, { method: "DELETE" });
     await _loadSubAccounts();
-  } catch(e) { alert("Error: " + e.message); }
+  } catch(e) {
+    _showMemberErr(id, e.message || "Remove failed");
+    await _loadSubAccounts();
+  }
+}
+
+function _showMemberErr(id, msg) {
+  const row = document.querySelector(`.member-row[data-mid="${CSS.escape(id)}"]`);
+  if (!row) return;
+  const errEl = row.querySelector('.member-action-err');
+  if (errEl) errEl.textContent = msg;
 }
 
 // ── PDF Report Modal ─────────────────────────────────────────────────────────
