@@ -2732,7 +2732,7 @@ function _renderFilesView() {
           <div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
             <span style="font-size:1.5rem;flex-shrink:0">${icon}</span>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:0.85rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(f.name || f.id)}</div>
+              <div style="font-size:0.85rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(f.name || f.file_id)}</div>
               <div style="font-size:0.72rem;color:var(--muted);margin-top:0.1rem;">${sizeStr} · ${esc(f.mime_type || "")} · ${dateStr}</div>
             </div>
             <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
@@ -2740,9 +2740,9 @@ function _renderFilesView() {
                 <option value="">Send to agent…</option>
                 ${agentOptions}
               </select>
-              <button onclick="_shareFile('${esc(f.id)}', ${i})" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0.25rem 0.55rem;cursor:pointer;font-size:0.75rem;font-weight:600;">Send</button>
-              <button onclick="_downloadFile('${esc(f.id)}','${esc(f.name || f.id)}')" title="Download" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;cursor:pointer;font-size:0.75rem;color:var(--accent);">↓</button>
-              <button onclick="_deleteFile('${esc(f.id)}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;cursor:pointer;font-size:0.75rem;color:var(--muted);">🗑</button>
+              <button onclick="_shareFile('${esc(f.file_id)}', ${i})" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0.25rem 0.55rem;cursor:pointer;font-size:0.75rem;font-weight:600;">Send</button>
+              <button onclick="_downloadFile('${esc(f.file_id)}','${esc(f.name || f.file_id)}')" title="Download" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;cursor:pointer;font-size:0.75rem;color:var(--accent);">↓</button>
+              <button onclick="_deleteFile('${esc(f.file_id)}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;cursor:pointer;font-size:0.75rem;color:var(--muted);">🗑</button>
             </div>
           </div>`;
       }).join("") + `</div>`;
@@ -2796,7 +2796,7 @@ async function _shareFile(fileId, idx) {
   const sel = document.getElementById(`file-share-to-${idx}`);
   const toDid = sel?.value;
   if (!toDid) { alert("Select an agent to send the file to."); return; }
-  const file = _files.find(f => f.id === fileId);
+  const file = _files.find(f => f.file_id === fileId);
   if (!file) return;
   const fromAgent = _agents[0];
   if (!fromAgent) { alert("No agents available to send from."); return; }
@@ -2830,7 +2830,7 @@ async function _deleteFile(fileId) {
       credentials: "include",
     });
     if (!r.ok && r.status !== 204) { const d = await r.json(); throw new Error(_strErr(d, r.status)); }
-    _files = _files.filter(f => f.id !== fileId);
+    _files = _files.filter(f => f.file_id !== fileId);
     _renderFilesView();
   } catch(e) {
     alert("Could not delete file: " + e.message);
