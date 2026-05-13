@@ -255,6 +255,25 @@
       border:1px solid #8a5a13; background:linear-gradient(180deg, rgba(245,158,11,0.09), rgba(18,22,28,0.96));
       border-radius:16px; padding:0.95rem 1rem; margin-top:0.9rem;
     }
+    .command-panel {
+      border:1px solid #1d4ed8; background:linear-gradient(180deg, rgba(59,130,246,0.10), rgba(18,22,28,0.96));
+      border-radius:16px; padding:0.95rem 1rem; margin-bottom:0.9rem;
+    }
+    .command-title { font-size:0.82rem; font-weight:900; text-transform:uppercase; letter-spacing:0.06em; color:#93c5fd; }
+    .command-copy { font-size:0.8rem; color:var(--text-2); line-height:1.6; margin-top:0.3rem; }
+    .command-grid { display:grid; grid-template-columns:1.25fr 0.75fr; gap:0.8rem; margin-top:0.8rem; }
+    .command-card {
+      border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,0.03); padding:0.8rem;
+    }
+    .command-card-title { font-size:0.72rem; color:var(--text-2); font-weight:900; text-transform:uppercase; letter-spacing:0.05em; }
+    .checkbox-row {
+      display:flex; align-items:center; gap:0.55rem; font-size:0.78rem; color:var(--text-2);
+    }
+    .inline-input {
+      width:100%; border:1px solid var(--border-2); background:var(--bg); color:var(--text);
+      border-radius:10px; padding:0.65rem 0.75rem; outline:none;
+    }
+    .helper-copy { font-size:0.68rem; color:var(--muted); line-height:1.5; margin-top:0.25rem; }
     .control-panel strong { color:var(--text); }
     .control-top {
       display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap;
@@ -327,6 +346,7 @@
       .workspace-shell { grid-template-columns:1fr; }
       .rail { border-right:none; border-bottom:1px solid var(--border); }
       .main-grid { grid-template-columns:1fr; }
+      .command-grid { grid-template-columns:1fr; }
       .hero-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
       .assignment-meta-grid, .contrib-breakdown, .perf-metrics, .timeline-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
     }
@@ -433,6 +453,7 @@
     stream: null,
     sseCancelled: false,
     editingNoteId: null,
+    taskDraft: null,
   };
 
   window.fetch = function(url, opts = {}) {
@@ -559,6 +580,9 @@
           );
       renderTeams();
     });
+    document.addEventListener("input", e => {
+      if (e.target?.id === "team-task-input") state.taskDraft = e.target.value;
+    });
 
     await loadGroups();
 
@@ -603,6 +627,7 @@
     state.analytics = analyticsData;
     state.settings = settingsData;
     state.editingNoteId = null;
+    state.taskDraft = null;
 
     renderTeams();
     renderRuns();
@@ -732,6 +757,20 @@
             <div class="perf-metric"><strong>${state.runs.filter(run => run.status === "paused_for_approval").length}</strong>Awaiting approval</div>
             <div class="perf-metric"><strong>${state.runs.filter(run => run.status === "paused_for_user").length}</strong>Awaiting user</div>
           </div>
+          <div class="side-form" style="margin-top:0.8rem;">
+            <label class="checkbox-row">
+              <input id="ws-require-approval" type="checkbox" ${settings.require_plan_approval ? "checked" : ""} />
+              Require plan approval before agents start
+            </label>
+            <div>
+              <label class="field-label" for="ws-trust-threshold">High-risk trust threshold</label>
+              <input id="ws-trust-threshold" class="inline-input" type="number" min="0" max="100" value="${esc(settings.high_risk_trust_threshold ?? 70)}" />
+              <div class="helper-copy">Assignments below this trust score should not receive high-risk work.</div>
+            </div>
+            <div class="note-actions">
+              <button class="tiny-btn primary" onclick="saveGroupSettings()">Save guardrails</button>
+            </div>
+          </div>
         </div>
       </div>` : "";
 
@@ -818,7 +857,14 @@
   }
 
   function renderWorkspaceEmpty(label) {
-    document.getElementById("workspace-root").innerHTML = `<div class="empty-state">${esc(label || "Nothing selected.")}</div>`;
+    const root = document.getElementById("workspace-root");
+    if (!state.selectedGroupId) {
+      root.innerHTML = `<div class="empty-state">${esc(label || "Nothing selected.")}</div>`;
+      return;
+    }
+    root.innerHTML = `
+      ${buildTeamCommandPanel()}
+      <div class="empty-state">${esc(label || "No run selected yet.")}</div>`;
   }
 
   function syncRunIntoList(run) {
@@ -1025,6 +1071,51 @@
     return "";
   }
 
+  function buildTeamCommandPanel(run = state.run) {
+    const selectedGroup = state.groups.find(g => Number(g.id) === Number(state.selectedGroupId));
+    const activeCount = state.runs.filter(item => !isTerminal(item.status)).length;
+    const waitingCount = state.runs.filter(item => ["paused_for_user", "paused_for_approval"].includes(item.status)).length;
+    const missionSeed = state.taskDraft != null ? state.taskDraft : (run?.user_task || "");
+    return `
+      <div class="command-panel">
+        <div class="control-top">
+          <div>
+            <div class="command-title">Team Command</div>
+            <div class="command-copy">Launch new work from this page, not just monitor it. This is the execution entry point for ${esc(selectedGroup?.name || `Team ${state.selectedGroupId}`)}.</div>
+          </div>
+          <div class="ws-pill-row">
+            <span class="trust-chip">${activeCount} active run${activeCount === 1 ? "" : "s"}</span>
+            <span class="trust-chip">${waitingCount} waiting on humans</span>
+          </div>
+        </div>
+        <div class="command-grid">
+          <div class="command-card">
+            <div class="command-card-title">Launch Team Run</div>
+            <div class="helper-copy">Give the team a mission, let the orchestrator split it, and move straight into the live workspace.</div>
+            <div class="control-stack">
+              <label class="field-label" for="team-task-input">Mission for the team</label>
+              <textarea id="team-task-input" class="control-textarea" placeholder="Research the market, compare the strongest options, and return a decision memo with risks and a recommended next step.">${esc(missionSeed)}</textarea>
+              <div class="control-row">
+                <button class="tiny-btn primary" onclick="createTeamRun()">Start team run</button>
+                ${run?.user_task ? `<button class="tiny-btn" onclick="seedCurrentMission()">Reuse current mission</button>` : ""}
+                <button class="tiny-btn" onclick="clearTeamTaskComposer()">Clear</button>
+              </div>
+            </div>
+          </div>
+          <div class="command-card">
+            <div class="command-card-title">Quick Actions</div>
+            <div class="helper-copy">Keep the team moving without leaving the workspace.</div>
+            <div class="control-stack">
+              ${run?.user_task ? `<button class="tiny-btn" onclick="createTeamRunFromCurrent()">Run this mission again</button>` : ""}
+              ${state.runs[0]?.id ? `<button class="tiny-btn" onclick="selectRun('${String(state.runs[0].id)}')">Open latest run</button>` : ""}
+              ${state.runs.find(item => !isTerminal(item.status))?.id ? `<button class="tiny-btn" onclick="selectRun('${String(state.runs.find(item => !isTerminal(item.status)).id)}')">Jump to active run</button>` : ""}
+              <button class="tiny-btn" onclick="location.href='messages.html'">Open team conversation</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
   function deriveStatusBuckets(assignments) {
     const buckets = {
       assigned: [],
@@ -1216,6 +1307,7 @@
 
     const root = document.getElementById("workspace-root");
     root.innerHTML = `
+      ${buildTeamCommandPanel(run)}
       <div class="hero">
         <div class="hero-top">
           <div>
@@ -1450,6 +1542,56 @@
     }
   }
 
+  function clearTeamTaskComposer() {
+    const input = document.getElementById("team-task-input");
+    state.taskDraft = "";
+    if (input) input.value = "";
+  }
+
+  function seedCurrentMission() {
+    const input = document.getElementById("team-task-input");
+    if (state.run?.user_task) state.taskDraft = state.run.user_task;
+    if (input && state.run?.user_task) input.value = state.run.user_task;
+  }
+
+  async function createTeamRun(taskText = null) {
+    if (!state.selectedGroupId) {
+      showToast("Select a team before starting a run.", true);
+      return;
+    }
+    const input = document.getElementById("team-task-input");
+    const task = (taskText != null ? taskText : input?.value || "").trim();
+    if (!task) {
+      showToast("Write a mission for the team first.", true);
+      return;
+    }
+    try {
+      const data = await fetchJson(`/pro/groups/${state.selectedGroupId}/runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task }),
+      });
+      showToast("Team run started.");
+      state.taskDraft = "";
+      if (input && taskText == null) input.value = "";
+      const runsData = await fetchJson(`/pro/groups/${state.selectedGroupId}/runs?limit=20`);
+      state.runs = runsData.runs || [];
+      renderRuns();
+      await refreshGroupSignals();
+      if (data?.run_id) await selectRun(data.run_id);
+    } catch (e) {
+      showToast(e.message || "Could not start the team run.", true);
+    }
+  }
+
+  async function createTeamRunFromCurrent() {
+    if (!state.run?.user_task) {
+      showToast("No current mission to reuse.", true);
+      return;
+    }
+    await createTeamRun(state.run.user_task);
+  }
+
   async function submitRunClarification() {
     if (!state.selectedRunId) return;
     const input = document.getElementById("clarification-input");
@@ -1486,6 +1628,36 @@
     if (!state.selectedGroupId) return;
     state.memory = await fetchJson(`/pro/groups/${state.selectedGroupId}/memory`);
     renderSideInsights();
+  }
+
+  async function saveGroupSettings() {
+    if (!state.selectedGroupId) return;
+    const requireApproval = !!document.getElementById("ws-require-approval")?.checked;
+    const thresholdRaw = document.getElementById("ws-trust-threshold")?.value ?? "";
+    const highRiskTrustThreshold = Number(thresholdRaw);
+    if (!Number.isFinite(highRiskTrustThreshold) || highRiskTrustThreshold < 0 || highRiskTrustThreshold > 100) {
+      showToast("High-risk trust threshold must be between 0 and 100.", true);
+      return;
+    }
+    try {
+      const data = await fetchJson(`/pro/groups/${state.selectedGroupId}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          require_plan_approval: requireApproval,
+          high_risk_trust_threshold: highRiskTrustThreshold,
+        }),
+      });
+      state.settings = {
+        ...(state.settings || {}),
+        require_plan_approval: data.require_plan_approval,
+        high_risk_trust_threshold: data.high_risk_trust_threshold,
+      };
+      renderSideInsights();
+      showToast("Guardrails updated.");
+    } catch (e) {
+      showToast(e.message || "Could not save guardrails.", true);
+    }
   }
 
   function beginTeamNoteEdit(noteId) {

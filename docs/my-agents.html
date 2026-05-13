@@ -432,7 +432,8 @@
         <button class="btn btn-primary" id="reg-register-btn" style="width:100%;">Register Agent</button>
         <div id="reg-success" style="display:none;margin-top:1rem;padding:1rem;background:var(--green-bg);border:1px solid var(--green);border-radius:8px;">
           <div style="font-weight:700;color:var(--green);margin-bottom:0.3rem;">✓ Agent Registered</div>
-          <div class="did-mono" id="reg-success-did" style="margin-bottom:0.75rem;word-break:break-all;"></div>
+          <div class="did-mono" id="reg-success-did" style="margin-bottom:0.5rem;word-break:break-all;"></div>
+          <div id="reg-success-signing" style="display:none;font-size:0.8rem;color:var(--green);margin-bottom:0.6rem;">✍ Message signing enabled automatically — private key saved to your download.</div>
           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
             <button class="btn btn-outline" id="reg-view-btn" style="font-size:0.8rem;">View Profile</button>
             <button class="btn btn-outline" id="reg-another-btn" style="font-size:0.8rem;">+ Register Another</button>
@@ -1330,6 +1331,9 @@ document.getElementById("reg-register-btn").addEventListener("click", async func
     document.getElementById("reg-register-btn").style.display = "none";
     document.getElementById("reg-success").style.display = "";
     document.getElementById("reg-success-did").textContent = data.did || "";
+    // Show signing-enabled note in success block
+    const sigNote = document.getElementById("reg-success-signing");
+    if (sigNote) sigNote.style.display = data.private_key_b64 ? "block" : "none";
     document.getElementById("reg-view-btn").onclick = () => window.open(`agent.html?did=${encodeURIComponent(data.did)}`, "_blank");
     document.getElementById("reg-another-btn").onclick = regReset;
     loadAgents();
