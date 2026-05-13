@@ -853,6 +853,35 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
     </div>
 
+    <!-- Team Memory panel (slides in from right when a team is selected) -->
+    <div id="team-memory-panel" style="width:0;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width 0.22s ease;">
+      <div style="padding:0.65rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--surface2);">
+        <span style="font-weight:700;font-size:0.85rem;white-space:nowrap;">📋 Team Memory</span>
+        <button id="team-memory-close-btn" style="background:none;border:none;font-size:1rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.35rem;border-radius:4px;" title="Close">✕</button>
+      </div>
+      <!-- Notes section -->
+      <div style="padding:0.55rem 0.85rem 0.3rem;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
+          <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);">Team Notes</span>
+          <button id="team-note-add-btn" style="font-size:0.72rem;font-weight:600;color:var(--green);background:none;border:1px solid var(--green);border-radius:5px;padding:0.1rem 0.45rem;cursor:pointer;font-family:inherit;">+ Note</button>
+        </div>
+        <div id="team-note-form" style="display:none;flex-direction:column;gap:0.35rem;margin-bottom:0.35rem;">
+          <textarea id="team-note-input" rows="2" placeholder="Add a note for the team…"
+            style="resize:none;border:1px solid var(--border-dark);border-radius:7px;padding:0.38rem 0.55rem;font-size:0.8rem;font-family:inherit;outline:none;background:var(--surface);color:var(--text);line-height:1.4;"></textarea>
+          <div style="display:flex;gap:0.4rem;justify-content:flex-end;">
+            <button id="team-note-cancel-btn" style="font-size:0.75rem;background:none;border:1px solid var(--border-dark);border-radius:6px;padding:0.2rem 0.55rem;cursor:pointer;color:var(--muted);font-family:inherit;">Cancel</button>
+            <button id="team-note-save-btn" style="font-size:0.75rem;background:var(--green);color:#fff;border:none;border-radius:6px;padding:0.2rem 0.65rem;cursor:pointer;font-weight:600;font-family:inherit;">Save</button>
+          </div>
+        </div>
+        <div id="team-notes-list" style="display:flex;flex-direction:column;gap:0.3rem;max-height:180px;overflow-y:auto;"></div>
+      </div>
+      <!-- Run summaries section -->
+      <div style="flex:1;overflow-y:auto;padding:0.55rem 0.85rem;">
+        <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:0.35rem;">Run Summaries</div>
+        <div id="team-summaries-list" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+      </div>
+    </div>
+
     <!-- Group command panel -->
     <div id="gcmd-panel" class="gcmd-panel">
       <div class="gcmd-header">
@@ -4196,7 +4225,8 @@ async function showTeamGroupView(groupId) {
 
   // Header actions
   document.getElementById("header-right-actions").innerHTML =
-    `<button class="btn btn-outline" style="font-size:0.78rem" onclick="_refreshTeamRuns()">↻ Runs</button>`;
+    `<button class="btn btn-outline" style="font-size:0.78rem" onclick="_refreshTeamRuns()">↻ Runs</button>
+     <button class="btn btn-outline" style="font-size:0.78rem" onclick="_toggleMemoryPanel()">📋 Memory</button>`;
 
   // Show task input
   const taskLabel = document.getElementById("teams-task-label");
@@ -4659,6 +4689,95 @@ async function _teamsCancelClarify() {
   }
 }
 
+// ── Team Memory panel ─────────────────────────────────────────────────────────
+
+let _memoryPanelOpen = false;
+
+function _toggleMemoryPanel() {
+  if (_memoryPanelOpen) _closeMemoryPanel();
+  else _openMemoryPanel();
+}
+
+function _openMemoryPanel() {
+  if (!_activeTeamId) return;
+  _memoryPanelOpen = true;
+  const panel = document.getElementById("team-memory-panel");
+  if (panel) panel.style.width = "280px";
+  _loadTeamMemory(_activeTeamId);
+}
+
+function _closeMemoryPanel() {
+  _memoryPanelOpen = false;
+  const panel = document.getElementById("team-memory-panel");
+  if (panel) panel.style.width = "0";
+}
+
+async function _loadTeamMemory(groupId) {
+  const notesList    = document.getElementById("team-notes-list");
+  const summaryList  = document.getElementById("team-summaries-list");
+  if (!notesList || !summaryList) return;
+
+  notesList.innerHTML   = `<div style="font-size:0.75rem;color:var(--muted);font-style:italic;">Loading…</div>`;
+  summaryList.innerHTML = `<div style="font-size:0.75rem;color:var(--muted);font-style:italic;">Loading…</div>`;
+
+  try {
+    const r = await fetch(`${BASE}/pro/groups/${groupId}/memory`, { headers: apiHeaders(), credentials:"include" });
+    if (!r.ok) throw new Error(`${r.status}`);
+    const d = await r.json();
+    _renderTeamNotes(groupId, d.team_notes || []);
+    _renderTeamSummaries(d.run_summaries || []);
+  } catch(e) {
+    notesList.innerHTML   = `<div style="font-size:0.75rem;color:var(--red);">Error: ${esc(e.message)}</div>`;
+    summaryList.innerHTML = "";
+  }
+}
+
+function _renderTeamNotes(groupId, notes) {
+  const list = document.getElementById("team-notes-list");
+  if (!list) return;
+  if (!notes.length) {
+    list.innerHTML = `<div style="font-size:0.75rem;color:var(--muted);font-style:italic;">No notes yet</div>`;
+    return;
+  }
+  list.innerHTML = notes.map(n => `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.35rem 0.55rem;font-size:0.78rem;position:relative;group:1;">
+      <div style="color:var(--text-2);line-height:1.45;white-space:pre-wrap;word-break:break-word;padding-right:1.2rem;">${esc(n.content)}</div>
+      <div style="font-size:0.62rem;color:var(--muted);margin-top:0.2rem;">${n.created_by || "you"} · ${n.created_at ? relativeTime(n.created_at) : ""}</div>
+      <button data-note-id="${n.id}" data-group-id="${groupId}"
+        style="position:absolute;top:0.3rem;right:0.35rem;background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.72rem;padding:0.1rem 0.2rem;border-radius:3px;opacity:0.6;"
+        class="team-note-del-btn" title="Delete note">✕</button>
+    </div>`).join("");
+
+  list.querySelectorAll(".team-note-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this note?")) return;
+      try {
+        const r = await fetch(`${BASE}/pro/groups/${btn.dataset.groupId}/memory/${btn.dataset.noteId}`, {
+          method: "DELETE", headers: apiHeaders(), credentials:"include",
+        });
+        if (!r.ok) throw new Error(`${r.status}`);
+        _loadTeamMemory(groupId);
+      } catch(e) { alert("Could not delete note: " + e.message); }
+    });
+  });
+}
+
+function _renderTeamSummaries(summaries) {
+  const list = document.getElementById("team-summaries-list");
+  if (!list) return;
+  if (!summaries.length) {
+    list.innerHTML = `<div style="font-size:0.75rem;color:var(--muted);font-style:italic;">No run summaries yet</div>`;
+    return;
+  }
+  list.innerHTML = summaries.map(s => `
+    <div style="border:1px solid var(--border);border-radius:7px;overflow:hidden;">
+      <div style="background:var(--surface2);padding:0.25rem 0.55rem;font-size:0.62rem;color:var(--muted);">
+        ${s.created_at ? relativeTime(s.created_at) : ""}
+      </div>
+      <div style="padding:0.35rem 0.55rem;font-size:0.78rem;color:var(--text-2);line-height:1.45;white-space:pre-wrap;word-break:break-word;">${esc(s.content)}</div>
+    </div>`).join("");
+}
+
 // Keyboard shortcut: Ctrl/Cmd+Enter in task input to submit
 document.addEventListener("DOMContentLoaded", () => {
   const taskInput = document.getElementById("teams-task-input");
@@ -4670,6 +4789,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
   const clarifyInput = document.getElementById("clarify-input");
   if (clarifyInput) {
     clarifyInput.addEventListener("keydown", e => {
@@ -4679,6 +4799,59 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Memory panel close
+  document.getElementById("team-memory-close-btn")?.addEventListener("click", _closeMemoryPanel);
+
+  // Note add button — toggle form
+  document.getElementById("team-note-add-btn")?.addEventListener("click", () => {
+    const form = document.getElementById("team-note-form");
+    if (!form) return;
+    const visible = form.style.display === "flex";
+    form.style.display = visible ? "none" : "flex";
+    if (!visible) document.getElementById("team-note-input")?.focus();
+  });
+
+  // Note cancel
+  document.getElementById("team-note-cancel-btn")?.addEventListener("click", () => {
+    const form = document.getElementById("team-note-form");
+    if (form) form.style.display = "none";
+    const inp = document.getElementById("team-note-input");
+    if (inp) inp.value = "";
+  });
+
+  // Note save
+  document.getElementById("team-note-save-btn")?.addEventListener("click", async () => {
+    const inp = document.getElementById("team-note-input");
+    const content = (inp?.value || "").trim();
+    if (!content || !_activeTeamId) return;
+    const btn = document.getElementById("team-note-save-btn");
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      const r = await fetch(`${BASE}/pro/groups/${_activeTeamId}/memory`, {
+        method: "POST",
+        headers: apiHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ content }),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      inp.value = "";
+      document.getElementById("team-note-form").style.display = "none";
+      _loadTeamMemory(_activeTeamId);
+    } catch(e) {
+      alert("Could not save note: " + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = "Save";
+    }
+  });
+
+  // Note input — Ctrl/Cmd+Enter to save
+  document.getElementById("team-note-input")?.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      document.getElementById("team-note-save-btn")?.click();
+    }
+  });
 });
 
 // ── THEME ─────────────────────────────────────────────────────────────────────

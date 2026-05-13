@@ -102,4 +102,17 @@ Format: date · file(s) · what changed · why · what it does.
 - Status colour map: planning=purple, running=blue, synthesizing=amber, completed=green, failed=red, cancelled=grey, paused_for_user=orange.
 
 ## Phase 4 — Team Memory UI
-_(planned — not yet built)_
+
+### 2026-05-13 · `docs/messages.html` (modified)
+**What**: Team Memory slide-in panel with editable notes and auto run summaries.
+**Why**: The orchestrator reads team notes when planning — users need a way to add/remove them without leaving the messages view. Run summaries give a quick "what happened last time" reference.
+**Does**:
+- `#team-memory-panel` — 280px panel that slides in from the right alongside the group command panel; hidden at width:0 by default; transition on open/close.
+- **Team Notes section** — lists all active notes (content + author + relative time); each note has a ✕ delete button that calls `DELETE /pro/groups/{id}/memory/{mem_id}`. "+ Note" button reveals inline textarea form; save calls `POST /pro/groups/{id}/memory`; Ctrl/Cmd+Enter shortcut.
+- **Run Summaries section** — lists last 10 auto-generated summaries (orchestrator-written after each completed run); read-only; shows relative timestamp.
+- `_toggleMemoryPanel()` / `_openMemoryPanel()` / `_closeMemoryPanel()` — width toggle with CSS transition.
+- `_loadTeamMemory(groupId)` — `GET /pro/groups/{id}/memory`; populates both sections.
+- `_renderTeamNotes(groupId, notes)` — renders note cards with delete handlers wired via event listeners.
+- `_renderTeamSummaries(summaries)` — renders read-only summary cards.
+- **"📋 Memory" button** added to team header actions (alongside "↻ Runs"); toggles panel.
+- All note form buttons and panel close wired in DOMContentLoaded (no inline onclick).
