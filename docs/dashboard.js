@@ -10124,8 +10124,8 @@ async function openRunDrilldown(runId, groupId) {
         <div style="background:var(--green-bg);border:1px solid #6ee7b7;border-radius:10px;padding:0.85rem 1rem;margin-bottom:1rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
             <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--green);">✨ Final Answer</div>
-            <a href="${(window.BASE||"")}/pro/groups/runs/${runId}/report" download
-               style="font-size:0.72rem;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid var(--accent);border-radius:6px;padding:0.15rem 0.5rem;">📄 Download .md</a>
+            <button onclick="_downloadRunReport('${runId}')"
+               style="font-size:0.72rem;font-weight:600;color:var(--accent);background:none;cursor:pointer;border:1px solid var(--accent);border-radius:6px;padding:0.15rem 0.5rem;font-family:inherit;">📄 Download .md</button>
           </div>
           <div style="font-size:0.84rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;">${_esc(run.final_output)}</div>
           ${run.run_summary ? `<div style="margin-top:0.5rem;font-size:0.72rem;color:var(--muted);font-style:italic;border-top:1px solid #a7f3d0;padding-top:0.4rem;">${_esc(run.run_summary)}</div>` : ""}
@@ -10176,6 +10176,25 @@ function _closeRunDrilldown() {
   _stopDrilldownSSE();
   const panel = document.getElementById("group-run-drilldown");
   if (panel) panel.style.display = "none";
+}
+
+async function _downloadRunReport(runId) {
+  try {
+    const res = await _authFetch(`${BASE}/pro/groups/runs/${runId}/report`);
+    if (!res.ok) { alert("Report not available yet."); return; }
+    const text = await res.text();
+    const blob = new Blob([text], { type: "text/markdown" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `agentid_run_${runId.slice(0,8)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert("Failed to download report: " + e.message);
+  }
 }
 
 // ── Drilldown live SSE ────────────────────────────────────────────────────────

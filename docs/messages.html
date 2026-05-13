@@ -4907,11 +4907,10 @@ function _handleRunEvent(ev, isReplay) {
            </button>`
         : "";
       const mdDlBtn = runIdForDl
-        ? `<a href="${BASE}/pro/groups/runs/${runIdForDl}/report"
-              download
-              style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--surface2);color:var(--text-2);border:1px solid var(--border);border-radius:8px;padding:0.45rem 0.9rem;font-size:0.79rem;font-weight:600;cursor:pointer;font-family:inherit;margin-top:0.4rem;text-decoration:none;">
+        ? `<button onclick="_downloadRunReport('${runIdForDl}')"
+              style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--surface2);color:var(--text-2);border:1px solid var(--border);border-radius:8px;padding:0.45rem 0.9rem;font-size:0.79rem;font-weight:600;cursor:pointer;font-family:inherit;margin-top:0.4rem;">
               📄 Download Report (.md)
-            </a>`
+            </button>`
         : "";
       _appendOrchCard(`<div class="orch-card final-answer">
         <div class="orch-card-head">
@@ -5068,6 +5067,27 @@ async function _teamsApprovePlan() {
   } catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = "✓ Approve & Execute"; }
     alert("Could not approve plan: " + e.message);
+  }
+}
+
+async function _downloadRunReport(runId) {
+  try {
+    const key = typeof getApiKey === "function" ? getApiKey() : (localStorage.getItem("agentid_persisted_key") || sessionStorage.getItem("agentid_key") || "");
+    const headers = key ? { "x-api-key": key } : {};
+    const res = await fetch(`${BASE}/pro/groups/runs/${runId}/report`, { credentials: "include", headers });
+    if (!res.ok) { alert("Report not available yet."); return; }
+    const text = await res.text();
+    const blob = new Blob([text], { type: "text/markdown" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `agentid_run_${runId.slice(0,8)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert("Failed to download report: " + e.message);
   }
 }
 
