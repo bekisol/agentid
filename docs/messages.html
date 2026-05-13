@@ -523,6 +523,12 @@
     .orch-quality-bar { display:flex; align-items:center; gap:0.4rem; margin-top:0.3rem; }
     .orch-quality-fill { height:4px; border-radius:2px; background:var(--green); flex-shrink:0; }
     .orch-quality-label { font-size:0.65rem; color:var(--muted); }
+    .orch-card-rationale { padding:0.3rem 0.85rem 0.55rem; font-size:0.72rem; color:var(--muted); border-top:1px solid var(--border); font-style:italic; line-height:1.45; }
+    .orch-risk-badge { display:inline-flex; align-items:center; font-size:0.6rem; font-weight:700; padding:0.06rem 0.35rem; border-radius:999px; margin-left:0.3rem; }
+    .orch-risk-badge.low    { background:#d1fae5; color:#065f46; }
+    .orch-risk-badge.medium { background:#fef3c7; color:#92400e; }
+    .orch-risk-badge.high   { background:#fee2e2; color:#991b1b; }
+    .orch-trust-tag { font-size:0.65rem; color:var(--muted); margin-left:auto; flex-shrink:0; }
     /* Planning spinner */
     .planning-pulse { display:flex; align-items:center; gap:0.5rem; padding:0.6rem 0.85rem; font-size:0.8rem; color:#7c3aed; font-style:italic; }
     .dot-pulse { display:inline-flex; gap:0.2rem; }
@@ -4661,8 +4667,11 @@ function _handleRunEvent(ev, isReplay) {
     case "orchestrator_plan": {
       const subtasks = (data.plan || data.assignments || []).map(a => {
         const agentName = _agentNameForDid(a.agent_did);
+        const riskLevel = a.risk_level || "";
+        const riskBadge = riskLevel
+          ? `<span class="orch-risk-badge ${riskLevel}" style="margin-left:0.3rem;">${riskLevel}</span>` : "";
         return `<div class="orch-subtask">
-          <span class="orch-subtask-agent">${esc(agentName)}</span>
+          <span class="orch-subtask-agent">${esc(agentName)}${riskBadge}</span>
           <span class="orch-subtask-text">${esc(a.subtask || "")}</span>
         </div>`;
       }).join("");
@@ -4685,14 +4694,24 @@ function _handleRunEvent(ev, isReplay) {
     }
 
     case "agent_assigned": {
-      const agentName = _agentNameForDid(ev.agent_did);
+      const agentName  = _agentNameForDid(ev.agent_did);
+      const rationale  = data.rationale  || "";
+      const riskLevel  = data.risk_level || "";
+      const trustScore = data.trust_score != null ? Math.round(data.trust_score) : null;
+      const trustLevel = data.trust_level || "";
+      const riskBadge  = riskLevel
+        ? `<span class="orch-risk-badge ${riskLevel}">${riskLevel}</span>` : "";
+      const trustTag   = trustScore != null
+        ? `<span class="orch-trust-tag">Trust: ${trustScore}/100${trustLevel ? ` · ${trustLevel}` : ""}</span>` : "";
       _appendOrchCard(`<div class="orch-card agent-assigned">
         <div class="orch-card-head">
           <span class="orch-card-icon">📤</span>
-          <span class="orch-card-label">${esc(agentName)} — assigned</span>
+          <span class="orch-card-label">${esc(agentName)} — assigned${riskBadge}</span>
+          ${trustTag}
           <span class="orch-card-time">${esc(ts)}</span>
         </div>
         <div class="orch-card-body">${esc(data.subtask || "")}</div>
+        ${rationale ? `<div class="orch-card-rationale">${esc(rationale)}</div>` : ""}
       </div>`);
       break;
     }

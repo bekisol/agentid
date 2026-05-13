@@ -10017,13 +10017,24 @@ async function openRunDrilldown(runId, groupId) {
     const assignmentRows = assignments.map(a => {
       const score = a.quality_score != null ? `${Math.round(a.quality_score * 100)}%` : "—";
       const scoreColor = a.quality_score != null && a.quality_score >= 0.6 ? "var(--green)" : "var(--yellow)";
-      return `<tr style="border-bottom:1px solid var(--border);" data-agent-did="${_esc(a.agent_did || "")}">
+      const trustStr = a.trust_score_at_assignment != null ? `${Math.round(a.trust_score_at_assignment)}/100` : "—";
+      const riskLevel = a.risk_level || "medium";
+      const riskColors = { low: "#065f46", medium: "#92400e", high: "#991b1b" };
+      const riskBgs    = { low: "#d1fae5", medium: "#fef3c7", high: "#fee2e2" };
+      const riskBadge = `<span style="display:inline-block;font-size:0.58rem;font-weight:700;padding:0.05rem 0.3rem;border-radius:999px;background:${riskBgs[riskLevel]||riskBgs.medium};color:${riskColors[riskLevel]||riskColors.medium};text-transform:uppercase;">${_esc(riskLevel)}</span>`;
+      const rationaleRow = a.rationale
+        ? `<tr style="border-bottom:1px solid var(--border);" data-agent-did="${_esc(a.agent_did || "")}">
+            <td colspan="6" style="padding:0.2rem 0.6rem 0.45rem 2.2rem;font-size:0.72rem;color:var(--muted);font-style:italic;">${_esc(a.rationale)}</td>
+           </tr>` : "";
+      return `<tr style="border-bottom:${a.rationale ? "none" : "1px solid var(--border)"};" data-agent-did="${_esc(a.agent_did || "")}">
         <td style="padding:0.45rem 0.6rem;font-size:0.78rem;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc((a.agent_did || "").slice(-14))}</td>
-        <td style="padding:0.45rem 0.6rem;font-size:0.78rem;color:var(--text-2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(a.subtask || "")}</td>
+        <td style="padding:0.45rem 0.6rem;font-size:0.78rem;color:var(--text-2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(a.subtask || "")}</td>
         <td style="padding:0.45rem 0.6rem;" class="grd-status-cell">${_runStatusBadge(a.status)}</td>
+        <td style="padding:0.45rem 0.6rem;">${riskBadge}</td>
+        <td style="padding:0.45rem 0.6rem;font-size:0.75rem;color:var(--muted);">${_esc(trustStr)}</td>
         <td style="padding:0.45rem 0.6rem;font-size:0.78rem;font-weight:700;color:${scoreColor};" class="grd-quality-cell">${_esc(score)}</td>
         <td style="padding:0.45rem 0.6rem;font-size:0.72rem;color:var(--muted);">${a.retry_count > 0 ? `${a.retry_count} retr${a.retry_count > 1 ? "ies" : "y"}` : "—"}</td>
-      </tr>`;
+      </tr>${rationaleRow}`;
     }).join("");
 
     // Events timeline — container gets stable ID for live appending
@@ -10090,6 +10101,8 @@ async function openRunDrilldown(runId, groupId) {
                 <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Agent</th>
                 <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Subtask</th>
                 <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Status</th>
+                <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Risk</th>
+                <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Trust</th>
                 <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Quality</th>
                 <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Retries</th>
               </tr></thead>
