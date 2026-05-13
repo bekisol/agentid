@@ -10216,7 +10216,7 @@ function _grdHandleEvent(ev, runId) {
         if (ev.event_type === "agent_completed") {
           badgeCell.innerHTML = _runStatusBadge("completed");
           const qCell = tr.querySelector(".grd-quality-cell");
-          const score = ev.data?.quality_score;
+          const score = ev.data?.score ?? ev.data?.quality_score;
           if (qCell && score != null) {
             const pct = Math.round(score * 100);
             const c = score >= 0.6 ? "var(--green)" : "var(--yellow)";
