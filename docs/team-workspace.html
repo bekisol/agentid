@@ -445,6 +445,7 @@
     performance: [],
     analytics: null,
     settings: null,
+    capabilityProfiles: [],
     selectedGroupId: null,
     selectedRunId: null,
     run: null,
@@ -453,6 +454,7 @@
     stream: null,
     sseCancelled: false,
     editingNoteId: null,
+    editingProfileId: null,
     taskDraft: null,
   };
 
@@ -613,12 +615,13 @@
     renderSideInsightsLoading();
     renderWorkspaceLoading("Loading team workspace...");
 
-    const [runsData, memoryData, perfData, analyticsData, settingsData] = await Promise.all([
+    const [runsData, memoryData, perfData, analyticsData, settingsData, profilesData] = await Promise.all([
       fetchJson(`/pro/groups/${groupId}/runs?limit=20`),
       fetchJson(`/pro/groups/${groupId}/memory`),
       fetchJson(`/pro/groups/${groupId}/performance`).catch(() => ({ agents: [] })),
       fetchJson(`/pro/groups/${groupId}/analytics`).catch(() => null),
       fetchJson(`/pro/groups/${groupId}/settings`).catch(() => null),
+      fetchJson(`/pro/capability-profiles?group_id=${groupId}`).catch(() => []),
     ]);
 
     state.runs = runsData.runs || [];
@@ -626,7 +629,9 @@
     state.performance = perfData.agents || [];
     state.analytics = analyticsData;
     state.settings = settingsData;
+    state.capabilityProfiles = Array.isArray(profilesData) ? profilesData : [];
     state.editingNoteId = null;
+    state.editingProfileId = null;
     state.taskDraft = null;
 
     renderTeams();
@@ -721,6 +726,7 @@
     const perf = state.performance || [];
     const analytics = state.analytics;
     const settings = state.settings;
+    const profiles = state.capabilityProfiles || [];
 
     const analyticsHtml = analytics ? `
       <div class="panel">
@@ -817,9 +823,80 @@
         </div>`).join("")
       : `<div class="empty">No performance history yet.</div>`;
 
+    // ── Capability Profiles panel ─────────────────────────────────────
+    const PERM_LABELS = { read_only: "Read only", contribute: "Contribute", approve: "Approve", orchestrate: "Orchestrate" };
+
+    const profileListHtml = profiles.length
+      ? profiles.map(p => {
+          const isEditing = state.editingProfileId === p.id;
+          return `<div class="note-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
+              <div>
+                <span class="trust-chip" style="font-family:monospace;letter-spacing:0;">${esc(p.capability)}</span>
+                <span style="font-size:0.7rem;color:var(--text-2);margin-left:0.35rem;">${esc(PERM_LABELS[p.permission_level] || p.permission_level)}</span>
+              </div>
+              <div style="display:flex;gap:0.3rem;flex-shrink:0;">
+                <button class="tiny-btn" onclick="beginProfileEdit('${esc(p.id)}')">Edit</button>
+                <button class="tiny-btn danger" onclick="deleteCapabilityProfile('${esc(p.id)}')">Delete</button>
+              </div>
+            </div>
+            ${p.prompt_injection
+              ? `<div class="mission-copy" style="font-size:0.73rem;margin-top:0.4rem;color:var(--text-2);">${esc(p.prompt_injection.slice(0, 140))}${p.prompt_injection.length > 140 ? "…" : ""}</div>`
+              : `<div class="mission-copy" style="font-size:0.73rem;margin-top:0.4rem;color:var(--muted);">No prompt injection set.</div>`}
+            ${isEditing ? `
+              <div class="side-form" style="margin-top:0.6rem;">
+                <label class="field-label">Prompt injection</label>
+                <textarea id="pe-injection-${esc(p.id)}" rows="4">${esc(p.prompt_injection || "")}</textarea>
+                <label class="field-label" style="margin-top:0.4rem;">Quality rubric</label>
+                <textarea id="pe-rubric-${esc(p.id)}" rows="3" placeholder="Criteria the orchestrator uses to score this agent's output…">${esc(p.quality_rubric || "")}</textarea>
+                <label class="field-label" style="margin-top:0.4rem;">Permission level</label>
+                <select id="pe-perm-${esc(p.id)}" class="inline-input">
+                  ${Object.entries(PERM_LABELS).map(([v,l]) => `<option value="${v}"${p.permission_level===v?" selected":""}>${l}</option>`).join("")}
+                </select>
+                <div class="note-actions">
+                  <button class="tiny-btn primary" onclick="saveProfileEdit('${esc(p.id)}')">Save</button>
+                  <button class="tiny-btn" onclick="cancelProfileEdit()">Cancel</button>
+                </div>
+              </div>` : ""}
+          </div>`;
+        }).join("")
+      : `<div class="empty">No profiles yet. Add one below.</div>`;
+
+    const profilesHtml = `
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Capability Profiles</div>
+          <div class="panel-note">${profiles.length} profile${profiles.length === 1 ? "" : "s"}</div>
+        </div>
+        <div class="panel-body">
+          <div class="helper-copy" style="margin-bottom:0.7rem;">
+            Profiles make capability labels real — they inject role-specific guidance into agent prompts and set evaluation criteria and permissions.
+          </div>
+          <div class="stack" id="profile-list">${profileListHtml}</div>
+          <div class="side-form" style="margin-top:0.9rem;" id="new-profile-form">
+            <label class="field-label">Capability slug</label>
+            <input id="np-capability" class="inline-input" type="text" placeholder="e.g. regulatory_compliance" />
+            <label class="field-label" style="margin-top:0.4rem;">Prompt injection</label>
+            <textarea id="np-injection" rows="4" placeholder="Role guidance prepended to the agent's subtask prompt…"></textarea>
+            <label class="field-label" style="margin-top:0.4rem;">Quality rubric <span style="color:var(--muted);font-weight:400;">(Phase 2 — stored now)</span></label>
+            <textarea id="np-rubric" rows="3" placeholder="Criteria the orchestrator uses to score outputs for this capability…"></textarea>
+            <label class="field-label" style="margin-top:0.4rem;">Permission level</label>
+            <select id="np-perm" class="inline-input">
+              ${Object.entries(PERM_LABELS).map(([v,l]) => `<option value="${v}"${v==="contribute"?" selected":""}>${l}</option>`).join("")}
+            </select>
+            <div class="helper-copy">Scoped to this group. Leave capability blank to apply to all groups for this owner.</div>
+            <div class="note-actions">
+              <button class="tiny-btn primary" onclick="createCapabilityProfile()">Add profile</button>
+            </div>
+            <div id="np-msg" style="font-size:0.75rem;margin-top:0.3rem;"></div>
+          </div>
+        </div>
+      </div>`;
+
     root.innerHTML = `
       ${settingsHtml}
       ${analyticsHtml}
+      ${profilesHtml}
       <div class="panel">
         <div class="panel-head">
           <div class="panel-title">Team Notes</div>
@@ -1726,6 +1803,89 @@
       await refreshGroupMemory();
     } catch (e) {
       showToast(e.message || "Could not delete the note.", true);
+    }
+  }
+
+  // ── Capability Profile CRUD ───────────────────────────────────────────────
+
+  async function createCapabilityProfile() {
+    const cap  = (document.getElementById("np-capability")?.value || "").trim().toLowerCase().replace(/\s+/g, "_");
+    const inj  = (document.getElementById("np-injection")?.value || "").trim();
+    const rub  = (document.getElementById("np-rubric")?.value || "").trim();
+    const perm = document.getElementById("np-perm")?.value || "contribute";
+    const msg  = document.getElementById("np-msg");
+    if (msg) { msg.style.color = "var(--red)"; msg.textContent = ""; }
+    if (!cap) { if (msg) msg.textContent = "Capability slug is required."; return; }
+    try {
+      await fetchJson("/pro/capability-profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          capability:       cap,
+          group_id:         state.selectedGroupId,
+          prompt_injection: inj || null,
+          quality_rubric:   rub || null,
+          permission_level: perm,
+        }),
+      });
+      // Clear form
+      ["np-capability","np-injection","np-rubric"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+      if (document.getElementById("np-perm")) document.getElementById("np-perm").value = "contribute";
+      if (msg) { msg.style.color = "var(--green)"; msg.textContent = "Profile created."; }
+      // Reload profiles list
+      const fresh = await fetchJson(`/pro/capability-profiles?group_id=${state.selectedGroupId}`).catch(() => []);
+      state.capabilityProfiles = Array.isArray(fresh) ? fresh : [];
+      renderSideInsights();
+    } catch(e) {
+      if (msg) msg.textContent = e.message || "Failed to create profile.";
+    }
+  }
+
+  function beginProfileEdit(profileId) {
+    state.editingProfileId = profileId;
+    renderSideInsights();
+  }
+
+  function cancelProfileEdit() {
+    state.editingProfileId = null;
+    renderSideInsights();
+  }
+
+  async function saveProfileEdit(profileId) {
+    const inj  = (document.getElementById(`pe-injection-${profileId}`)?.value || "").trim();
+    const rub  = (document.getElementById(`pe-rubric-${profileId}`)?.value || "").trim();
+    const perm = document.getElementById(`pe-perm-${profileId}`)?.value || "contribute";
+    try {
+      await fetchJson(`/pro/capability-profiles/${profileId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt_injection: inj || null,
+          quality_rubric:   rub || null,
+          permission_level: perm,
+        }),
+      });
+      state.editingProfileId = null;
+      const fresh = await fetchJson(`/pro/capability-profiles?group_id=${state.selectedGroupId}`).catch(() => []);
+      state.capabilityProfiles = Array.isArray(fresh) ? fresh : [];
+      renderSideInsights();
+    } catch(e) {
+      showToast(e.message || "Failed to save profile.", true);
+    }
+  }
+
+  async function deleteCapabilityProfile(profileId) {
+    if (!confirm("Delete this capability profile?")) return;
+    try {
+      await fetchJson(`/pro/capability-profiles/${profileId}`, { method: "DELETE" });
+      state.capabilityProfiles = state.capabilityProfiles.filter(p => p.id !== profileId);
+      if (state.editingProfileId === profileId) state.editingProfileId = null;
+      renderSideInsights();
+    } catch(e) {
+      showToast(e.message || "Failed to delete profile.", true);
     }
   }
 
