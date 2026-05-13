@@ -39,6 +39,80 @@ GENERATED = NOW.strftime("%Y-%m-%d %H:%M")   # e.g. "2026-05-06 14:32"
 
 # ── Version changelog (newest first) ──────────────────────────────────────────
 CHANGELOG = [
+    ("v1.4.0", "2026-05-13",
+     "Phase 3 — Enterprise Agent Operations. "
+     "Goal: observable, controlled, auditable team runs for enterprise users. "
+     "PLAN APPROVAL GATE: group_settings table (require_plan_approval BOOLEAN, "
+     "high_risk_trust_threshold INT, max_retries_per_slot INT, synthesis_model TEXT). "
+     "_get_group_settings() helper reads per-group config. _orchestrate() checks "
+     "require_plan_approval after planning: if true, sets status='paused_for_approval', "
+     "logs approval_requested event with full plan summary (agent_did, subtask, risk_level, "
+     "rationale per slot), and returns without dispatching. _dispatch_pending_assignments() "
+     "dispatches all pending assignments for an approved run. approve_group_run_plan() sets "
+     "status back to 'running' and calls _dispatch_pending_assignments(). "
+     "POST /pro/groups/runs/{run_id}/approve-plan endpoint requires owner auth. "
+     "GET/PATCH /pro/groups/{group_id}/settings endpoints for reading and updating group config. "
+     "EXPORTABLE RUN REPORT: GET /pro/groups/runs/{run_id}/report returns full markdown "
+     "with owner auth. Report includes: run header (status, task, date, duration), "
+     "per-agent contribution sections with subtask, risk, trust score, quality, output (decrypted), "
+     "rejection/retry notes, and orchestrator rationale; full event timeline table (type, agent, "
+     "timestamp, detail); and run summary (decrypted). Content-Disposition: attachment header "
+     "triggers browser download as agentid_run_{id}.md. "
+     "CROSS-RUN ANALYTICS: GET /pro/groups/{group_id}/analytics endpoint aggregates across "
+     "all completed/failed runs: total runs, completion rate, avg duration, avg quality, "
+     "clarification rate; acceptance/rejection rate, risk distribution (low/medium/high counts), "
+     "trust-influenced routing count; per-agent breakdown (assigned, completed, rejected, "
+     "avg quality, avg trust). Dashboard shows 5-stat grid at top of drilldown panel + link to "
+     "download run report as .md. "
+     "FRONTEND: approval_requested event renders plan summary with risk badges and Approve button "
+     "in #approval-bar (blue sticky bar); Approve calls _teamsApprovePlan(); approval_granted clears "
+     "bar; run_completed card gains '📄 Download Report (.md)' anchor. "
+     "Files: agentid-pro/group_orchestrator.py, agentid-pro/group_runs.py, "
+     "agentid/docs/messages.html, agentid/docs/dashboard.js."),
+    ("v1.3.0", "2026-05-13",
+     "Phase 2 — Trust-Aware Coordination. "
+     "Goal: trust scores reach the orchestrator and shape runtime routing decisions. "
+     "TRUST IN PLANNING: _fetch_trust_info() lazy-imports get_trust_score() per member. "
+     "Planning prompt now includes trust score (0-100) and level (low/moderate/good/excellent) "
+     "per agent so the LLM orchestrator can route subtasks to the most trustworthy agent. "
+     "RISK LEVELS: plan JSON format expanded with risk_level (low/medium/high) and rationale. "
+     "High-risk subtasks require agent trust ≥ 70; orchestrator instructed to note when no "
+     "qualifying agent is available. "
+     "ATTRIBUTION: group_run_assignments gains rationale, risk_level, trust_score_at_assignment "
+     "columns (idempotent ALTER TABLE IF NOT EXISTS). All three saved per assignment. "
+     "agent_assigned event carries rationale, risk_level, trust_score, trust_level. "
+     "VISIBLE REASONING (messages.html): agent_assigned card shows risk badge, trust score/level, "
+     "and orchestrator rationale; orchestrator_plan card shows risk badge per subtask. "
+     "DASHBOARD DRILLDOWN: assignments table adds Risk and Trust columns; rationale shown as "
+     "italic sub-row beneath each assignment row. "
+     "Files: agentid-pro/group_orchestrator.py, agentid-pro/group_runs.py, "
+     "agentid/docs/messages.html, agentid/docs/dashboard.js."),
+    ("v1.2.0", "2026-05-13",
+     "Phase 1 Hardening — Trusted Team Runs. "
+     "Goal: a customer can complete one end-to-end team run and understand what happened "
+     "without reading server logs. "
+     "CLARIFICATION PROPAGATION: _execute_subtask() now accepts clarification param; "
+     "user's guidance injected into retrying agent's prompt between subtask and context. "
+     "_handle_failed_output() queries user_clarification from run row and passes it through. "
+     "submit_user_clarification() passes clarification directly to _execute_subtask(). "
+     "LEASE/HEARTBEAT ORPHAN RECOVERY: active runs write updated_at = NOW() every 30s via "
+     "daemon thread. Background sweeper (60s interval, singleton guard) marks runs with "
+     "updated_at < NOW() - INTERVAL '10 minutes' as failed — safe across Railway deploys "
+     "(new container waits 60s before first check, old container's runs are either done or "
+     "truly stopped). "
+     "SSE HEARTBEAT: emit ': heartbeat' SSE comment every 15s of no events — keeps TCP "
+     "connection alive through browsers and Railway proxies during long LLM calls (up to 150s). "
+     "No frontend change needed (browsers ignore SSE comment lines). "
+     "SSE CURSOR/RESUME: ?since_id= query param on stream endpoint; poll query starts at "
+     "id > since_id; frontend tracks _teamRunLastEventId, passes cursor on open. "
+     "Auto-reconnect after 2s on drop if run is non-terminal — no event gap, no out-of-order replay. "
+     "'Connecting...' state shown when no events exist yet. "
+     "SYNTHESIS CANCEL GUARD: cancel_group_run() raises 409 when status=synthesizing — "
+     "prevents race that could corrupt final_output. "
+     "EVENT HISTORY: LIMIT 200 → 1000 in GET /pro/groups/runs/{run_id} (~200–500KB, acceptable). "
+     "ACTIVE RUN RECOVERY: _selectTeam() checks for exactly one non-terminal run; if found, "
+     "auto-opens run thread (transparent page-reload recovery). Stays on runs list if ambiguous. "
+     "Files: agentid-pro/group_orchestrator.py, agentid-pro/group_runs.py, agentid/docs/messages.html."),
     ("v1.1.0", "2026-05-13",
      "At-rest content encryption for all customer data fields. "
      "NEW MODULE content_crypto.py: per-owner envelope encryption using HKDF-SHA256 "
@@ -1123,6 +1197,78 @@ def build_tracker():
              "now decrypt before use. Warning logged on startup when key is not set.",
              "agentid-pro/server_pro.py  _encrypt_api_key() + _decrypt_api_key()\n"
              "                           + all 6 write/read sites",
+             "done"),
+        ]),
+        ("v1.4.0", "Phase 3 — Enterprise Agent Operations (2026-05-13)", GREEN, [
+            ("Plan approval gate",
+             "group_settings table: require_plan_approval, high_risk_trust_threshold, "
+             "max_retries_per_slot, synthesis_model. _orchestrate() pauses at "
+             "'paused_for_approval' after planning when flag is set. "
+             "_dispatch_pending_assignments() dispatches after approval. "
+             "POST /approve-plan endpoint. GET/PATCH /settings endpoints.",
+             "agentid-pro/group_orchestrator.py  _get_group_settings() + approval gate + "
+             "_dispatch_pending_assignments() + approve_group_run_plan()\n"
+             "agentid-pro/group_runs.py  approve-plan + settings endpoints\n"
+             "agentid/docs/messages.html  #approval-bar + approval_requested/granted events",
+             "done"),
+            ("Exportable run report",
+             "GET /runs/{id}/report returns full markdown: per-agent contributions (subtask, "
+             "risk, trust, quality, decrypted output, rationale), event timeline table, "
+             "run summary. Content-Disposition triggers browser download.",
+             "agentid-pro/group_runs.py  /report endpoint",
+             "done"),
+            ("Cross-run analytics",
+             "GET /{group_id}/analytics aggregates: completion rate, avg duration, "
+             "avg quality, clarification rate, acceptance/rejection rate, risk distribution, "
+             "trust-influenced count, per-agent breakdown. "
+             "Dashboard: 5-stat grid + download link in drilldown panel.",
+             "agentid-pro/group_runs.py  /analytics endpoint\n"
+             "agentid/docs/dashboard.js  analytics stats grid + download button",
+             "done"),
+        ]),
+        ("v1.3.0", "Phase 2 — Trust-Aware Coordination (2026-05-13)", GREEN, [
+            ("Trust scores reach the orchestrator",
+             "_fetch_trust_info() lazy-imports get_trust_score() per member (fail-open at 50/moderate). "
+             "Planning prompt includes trust score + level per agent. "
+             "High-risk subtasks (risk_level=high) require agent trust ≥ 70.",
+             "agentid-pro/group_orchestrator.py  _fetch_trust_info() + planning prompt",
+             "done"),
+            ("Rationale, risk level, and trust stored on assignments",
+             "group_run_assignments: rationale, risk_level, trust_score_at_assignment columns added. "
+             "agent_assigned event carries all three fields for full post-run attribution. "
+             "GET /pro/groups/runs/{run_id} returns new columns in assignments array.",
+             "agentid-pro/group_orchestrator.py  assignment INSERT\n"
+             "agentid-pro/group_runs.py  SELECT expanded",
+             "done"),
+            ("Visible reasoning in thread view and dashboard drilldown",
+             "agent_assigned card: risk badge, trust score/level, orchestrator rationale. "
+             "orchestrator_plan card: risk badge per subtask. "
+             "Dashboard assignments table: Risk + Trust columns; rationale as italic sub-row.",
+             "agentid/docs/messages.html  agent_assigned + orchestrator_plan cards\n"
+             "agentid/docs/dashboard.js  drilldown table headers + rows",
+             "done"),
+        ]),
+        ("v1.2.0", "Phase 1 Hardening — Trusted Team Runs (2026-05-13)", GREEN, [
+            ("Clarification propagation to retrying agents",
+             "_execute_subtask() clarification param injects user's guidance into prompt. "
+             "_handle_failed_output() queries user_clarification from run row and passes it. "
+             "submit_user_clarification() passes clarification text directly.",
+             "agentid-pro/group_orchestrator.py  _execute_subtask() + _handle_failed_output()",
+             "done"),
+            ("Lease/heartbeat orphan recovery",
+             "_run_heartbeat() daemon writes updated_at = NOW() every 30s. "
+             "_start_orphan_sweeper() singleton daemon checks every 60s, marks runs with "
+             "updated_at < NOW() - 10min as failed. Safe across Railway deploys.",
+             "agentid-pro/group_orchestrator.py  _run_heartbeat() + _start_orphan_sweeper()",
+             "done"),
+            ("SSE heartbeat + cursor/resume + auto-reconnect",
+             "': heartbeat' SSE comment every 15s keeps TCP alive through proxies. "
+             "?since_id= param resumes stream exactly where client left off. "
+             "_teamRunLastEventId cursor tracked in frontend; passed on every SSE open. "
+             "Auto-reconnect after 2s on drop when run is non-terminal. "
+             "'Connecting...' state + synthesis cancel guard (409) + LIMIT 1000.",
+             "agentid-pro/group_runs.py  SSE generator + since_id + cancel guard + limit\n"
+             "agentid/docs/messages.html  cursor tracking + reconnect + run recovery",
              "done"),
         ]),
         ("v1.1.0", "At-Rest Content Encryption — All Customer Data Fields (2026-05-13)", GREEN, [
