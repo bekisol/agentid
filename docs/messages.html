@@ -4788,6 +4788,11 @@ function _handleRunEvent(ev, isReplay) {
       _showStopBtn(false);
       _stopTeamRunSSE();
       _refreshTeamRuns();
+      // Refresh files list so the generated PDF appears in Files view immediately
+      fetch(`${BASE}/pro/files`, { headers: apiHeaders(), credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.files) { _files = d.files; _renderFilesView(); } })
+        .catch(() => {});
       break;
     }
 
