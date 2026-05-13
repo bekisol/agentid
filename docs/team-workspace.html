@@ -583,6 +583,91 @@
       color: var(--accent-2);
       font-weight: 700;
     }
+    .doc-nav-links,
+    .past-run-list,
+    .timeline-mini {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      margin-top: 0.75rem;
+    }
+    .doc-nav-link,
+    .past-run-link,
+    .timeline-mini-item {
+      width: 100%;
+      text-align: left;
+      border: 1.3px solid rgba(39,34,28,0.14);
+      background: rgba(255,255,255,0.34);
+      color: var(--text-2);
+      border-radius: 14px;
+      padding: 0.72rem 0.82rem;
+      cursor: pointer;
+      transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+    }
+    .doc-nav-link:hover,
+    .past-run-link:hover,
+    .timeline-mini-item:hover {
+      border-color: rgba(39,34,28,0.28);
+      background: rgba(255,255,255,0.52);
+      transform: translateY(-1px);
+    }
+    .doc-nav-link.active {
+      border-color: rgba(200,100,44,0.42);
+      background: rgba(200,100,44,0.10);
+      color: var(--text);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+    .doc-nav-link strong,
+    .past-run-link strong {
+      display: block;
+      font-size: 0.89rem;
+      color: var(--text);
+      margin-bottom: 0.18rem;
+    }
+    .doc-nav-link span,
+    .past-run-link span,
+    .timeline-mini-copy {
+      display: block;
+      font-size: 0.75rem;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    .timeline-mini-item {
+      position: relative;
+      padding-left: 1rem;
+    }
+    .timeline-mini-item::before {
+      content: "";
+      position: absolute;
+      left: 0.42rem;
+      top: 1rem;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(200,100,44,0.12);
+    }
+    .timeline-mini-item.active {
+      border-color: rgba(53,88,168,0.36);
+      background: rgba(53,88,168,0.08);
+    }
+    .timeline-mini-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.65rem;
+      margin-bottom: 0.22rem;
+    }
+    .timeline-mini-top strong {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+    .timeline-mini-top span {
+      font-size: 0.7rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
     .doc-body {
       display: flex;
       flex-direction: column;
@@ -957,29 +1042,26 @@
       line-height: 1.7;
       color: var(--text);
     }
-    /* rendered markdown inside final-copy */
-    .final-copy h1, .final-copy h2, .final-copy h3, .final-copy h4 {
-      font-family: "Source Serif 4", Georgia, serif;
-      color: var(--text);
-      margin: 1rem 0 0.3rem;
-      line-height: 1.3;
+    .final-copy h1,.final-copy h2,.final-copy h3,.final-copy h4 {
+      font-family:"Source Serif 4",Georgia,serif; color:var(--text);
+      margin:1rem 0 0.3rem; line-height:1.3;
     }
-    .final-copy h1 { font-size: 1.25rem; }
-    .final-copy h2 { font-size: 1.08rem; }
-    .final-copy h3 { font-size: 0.97rem; font-weight: 700; }
-    .final-copy h4 { font-size: 0.88rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-    .final-copy p  { margin: 0.45rem 0; }
-    .final-copy ul, .final-copy ol { margin: 0.4rem 0 0.4rem 1.2rem; padding: 0; }
-    .final-copy li { margin: 0.2rem 0; }
-    .final-copy hr { border: none; border-top: 1px solid rgba(29,122,58,0.3); margin: 0.9rem 0; }
-    .final-copy strong { font-weight: 700; color: var(--text); }
-    .final-copy em { font-style: italic; }
-    .final-copy code { background: rgba(0,0,0,0.18); border-radius: 3px; padding: 0.1em 0.35em; font-size: 0.83em; font-family: ui-monospace, monospace; }
-    .final-copy pre { background: rgba(0,0,0,0.22); border-radius: 6px; padding: 0.7rem 0.9rem; overflow-x: auto; margin: 0.6rem 0; }
-    .final-copy pre code { background: none; padding: 0; font-size: 0.82em; }
-    .final-copy .md-gap { height: 0.5rem; }
-    .final-edit-area { width: 100%; min-height: 260px; font-size: 0.86rem; line-height: 1.65; resize: vertical; background: rgba(0,0,0,0.15); border: 1.5px solid var(--border-2); border-radius: 8px; padding: 0.7rem 0.85rem; color: var(--text); font-family: ui-monospace, monospace; }
-    .final-edit-actions { display: flex; gap: 0.5rem; margin-top: 0.55rem; }
+    .final-copy h1{font-size:1.25rem;} .final-copy h2{font-size:1.08rem;}
+    .final-copy h3{font-size:0.97rem;font-weight:700;}
+    .final-copy h4{font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);}
+    .final-copy p{margin:0.45rem 0;}
+    .final-copy ul,.final-copy ol{margin:0.4rem 0 0.4rem 1.2rem;padding:0;}
+    .final-copy li{margin:0.2rem 0;}
+    .final-copy hr{border:none;border-top:1px solid rgba(29,122,58,0.3);margin:0.9rem 0;}
+    .final-copy strong{font-weight:700;} .final-copy em{font-style:italic;}
+    .final-copy code{background:rgba(0,0,0,0.18);border-radius:3px;padding:.1em .35em;font-size:.83em;font-family:ui-monospace,monospace;}
+    .final-copy pre{background:rgba(0,0,0,0.22);border-radius:6px;padding:.7rem .9rem;overflow-x:auto;margin:.6rem 0;}
+    .final-copy pre code{background:none;padding:0;}
+    .final-copy .md-gap{height:0.45rem;}
+    .final-edit-area{width:100%;min-height:260px;font-size:0.85rem;line-height:1.65;resize:vertical;
+      background:rgba(0,0,0,0.15);border:1.5px solid var(--border-2);border-radius:8px;
+      padding:.7rem .85rem;color:var(--text);font-family:ui-monospace,monospace;}
+    .final-edit-actions{display:flex;gap:0.5rem;margin-top:0.55rem;}
     .final-summary {
       margin-top: 0.8rem;
       padding-top: 0.8rem;
@@ -1129,6 +1211,8 @@
     editingProfileId: null,
     editingFinalOutput: false,
     taskDraft: null,
+    activeDocSection: "mission",
+    sectionObserver: null,
   };
 
   window.fetch = function(url, opts = {}) {
@@ -1148,13 +1232,34 @@
       .replace(/"/g, "&quot;");
   }
 
-  // ── Lightweight markdown → HTML renderer ─────────────────────────────────
+  function formatEventLabel(type) {
+    const labels = {
+      orchestrator_plan:       "Plan Created",
+      orchestrator_rejected:   "Output Rejected",
+      agent_assigned:          "Agent Assigned",
+      agent_started:           "Agent Started",
+      agent_completed:         "Agent Completed",
+      agent_reassigned:        "Agent Reassigned",
+      context_written:         "Context Written",
+      clarification_requested: "Clarification Requested",
+      clarification_received:  "Clarification Received",
+      approval_requested:      "Plan Approval Requested",
+      approval_granted:        "Plan Approved",
+      synthesis_started:       "Synthesis Started",
+      synthesis_completed:     "Synthesis Completed",
+      run_completed:           "Run Completed",
+      run_failed:              "Run Failed",
+      run_cancelled:           "Run Cancelled",
+    };
+    return labels[type] || (type || "").replace(/_/g, " ");
+  }
+
   function applyInline(s) {
     return s
       .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
       .replace(/\*\*(.+?)\*\*/g,     "<strong>$1</strong>")
       .replace(/\*([^\s*][^*]*?)\*/g, "<em>$1</em>")
-      .replace(/`([^`]+)`/g,         "<code>$1</code>");
+      .replace(/`([^`]+)`/g,          "<code>$1</code>");
   }
 
   function renderMd(raw) {
@@ -1162,58 +1267,34 @@
     const lines = raw.split("\n");
     const out = [];
     let inList = false, listTag = "ul", inCode = false, codeBuf = [];
-
-    const flush = () => {
-      if (inList) { out.push(`</${listTag}>`); inList = false; }
-    };
-
+    const flush = () => { if (inList) { out.push(`</${listTag}>`); inList = false; } };
     for (const line of lines) {
-      // Code fence
       if (line.trimStart().startsWith("```")) {
         if (!inCode) { flush(); inCode = true; codeBuf = []; continue; }
         out.push(`<pre><code>${esc(codeBuf.join("\n"))}</code></pre>`);
         inCode = false; codeBuf = []; continue;
       }
       if (inCode) { codeBuf.push(line); continue; }
-
-      // Headings
       const hm = line.match(/^(#{1,4})\s+(.*)/);
-      if (hm) {
-        flush();
-        out.push(`<h${hm[1].length}>${applyInline(esc(hm[2]))}</h${hm[1].length}>`);
-        continue;
-      }
-
-      // HR (-- or --- or ***)
-      if (/^(-{2,}|_{3,}|\*{3,})\s*$/.test(line.trim())) {
-        flush(); out.push("<hr>"); continue;
-      }
-
-      // Bullet list
+      if (hm) { flush(); out.push(`<h${hm[1].length}>${applyInline(esc(hm[2]))}</h${hm[1].length}>`); continue; }
+      if (/^(-{2,}|_{3,}|\*{3,})\s*$/.test(line.trim())) { flush(); out.push("<hr>"); continue; }
       const lim = line.match(/^[-*•]\s+(.*)/);
       if (lim) {
         if (!inList || listTag !== "ul") { flush(); out.push("<ul>"); inList = true; listTag = "ul"; }
         out.push(`<li>${applyInline(esc(lim[1]))}</li>`); continue;
       }
-
-      // Numbered list
       const olm = line.match(/^\d+\.\s+(.*)/);
       if (olm) {
         if (!inList || listTag !== "ol") { flush(); out.push("<ol>"); inList = true; listTag = "ol"; }
         out.push(`<li>${applyInline(esc(olm[1]))}</li>`); continue;
       }
-
-      // Empty line
       if (!line.trim()) { flush(); out.push('<div class="md-gap"></div>'); continue; }
-
-      // Paragraph
       flush();
       out.push(`<p>${applyInline(esc(line))}</p>`);
     }
     flush();
     return out.join("");
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
   function relTime(iso) {
     if (!iso) return "";
@@ -1305,6 +1386,8 @@
       } catch (_) {}
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
+    // 204 No Content (DELETE endpoints) — no body to parse
+    if (r.status === 204) return null;
     return r.json();
   }
 
@@ -1963,6 +2046,72 @@
     return `<div class="context-mini">${html}${more}</div>`;
   }
 
+  function sectionTargetForEventType(type) {
+    if (["clarification_requested", "clarification_received", "approval_requested", "approval_granted", "orchestrator_rejected", "agent_reassigned", "run_failed", "run_cancelled"].includes(type)) {
+      return "decisions";
+    }
+    if (["run_completed", "synthesis_started"].includes(type)) {
+      return "final";
+    }
+    if (["context_written", "shared_context_updated"].includes(type)) {
+      return "context";
+    }
+    return "happening";
+  }
+
+  function updateDocNavActive(sectionId) {
+    state.activeDocSection = sectionId || state.activeDocSection || "mission";
+    document.querySelectorAll(".doc-nav-link").forEach(node => {
+      node.classList.toggle("active", node.dataset.section === state.activeDocSection);
+    });
+  }
+
+  function bindWorkspaceSidebarInteractions() {
+    if (state.sectionObserver) {
+      state.sectionObserver.disconnect();
+      state.sectionObserver = null;
+    }
+
+    document.querySelectorAll(".doc-nav-link").forEach(node => {
+      node.addEventListener("click", () => {
+        const targetId = node.dataset.section;
+        const section = document.querySelector(`[data-doc-section="${targetId}"]`);
+        if (!section) return;
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+        updateDocNavActive(targetId);
+      });
+    });
+
+    document.querySelectorAll(".timeline-mini-item").forEach(node => {
+      node.addEventListener("click", () => {
+        const targetId = node.dataset.section || "happening";
+        const section = document.querySelector(`[data-doc-section="${targetId}"]`);
+        if (!section) return;
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+        updateDocNavActive(targetId);
+      });
+    });
+
+    const scrollRoot = document.querySelector(".main-scroll");
+    const sections = [...document.querySelectorAll("[data-doc-section]")];
+    if (!scrollRoot || !sections.length) return;
+
+    state.sectionObserver = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter(entry => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (!visible) return;
+      updateDocNavActive(visible.target.dataset.docSection);
+    }, {
+      root: scrollRoot,
+      rootMargin: "-12% 0px -58% 0px",
+      threshold: [0.2, 0.45, 0.7],
+    });
+
+    sections.forEach(section => state.sectionObserver.observe(section));
+    updateDocNavActive(state.activeDocSection || sections[0]?.dataset.docSection || "mission");
+  }
+
   // NOTE FOR FOLLOW-ON LLMS:
   // Paused states live here on purpose. A true run workspace should let the
   // operator intervene without bouncing back into Messages for approvals or
@@ -2083,6 +2232,15 @@
     const interventionHtml = buildInterventionPanel(run, plan);
     const contributions = Array.isArray(run.contributions) ? run.contributions : [];
     const timelineEvents = (run.events || []).slice(-16).reverse();
+    const navSections = [
+      { id: "mission", title: "Mission", note: "What the team is solving" },
+      { id: "plan", title: "The Plan", note: "How work was split" },
+      { id: "happening", title: "What's happening", note: "Live narrative and intervention" },
+      { id: "context", title: "Context used", note: "Shared artifacts shaping work" },
+      { id: "decisions", title: "Decisions", note: "Why the run changed course" },
+      { id: "assignments", title: "Assignments", note: "Role, status, and quality" },
+      { id: "final", title: "Final answer", note: "Merged output and summary" },
+    ];
 
     const completed = (run.assignments || []).filter(a => a.status === "completed").length;
     const avgTrust = (run.assignments || []).filter(a => a.trust_score_at_assignment != null);
@@ -2155,6 +2313,43 @@
         ${esc(output.preview)}${output.preview.length >= 220 ? "..." : ""}
       </blockquote>`).join("") : `<div class="empty">Accepted agent outputs will appear here.</div>`;
 
+    const navHtml = navSections.map(section => `
+      <button class="doc-nav-link${state.activeDocSection === section.id ? " active" : ""}" type="button" data-section="${section.id}">
+        <strong>${esc(section.title)}</strong>
+        <span>${esc(section.note)}</span>
+      </button>`).join("");
+
+    const pastRunsHtml = state.runs
+      .filter(item => String(item.id) !== String(run.id))
+      .slice(0, 4)
+      .map(item => `
+        <button class="past-run-link" type="button" onclick="selectRun('${String(item.id)}')">
+          <strong>${esc((item.user_task || "Untitled run").slice(0, 42))}${(item.user_task || "").length > 42 ? "..." : ""}</strong>
+          <span>${esc((item.status || "planning").replace(/_/g, " "))} · ${esc(relTime(item.updated_at || item.completed_at || item.started_at))}</span>
+        </button>`)
+      .join("") || `<div class="empty">No past runs yet.</div>`;
+
+    const sidebarTimelineHtml = timelineEvents.length
+      ? timelineEvents.slice(0, 6).map(ev => {
+          const targetSection = sectionTargetForEventType(ev.event_type);
+          const data = ev.event_data || ev.data || {};
+          const subtitle =
+            data.reason ||
+            data.pause_question ||
+            data.status ||
+            data.clarification ||
+            (ev.agent_did ? agentName(ev.agent_did) : "Orchestrator");
+          return `
+            <button class="timeline-mini-item${targetSection === "happening" ? " active" : ""}" type="button" data-section="${targetSection}">
+              <div class="timeline-mini-top">
+                <strong>${esc(formatEventLabel(ev.event_type))}</strong>
+                <span>${esc(relTime(ev.ts || ev.created_at))}</span>
+              </div>
+              <div class="timeline-mini-copy">${esc(previewText(subtitle, 96))}</div>
+            </button>`;
+        }).join("")
+      : `<div class="empty">Timeline events will appear once the run starts moving.</div>`;
+
     const acceptedOutputsHtml = outputs.length ? outputs.map(output => `
       <div class="summary-mini">
         <strong>${esc(agentName(output.did))}</strong>
@@ -2214,34 +2409,28 @@
         <aside class="doc-nav">
           <div class="panel doc-nav-card">
             <h4>On this run</h4>
-            <ol>
-              <li class="here">Mission</li>
-              <li>The Plan</li>
-              <li>What's happening</li>
-              <li>Context used</li>
-              <li>Decisions</li>
-              <li>Assignments</li>
-              <li>Final answer</li>
-            </ol>
+            <div class="doc-nav-links">${navHtml}</div>
+          </div>
+          <div class="panel doc-nav-card">
+            <h4>Live timeline</h4>
+            <div class="timeline-mini">${sidebarTimelineHtml}</div>
             <hr style="border:none;border-top:1px dashed rgba(43,36,27,0.25);margin:12px 0;" />
             <h4 style="margin-top:0;">Past runs</h4>
-            <ol style="list-style:none;padding-left:0;">
-              ${state.runs.filter(item => String(item.id) !== String(run.id)).slice(0, 3).map(item => `<li>· ${esc((item.user_task || "Untitled run").slice(0, 34))}${(item.user_task || "").length > 34 ? "…" : ""}</li>`).join("") || "<li>· No past runs yet</li>"}
-            </ol>
+            <div class="past-run-list">${pastRunsHtml}</div>
           </div>
         </aside>
         <div class="doc-body">
-          <section class="doc-section">
+          <section class="doc-section" data-doc-section="mission">
             <h3>Mission</h3>
             <p class="lede">What the team is trying to accomplish right now.</p>
             <div class="mission-copy">${esc(run.user_task || "")}</div>
           </section>
-          <section class="doc-section">
+          <section class="doc-section" data-doc-section="plan">
             <h3>The Plan</h3>
             <p class="lede">What the orchestrator broke the mission into, and why each agent.</p>
             ${planHtml}
           </section>
-          <section class="doc-section">
+          <section class="doc-section" data-doc-section="happening">
             <h3>What's happening</h3>
             <p class="lede">Live narrative. Agent work lands here as readable run updates instead of raw system noise.</p>
             ${run.status === "paused_for_user" ? `
@@ -2258,22 +2447,22 @@
               </blockquote>` : ""}
             ${outputsHtml}
           </section>
-          <section class="doc-section">
+          <section class="doc-section" data-doc-section="context">
             <h3>Context used</h3>
             <p class="lede">Shared artifacts and context that shaped the run.</p>
             <div class="col-2">${contextHtml}</div>
           </section>
-          <section class="doc-section">
+          <section class="doc-section" data-doc-section="decisions">
             <h3>Decisions</h3>
             <p class="lede">Why the run changed shape: rejections, reassignments, approvals, and clarifications.</p>
             <div class="decision-list">${decisionHtml}</div>
           </section>
-          <section class="doc-section">
+          <section class="doc-section" data-doc-section="assignments">
             <h3>Assignments</h3>
             <p class="lede">Role, status, quality, and permission history for each agent task in this run.</p>
             <div class="output-list">${assignmentHtml}</div>
           </section>
-          <section class="doc-section final-panel">
+          <section class="doc-section final-panel" data-doc-section="final">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
               <div>
                 <h3>Final answer</h3>
@@ -2328,33 +2517,12 @@
           </div>
         </aside>
       </div>`;
+    requestAnimationFrame(bindWorkspaceSidebarInteractions);
   }
 
   function agentName(did) {
     const perfMatch = (state.performance || []).find(agent => agent.did === did);
     return perfMatch?.name || (did || "").slice(-14) || "Agent";
-  }
-
-  function formatEventLabel(type) {
-    const labels = {
-      orchestrator_plan:       "Plan Created",
-      orchestrator_rejected:   "Output Rejected",
-      agent_assigned:          "Agent Assigned",
-      agent_started:           "Agent Started",
-      agent_completed:         "Agent Completed",
-      agent_reassigned:        "Agent Reassigned",
-      context_written:         "Context Written",
-      clarification_requested: "Clarification Requested",
-      clarification_received:  "Clarification Received",
-      approval_requested:      "Plan Approval Requested",
-      approval_granted:        "Plan Approved",
-      synthesis_started:       "Synthesis Started",
-      synthesis_completed:     "Synthesis Completed",
-      run_completed:           "Run Completed",
-      run_failed:              "Run Failed",
-      run_cancelled:           "Run Cancelled",
-    };
-    return labels[type] || (type || "").replace(/_/g, " ");
   }
 
   function stopRunStream() {
@@ -2424,9 +2592,7 @@
         }
       }
     }).catch(() => {
-      // On error, reconnect only if the run this stream was opened for is still active.
-      // Use the captured `runId` (closure), not `state.selectedRunId` which may have
-      // already changed if the user navigated to a different run.
+      // Only reconnect for the exact run this stream was opened for
       if (!state.sseCancelled && state.run && !isTerminal(state.run.status)) {
         setTimeout(() => {
           if (!state.sseCancelled && state.selectedRunId === runId) startRunStream(runId);
@@ -2464,11 +2630,9 @@
     _toastTimer = setTimeout(() => { el.className = ""; }, 3500);
   }
 
-  // ── Final output editing ───────────────────────────────────────────────────
   function beginEditFinalOutput() {
     state.editingFinalOutput = true;
     renderWorkspace();
-    // Focus textarea after render
     requestAnimationFrame(() => document.getElementById("final-output-edit")?.focus());
   }
 
@@ -2488,7 +2652,6 @@
         body: JSON.stringify({ final_output: newText }),
       });
       state.editingFinalOutput = false;
-      // Update local state immediately so re-render shows the new text
       if (state.run) state.run.final_output = newText;
       renderWorkspace();
       showToast("Final answer updated.");
@@ -2496,7 +2659,6 @@
       showToast(e.message || "Could not save changes.", true);
     }
   }
-  // ──────────────────────────────────────────────────────────────────────────
 
   async function cancelCurrentRun() {
     if (!state.selectedRunId) return;
@@ -2616,8 +2778,8 @@
       });
       state.settings = {
         ...(state.settings || {}),
-        require_plan_approval: data.require_plan_approval,
-        high_risk_trust_threshold: data.high_risk_trust_threshold,
+        require_plan_approval: data?.require_plan_approval ?? requireApproval,
+        high_risk_trust_threshold: data?.high_risk_trust_threshold ?? highRiskTrustThreshold,
       };
       renderSideInsights();
       showToast("Guardrails updated.");
