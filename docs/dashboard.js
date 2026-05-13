@@ -9888,6 +9888,13 @@ document.addEventListener("DOMContentLoaded", () => {
   loadGroupRuns();
   document.getElementById("group-runs-refresh-btn")?.addEventListener("click", () => loadGroupRuns());
   document.getElementById("grd-close-btn")?.addEventListener("click", _closeRunDrilldown);
+  document.getElementById("grd-workspace-btn")?.addEventListener("click", () => {
+    const btn = document.getElementById("grd-workspace-btn");
+    const runId = btn?.dataset?.runId;
+    const groupId = btn?.dataset?.groupId;
+    if (!runId || !groupId) return;
+    window.location.href = `team-workspace.html?group_id=${encodeURIComponent(groupId)}&run_id=${encodeURIComponent(runId)}`;
+  });
   document.getElementById("group-run-drilldown")?.addEventListener("click", e => {
     if (e.target === e.currentTarget) _closeRunDrilldown();
   });
@@ -9995,6 +10002,7 @@ async function openRunDrilldown(runId, groupId) {
   const body  = document.getElementById("grd-body");
   const title = document.getElementById("grd-title");
   const meta  = document.getElementById("grd-meta");
+  const workspaceBtn = document.getElementById("grd-workspace-btn");
   if (!panel || !body) return;
 
   _stopDrilldownSSE();
@@ -10007,6 +10015,12 @@ async function openRunDrilldown(runId, groupId) {
     const run = await apiFetch(`/pro/groups/runs/${runId}`);
     // preserve groupId across reloads triggered by SSE terminal event
     if (groupId != null) run._groupId = groupId;
+    const workspaceGroupId = run.group_id || run._groupId || groupId || "";
+    if (workspaceBtn) {
+      workspaceBtn.dataset.runId = runId;
+      workspaceBtn.dataset.groupId = String(workspaceGroupId || "");
+      workspaceBtn.style.display = workspaceGroupId ? "inline-flex" : "none";
+    }
 
     title.textContent = run.user_task ? run.user_task.slice(0, 60) + (run.user_task.length > 60 ? "…" : "") : "Run Detail";
     const startedAt = run.started_at ? new Date(run.started_at).toLocaleString() : "";
@@ -10301,6 +10315,7 @@ async function openRunDrilldown(runId, groupId) {
     }
 
   } catch(e) {
+    if (workspaceBtn) workspaceBtn.style.display = "none";
     body.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">Could not load run: ${_esc(e.message)}</div>`;
   }
 }
@@ -10308,7 +10323,13 @@ async function openRunDrilldown(runId, groupId) {
 function _closeRunDrilldown() {
   _stopDrilldownSSE();
   const panel = document.getElementById("group-run-drilldown");
+  const workspaceBtn = document.getElementById("grd-workspace-btn");
   if (panel) panel.style.display = "none";
+  if (workspaceBtn) {
+    workspaceBtn.style.display = "none";
+    delete workspaceBtn.dataset.runId;
+    delete workspaceBtn.dataset.groupId;
+  }
 }
 
 async function _downloadRunReport(runId) {

@@ -107,10 +107,12 @@
     }
     .badge.planning { background:#e5e7eb1a; color:#d1d5db; border-color:#374151; }
     .badge.running { background:var(--blue-bg); color:#93c5fd; border-color:#1d4ed8; }
+    .badge.assigned, .badge.pending { background:#e5e7eb12; color:#cbd5e1; border-color:#475569; }
     .badge.paused_for_user, .badge.paused_for_approval { background:var(--yellow-bg); color:#fbbf24; border-color:#d97706; }
     .badge.synthesizing { background:var(--purple-bg); color:#c4b5fd; border-color:#7c3aed; }
     .badge.completed { background:var(--green-bg); color:#6ee7b7; border-color:#047857; }
     .badge.failed, .badge.cancelled { background:var(--red-bg); color:#fca5a5; border-color:#b91c1c; }
+    .badge.rejected, .badge.reassigned { background:var(--yellow-bg); color:#fbbf24; border-color:#92400e; }
     .mini-btn {
       border:1px solid var(--border); background:var(--bg); color:var(--muted);
       border-radius:8px; padding:0.32rem 0.55rem; cursor:pointer; font-size:0.72rem; font-weight:700;
@@ -224,6 +226,78 @@
     .perf-metrics { margin-top:0.35rem; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0.4rem; }
     .perf-metric { font-size:0.67rem; color:var(--muted); }
     .perf-metric strong { display:block; font-size:0.82rem; color:var(--text); margin-bottom:0.08rem; }
+    .side-form { display:flex; flex-direction:column; gap:0.55rem; }
+    .side-form textarea, .control-textarea {
+      width:100%; min-height:90px; resize:vertical; border-radius:10px; border:1px solid var(--border-2);
+      background:var(--bg); color:var(--text); padding:0.72rem 0.8rem; outline:none; line-height:1.5;
+    }
+    .field-label {
+      font-size:0.68rem; color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.05em;
+    }
+    .tiny-btn {
+      border:1px solid var(--border); background:var(--surface2); color:var(--text-2);
+      border-radius:8px; padding:0.38rem 0.62rem; cursor:pointer; font-size:0.71rem; font-weight:800;
+    }
+    .tiny-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .tiny-btn.danger { color:#fca5a5; border-color:#7f1d1d; background:#220f10; }
+    .note-actions { display:flex; align-items:center; gap:0.38rem; flex-wrap:wrap; margin-top:0.55rem; }
+    .context-mini {
+      margin-top:0.4rem; padding-top:0.45rem; border-top:1px solid var(--border);
+      display:flex; flex-direction:column; gap:0.35rem;
+    }
+    .context-mini-item {
+      border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.02);
+      padding:0.55rem 0.6rem;
+    }
+    .context-mini-key { font-size:0.67rem; font-weight:900; color:var(--text-2); }
+    .context-mini-copy { font-size:0.68rem; color:var(--muted); line-height:1.45; margin-top:0.18rem; }
+    .control-panel {
+      border:1px solid #8a5a13; background:linear-gradient(180deg, rgba(245,158,11,0.09), rgba(18,22,28,0.96));
+      border-radius:16px; padding:0.95rem 1rem; margin-top:0.9rem;
+    }
+    .control-panel strong { color:var(--text); }
+    .control-top {
+      display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap;
+    }
+    .control-title { font-size:0.82rem; font-weight:900; text-transform:uppercase; letter-spacing:0.06em; color:#fbbf24; }
+    .control-copy { font-size:0.8rem; color:var(--text-2); line-height:1.6; margin-top:0.3rem; white-space:pre-wrap; }
+    .control-stack { display:flex; flex-direction:column; gap:0.6rem; margin-top:0.8rem; }
+    .control-row { display:flex; gap:0.5rem; flex-wrap:wrap; }
+    .assignment-list, .timeline-list, .contrib-list { display:flex; flex-direction:column; gap:0.6rem; }
+    .assignment-item, .timeline-item, .contrib-item {
+      border:1px solid var(--border); background:var(--bg); border-radius:12px; padding:0.78rem;
+    }
+    .assignment-meta-grid {
+      margin-top:0.45rem; display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:0.45rem;
+    }
+    .assignment-stat, .timeline-stat {
+      border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.02); padding:0.48rem 0.52rem;
+    }
+    .assignment-stat strong, .timeline-stat strong {
+      display:block; font-size:0.8rem; color:var(--text); margin-bottom:0.08rem;
+    }
+    .assignment-stat span, .timeline-stat span {
+      font-size:0.64rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; font-weight:800;
+    }
+    .assignment-output {
+      margin-top:0.55rem; padding-top:0.55rem; border-top:1px solid var(--border);
+      font-size:0.73rem; color:var(--text-2); line-height:1.55; white-space:pre-wrap; word-break:break-word;
+    }
+    .contrib-item {
+      display:grid; grid-template-columns:auto 1fr auto; align-items:start; gap:0.7rem;
+    }
+    .contrib-rank {
+      width:34px; height:34px; border-radius:999px; display:flex; align-items:center; justify-content:center;
+      background:var(--surface2); border:1px solid var(--border); font-weight:900; font-size:0.82rem;
+    }
+    .contrib-score {
+      font-size:1.02rem; font-weight:900; color:var(--text);
+    }
+    .contrib-breakdown {
+      margin-top:0.38rem; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0.42rem;
+    }
+    .timeline-copy { font-size:0.73rem; color:var(--text-2); line-height:1.5; margin-top:0.35rem; white-space:pre-wrap; }
+    .timeline-grid { margin-top:0.45rem; display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0.45rem; }
 
     .loading, .empty-state {
       border:1px dashed var(--border-2); border-radius:14px; padding:1.3rem 1rem; text-align:center;
@@ -254,6 +328,7 @@
       .rail { border-right:none; border-bottom:1px solid var(--border); }
       .main-grid { grid-template-columns:1fr; }
       .hero-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
+      .assignment-meta-grid, .contrib-breakdown, .perf-metrics, .timeline-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
     }
   </style>
 </head>
@@ -349,6 +424,7 @@
     memory: { team_notes: [], run_summaries: [] },
     performance: [],
     analytics: null,
+    settings: null,
     selectedGroupId: null,
     selectedRunId: null,
     run: null,
@@ -356,6 +432,7 @@
     refreshTimer: null,
     stream: null,
     sseCancelled: false,
+    editingNoteId: null,
   };
 
   window.fetch = function(url, opts = {}) {
@@ -512,17 +589,20 @@
     renderSideInsightsLoading();
     renderWorkspaceLoading("Loading team workspace...");
 
-    const [runsData, memoryData, perfData, analyticsData] = await Promise.all([
+    const [runsData, memoryData, perfData, analyticsData, settingsData] = await Promise.all([
       fetchJson(`/pro/groups/${groupId}/runs?limit=20`),
       fetchJson(`/pro/groups/${groupId}/memory`),
       fetchJson(`/pro/groups/${groupId}/performance`).catch(() => ({ agents: [] })),
       fetchJson(`/pro/groups/${groupId}/analytics`).catch(() => null),
+      fetchJson(`/pro/groups/${groupId}/settings`).catch(() => null),
     ]);
 
     state.runs = runsData.runs || [];
     state.memory = memoryData || { team_notes: [], run_summaries: [] };
     state.performance = perfData.agents || [];
     state.analytics = analyticsData;
+    state.settings = settingsData;
+    state.editingNoteId = null;
 
     renderTeams();
     renderRuns();
@@ -615,6 +695,7 @@
     const summaries = state.memory?.run_summaries || [];
     const perf = state.performance || [];
     const analytics = state.analytics;
+    const settings = state.settings;
 
     const analyticsHtml = analytics ? `
       <div class="panel">
@@ -629,6 +710,28 @@
             <div class="perf-metric"><strong>${Math.round((analytics.assignments?.avg_quality || 0) * 100)}%</strong>Avg quality</div>
             <div class="perf-metric"><strong>${analytics.assignments?.trust_influenced || 0}</strong>Trust-routed</div>
           </div>
+          <div class="perf-metrics" style="margin-top:0.55rem;">
+            <div class="perf-metric"><strong>${Math.round((((analytics.assignments?.rejected || 0) / Math.max(analytics.assignments?.total || 1, 1)) || 0) * 100)}%</strong>Rejected</div>
+            <div class="perf-metric"><strong>${analytics.runs?.with_clarification || 0}</strong>Clarified</div>
+            <div class="perf-metric"><strong>${analytics.runs?.active || 0}</strong>Active</div>
+            <div class="perf-metric"><strong>${analytics.runs?.avg_duration_sec ? fmtDuration(analytics.runs.avg_duration_sec) : "—"}</strong>Avg run</div>
+          </div>
+        </div>
+      </div>` : "";
+
+    const settingsHtml = settings ? `
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Run Guardrails</div>
+          <div class="panel-note">Execution policy</div>
+        </div>
+        <div class="panel-body">
+          <div class="perf-metrics">
+            <div class="perf-metric"><strong>${settings.require_plan_approval ? "On" : "Off"}</strong>Plan approval</div>
+            <div class="perf-metric"><strong>${settings.high_risk_trust_threshold ?? 70}</strong>High-risk trust</div>
+            <div class="perf-metric"><strong>${state.runs.filter(run => run.status === "paused_for_approval").length}</strong>Awaiting approval</div>
+            <div class="perf-metric"><strong>${state.runs.filter(run => run.status === "paused_for_user").length}</strong>Awaiting user</div>
+          </div>
         </div>
       </div>` : "";
 
@@ -636,7 +739,20 @@
       ? notes.map(note => `<div class="note-card">
           <div class="team-name" style="font-size:0.75rem;">${esc(note.created_by || "team note")}</div>
           <div class="team-meta">${esc(relTime(note.updated_at || note.created_at))}</div>
-          <div class="mission-copy" style="font-size:0.77rem;margin-top:0.45rem;">${esc(note.content)}</div>
+          ${state.editingNoteId === Number(note.id)
+            ? `<div class="side-form" style="margin-top:0.5rem;">
+                 <label class="field-label" for="note-edit-${note.id}">Edit note</label>
+                 <textarea id="note-edit-${note.id}">${esc(note.content)}</textarea>
+                 <div class="note-actions">
+                   <button class="tiny-btn primary" onclick="saveTeamNoteEdit(${Number(note.id)})">Save</button>
+                   <button class="tiny-btn" onclick="cancelTeamNoteEdit()">Cancel</button>
+                 </div>
+               </div>`
+            : `<div class="mission-copy" style="font-size:0.77rem;margin-top:0.45rem;">${esc(note.content)}</div>
+               <div class="note-actions">
+                 <button class="tiny-btn" onclick="beginTeamNoteEdit(${Number(note.id)})">Edit</button>
+                 <button class="tiny-btn danger" onclick="removeTeamNote(${Number(note.id)})">Delete</button>
+               </div>`}
         </div>`).join("")
       : `<div class="empty">No team notes yet.</div>`;
 
@@ -663,13 +779,23 @@
       : `<div class="empty">No performance history yet.</div>`;
 
     root.innerHTML = `
+      ${settingsHtml}
       ${analyticsHtml}
       <div class="panel">
         <div class="panel-head">
           <div class="panel-title">Team Notes</div>
           <div class="panel-note">${notes.length}</div>
         </div>
-        <div class="panel-body"><div class="stack">${notesHtml}</div></div>
+        <div class="panel-body">
+          <div class="side-form" style="margin-bottom:0.8rem;">
+            <label class="field-label" for="new-team-note">Add note for future runs</label>
+            <textarea id="new-team-note" placeholder="Capture routing guidance, team preferences, or lessons learned..."></textarea>
+            <div class="note-actions">
+              <button class="tiny-btn primary" onclick="createTeamNote()">Save note</button>
+            </div>
+          </div>
+          <div class="stack">${notesHtml}</div>
+        </div>
       </div>
       <div class="panel">
         <div class="panel-head">
@@ -693,6 +819,40 @@
 
   function renderWorkspaceEmpty(label) {
     document.getElementById("workspace-root").innerHTML = `<div class="empty-state">${esc(label || "Nothing selected.")}</div>`;
+  }
+
+  function syncRunIntoList(run) {
+    if (!run?.id) return;
+    const summary = {
+      id: String(run.id),
+      user_task: run.user_task || "",
+      status: run.status || "planning",
+      final_output: run.final_output || "",
+      started_at: run.started_at || null,
+      completed_at: run.completed_at || null,
+      updated_at: run.updated_at || null,
+    };
+    const idx = state.runs.findIndex(item => String(item.id) === String(run.id));
+    if (idx >= 0) state.runs[idx] = { ...state.runs[idx], ...summary };
+    else state.runs.unshift(summary);
+  }
+
+  // NOTE FOR FOLLOW-ON LLMS:
+  // The workspace keeps the run detail authoritative, then mirrors the minimal
+  // summary fields back into the left rail and side insights. That keeps the
+  // run page coherent without introducing a second frontend-only run model.
+  async function refreshGroupSignals({ includeMemory = false } = {}) {
+    if (!state.selectedGroupId) return;
+    const tasks = [
+      fetchJson(`/pro/groups/${state.selectedGroupId}/performance`).catch(() => ({ agents: [] })),
+      fetchJson(`/pro/groups/${state.selectedGroupId}/analytics`).catch(() => null),
+    ];
+    if (includeMemory) tasks.push(fetchJson(`/pro/groups/${state.selectedGroupId}/memory`).catch(() => state.memory));
+    const [perfData, analyticsData, memoryData] = await Promise.all(tasks);
+    state.performance = perfData?.agents || [];
+    state.analytics = analyticsData;
+    if (includeMemory && memoryData) state.memory = memoryData;
+    renderSideInsights();
   }
 
   function isTerminal(status) {
@@ -749,13 +909,120 @@
     return (run.assignments || [])
       .filter(assign => assign.status === "completed" && assign.output)
       .map(assign => {
-        const raw = assign.output?.result || assign.output?.output || assign.output?.text || JSON.stringify(assign.output);
+        const raw = toPlainText(assign.output);
         return {
           did: assign.agent_did,
           preview: String(raw || "").slice(0, 220),
           score: assign.quality_score,
         };
       });
+  }
+
+  function normalizeObject(value) {
+    if (!value) return {};
+    if (typeof value === "object") return value;
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch (_) {
+        return {};
+      }
+    }
+    return {};
+  }
+
+  function toPlainText(value) {
+    if (value == null) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    if (typeof value === "object") {
+      const preferred = value.result || value.output || value.text || value.summary || value.subtask;
+      if (preferred != null && typeof preferred !== "object") return String(preferred);
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch (_) {
+        return String(value);
+      }
+    }
+    return String(value);
+  }
+
+  function previewText(value, maxLen = 180) {
+    const text = toPlainText(value).replace(/\s+/g, " ").trim();
+    return text.length > maxLen ? `${text.slice(0, maxLen)}...` : text;
+  }
+
+  function renderContextUsage(context) {
+    const entries = Object.entries(normalizeObject(context));
+    if (!entries.length) return `<div class="empty">No linked context captured.</div>`;
+    const html = entries.slice(0, 4).map(([key, value]) => {
+      return `<div class="context-mini-item">
+        <div class="context-mini-key">${esc(key)}</div>
+        <div class="context-mini-copy">${esc(previewText(value?.value ?? value, 135))}</div>
+      </div>`;
+    }).join("");
+    const more = entries.length > 4
+      ? `<div class="small-meta">+ ${entries.length - 4} more context item${entries.length - 4 === 1 ? "" : "s"}</div>`
+      : "";
+    return `<div class="context-mini">${html}${more}</div>`;
+  }
+
+  // NOTE FOR FOLLOW-ON LLMS:
+  // Paused states live here on purpose. A true run workspace should let the
+  // operator intervene without bouncing back into Messages for approvals or
+  // clarification, so these controls are rendered from the run state itself.
+  function buildInterventionPanel(run, plan) {
+    if (!run || isTerminal(run.status)) return "";
+    if (run.status === "paused_for_user") {
+      return `
+        <div class="control-panel">
+          <div class="control-top">
+            <div>
+              <div class="control-title">Run Waiting For Guidance</div>
+              <div class="control-copy">${esc(run.pause_question || "The team needs clarification before it can continue.")}</div>
+            </div>
+            ${runBadge(run.status)}
+          </div>
+          <div class="control-stack">
+            <label class="field-label" for="clarification-input">Clarification for the team</label>
+            <textarea id="clarification-input" class="control-textarea" placeholder="Add the missing constraint, preference, or direction the agents should follow next..."></textarea>
+            <div class="control-row">
+              <button class="tiny-btn primary" onclick="submitRunClarification()">Send clarification</button>
+              <button class="tiny-btn" onclick="refreshCurrentRun()">Refresh state</button>
+            </div>
+          </div>
+        </div>`;
+    }
+    if (run.status === "paused_for_approval") {
+      return `
+        <div class="control-panel">
+          <div class="control-top">
+            <div>
+              <div class="control-title">Run Waiting For Approval</div>
+              <div class="control-copy">The orchestrator has planned ${plan.length} assignment${plan.length === 1 ? "" : "s"} and is waiting for an explicit approval before dispatching work.</div>
+            </div>
+            ${runBadge(run.status)}
+          </div>
+          <div class="control-row" style="margin-top:0.8rem;">
+            <button class="tiny-btn primary" onclick="approveCurrentPlan()">Approve plan and start work</button>
+            <button class="tiny-btn" onclick="refreshCurrentRun()">Refresh state</button>
+          </div>
+        </div>`;
+    }
+    if (run.status === "synthesizing") {
+      return `
+        <div class="control-panel">
+          <div class="control-top">
+            <div>
+              <div class="control-title">Final Synthesis In Progress</div>
+              <div class="control-copy">Assignments are done. The orchestrator is merging accepted outputs into one final answer and run summary.</div>
+            </div>
+            ${runBadge(run.status)}
+          </div>
+        </div>`;
+    }
+    return "";
   }
 
   function deriveStatusBuckets(assignments) {
@@ -793,6 +1060,9 @@
     const decisions = deriveDecisionList(run);
     const contextList = deriveContextList(run);
     const statusBuckets = deriveStatusBuckets(run.assignments || []);
+    const interventionHtml = buildInterventionPanel(run, plan);
+    const contributions = Array.isArray(run.contributions) ? run.contributions : [];
+    const timelineEvents = (run.events || []).slice(-16).reverse();
 
     const completed = (run.assignments || []).filter(a => a.status === "completed").length;
     const avgTrust = (run.assignments || []).filter(a => a.trust_score_at_assignment != null);
@@ -870,7 +1140,7 @@
           <div class="small-meta">${esc(relTime(ev.ts))}</div>
         </div>
         <div class="decision-copy">${esc(details || who)}</div>
-        <div class="decision-meta">${esc(who)}</div>
+        <div class="decision-meta">${esc(who)}${ev.context_snapshot ? ` · ${Object.keys(normalizeObject(ev.context_snapshot)).length} context item${Object.keys(normalizeObject(ev.context_snapshot)).length === 1 ? "" : "s"}` : ""}</div>
       </div>`;
     }).join("") : `<div class="empty">No major run decisions logged yet.</div>`;
 
@@ -882,6 +1152,67 @@
         </div>
         <div class="output-copy">${esc(output.preview)}${output.preview.length >= 220 ? "..." : ""}</div>
       </div>`).join("") : `<div class="empty">Accepted agent outputs will appear here.</div>`;
+
+    const contributionHtml = contributions.length ? contributions.map(item => {
+      return `<div class="contrib-item">
+        <div class="contrib-rank">${item.rank}</div>
+        <div>
+          <div class="plan-top">
+            <div class="plan-agent">${esc(agentName(item.did))}</div>
+            <div class="small-meta">${esc((item.did || "").slice(-14))}</div>
+          </div>
+          <div class="contrib-breakdown">
+            <div class="assignment-stat"><strong>${Math.round(item.quality_pts)}</strong><span>Quality</span></div>
+            <div class="assignment-stat"><strong>${Math.round(item.reuse_pts)}</strong><span>Reuse</span></div>
+            <div class="assignment-stat"><strong>${Math.round(item.reliability_pts)}</strong><span>Reliability</span></div>
+            <div class="assignment-stat"><strong>${Math.round(item.completion_pts)}</strong><span>Completion</span></div>
+          </div>
+          <div class="plan-meta">Reused ${item.reuse_count} time${item.reuse_count === 1 ? "" : "s"} across the run. Raw score ${Math.round(item.raw_score)}.</div>
+        </div>
+        <div class="contrib-score">${Math.round(item.score)}%</div>
+      </div>`;
+    }).join("") : `<div class="empty">Contribution ranking appears once assignments are evaluated.</div>`;
+
+    const assignmentHtml = (run.assignments || []).length ? (run.assignments || []).map(assign => {
+      return `<div class="assignment-item">
+        <div class="plan-top">
+          <div class="plan-agent">${esc(agentName(assign.agent_did))}</div>
+          <div class="ws-pill-row">
+            ${runBadge(assign.status || "assigned")}
+            ${assign.risk_level ? `<span class="risk-badge ${esc(assign.risk_level)}">${esc(assign.risk_level)}</span>` : ""}
+            ${assign.trust_score_at_assignment != null ? `<span class="trust-chip">Trust ${Math.round(assign.trust_score_at_assignment)}</span>` : ""}
+          </div>
+        </div>
+        <div class="plan-copy">${esc(assign.subtask || "")}</div>
+        ${assign.rationale ? `<div class="plan-meta">Assignment rationale: ${esc(assign.rationale)}</div>` : ""}
+        <div class="assignment-meta-grid">
+          <div class="assignment-stat"><strong>${assign.retry_count || 0}</strong><span>Retries</span></div>
+          <div class="assignment-stat"><strong>${assign.quality_score != null ? `${Math.round(assign.quality_score * 100)}%` : "—"}</strong><span>Quality</span></div>
+          <div class="assignment-stat"><strong>${assign.reassigned_from ? esc(agentName(assign.reassigned_from)) : "—"}</strong><span>Reassigned from</span></div>
+          <div class="assignment-stat"><strong>${assign.completed_at ? esc(relTime(assign.completed_at)) : "Open"}</strong><span>Finished</span></div>
+        </div>
+        ${assign.rejection_reason ? `<div class="plan-meta" style="color:#fca5a5;">Rejected because: ${esc(assign.rejection_reason)}</div>` : ""}
+        ${renderContextUsage(assign.contributing_context)}
+        ${assign.output ? `<div class="assignment-output">${esc(previewText(assign.output, 600))}</div>` : ""}
+      </div>`;
+    }).join("") : `<div class="empty">Assignments will appear here once the plan is dispatched.</div>`;
+
+    const timelineHtml = timelineEvents.length ? timelineEvents.map(ev => {
+      const data = ev.event_data || ev.data || {};
+      const contextCount = Object.keys(normalizeObject(ev.context_snapshot)).length;
+      return `<div class="timeline-item">
+        <div class="plan-top">
+          <div class="plan-agent">${esc((ev.event_type || "").replace(/_/g, " "))}</div>
+          <div class="small-meta">${esc(relTime(ev.ts))}</div>
+        </div>
+        <div class="timeline-copy">${esc(previewText(data, 220) || (ev.agent_did ? agentName(ev.agent_did) : "Run event"))}</div>
+        <div class="timeline-grid">
+          <div class="timeline-stat"><strong>${esc(ev.agent_did ? agentName(ev.agent_did) : "Orchestrator")}</strong><span>Actor</span></div>
+          <div class="timeline-stat"><strong>${contextCount}</strong><span>Context items</span></div>
+        </div>
+        ${contextCount ? renderContextUsage(ev.context_snapshot) : ""}
+      </div>`;
+    }).join("") : `<div class="empty">The event timeline will populate as the run progresses.</div>`;
 
     const root = document.getElementById("workspace-root");
     root.innerHTML = `
@@ -906,6 +1237,7 @@
           <div class="kpi"><div class="kpi-value">${fmtDuration(elapsedSec)}</div><div class="kpi-label">Elapsed</div></div>
         </div>
       </div>
+      ${interventionHtml}
 
       <div class="main-grid">
         <div class="stack">
@@ -944,15 +1276,39 @@
             </div>
             <div class="panel-body"><div class="context-list">${contextHtml}</div></div>
           </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Assignment Ledger</div>
+              <div class="panel-note">Trust, rationale, retries, and linked context per agent</div>
+            </div>
+            <div class="panel-body"><div class="assignment-list">${assignmentHtml}</div></div>
+          </div>
         </div>
 
         <div class="stack">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Contribution Ranking</div>
+              <div class="panel-note">Who shaped the run most</div>
+            </div>
+            <div class="panel-body"><div class="contrib-list">${contributionHtml}</div></div>
+          </div>
+
           <div class="panel">
             <div class="panel-head">
               <div class="panel-title">Decision Log</div>
               <div class="panel-note">Why the run changed shape</div>
             </div>
             <div class="panel-body"><div class="decision-list">${decisionHtml}</div></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Event Timeline</div>
+              <div class="panel-note">Recent state changes and context snapshots</div>
+            </div>
+            <div class="panel-body"><div class="timeline-list">${timelineHtml}</div></div>
           </div>
 
           <div class="panel">
@@ -999,11 +1355,16 @@
     state.refreshTimer = setTimeout(async () => {
       state.refreshTimer = null;
       try {
+        const prevStatus = state.run?.status;
         const run = await fetchJson(`/pro/groups/runs/${state.selectedRunId}`);
         state.run = run;
         state.lastEventId = Math.max(state.lastEventId, ...(run.events || []).map(ev => Number(ev.id) || 0));
+        syncRunIntoList(run);
         renderRuns();
         renderWorkspace();
+        if (prevStatus !== run.status || isTerminal(run.status)) {
+          await refreshGroupSignals({ includeMemory: isTerminal(run.status) });
+        }
       } catch (_) {}
     }, 350);
   }
@@ -1056,11 +1417,16 @@
 
   async function refreshCurrentRun() {
     if (!state.selectedRunId) return;
+    const prevStatus = state.run?.status;
     const run = await fetchJson(`/pro/groups/runs/${state.selectedRunId}`);
     state.run = run;
     state.lastEventId = Math.max(0, ...(run.events || []).map(ev => Number(ev.id) || 0));
+    syncRunIntoList(run);
     renderRuns();
     renderWorkspace();
+    if (prevStatus !== run.status || isTerminal(run.status)) {
+      await refreshGroupSignals({ includeMemory: isTerminal(run.status) });
+    }
     if (!isTerminal(run.status) && !state.stream) startRunStream(state.selectedRunId);
   }
 
@@ -1081,6 +1447,113 @@
       await refreshCurrentRun();
     } catch (e) {
       showToast(e.message || "Could not stop run.", true);
+    }
+  }
+
+  async function submitRunClarification() {
+    if (!state.selectedRunId) return;
+    const input = document.getElementById("clarification-input");
+    const clarification = (input?.value || "").trim();
+    if (!clarification) {
+      showToast("Add clarification before sending it to the team.", true);
+      return;
+    }
+    try {
+      await fetchJson(`/pro/groups/runs/${state.selectedRunId}/clarify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clarification }),
+      });
+      showToast("Clarification sent to the team.");
+      await refreshCurrentRun();
+    } catch (e) {
+      showToast(e.message || "Could not send clarification.", true);
+    }
+  }
+
+  async function approveCurrentPlan() {
+    if (!state.selectedRunId) return;
+    try {
+      await fetchJson(`/pro/groups/runs/${state.selectedRunId}/approve-plan`, { method: "POST" });
+      showToast("Plan approved. Agents are starting work.");
+      await refreshCurrentRun();
+    } catch (e) {
+      showToast(e.message || "Could not approve the plan.", true);
+    }
+  }
+
+  async function refreshGroupMemory() {
+    if (!state.selectedGroupId) return;
+    state.memory = await fetchJson(`/pro/groups/${state.selectedGroupId}/memory`);
+    renderSideInsights();
+  }
+
+  function beginTeamNoteEdit(noteId) {
+    state.editingNoteId = Number(noteId);
+    renderSideInsights();
+  }
+
+  function cancelTeamNoteEdit() {
+    state.editingNoteId = null;
+    renderSideInsights();
+  }
+
+  async function createTeamNote() {
+    if (!state.selectedGroupId) return;
+    const input = document.getElementById("new-team-note");
+    const content = (input?.value || "").trim();
+    if (!content) {
+      showToast("Write a note before saving it.", true);
+      return;
+    }
+    try {
+      await fetchJson(`/pro/groups/${state.selectedGroupId}/memory`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      showToast("Team note saved.");
+      state.editingNoteId = null;
+      await refreshGroupMemory();
+    } catch (e) {
+      showToast(e.message || "Could not save the note.", true);
+    }
+  }
+
+  async function saveTeamNoteEdit(noteId) {
+    if (!state.selectedGroupId) return;
+    const input = document.getElementById(`note-edit-${noteId}`);
+    const content = (input?.value || "").trim();
+    if (!content) {
+      showToast("Edited note cannot be empty.", true);
+      return;
+    }
+    try {
+      await fetchJson(`/pro/groups/${state.selectedGroupId}/memory/${noteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      showToast("Team note updated.");
+      state.editingNoteId = null;
+      await refreshGroupMemory();
+    } catch (e) {
+      showToast(e.message || "Could not update the note.", true);
+    }
+  }
+
+  async function removeTeamNote(noteId) {
+    if (!state.selectedGroupId) return;
+    if (!confirm("Delete this team note?")) return;
+    try {
+      await fetchJson(`/pro/groups/${state.selectedGroupId}/memory/${noteId}`, {
+        method: "DELETE",
+      });
+      showToast("Team note deleted.");
+      state.editingNoteId = null;
+      await refreshGroupMemory();
+    } catch (e) {
+      showToast(e.message || "Could not delete the note.", true);
     }
   }
 
