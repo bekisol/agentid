@@ -5142,13 +5142,68 @@ function _renderTeamNotes(groupId, notes) {
     return;
   }
   list.innerHTML = notes.map(n => `
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.35rem 0.55rem;font-size:0.78rem;position:relative;group:1;">
-      <div style="color:var(--text-2);line-height:1.45;white-space:pre-wrap;word-break:break-word;padding-right:1.2rem;">${esc(n.content)}</div>
-      <div style="font-size:0.62rem;color:var(--muted);margin-top:0.2rem;">${n.created_by || "you"} · ${n.created_at ? relativeTime(n.created_at) : ""}</div>
-      <button data-note-id="${n.id}" data-group-id="${groupId}"
-        style="position:absolute;top:0.3rem;right:0.35rem;background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.72rem;padding:0.1rem 0.2rem;border-radius:3px;opacity:0.6;"
-        class="team-note-del-btn" title="Delete note">✕</button>
+    <div data-note-id="${n.id}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.35rem 0.55rem;font-size:0.78rem;position:relative;">
+      <div class="note-view-${n.id}">
+        <div style="color:var(--text-2);line-height:1.45;white-space:pre-wrap;word-break:break-word;padding-right:2.6rem;">${esc(n.content)}</div>
+        <div style="font-size:0.62rem;color:var(--muted);margin-top:0.2rem;">${n.created_by || "you"} · ${n.created_at ? relativeTime(n.created_at) : ""}</div>
+        <div style="position:absolute;top:0.3rem;right:0.35rem;display:flex;gap:0.2rem;">
+          <button data-note-id="${n.id}" data-group-id="${groupId}" data-content="${esc(n.content)}"
+            style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.72rem;padding:0.1rem 0.2rem;border-radius:3px;opacity:0.6;"
+            class="team-note-edit-btn" title="Edit note">✎</button>
+          <button data-note-id="${n.id}" data-group-id="${groupId}"
+            style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.72rem;padding:0.1rem 0.2rem;border-radius:3px;opacity:0.6;"
+            class="team-note-del-btn" title="Delete note">✕</button>
+        </div>
+      </div>
+      <div class="note-edit-${n.id}" style="display:none;">
+        <textarea class="note-edit-input" rows="3"
+          style="width:100%;resize:vertical;border:1px solid var(--accent);border-radius:6px;padding:0.3rem 0.4rem;font-size:0.78rem;font-family:inherit;background:var(--bg);color:var(--text);box-sizing:border-box;">${esc(n.content)}</textarea>
+        <div style="display:flex;gap:0.3rem;justify-content:flex-end;margin-top:0.25rem;">
+          <button class="note-edit-cancel" data-note-id="${n.id}"
+            style="background:none;border:1px solid var(--border);border-radius:5px;padding:0.2rem 0.5rem;font-size:0.72rem;cursor:pointer;color:var(--muted);font-family:inherit;">Cancel</button>
+          <button class="note-edit-save" data-note-id="${n.id}" data-group-id="${groupId}"
+            style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:0.2rem 0.55rem;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:inherit;">Save</button>
+        </div>
+      </div>
     </div>`).join("");
+
+  list.querySelectorAll(".team-note-edit-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.noteId;
+      list.querySelector(`.note-view-${id}`).style.display = "none";
+      list.querySelector(`.note-edit-${id}`).style.display = "block";
+      list.querySelector(`.note-edit-${id} textarea`).focus();
+    });
+  });
+
+  list.querySelectorAll(".note-edit-cancel").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.noteId;
+      list.querySelector(`.note-view-${id}`).style.display = "";
+      list.querySelector(`.note-edit-${id}`).style.display = "none";
+    });
+  });
+
+  list.querySelectorAll(".note-edit-save").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.noteId;
+      const gid = btn.dataset.groupId;
+      const content = list.querySelector(`.note-edit-${id} textarea`).value.trim();
+      if (!content) return;
+      btn.disabled = true; btn.textContent = "Saving…";
+      try {
+        const r = await fetch(`${BASE}/pro/groups/${gid}/memory/${id}`, {
+          method: "PATCH", headers: { ...apiHeaders(), "Content-Type": "application/json" },
+          credentials: "include", body: JSON.stringify({ content }),
+        });
+        if (!r.ok) throw new Error(`${r.status}`);
+        _loadTeamMemory(groupId);
+      } catch(e) {
+        btn.disabled = false; btn.textContent = "Save";
+        alert("Could not save note: " + e.message);
+      }
+    });
+  });
 
   list.querySelectorAll(".team-note-del-btn").forEach(btn => {
     btn.addEventListener("click", async () => {

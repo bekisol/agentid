@@ -10022,11 +10022,36 @@ async function openRunDrilldown(runId, groupId) {
       const riskColors = { low: "#065f46", medium: "#92400e", high: "#991b1b" };
       const riskBgs    = { low: "#d1fae5", medium: "#fef3c7", high: "#fee2e2" };
       const riskBadge = `<span style="display:inline-block;font-size:0.58rem;font-weight:700;padding:0.05rem 0.3rem;border-radius:999px;background:${riskBgs[riskLevel]||riskBgs.medium};color:${riskColors[riskLevel]||riskColors.medium};text-transform:uppercase;">${_esc(riskLevel)}</span>`;
-      const rationaleRow = a.rationale
-        ? `<tr style="border-bottom:1px solid var(--border);" data-agent-did="${_esc(a.agent_did || "")}">
-            <td colspan="6" style="padding:0.2rem 0.6rem 0.45rem 2.2rem;font-size:0.72rem;color:var(--muted);font-style:italic;">${_esc(a.rationale)}</td>
-           </tr>` : "";
-      return `<tr style="border-bottom:${a.rationale ? "none" : "1px solid var(--border)"};" data-agent-did="${_esc(a.agent_did || "")}">
+      // Build causality sub-rows: rationale, rejection reason, context trail
+      const extraRows = [];
+      if (a.rationale) {
+        extraRows.push(`<tr data-agent-did="${_esc(a.agent_did||"")}">
+          <td colspan="7" style="padding:0.15rem 0.6rem 0.3rem 2rem;font-size:0.72rem;color:var(--muted);font-style:italic;">
+            💬 ${_esc(a.rationale)}</td></tr>`);
+      }
+      if (a.rejection_reason) {
+        extraRows.push(`<tr data-agent-did="${_esc(a.agent_did||"")}">
+          <td colspan="7" style="padding:0.15rem 0.6rem 0.3rem 2rem;font-size:0.72rem;color:#b45309;">
+            ⚠ Rejected: ${_esc(a.rejection_reason)}</td></tr>`);
+      }
+      if (a.contributing_context && typeof a.contributing_context === "object") {
+        const ctxEntries = Object.entries(a.contributing_context);
+        if (ctxEntries.length) {
+          const ctxLines = ctxEntries.map(([k, v]) => {
+            const val = v?.value || v;
+            const preview = typeof val === "object" ? (val?.result || val?.subtask || JSON.stringify(val)).slice(0,80) : String(val).slice(0,80);
+            const by = v?.by ? v.by.slice(-12) : "";
+            return `<span style="display:block;padding:0.1rem 0;"><span style="color:var(--muted);font-weight:600;">${_esc(k)}${by ? ` (${_esc(by)})` : ""}:</span> ${_esc(preview)}…</span>`;
+          }).join("");
+          extraRows.push(`<tr data-agent-did="${_esc(a.agent_did||"")}">
+            <td colspan="7" style="padding:0.15rem 0.6rem 0.4rem 2rem;font-size:0.7rem;color:var(--text-2);">
+              <details><summary style="cursor:pointer;color:var(--muted);font-size:0.68rem;list-style:none;user-select:none;">▸ Context seen (${ctxEntries.length} item${ctxEntries.length>1?"s":""})</summary>
+              <div style="margin-top:0.2rem;padding:0.3rem 0.4rem;background:var(--surface2);border-radius:5px;">${ctxLines}</div></details>
+            </td></tr>`);
+        }
+      }
+      const hasExtra = extraRows.length > 0;
+      return `<tr style="border-bottom:${hasExtra ? "none" : "1px solid var(--border)"};" data-agent-did="${_esc(a.agent_did || "")}">
         <td style="padding:0.45rem 0.6rem;font-size:0.78rem;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc((a.agent_did || "").slice(-14))}</td>
         <td style="padding:0.45rem 0.6rem;font-size:0.78rem;color:var(--text-2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(a.subtask || "")}</td>
         <td style="padding:0.45rem 0.6rem;" class="grd-status-cell">${_runStatusBadge(a.status)}</td>
@@ -10034,7 +10059,7 @@ async function openRunDrilldown(runId, groupId) {
         <td style="padding:0.45rem 0.6rem;font-size:0.75rem;color:var(--muted);">${_esc(trustStr)}</td>
         <td style="padding:0.45rem 0.6rem;font-size:0.78rem;font-weight:700;color:${scoreColor};" class="grd-quality-cell">${_esc(score)}</td>
         <td style="padding:0.45rem 0.6rem;font-size:0.72rem;color:var(--muted);">${a.retry_count > 0 ? `${a.retry_count} retr${a.retry_count > 1 ? "ies" : "y"}` : "—"}</td>
-      </tr>${rationaleRow}`;
+      </tr>${extraRows.join("")}${hasExtra ? `<tr><td colspan="7" style="border-bottom:1px solid var(--border);padding:0;"></td></tr>` : ""}`;
     }).join("");
 
     // Events timeline — container gets stable ID for live appending
@@ -10043,11 +10068,28 @@ async function openRunDrilldown(runId, groupId) {
       const ts = ev.ts ? new Date(ev.ts).toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit", second:"2-digit" }) : "";
       const col = _GRD_EVENT_COLORS[ev.event_type] || "#6b7280";
       const label = (ev.event_type || "").replace(/_/g, " ");
-      return `<div style="display:flex;gap:0.6rem;align-items:flex-start;padding:0.35rem 0;border-bottom:1px solid var(--border);">
-        <span style="font-size:0.65rem;color:var(--muted);white-space:nowrap;flex-shrink:0;padding-top:0.05rem;min-width:56px;">${_esc(ts)}</span>
-        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-top:0.2rem;"></span>
-        <span style="font-size:0.75rem;font-weight:600;color:${col};flex-shrink:0;min-width:160px;">${_esc(label)}</span>
-        <span style="font-size:0.72rem;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ev.agent_did ? _esc(ev.agent_did.slice(-14)) : ""}</span>
+      const ed = ev.event_data || {};
+      // Build detail line: rejection reason, quality score, clarification question, etc.
+      let detail = ev.agent_did ? `<span style="font-size:0.7rem;color:var(--muted);">${_esc(ev.agent_did.slice(-14))}</span>` : "";
+      if (ed.reason)          detail += ` <span style="font-size:0.7rem;color:#b45309;">— ${_esc(String(ed.reason).slice(0,80))}</span>`;
+      if (ed.score != null)   detail += ` <span style="font-size:0.7rem;color:var(--muted);">score: ${Math.round(ed.score*100)}%</span>`;
+      if (ed.pause_question)  detail += ` <span style="font-size:0.7rem;color:#1d4ed8;font-style:italic;">"${_esc(String(ed.pause_question).slice(0,60))}"</span>`;
+      if (ed.output_preview)  detail += ` <span style="font-size:0.7rem;color:var(--muted);">${_esc(String(ed.output_preview).slice(0,60))}…</span>`;
+      // Context snapshot: show count of context entries at this moment
+      const snap = ev.context_snapshot;
+      const ctxCount = snap && typeof snap === "object" ? Object.keys(snap).length : 0;
+      const ctxTag = ctxCount > 0
+        ? ` <details style="display:inline;"><summary style="display:inline;cursor:pointer;font-size:0.65rem;color:var(--muted);list-style:none;">▸ ${ctxCount} ctx</summary>
+            <span style="display:block;margin-top:0.2rem;padding:0.25rem 0.4rem;background:var(--surface2);border-radius:5px;font-size:0.68rem;color:var(--text-2);">
+              ${Object.keys(snap).map(k => _esc(k)).join(", ")}
+            </span></details>` : "";
+      return `<div style="padding:0.3rem 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;gap:0.6rem;align-items:flex-start;">
+          <span style="font-size:0.65rem;color:var(--muted);white-space:nowrap;flex-shrink:0;min-width:56px;">${_esc(ts)}</span>
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-top:0.25rem;"></span>
+          <span style="font-size:0.75rem;font-weight:600;color:${col};flex-shrink:0;min-width:150px;">${_esc(label)}</span>
+          <span style="font-size:0.72rem;flex:1;line-height:1.4;">${detail}${ctxTag}</span>
+        </div>
       </div>`;
     }).join("");
 
