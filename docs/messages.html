@@ -4219,13 +4219,14 @@ function _renderHandoffsTable() {
 // ── TEAMS / ORCHESTRATION ─────────────────────────────────────────────────────
 
 let _teamsListView    = false;
-let _agentGroups      = [];        // [{id, name, description, member_count}]
-let _activeTeamId     = null;      // currently selected agent_group id
-let _activeTeamRun    = null;      // {id, status, pause_question} of current run
-let _teamRunSSE       = null;      // EventSource for live run stream
-let _teamRunEvents    = [];        // rendered event ids this session
-let _teamGroupRuns    = [];        // recent runs list for current group
-let _teamsChatHistory = [];        // [{role, content}] conversation with governing LLM
+let _agentGroups        = [];        // [{id, name, description, member_count}]
+let _activeTeamId       = null;      // currently selected agent_group id
+let _activeTeamRun      = null;      // {id, status, pause_question} of current run
+let _teamRunSSE         = null;      // EventSource for live run stream
+let _teamRunEvents      = [];        // rendered event ids this session
+let _teamGroupRuns      = [];        // recent runs list for current group
+let _teamsChatHistory   = [];        // [{role, content}] conversation with governing LLM
+let _teamRunLastEventId = 0;         // cursor: highest event id seen — passed as ?since_id on reconnect
 
 const _RUN_TERMINAL = new Set(["completed","failed","cancelled"]);
 
@@ -4366,6 +4367,16 @@ async function _loadTeamRuns(groupId) {
     const d = await r.json();
     _teamGroupRuns = d.runs || [];
     _renderTeamRunsList(groupId);
+
+    // Active run recovery: if exactly one non-terminal run exists and there is no
+    // run currently open, auto-restore it so a page refresh is transparent.
+    // If multiple active runs exist the user should choose — stay on the list.
+    if (!_activeTeamRun || _RUN_TERMINAL.has(_activeTeamRun.status)) {
+      const activeRuns = _teamGroupRuns.filter(r => !_RUN_TERMINAL.has(r.status));
+      if (activeRuns.length === 1) {
+        openRunThread(activeRuns[0].id, groupId);
+      }
+    }
   } catch(e) {
     scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load runs</div><div class="state-sub">${esc(e.message)}</div></div>`;
   }
@@ -4463,8 +4474,9 @@ async function _teamsCancelRun() {
 
 // ── Open and stream a run thread ───────────────────────────────────────────────
 async function openRunThread(runId, groupId) {
-  _activeTeamRun = { id: runId, status: "planning", pause_question: null };
-  _teamRunEvents  = [];
+  _activeTeamRun      = { id: runId, status: "planning", pause_question: null };
+  _teamRunEvents      = [];
+  _teamRunLastEventId = 0;  // reset cursor — events replayed from preload set it as they arrive
   _stopTeamRunSSE();
 
   if (_activeTeamId !== groupId) {
@@ -4525,6 +4537,16 @@ async function openRunThread(runId, groupId) {
 
   // If not yet terminal, open SSE stream and show Stop button
   if (!_RUN_TERMINAL.has(_activeTeamRun.status)) {
+    // Show a connecting indicator if there are no events yet — gives the user
+    // immediate feedback before the first SSE event arrives.
+    const thread = document.getElementById("orch-thread");
+    if (thread && !thread.children.length) {
+      thread.insertAdjacentHTML("beforeend",
+        `<div id="orch-connecting-msg" style="padding:1rem;color:var(--text-muted);font-size:0.85rem;">
+          <span class="dot-pulse"></span>&nbsp; Connecting to live run…
+        </div>`
+      );
+    }
     _openTeamRunSSE(runId);
     _showStopBtn(true);
   } else {
@@ -4565,7 +4587,11 @@ function _openTeamRunSSE(runId) {
   // Store a closer so _stopTeamRunSSE() can abort the fetch
   _teamRunSSE = { close: () => { cancelled = true; controller.abort(); } };
 
-  fetch(`${BASE}/pro/groups/runs/${runId}/stream`, {
+  // Pass ?since_id cursor so reconnects resume exactly where they left off —
+  // no events replayed from the preload, no events dropped between disconnect and reconnect.
+  const url = `${BASE}/pro/groups/runs/${runId}/stream?since_id=${_teamRunLastEventId}`;
+
+  fetch(url, {
     headers: apiHeaders(),
     credentials: "include",
     signal: controller.signal,
@@ -4583,18 +4609,30 @@ function _openTeamRunSSE(runId) {
       const chunks = buffer.split("\n\n");
       buffer = chunks.pop(); // keep trailing incomplete chunk
       for (const chunk of chunks) {
+        // Skip SSE comment lines (heartbeats start with ": ")
+        if (chunk.trimStart().startsWith(":")) continue;
         const dataLine = chunk.split("\n").find(l => l.startsWith("data: "));
         if (!dataLine) continue;
         try {
           const ev = JSON.parse(dataLine.slice(6));
           if (ev.event_type === "stream_end") { cancelled = true; break; }
+          // Track the highest event id received for cursor-based resume
+          if (ev.id && ev.id > _teamRunLastEventId) _teamRunLastEventId = ev.id;
           _handleRunEvent(ev, false);
         } catch(_) {}
       }
       if (cancelled) break;
     }
   }).catch(() => {
-    // Aborted or stream ended — normal on run completion
+    // If not intentionally stopped and run is still active, reconnect after 2s.
+    // This recovers from network hiccups and Railway proxy timeouts during long agent calls.
+    if (!cancelled && _activeTeamRun && !_RUN_TERMINAL.has(_activeTeamRun.status)) {
+      setTimeout(() => {
+        if (!cancelled && _activeTeamRun && !_RUN_TERMINAL.has(_activeTeamRun.status)) {
+          _openTeamRunSSE(runId);
+        }
+      }, 2000);
+    }
   });
 }
 
@@ -4609,10 +4647,14 @@ function _handleRunEvent(ev, isReplay) {
   if (_teamRunEvents.includes(evId)) return;
   _teamRunEvents.push(evId);
 
+  // Keep cursor in sync so SSE reconnects start exactly where replay ended
+  if (ev.id && ev.id > _teamRunLastEventId) _teamRunLastEventId = ev.id;
+
   const ts   = ev.ts ? relativeTime(ev.ts) : "";
   const data = ev.data || ev.event_data || {};
 
-  // Remove any "planning…" spinner that may be showing
+  // Remove connecting indicator and planning spinner when first event arrives
+  document.getElementById("orch-connecting-msg")?.remove();
   document.getElementById("orch-planning-spinner")?.remove();
 
   switch (type) {
