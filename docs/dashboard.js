@@ -6335,8 +6335,8 @@ document.addEventListener("DOMContentLoaded", () => {
         errEl.style.display = "block";
         return;
       }
-      if (!key.startsWith("sk-")) {
-        errEl.textContent = "Enter your permanent owner API key (starts with sk-).";
+      if (!key.startsWith("agentid_")) {
+        errEl.textContent = "Enter your permanent owner API key (starts with agentid_).";
         errEl.style.display = "block";
         return;
       }
