@@ -63,7 +63,24 @@ Format: date · file(s) · what changed · why · what it does.
 ---
 
 ## Phase 2 — Messages Integration
-_(planned — not yet built)_
+
+### 2026-05-13 · `docs/messages.html` (modified)
+**What**: Added Teams channel — full orchestration thread view with live SSE rendering.
+**Why**: Users need a way to send tasks to groups and watch agents work in real time from the messages page.
+**Does**:
+- **CSS** — 25+ new rules for: run status badges (planning/running/synthesizing/completed/failed/paused), orchestration card types (user-task, plan, agent-assigned/completed/rejected, synthesis, final-answer, clarification), animated planning pulse dots, Teams task input bar, clarification answer bar.
+- **"Teams ⚡" channel button** — added to channels section in sidebar; shows agent count badge.
+- **Task input bar** (`#teams-task-bar`) — shown when a team is selected; Ctrl/Cmd+Enter to submit; calls `POST /pro/groups/{id}/runs`.
+- **Clarification bar** (`#clarify-bar`) — appears when a run pauses for user input; shows orchestrator's question; calls `POST /pro/groups/runs/{id}/clarify` or cancels the run.
+- **`showTeamsListView()`** — channel click handler; sets state, clears other views, loads agent groups.
+- **`_loadAgentGroups()`** — `GET /pro/groups` fire-and-forget; called from `loadAll()` on boot and on channel open.
+- **`_renderTeamsInThreadPanel()`** — renders agent groups in sidebar thread panel.
+- **`showTeamGroupView(groupId)`** — opens a group's run list; fetches `GET /pro/groups/{id}/runs`.
+- **`openRunThread(runId, groupId)`** — loads full run detail, replays past events, then opens SSE stream for live updates.
+- **`_openTeamRunSSE(runId)`** — uses `fetch` + `ReadableStream` (not `EventSource`) so the `x-api-key` header can be sent; parses `data: {...}` chunks, handles stream_end.
+- **`_handleRunEvent(ev, isReplay)`** — dispatches all 10 event types to typed card renderers: `orchestrator_plan` (subtask list), `agent_assigned`, `agent_completed` (with quality bar), `orchestrator_rejected`, `agent_reassigned`, `clarification_requested`, `clarification_received`, `synthesis_started`, `synthesis_completed`/`run_completed` (final answer card), `run_failed`, `run_cancelled`.
+- **`_clearChannelActive()`** — extended to reset `_teamsListView` and close SSE stream when user navigates away.
+- **`_loadAgentGroups()` wired into `loadAll()`** — groups badge and list update every 30s refresh.
 
 ## Phase 3 — Dashboard Tracking
 _(planned — not yet built)_

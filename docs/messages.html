@@ -478,6 +478,69 @@
     .rcpt-view-btn{padding:0.3rem 0.7rem;font-size:0.75rem;font-weight:600;background:none;border:none;cursor:pointer;color:var(--muted);font-family:inherit;transition:background 0.12s,color 0.12s}
     .rcpt-view-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.1)}
     .rcpt-view-btn:hover:not(.active){color:var(--text-2)}
+
+    /* ── Teams / Orchestration styles ── */
+    .sidebar-item-team { padding:0.55rem 0.9rem; cursor:pointer; font-size:0.82rem; font-weight:500; color:var(--text-2); display:flex; align-items:center; gap:0.6rem; border-left:3px solid transparent; }
+    .sidebar-item-team:hover { background:var(--surface); }
+    .sidebar-item-team.active { background:rgba(5,150,105,0.1); border-left-color:var(--green); color:var(--green); font-weight:600; }
+    .team-run-row { padding:0.5rem 0.85rem; cursor:pointer; border-left:3px solid transparent; border-bottom:1px solid var(--border); transition:background 0.1s; }
+    .team-run-row:hover { background:var(--surface2); }
+    .team-run-row.active { background:var(--accent-light); border-left-color:var(--accent); }
+    .run-status-badge { display:inline-flex; align-items:center; font-size:0.6rem; font-weight:700; padding:0.08rem 0.4rem; border-radius:999px; white-space:nowrap; text-transform:uppercase; letter-spacing:0.04em; }
+    .run-status-badge.planning    { background:#ede9fe; color:#7c3aed; }
+    .run-status-badge.running     { background:#dbeafe; color:#2563eb; }
+    .run-status-badge.synthesizing{ background:#fef3c7; color:#d97706; }
+    .run-status-badge.completed   { background:var(--green-bg); color:var(--green); }
+    .run-status-badge.failed      { background:var(--red-bg); color:var(--red); }
+    .run-status-badge.cancelled   { background:var(--surface2); color:var(--muted); }
+    .run-status-badge.paused_for_user { background:#fef3c7; color:#b45309; }
+    /* Orchestration thread cards */
+    .orch-thread { display:flex; flex-direction:column; gap:0.6rem; padding:0.85rem 1.25rem; }
+    .orch-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .orch-card-head { display:flex; align-items:center; gap:0.55rem; padding:0.55rem 0.85rem; border-bottom:1px solid var(--border); background:var(--surface2); }
+    .orch-card-icon { font-size:1rem; flex-shrink:0; }
+    .orch-card-label { font-size:0.78rem; font-weight:700; flex:1; min-width:0; }
+    .orch-card-time { font-size:0.65rem; color:var(--muted); flex-shrink:0; }
+    .orch-card-body { padding:0.6rem 0.85rem; font-size:0.82rem; line-height:1.55; color:var(--text-2); white-space:pre-wrap; word-break:break-word; }
+    .orch-card.user-task { border-left:3px solid var(--accent); }
+    .orch-card.user-task .orch-card-head { background:var(--accent-light); border-bottom-color:var(--accent-border); }
+    .orch-card.plan { border-left:3px solid #7c3aed; }
+    .orch-card.plan .orch-card-head { background:#ede9fe; border-bottom-color:#ddd6fe; }
+    .orch-card.agent-assigned { border-left:3px solid var(--blue); }
+    .orch-card.agent-completed { border-left:3px solid var(--green); }
+    .orch-card.agent-rejected { border-left:3px solid var(--yellow); }
+    .orch-card.agent-reassigned { border-left:3px solid var(--yellow); }
+    .orch-card.synthesis { border-left:3px solid #0891b2; }
+    .orch-card.synthesis .orch-card-head { background:#ecfeff; border-bottom-color:#a5f3fc; }
+    .orch-card.final-answer { border-left:3px solid var(--green); background:var(--green-bg); }
+    .orch-card.final-answer .orch-card-head { background:#d1fae5; border-bottom-color:#6ee7b7; }
+    .orch-card.clarification-needed { border-left:3px solid var(--yellow); border:1px solid #fde68a; background:#fef3c7; }
+    .orch-card.clarification-needed .orch-card-head { background:#fde68a; border-bottom-color:#fcd34d; }
+    .orch-subtask-list { display:flex; flex-direction:column; gap:0.25rem; padding:0 0 0.2rem; }
+    .orch-subtask { display:flex; align-items:flex-start; gap:0.45rem; padding:0.3rem 0.85rem; font-size:0.78rem; color:var(--text-2); border-top:1px solid var(--border); }
+    .orch-subtask-agent { font-weight:700; flex-shrink:0; min-width:80px; }
+    .orch-subtask-text { flex:1; min-width:0; }
+    .orch-quality-bar { display:flex; align-items:center; gap:0.4rem; margin-top:0.3rem; }
+    .orch-quality-fill { height:4px; border-radius:2px; background:var(--green); flex-shrink:0; }
+    .orch-quality-label { font-size:0.65rem; color:var(--muted); }
+    /* Planning spinner */
+    .planning-pulse { display:flex; align-items:center; gap:0.5rem; padding:0.6rem 0.85rem; font-size:0.8rem; color:#7c3aed; font-style:italic; }
+    .dot-pulse { display:inline-flex; gap:0.2rem; }
+    .dot-pulse span { width:5px; height:5px; border-radius:50%; background:#7c3aed; animation:dotPulse 1.2s ease-in-out infinite; }
+    .dot-pulse span:nth-child(2) { animation-delay:0.2s; }
+    .dot-pulse span:nth-child(3) { animation-delay:0.4s; }
+    @keyframes dotPulse { 0%,80%,100%{opacity:0.2;transform:scale(0.85)} 40%{opacity:1;transform:scale(1)} }
+    /* Teams task input bar */
+    #teams-task-bar { display:none; border-top:1px solid var(--border); padding:0.6rem 1rem; background:var(--surface); flex-direction:column; gap:0.4rem; flex-shrink:0; }
+    #teams-task-bar.visible { display:flex; }
+    .teams-task-input { flex:1; resize:none; border:1px solid var(--border-dark); border-radius:8px; padding:0.5rem 0.75rem; font-size:0.84rem; font-family:inherit; outline:none; max-height:100px; line-height:1.45; background:var(--surface); color:var(--text); }
+    .teams-task-input:focus { border-color:var(--green); }
+    /* Clarification input bar */
+    #clarify-bar { display:none; padding:0.75rem 1rem; background:#fef3c7; border-top:2px solid #fcd34d; flex-direction:column; gap:0.45rem; flex-shrink:0; }
+    #clarify-bar.visible { display:flex; }
+    .clarify-question { font-size:0.8rem; font-weight:600; color:#92400e; }
+    .clarify-input { resize:none; border:1px solid #fcd34d; border-radius:8px; padding:0.45rem 0.7rem; font-size:0.84rem; font-family:inherit; outline:none; background:#fff; color:var(--text); }
+    .clarify-input:focus { border-color:#d97706; }
   </style>
 </head>
 <body>
@@ -595,6 +658,9 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           <div class="sb-channel-item" id="sidebar-handoffs-btn" onclick="showHandoffsView()">
             <span class="sb-channel-icon">🔀</span><span>Handoffs</span><span class="sb-channel-count" id="sidebar-handoffs-count"></span>
+          </div>
+          <div class="sb-channel-item" id="sidebar-teams-btn" onclick="showTeamsListView()">
+            <span class="sb-channel-icon">⚡</span><span>Teams</span><span class="sb-channel-count" id="sidebar-teams-count"></span>
           </div>
         </div>
       </div>
@@ -742,6 +808,30 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="feed-scroll" id="feed-scroll">
         <div class="state-box"><div class="spinner"></div><div class="state-title">Loading messages…</div></div>
       </div>
+      <!-- Teams task input bar — shown when an orchestrated group is selected -->
+      <div id="teams-task-bar">
+        <div style="font-size:0.72rem;color:var(--muted);font-weight:600;" id="teams-task-label">Send a task to the team…</div>
+        <div style="display:flex;gap:0.5rem;align-items:flex-end;">
+          <textarea id="teams-task-input" class="teams-task-input" rows="2"
+            placeholder="Describe the task for this team to work on together…"></textarea>
+          <button id="teams-task-send-btn"
+            style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:0.5rem 0.85rem;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;height:2.4rem;"
+            onclick="_teamsStartRun()">Run</button>
+        </div>
+      </div>
+
+      <!-- Clarification bar — shown when a run pauses for user input -->
+      <div id="clarify-bar">
+        <div class="clarify-question" id="clarify-question">The orchestrator needs your input:</div>
+        <textarea id="clarify-input" class="clarify-input" rows="2" placeholder="Your answer…"></textarea>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+          <button onclick="_teamsCancelClarify()"
+            style="background:none;border:1px solid #fcd34d;border-radius:7px;padding:0.35rem 0.75rem;font-size:0.8rem;font-weight:600;cursor:pointer;color:#92400e;font-family:inherit;">Cancel run</button>
+          <button onclick="_teamsSubmitClarification()"
+            style="background:#d97706;color:#fff;border:none;border-radius:7px;padding:0.35rem 0.85rem;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:inherit;">Send answer</button>
+        </div>
+      </div>
+
       <!-- Group reply bar — shown when a group room is active -->
       <div id="chat-bar" style="display:none;border-top:1px solid var(--border);padding:0.6rem 1rem;display:none;flex-direction:column;gap:0.4rem;background:var(--surface);">
         <div id="chat-bar-file-preview" style="display:none;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.78rem;">
@@ -1056,6 +1146,9 @@ async function loadAll(silent = false) {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) { _rooms = d.rooms || []; renderGroupsSidebar(); } })
       .catch(() => {});
+
+    // Fetch agent groups for Teams orchestration (fire-and-forget)
+    _loadAgentGroups();
 
     // Update ledger count badge in sidebar (fire-and-forget)
     fetch(`${BASE}/pro/interactions?limit=1`, { headers: apiHeaders(), credentials: "include" })
@@ -2403,6 +2496,17 @@ function _clearChannelActive() {
   // Restore thread panel header when leaving groups view
   if (_groupsListView) {
     _groupsListView = false;
+    const labelEl = document.getElementById("sb-threads-label");
+    if (labelEl) labelEl.textContent = "Threads";
+    const composeBtn = document.querySelector(".sb-panel-compose");
+    if (composeBtn) { composeBtn.textContent = "← new"; composeBtn.onclick = openCompose; }
+  }
+  // Clean up teams view state
+  if (_teamsListView) {
+    _teamsListView = false;
+    _stopTeamRunSSE();
+    document.getElementById("teams-task-bar")?.classList.remove("visible");
+    document.getElementById("clarify-bar")?.classList.remove("visible");
     const labelEl = document.getElementById("sb-threads-label");
     if (labelEl) labelEl.textContent = "Threads";
     const composeBtn = document.querySelector(".sb-panel-compose");
@@ -3972,6 +4076,610 @@ function _renderHandoffsTable() {
       </div>
     </div>`;
 }
+
+// ── TEAMS / ORCHESTRATION ─────────────────────────────────────────────────────
+
+let _teamsListView    = false;
+let _agentGroups      = [];        // [{id, name, description, member_count}]
+let _activeTeamId     = null;      // currently selected agent_group id
+let _activeTeamRun    = null;      // {id, status, pause_question} of current run
+let _teamRunSSE       = null;      // EventSource for live run stream
+let _teamRunEvents    = [];        // rendered event ids this session
+let _teamGroupRuns    = [];        // recent runs list for current group
+
+const _RUN_TERMINAL = new Set(["completed","failed","cancelled"]);
+
+// Load agent groups from /pro/groups
+async function _loadAgentGroups() {
+  try {
+    const r = await fetch(`${BASE}/pro/groups?limit=100`, { headers: apiHeaders(), credentials:"include" });
+    if (!r.ok) return;
+    const d = await r.json();
+    _agentGroups = d.groups || d || [];
+    _updateTeamsBadge();
+    if (_teamsListView) _renderTeamsInThreadPanel();
+  } catch(_) {}
+}
+
+function _updateTeamsBadge() {
+  const el = document.getElementById("sidebar-teams-count");
+  if (el) el.textContent = _agentGroups.length > 0 ? _agentGroups.length : "";
+}
+
+// ── Channel entry point ────────────────────────────────────────────────────────
+function showTeamsListView() {
+  _teamsListView   = true;
+  _activeTeamId    = null;
+  _activeTeamRun   = null;
+  _dealsView       = false;
+  _handoffsView    = false;
+  _filesView       = false;
+  _activeRoomId    = null;
+  _selectedDid     = "__teams__";
+  _stopGroupPoll();
+  _stopTeamRunSSE();
+
+  _clearChannelActive();
+  _teamsListView = true;
+  document.getElementById("sidebar-teams-btn")?.classList.add("active");
+
+  const labelEl = document.getElementById("sb-threads-label");
+  if (labelEl) labelEl.textContent = "Teams";
+  const composeBtn = document.querySelector(".sb-panel-compose");
+  if (composeBtn) { composeBtn.textContent = ""; composeBtn.onclick = null; }
+
+  document.getElementById("deal-search-bar").style.display    = "none";
+  document.getElementById("agent-info").style.display         = "none";
+  document.getElementById("stop-btn").style.display           = "none";
+  document.getElementById("header-right-actions").innerHTML   = "";
+  document.getElementById("feed-title").textContent           = "Teams";
+  document.getElementById("feed-meta").textContent            = `${_agentGroups.length} team${_agentGroups.length !== 1 ? "s" : ""}`;
+  document.getElementById("chat-bar").style.display           = "none";
+  document.getElementById("teams-task-bar").classList.remove("visible");
+  document.getElementById("clarify-bar").classList.remove("visible");
+
+  document.getElementById("feed-scroll").innerHTML =
+    '<div class="state-box"><div class="state-icon">⚡</div><div class="state-title">Select a team</div><div class="state-sub">Pick a team from the list to send it a task</div></div>';
+
+  _renderTeamsInThreadPanel();
+  _loadAgentGroups();
+}
+
+function _renderTeamsInThreadPanel() {
+  const list = document.getElementById("sb-partners-list");
+  if (!list) return;
+  if (!_agentGroups.length) {
+    list.innerHTML = '<div style="padding:1.2rem 0.9rem;font-size:0.8rem;color:var(--muted);">No teams yet — create a group first</div>';
+    return;
+  }
+  list.innerHTML = _agentGroups.map(g => {
+    const active = _activeTeamId === g.id;
+    const mc = g.member_count || 0;
+    return `<div class="thread-row sidebar-item-team${active ? " active" : ""}"
+              data-team-id="${g.id}" onclick="showTeamGroupView(${g.id})">
+      <div class="thread-row-top">
+        <span class="thread-row-name">⚡ ${esc(g.name)}</span>
+      </div>
+      <div class="thread-row-preview">${mc} agent${mc !== 1 ? "s" : ""}</div>
+    </div>`;
+  }).join("");
+}
+
+// ── Open a team group ──────────────────────────────────────────────────────────
+async function showTeamGroupView(groupId) {
+  _activeTeamId  = groupId;
+  _activeTeamRun = null;
+  _teamGroupRuns = [];
+  _selectedDid   = "__teams__";
+  _dealsView     = false;
+  _handoffsView  = false;
+  _stopGroupPoll();
+  _stopTeamRunSSE();
+
+  _clearChannelActive();
+  _teamsListView = true;
+  document.getElementById("sidebar-teams-btn")?.classList.add("active");
+  document.querySelectorAll(".sidebar-item-team").forEach(el => {
+    el.classList.toggle("active", parseInt(el.dataset.teamId) === groupId);
+  });
+
+  const group = _agentGroups.find(g => g.id === groupId);
+  const name  = group ? group.name : `Team ${groupId}`;
+
+  document.getElementById("feed-title").textContent = name;
+  document.getElementById("feed-meta").textContent  = group ? `${group.member_count || 0} agents` : "";
+  document.getElementById("agent-info").style.display   = "none";
+  document.getElementById("stop-btn").style.display     = "none";
+  document.getElementById("deal-search-bar").style.display = "none";
+  document.getElementById("chat-bar").style.display     = "none";
+  document.getElementById("clarify-bar").classList.remove("visible");
+
+  // Header actions
+  document.getElementById("header-right-actions").innerHTML =
+    `<button class="btn btn-outline" style="font-size:0.78rem" onclick="_refreshTeamRuns()">↻ Runs</button>`;
+
+  // Show task input
+  const taskLabel = document.getElementById("teams-task-label");
+  if (taskLabel) taskLabel.textContent = `Send a task to ${name}…`;
+  document.getElementById("teams-task-bar").classList.add("visible");
+  document.getElementById("teams-task-input").value = "";
+
+  const scroll = document.getElementById("feed-scroll");
+  scroll.innerHTML = '<div class="state-box"><div class="spinner"></div><div class="state-title">Loading runs…</div></div>';
+
+  await _loadTeamRuns(groupId);
+}
+
+async function _loadTeamRuns(groupId) {
+  const scroll = document.getElementById("feed-scroll");
+  try {
+    const r = await fetch(`${BASE}/pro/groups/${groupId}/runs?limit=20`, { headers: apiHeaders(), credentials:"include" });
+    if (!r.ok) throw new Error(`${r.status}`);
+    const d = await r.json();
+    _teamGroupRuns = d.runs || [];
+    _renderTeamRunsList(groupId);
+  } catch(e) {
+    scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚠️</div><div class="state-title">Could not load runs</div><div class="state-sub">${esc(e.message)}</div></div>`;
+  }
+}
+
+async function _refreshTeamRuns() {
+  if (_activeTeamId) await _loadTeamRuns(_activeTeamId);
+}
+
+function _renderTeamRunsList(groupId) {
+  const scroll = document.getElementById("feed-scroll");
+  if (!_teamGroupRuns.length) {
+    scroll.innerHTML = `<div class="state-box"><div class="state-icon">⚡</div><div class="state-title">No runs yet</div><div class="state-sub">Type a task below and hit <b>Run</b> to start your first orchestrated run.</div></div>`;
+    return;
+  }
+  const rows = _teamGroupRuns.map(run => {
+    const badge = `<span class="run-status-badge ${run.status}">${run.status.replace(/_/g," ")}</span>`;
+    const preview = (run.user_task || "").slice(0, 80) + ((run.user_task||"").length > 80 ? "…" : "");
+    const t = run.started_at ? relativeTime(run.started_at) : "";
+    return `<div class="team-run-row" onclick="openRunThread('${run.id}', ${groupId})" style="padding:0.6rem 0.9rem;">
+      <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.2rem;">
+        ${badge}
+        <span style="font-size:0.65rem;color:var(--muted);">${esc(t)}</span>
+      </div>
+      <div style="font-size:0.8rem;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(preview)}</div>
+    </div>`;
+  }).join("");
+  scroll.innerHTML = `<div style="padding:0.5rem 0;">${rows}</div>`;
+}
+
+// ── Start a new run ────────────────────────────────────────────────────────────
+async function _teamsStartRun() {
+  const input = document.getElementById("teams-task-input");
+  const task  = (input?.value || "").trim();
+  if (!task || !_activeTeamId) return;
+
+  const btn = document.getElementById("teams-task-send-btn");
+  btn.disabled = true; btn.textContent = "Starting…";
+  input.disabled = true;
+
+  try {
+    const r = await fetch(`${BASE}/pro/groups/${_activeTeamId}/runs`, {
+      method: "POST",
+      headers: apiHeaders(),
+      credentials: "include",
+      body: JSON.stringify({ task }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `Error ${r.status}`);
+    }
+    const d = await r.json();
+    input.value = "";
+    await openRunThread(d.run_id, _activeTeamId);
+  } catch(e) {
+    alert("Could not start run: " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Run";
+    input.disabled = false;
+  }
+}
+
+// ── Open and stream a run thread ───────────────────────────────────────────────
+async function openRunThread(runId, groupId) {
+  _activeTeamRun = { id: runId, status: "planning", pause_question: null };
+  _teamRunEvents  = [];
+  _stopTeamRunSSE();
+
+  if (_activeTeamId !== groupId) {
+    _activeTeamId = groupId;
+    document.querySelectorAll(".sidebar-item-team").forEach(el => {
+      el.classList.toggle("active", parseInt(el.dataset.teamId) === groupId);
+    });
+  }
+
+  document.getElementById("clarify-bar").classList.remove("visible");
+
+  const scroll = document.getElementById("feed-scroll");
+  scroll.innerHTML = `<div class="orch-thread" id="orch-thread"></div>`;
+
+  // Load existing run data first
+  try {
+    const r = await fetch(`${BASE}/pro/groups/runs/${runId}`, { headers: apiHeaders(), credentials:"include" });
+    if (r.ok) {
+      const run = await r.json();
+      _activeTeamRun = { id: runId, status: run.status, pause_question: run.pause_question };
+
+      // Render user task bubble
+      _appendOrchCard(_buildUserTaskCard(run.user_task));
+
+      // Replay all past events
+      (run.events || []).forEach(ev => _handleRunEvent(ev, true));
+
+      // If paused, show clarification bar
+      if (run.status === "paused_for_user" && run.pause_question) {
+        _showClarifyBar(runId, run.pause_question);
+      }
+    }
+  } catch(_) {}
+
+  // If not yet terminal, open SSE stream
+  if (!_RUN_TERMINAL.has(_activeTeamRun.status)) {
+    _openTeamRunSSE(runId);
+  }
+
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+function _buildUserTaskCard(task) {
+  return `<div class="orch-card user-task">
+    <div class="orch-card-head">
+      <span class="orch-card-icon">💬</span>
+      <span class="orch-card-label">Your task</span>
+    </div>
+    <div class="orch-card-body">${esc(task)}</div>
+  </div>`;
+}
+
+function _appendOrchCard(html) {
+  const thread = document.getElementById("orch-thread");
+  if (thread) {
+    thread.insertAdjacentHTML("beforeend", html);
+    const scroll = document.getElementById("feed-scroll");
+    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+  }
+}
+
+// ── SSE streaming (fetch + ReadableStream — supports custom headers) ───────────
+function _openTeamRunSSE(runId) {
+  _stopTeamRunSSE();
+  let cancelled = false;
+  const controller = new AbortController();
+  // Store a closer so _stopTeamRunSSE() can abort the fetch
+  _teamRunSSE = { close: () => { cancelled = true; controller.abort(); } };
+
+  fetch(`${BASE}/pro/groups/runs/${runId}/stream`, {
+    headers: apiHeaders(),
+    credentials: "include",
+    signal: controller.signal,
+  }).then(async (res) => {
+    if (!res.ok || !res.body) return;
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      if (cancelled) break;
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // SSE messages are separated by double newline
+      const chunks = buffer.split("\n\n");
+      buffer = chunks.pop(); // keep trailing incomplete chunk
+      for (const chunk of chunks) {
+        const dataLine = chunk.split("\n").find(l => l.startsWith("data: "));
+        if (!dataLine) continue;
+        try {
+          const ev = JSON.parse(dataLine.slice(6));
+          if (ev.event_type === "stream_end") { cancelled = true; break; }
+          _handleRunEvent(ev, false);
+        } catch(_) {}
+      }
+      if (cancelled) break;
+    }
+  }).catch(() => {
+    // Aborted or stream ended — normal on run completion
+  });
+}
+
+function _stopTeamRunSSE() {
+  if (_teamRunSSE) { _teamRunSSE.close(); _teamRunSSE = null; }
+}
+
+// ── Event rendering ────────────────────────────────────────────────────────────
+function _handleRunEvent(ev, isReplay) {
+  const type = ev.event_type;
+  const evId  = ev.id || (type + "_" + (ev.ts || Date.now()));
+  if (_teamRunEvents.includes(evId)) return;
+  _teamRunEvents.push(evId);
+
+  const ts   = ev.ts ? relativeTime(ev.ts) : "";
+  const data = ev.data || ev.event_data || {};
+
+  // Remove any "planning…" spinner that may be showing
+  document.getElementById("orch-planning-spinner")?.remove();
+
+  switch (type) {
+    case "orchestrator_plan": {
+      const subtasks = (data.assignments || []).map(a => {
+        const agentName = _agentNameForDid(a.agent_did);
+        return `<div class="orch-subtask">
+          <span class="orch-subtask-agent">${esc(agentName)}</span>
+          <span class="orch-subtask-text">${esc(a.subtask || "")}</span>
+        </div>`;
+      }).join("");
+      _appendOrchCard(`<div class="orch-card plan">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">🧠</span>
+          <span class="orch-card-label">Orchestrator plan</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        ${subtasks ? `<div class="orch-subtask-list">${subtasks}</div>` : '<div class="orch-card-body" style="font-style:italic;color:var(--muted);">No assignments in plan</div>'}
+      </div>`);
+      // Show spinner while agents run
+      _appendOrchCard(`<div class="orch-card" id="orch-planning-spinner" style="border-left:3px solid var(--muted);">
+        <div class="planning-pulse">
+          <div class="dot-pulse"><span></span><span></span><span></span></div>
+          Agents working…
+        </div>
+      </div>`);
+      break;
+    }
+
+    case "agent_assigned": {
+      const agentName = _agentNameForDid(ev.agent_did);
+      _appendOrchCard(`<div class="orch-card agent-assigned">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">📤</span>
+          <span class="orch-card-label">${esc(agentName)} — assigned</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        <div class="orch-card-body">${esc(data.subtask || "")}</div>
+      </div>`);
+      break;
+    }
+
+    case "agent_completed": {
+      const agentName = _agentNameForDid(ev.agent_did);
+      const score     = data.quality_score != null ? Math.round(data.quality_score * 100) : null;
+      const barWidth  = score != null ? `${score}%` : "0%";
+      const barColor  = score != null && score >= 60 ? "var(--green)" : "var(--yellow)";
+      const scoreHtml = score != null
+        ? `<div class="orch-quality-bar">
+            <div class="orch-quality-fill" style="width:${barWidth};background:${barColor};transition:width 0.5s;"></div>
+            <span class="orch-quality-label">Quality: ${score}%</span>
+          </div>`
+        : "";
+      const output = typeof data.output === "string" ? data.output : JSON.stringify(data.output || {}, null, 2);
+      _appendOrchCard(`<div class="orch-card agent-completed">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">✅</span>
+          <span class="orch-card-label">${esc(agentName)} — completed</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        <div class="orch-card-body">${esc(output.slice(0, 600))}${output.length > 600 ? "\n…" : ""}</div>
+        ${scoreHtml}
+      </div>`);
+      break;
+    }
+
+    case "orchestrator_rejected": {
+      const agentName = _agentNameForDid(ev.agent_did);
+      _appendOrchCard(`<div class="orch-card agent-rejected">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">⚠️</span>
+          <span class="orch-card-label">${esc(agentName)} — output rejected</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        <div class="orch-card-body" style="color:var(--yellow);">${esc(data.reason || "Quality below threshold")}</div>
+      </div>`);
+      break;
+    }
+
+    case "agent_reassigned": {
+      const from = _agentNameForDid(data.from_agent);
+      const to   = _agentNameForDid(ev.agent_did || data.to_agent);
+      _appendOrchCard(`<div class="orch-card agent-reassigned">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">↺</span>
+          <span class="orch-card-label">Reassigned: ${esc(from)} → ${esc(to)}</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        <div class="orch-card-body">${esc(data.subtask || "")}</div>
+      </div>`);
+      break;
+    }
+
+    case "clarification_requested": {
+      const question = data.question || "The orchestrator needs your input.";
+      _activeTeamRun = { ..._activeTeamRun, status: "paused_for_user", pause_question: question };
+      _appendOrchCard(`<div class="orch-card clarification-needed">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">❓</span>
+          <span class="orch-card-label">Orchestrator needs your input</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        <div class="orch-card-body" style="font-weight:600;">${esc(question)}</div>
+      </div>`);
+      if (!isReplay && _activeTeamRun.id) _showClarifyBar(_activeTeamRun.id, question);
+      break;
+    }
+
+    case "clarification_received": {
+      _appendOrchCard(`<div class="orch-card user-task">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">💬</span>
+          <span class="orch-card-label">Your clarification</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        <div class="orch-card-body">${esc(data.clarification || "")}</div>
+      </div>`);
+      document.getElementById("clarify-bar").classList.remove("visible");
+      // Show spinner while agents resume
+      _appendOrchCard(`<div class="orch-card" id="orch-planning-spinner" style="border-left:3px solid var(--muted);">
+        <div class="planning-pulse">
+          <div class="dot-pulse"><span></span><span></span><span></span></div>
+          Resuming run…
+        </div>
+      </div>`);
+      break;
+    }
+
+    case "synthesis_started": {
+      document.getElementById("orch-planning-spinner")?.remove();
+      _appendOrchCard(`<div class="orch-card synthesis">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">🔀</span>
+          <span class="orch-card-label">Synthesizing final answer…</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        <div class="planning-pulse">
+          <div class="dot-pulse"><span></span><span></span><span></span></div>
+          Merging agent outputs
+        </div>
+      </div>`);
+      break;
+    }
+
+    case "synthesis_completed":
+    case "run_completed": {
+      document.getElementById("orch-planning-spinner")?.remove();
+      document.getElementById("clarify-bar").classList.remove("visible");
+      const finalOutput = data.final_output || data.output || "";
+      const summary     = data.run_summary || "";
+      _appendOrchCard(`<div class="orch-card final-answer">
+        <div class="orch-card-head">
+          <span class="orch-card-icon">✨</span>
+          <span class="orch-card-label">Final answer</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        <div class="orch-card-body">${esc(finalOutput)}</div>
+        ${summary ? `<div style="padding:0.4rem 0.85rem 0.6rem;font-size:0.72rem;color:var(--muted);border-top:1px solid var(--border);font-style:italic;">${esc(summary)}</div>` : ""}
+      </div>`);
+      _activeTeamRun = { ..._activeTeamRun, status: "completed" };
+      _stopTeamRunSSE();
+      _refreshTeamRuns();
+      break;
+    }
+
+    case "run_failed": {
+      document.getElementById("orch-planning-spinner")?.remove();
+      _appendOrchCard(`<div class="orch-card" style="border-left:3px solid var(--red);">
+        <div class="orch-card-head" style="background:var(--red-bg);">
+          <span class="orch-card-icon">❌</span>
+          <span class="orch-card-label">Run failed</span>
+          <span class="orch-card-time">${esc(ts)}</span>
+        </div>
+        <div class="orch-card-body" style="color:var(--red);">${esc(data.error || "Unknown error")}</div>
+      </div>`);
+      _activeTeamRun = { ..._activeTeamRun, status: "failed" };
+      _stopTeamRunSSE();
+      _refreshTeamRuns();
+      break;
+    }
+
+    case "run_cancelled": {
+      document.getElementById("orch-planning-spinner")?.remove();
+      document.getElementById("clarify-bar").classList.remove("visible");
+      _appendOrchCard(`<div class="orch-card" style="border-left:3px solid var(--muted);">
+        <div class="orch-card-head"><span class="orch-card-icon">⏹</span><span class="orch-card-label">Run cancelled</span><span class="orch-card-time">${esc(ts)}</span></div>
+      </div>`);
+      _activeTeamRun = { ..._activeTeamRun, status: "cancelled" };
+      _stopTeamRunSSE();
+      _refreshTeamRuns();
+      break;
+    }
+
+    // agent_started, context_written — silent (no card needed)
+  }
+}
+
+function _agentNameForDid(did) {
+  if (!did) return "Unknown agent";
+  const found = _agents.find(a => a.did === did);
+  return found?.name || did.slice(-14);
+}
+
+// ── Clarification ──────────────────────────────────────────────────────────────
+function _showClarifyBar(runId, question) {
+  const bar = document.getElementById("clarify-bar");
+  const q   = document.getElementById("clarify-question");
+  const inp = document.getElementById("clarify-input");
+  if (q)   q.textContent = question || "The orchestrator needs your input:";
+  if (inp) inp.value = "";
+  bar.classList.add("visible");
+  inp?.focus();
+  _activeTeamRun = { ..._activeTeamRun, id: runId };
+}
+
+async function _teamsSubmitClarification() {
+  const runId = _activeTeamRun?.id;
+  if (!runId) return;
+  const text = (document.getElementById("clarify-input")?.value || "").trim();
+  if (!text) return;
+
+  try {
+    const r = await fetch(`${BASE}/pro/groups/runs/${runId}/clarify`, {
+      method: "POST",
+      headers: apiHeaders(),
+      credentials: "include",
+      body: JSON.stringify({ clarification: text }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `Error ${r.status}`);
+    }
+    document.getElementById("clarify-input").value = "";
+    document.getElementById("clarify-bar").classList.remove("visible");
+    // Re-open SSE if it was closed
+    if (!_teamRunSSE) _openTeamRunSSE(runId);
+  } catch(e) {
+    alert("Could not submit clarification: " + e.message);
+  }
+}
+
+async function _teamsCancelClarify() {
+  const runId = _activeTeamRun?.id;
+  if (!runId) return;
+  if (!confirm("Cancel this run?")) return;
+  try {
+    await fetch(`${BASE}/pro/groups/runs/${runId}/cancel`, {
+      method: "POST", headers: apiHeaders(), credentials: "include",
+    });
+    document.getElementById("clarify-bar").classList.remove("visible");
+    _stopTeamRunSSE();
+    _activeTeamRun = { ..._activeTeamRun, status: "cancelled" };
+    _refreshTeamRuns();
+  } catch(e) {
+    alert("Could not cancel: " + e.message);
+  }
+}
+
+// Keyboard shortcut: Ctrl/Cmd+Enter in task input to submit
+document.addEventListener("DOMContentLoaded", () => {
+  const taskInput = document.getElementById("teams-task-input");
+  if (taskInput) {
+    taskInput.addEventListener("keydown", e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        _teamsStartRun();
+      }
+    });
+  }
+  const clarifyInput = document.getElementById("clarify-input");
+  if (clarifyInput) {
+    clarifyInput.addEventListener("keydown", e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        _teamsSubmitClarification();
+      }
+    });
+  }
+});
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
 (function() {
