@@ -83,7 +83,23 @@ Format: date · file(s) · what changed · why · what it does.
 - **`_loadAgentGroups()` wired into `loadAll()`** — groups badge and list update every 30s refresh.
 
 ## Phase 3 — Dashboard Tracking
-_(planned — not yet built)_
+
+### 2026-05-13 · `docs/dashboard.html` (modified)
+**What**: Added "Group Runs" card and slide-in drilldown panel.
+**Why**: Users need visibility into orchestration run history without leaving the dashboard.
+**Does**:
+- `#group-runs-card` — new card section with "↻ Refresh" button; sits below Agent Groups card.
+- `#group-runs-list` — populated by `loadGroupRuns()`; shows table of recent runs across all groups (team name, task preview, status badge, started timestamp, duration).
+- `#group-run-drilldown` — fixed overlay panel slides in from right on row click; shows: final answer block (green), assignments table (agent / subtask / status / quality score / retries), event timeline (colour-coded dots by event type), all-runs performance table per agent (assigned / done / rejected / avg quality).
+
+### 2026-05-13 · `docs/dashboard.js` (modified)
+**What**: `loadGroupRuns()`, `openRunDrilldown()`, `_closeRunDrilldown()`, `_runStatusBadge()`.
+**Why**: Wire the new dashboard card to the group runs API.
+**Does**:
+- `loadGroupRuns()` — fetches `GET /pro/groups?limit=50`, then parallel-fetches `GET /pro/groups/{id}/runs?limit=5` for each group, merges and sorts newest-first, renders table with click-to-drilldown rows. Called on page load and on refresh button click.
+- `openRunDrilldown(runId, groupId)` — fetches `GET /pro/groups/runs/{run_id}` (full detail + assignments + events) and `GET /pro/groups/{id}/performance` in sequence; renders all three panels inside the drilldown panel. Click outside or ✕ closes it.
+- `_runStatusBadge(status)` — returns coloured pill HTML for all 7 run statuses.
+- Status colour map: planning=purple, running=blue, synthesizing=amber, completed=green, failed=red, cancelled=grey, paused_for_user=orange.
 
 ## Phase 4 — Team Memory UI
 _(planned — not yet built)_

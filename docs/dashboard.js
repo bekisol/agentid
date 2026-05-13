@@ -9831,4 +9831,241 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("rpt-agents-all")?.addEventListener("change", () => _rptToggleAgentScope("all"));
   document.getElementById("rpt-agents-specific")?.addEventListener("change", () => _rptToggleAgentScope("specific"));
+
+  // Group Runs
+  loadGroupRuns();
+  document.getElementById("group-runs-refresh-btn")?.addEventListener("click", () => loadGroupRuns());
+  document.getElementById("grd-close-btn")?.addEventListener("click", _closeRunDrilldown);
+  document.getElementById("group-run-drilldown")?.addEventListener("click", e => {
+    if (e.target === e.currentTarget) _closeRunDrilldown();
+  });
 });
+
+// ── GROUP RUNS ────────────────────────────────────────────────────────────────
+
+const _RUN_STATUS_COLORS = {
+  planning:        { bg:"#ede9fe", color:"#7c3aed" },
+  running:         { bg:"#dbeafe", color:"#2563eb" },
+  synthesizing:    { bg:"#fef3c7", color:"#d97706" },
+  completed:       { bg:"#d1fae5", color:"#059669" },
+  failed:          { bg:"#fee2e2", color:"#dc2626" },
+  cancelled:       { bg:"#f3f4f6", color:"#6b7280" },
+  paused_for_user: { bg:"#fef3c7", color:"#b45309" },
+};
+
+function _runStatusBadge(status) {
+  const s = _RUN_STATUS_COLORS[status] || { bg:"#f3f4f6", color:"#6b7280" };
+  const label = (status || "unknown").replace(/_/g," ");
+  return `<span style="display:inline-flex;align-items:center;font-size:0.65rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:999px;background:${s.bg};color:${s.color};text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap;">${_esc(label)}</span>`;
+}
+
+async function loadGroupRuns() {
+  const container = document.getElementById("group-runs-list");
+  if (!container) return;
+
+  try {
+    // Load all groups first, then pull recent runs for each
+    const groupsData = await apiFetch("/pro/groups?limit=50");
+    const groups = groupsData.groups || [];
+
+    if (!groups.length) {
+      container.innerHTML = `<div style="padding:1rem 1.25rem;font-size:0.85rem;color:var(--muted);">No groups yet — create a group first to run coordinated tasks.</div>`;
+      return;
+    }
+
+    // Fetch recent runs for all groups in parallel (limit 5 each)
+    const runResults = await Promise.allSettled(
+      groups.map(g =>
+        apiFetch(`/pro/groups/${g.id}/runs?limit=5`)
+          .then(d => ({ group: g, runs: d.runs || [] }))
+      )
+    );
+
+    const allRows = [];
+    runResults.forEach(res => {
+      if (res.status !== "fulfilled") return;
+      const { group, runs } = res.value;
+      runs.forEach(r => allRows.push({ ...r, _group: group }));
+    });
+
+    // Sort newest first
+    allRows.sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0));
+
+    if (!allRows.length) {
+      container.innerHTML = `<div style="padding:1rem 1.25rem;font-size:0.85rem;color:var(--muted);">No runs yet — go to <a href="messages.html" style="color:var(--accent);">Messages → Teams</a> to start one.</div>`;
+      return;
+    }
+
+    const rows = allRows.slice(0, 30).map(r => {
+      const t   = r.started_at ? new Date(r.started_at).toLocaleString(undefined, { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
+      const dur = (r.started_at && r.completed_at)
+        ? `${Math.round((new Date(r.completed_at) - new Date(r.started_at)) / 1000)}s`
+        : "—";
+      const task = (r.user_task || "").slice(0, 70) + ((r.user_task || "").length > 70 ? "…" : "");
+      return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" class="grr-row" data-run-id="${_esc(r.id)}" data-group-id="${r._group.id}">
+        <td style="padding:0.55rem 0.75rem;font-size:0.8rem;font-weight:600;white-space:nowrap;">${_esc(r._group.name)}</td>
+        <td style="padding:0.55rem 0.75rem;font-size:0.8rem;color:var(--text-2);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(task)}</td>
+        <td style="padding:0.55rem 0.75rem;">${_runStatusBadge(r.status)}</td>
+        <td style="padding:0.55rem 0.75rem;font-size:0.75rem;color:var(--muted);white-space:nowrap;">${_esc(t)}</td>
+        <td style="padding:0.55rem 0.75rem;font-size:0.75rem;color:var(--muted);white-space:nowrap;">${_esc(dur)}</td>
+        <td style="padding:0.55rem 0.75rem;"><button class="agent-action-btn" style="white-space:nowrap;">Details →</button></td>
+      </tr>`;
+    }).join("");
+
+    container.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:0.45rem 0.75rem;font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Team</th>
+            <th style="text-align:left;padding:0.45rem 0.75rem;font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Task</th>
+            <th style="text-align:left;padding:0.45rem 0.75rem;font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Status</th>
+            <th style="text-align:left;padding:0.45rem 0.75rem;font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Started</th>
+            <th style="text-align:left;padding:0.45rem 0.75rem;font-size:0.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Duration</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+
+    container.querySelectorAll(".grr-row").forEach(row => {
+      row.addEventListener("click", () => openRunDrilldown(row.dataset.runId, +row.dataset.groupId));
+    });
+
+  } catch(e) {
+    container.innerHTML = `<div style="padding:1rem 1.25rem;font-size:0.85rem;color:var(--red);">Could not load group runs: ${_esc(e.message)}</div>`;
+  }
+}
+
+// ── Run Drilldown panel ───────────────────────────────────────────────────────
+
+async function openRunDrilldown(runId, groupId) {
+  const panel = document.getElementById("group-run-drilldown");
+  const body  = document.getElementById("grd-body");
+  const title = document.getElementById("grd-title");
+  const meta  = document.getElementById("grd-meta");
+  if (!panel || !body) return;
+
+  panel.style.display = "flex";
+  body.innerHTML = `<div style="text-align:center;padding:3rem 1rem;"><div style="width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 0.75rem;"></div><div style="font-size:0.85rem;color:var(--muted);">Loading run…</div></div>`;
+  title.textContent = "Run Detail";
+  meta.textContent  = "";
+
+  try {
+    const run = await apiFetch(`/pro/groups/runs/${runId}`);
+
+    title.textContent = run.user_task ? run.user_task.slice(0, 60) + (run.user_task.length > 60 ? "…" : "") : "Run Detail";
+    const startedAt = run.started_at ? new Date(run.started_at).toLocaleString() : "";
+    meta.textContent = `${run.status} · ${startedAt}`;
+
+    // Assignments section
+    const assignments = run.assignments || [];
+    const assignmentRows = assignments.map(a => {
+      const score = a.quality_score != null ? `${Math.round(a.quality_score * 100)}%` : "—";
+      const scoreColor = a.quality_score != null && a.quality_score >= 0.6 ? "var(--green)" : "var(--yellow)";
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:0.45rem 0.6rem;font-size:0.78rem;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc((a.agent_did || "").slice(-14))}</td>
+        <td style="padding:0.45rem 0.6rem;font-size:0.78rem;color:var(--text-2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(a.subtask || "")}</td>
+        <td style="padding:0.45rem 0.6rem;">${_runStatusBadge(a.status)}</td>
+        <td style="padding:0.45rem 0.6rem;font-size:0.78rem;font-weight:700;color:${scoreColor};">${_esc(score)}</td>
+        <td style="padding:0.45rem 0.6rem;font-size:0.72rem;color:var(--muted);">${a.retry_count > 0 ? `${a.retry_count} retr${a.retry_count > 1 ? "ies" : "y"}` : "—"}</td>
+      </tr>`;
+    }).join("");
+
+    // Events timeline (last 50)
+    const events = (run.events || []).slice(-50);
+    const eventRows = events.map(ev => {
+      const ts = ev.ts ? new Date(ev.ts).toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit", second:"2-digit" }) : "";
+      const typeColors = {
+        orchestrator_plan: "#7c3aed", agent_assigned: "#2563eb", agent_completed: "#059669",
+        orchestrator_rejected: "#d97706", agent_reassigned: "#d97706",
+        clarification_requested: "#b45309", clarification_received: "#b45309",
+        synthesis_started: "#0891b2", synthesis_completed: "#059669",
+        run_completed: "#059669", run_failed: "#dc2626", run_cancelled: "#6b7280",
+      };
+      const col = typeColors[ev.event_type] || "#6b7280";
+      const label = (ev.event_type || "").replace(/_/g, " ");
+      return `<div style="display:flex;gap:0.6rem;align-items:flex-start;padding:0.35rem 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:0.65rem;color:var(--muted);white-space:nowrap;flex-shrink:0;padding-top:0.05rem;min-width:56px;">${_esc(ts)}</span>
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-top:0.2rem;"></span>
+        <span style="font-size:0.75rem;font-weight:600;color:${col};flex-shrink:0;min-width:160px;">${_esc(label)}</span>
+        <span style="font-size:0.72rem;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ev.agent_did ? _esc(ev.agent_did.slice(-14)) : ""}</span>
+      </div>`;
+    }).join("");
+
+    // Performance section
+    let perfHtml = "";
+    try {
+      const perf = await apiFetch(`/pro/groups/${groupId}/performance`);
+      const agents = perf.agents || [];
+      if (agents.length) {
+        const perfRows = agents.map(a => `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:0.4rem 0.6rem;font-size:0.78rem;font-weight:600;">${_esc(a.name || a.did.slice(-14))}</td>
+            <td style="padding:0.4rem 0.6rem;font-size:0.78rem;text-align:center;">${a.total_assigned}</td>
+            <td style="padding:0.4rem 0.6rem;font-size:0.78rem;text-align:center;color:var(--green);">${a.total_completed}</td>
+            <td style="padding:0.4rem 0.6rem;font-size:0.78rem;text-align:center;color:var(--yellow);">${a.total_rejected}</td>
+            <td style="padding:0.4rem 0.6rem;font-size:0.78rem;text-align:center;">${a.avg_quality_score != null ? Math.round(a.avg_quality_score * 100) + "%" : "—"}</td>
+          </tr>`).join("");
+        perfHtml = `
+          <div style="margin-top:1.5rem;">
+            <div style="font-size:0.8rem;font-weight:700;color:var(--text-2);margin-bottom:0.5rem;">Team performance (all runs)</div>
+            <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+                <thead><tr style="background:var(--surface2);border-bottom:1px solid var(--border);">
+                  <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Agent</th>
+                  <th style="text-align:center;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Assigned</th>
+                  <th style="text-align:center;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Done</th>
+                  <th style="text-align:center;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Rejected</th>
+                  <th style="text-align:center;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Avg quality</th>
+                </tr></thead>
+                <tbody>${perfRows}</tbody>
+              </table>
+            </div>
+          </div>`;
+      }
+    } catch(_) {}
+
+    body.innerHTML = `
+      ${run.final_output ? `
+        <div style="background:var(--green-bg);border:1px solid #6ee7b7;border-radius:10px;padding:0.85rem 1rem;margin-bottom:1.25rem;">
+          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--green);margin-bottom:0.4rem;">✨ Final Answer</div>
+          <div style="font-size:0.84rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;">${_esc(run.final_output)}</div>
+          ${run.run_summary ? `<div style="margin-top:0.5rem;font-size:0.72rem;color:var(--muted);font-style:italic;border-top:1px solid #a7f3d0;padding-top:0.4rem;">${_esc(run.run_summary)}</div>` : ""}
+        </div>` : ""}
+
+      ${assignments.length ? `
+        <div style="margin-bottom:1.25rem;">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--text-2);margin-bottom:0.5rem;">Assignments (${assignments.length})</div>
+          <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:var(--surface2);border-bottom:1px solid var(--border);">
+                <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Agent</th>
+                <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Subtask</th>
+                <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Status</th>
+                <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Quality</th>
+                <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Retries</th>
+              </tr></thead>
+              <tbody>${assignmentRows}</tbody>
+            </table>
+          </div>
+        </div>` : ""}
+
+      ${eventRows ? `
+        <div style="margin-bottom:1.25rem;">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--text-2);margin-bottom:0.5rem;">Event timeline</div>
+          <div style="border:1px solid var(--border);border-radius:8px;padding:0.4rem 0.75rem;max-height:280px;overflow-y:auto;">
+            ${eventRows}
+          </div>
+        </div>` : ""}
+
+      ${perfHtml}`;
+
+  } catch(e) {
+    body.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">Could not load run: ${_esc(e.message)}</div>`;
+  }
+}
+
+function _closeRunDrilldown() {
+  const panel = document.getElementById("group-run-drilldown");
+  if (panel) panel.style.display = "none";
+}

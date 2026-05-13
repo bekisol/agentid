@@ -5667,6 +5667,31 @@ curl https://api.agentid-protocol.com/agents \
     </div>
   </div>
 
+  <!-- ── GROUP RUNS ── -->
+  <div class="card" style="margin-bottom:2rem;" id="group-runs-card">
+    <div class="card-header">
+      <div class="card-title">⚡ Group Runs</div>
+      <button class="btn btn-outline" id="group-runs-refresh-btn" style="font-size:0.8rem;padding:0.35rem 0.75rem;">↻ Refresh</button>
+    </div>
+    <div id="group-runs-list" style="min-height:60px;">
+      <div style="padding:1rem 1.25rem;font-size:0.85rem;color:var(--muted);">Loading runs…</div>
+    </div>
+  </div>
+
+  <!-- Group Run Drilldown panel (slides in from right) -->
+  <div id="group-run-drilldown" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9500;align-items:flex-start;justify-content:flex-end;padding:0;">
+    <div style="width:min(700px,100vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface2);">
+        <div>
+          <div style="font-weight:700;font-size:0.95rem;" id="grd-title">Run Detail</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.1rem;" id="grd-meta"></div>
+        </div>
+        <button id="grd-close-btn" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--muted);padding:0.2rem 0.5rem;border-radius:4px;">✕</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="grd-body"></div>
+    </div>
+  </div>
+
   </div><!-- /dash-main -->
 </div><!-- /dashboard -->
 
