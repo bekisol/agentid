@@ -834,6 +834,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <button id="teams-task-send-btn"
             style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:0.5rem 0.85rem;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;height:2.4rem;"
             onclick="_teamsStartRun()">Run</button>
+          <button id="teams-stop-btn"
+            style="display:none;background:var(--red,#ef4444);color:#fff;border:none;border-radius:8px;padding:0.5rem 0.85rem;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;height:2.4rem;"
+            onclick="_teamsCancelRun()" title="Stop the current run">⏹ Stop</button>
         </div>
         <div id="teams-task-err" style="display:none;font-size:0.77rem;color:var(--red);margin-top:0.2rem;"></div>
       </div>
@@ -4419,6 +4422,7 @@ async function _teamsStartRun() {
     const d = await r.json();
     input.value = "";
     await openRunThread(d.run_id, _activeTeamId);
+    _showStopBtn(true);
   } catch(e) {
     const errEl = document.getElementById("teams-task-err");
     if (errEl) { errEl.textContent = e.message; errEl.style.display = "block"; setTimeout(() => { errEl.style.display = "none"; }, 6000); }
@@ -4426,6 +4430,31 @@ async function _teamsStartRun() {
   } finally {
     btn.disabled = false; btn.textContent = "Run";
     input.disabled = false;
+  }
+}
+
+function _showStopBtn(show) {
+  const stop = document.getElementById("teams-stop-btn");
+  const run  = document.getElementById("teams-task-send-btn");
+  if (!stop) return;
+  stop.style.display = show ? "block" : "none";
+  if (run) run.style.display = show ? "none" : "block";
+}
+
+async function _teamsCancelRun() {
+  const runId = _activeTeamRun?.id;
+  if (!runId) return;
+  const btn = document.getElementById("teams-stop-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Stopping…"; }
+  try {
+    const r = await fetch(`${BASE}/pro/groups/runs/${runId}/cancel`, {
+      method: "POST", headers: apiHeaders(), credentials: "include",
+    });
+    if (!r.ok) throw new Error(`${r.status}`);
+    // UI update handled by the run_cancelled SSE event
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = "⏹ Stop"; }
+    alert("Could not stop run: " + e.message);
   }
 }
 
@@ -4491,9 +4520,12 @@ async function openRunThread(runId, groupId) {
     }
   } catch(_) {}
 
-  // If not yet terminal, open SSE stream
+  // If not yet terminal, open SSE stream and show Stop button
   if (!_RUN_TERMINAL.has(_activeTeamRun.status)) {
     _openTeamRunSSE(runId);
+    _showStopBtn(true);
+  } else {
+    _showStopBtn(false);
   }
 
   cpMsgs.scrollTop = cpMsgs.scrollHeight;
@@ -4741,6 +4773,7 @@ function _handleRunEvent(ev, isReplay) {
         ${summary ? `<div style="padding:0.4rem 0.85rem 0.6rem;font-size:0.72rem;color:var(--muted);border-top:1px solid var(--border);font-style:italic;">${esc(summary)}</div>` : ""}
       </div>`);
       _activeTeamRun = { ..._activeTeamRun, status: "completed" };
+      _showStopBtn(false);
       _stopTeamRunSSE();
       _refreshTeamRuns();
       break;
@@ -4757,6 +4790,7 @@ function _handleRunEvent(ev, isReplay) {
         <div class="orch-card-body" style="color:var(--red);">${esc(data.reason || data.error || "Unknown error")}</div>
       </div>`);
       _activeTeamRun = { ..._activeTeamRun, status: "failed" };
+      _showStopBtn(false);
       _stopTeamRunSSE();
       _refreshTeamRuns();
       break;
@@ -4769,6 +4803,7 @@ function _handleRunEvent(ev, isReplay) {
         <div class="orch-card-head"><span class="orch-card-icon">⏹</span><span class="orch-card-label">Run cancelled</span><span class="orch-card-time">${esc(ts)}</span></div>
       </div>`);
       _activeTeamRun = { ..._activeTeamRun, status: "cancelled" };
+      _showStopBtn(false);
       _stopTeamRunSSE();
       _refreshTeamRuns();
       break;
