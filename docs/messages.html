@@ -4425,7 +4425,8 @@ async function showTeamGroupView(groupId) {
   // Header actions
   document.getElementById("header-right-actions").innerHTML =
     `<button class="btn btn-outline" style="font-size:0.78rem" onclick="_refreshTeamRuns()">↻ Runs</button>
-     <button class="btn btn-outline" style="font-size:0.78rem" onclick="_toggleMemoryPanel()">📋 Memory</button>`;
+     <button class="btn btn-outline" style="font-size:0.78rem" onclick="_toggleMemoryPanel()">📋 Memory</button>
+     <button class="btn btn-outline" style="font-size:0.78rem" onclick="_openTeamWorkspace()">↗ Workspace</button>`;
 
   // Close any open agent chat panel — teams uses the right panel for run threads
   const cp = document.getElementById("chat-panel");
@@ -4471,6 +4472,24 @@ async function _loadTeamRuns(groupId) {
 
 async function _refreshTeamRuns() {
   if (_activeTeamId) await _loadTeamRuns(_activeTeamId);
+}
+
+// NOTE FOR FOLLOW-ON LLMS:
+// The standalone team workspace is the long-term home for deep orchestration UX.
+// Messages remains the conversational entry point; this bridge lets us move richer
+// run analysis out of the narrow drawer without breaking the current workflow.
+function _openTeamWorkspace(runId = null) {
+  const groupId = _activeTeamId;
+  if (!groupId) return;
+
+  const targetRunId =
+    runId
+    || _activeTeamRun?.id
+    || (_teamGroupRuns.find(r => !_RUN_TERMINAL.has(r.status)) || _teamGroupRuns[0] || {}).id;
+
+  const qs = new URLSearchParams({ group_id: String(groupId) });
+  if (targetRunId) qs.set("run_id", String(targetRunId));
+  location.href = `team-workspace.html?${qs.toString()}`;
 }
 
 function _renderTeamRunsList(groupId) {

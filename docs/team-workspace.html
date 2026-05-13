@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AgentID - Team Workspace</title>
+  <style>
+    :root{
+      --bg:#0b0d10;
+      --surface:#12161c;
+      --surface2:#171c23;
+      --surface3:#1d2430;
+      --text:#f3f4f6;
+      --text-2:#d1d5db;
+      --muted:#97a1ad;
+      --border:#263040;
+      --border-2:#334155;
+      --accent:#f97316;
+      --accent-2:#fb923c;
+      --green:#10b981;
+      --green-bg:rgba(16,185,129,0.08);
+      --yellow:#f59e0b;
+      --yellow-bg:rgba(245,158,11,0.12);
+      --blue:#3b82f6;
+      --blue-bg:rgba(59,130,246,0.12);
+      --red:#ef4444;
+      --red-bg:rgba(239,68,68,0.10);
+      --purple:#8b5cf6;
+      --purple-bg:rgba(139,92,246,0.12);
+      --shadow:0 12px 42px rgba(0,0,0,0.28);
+    }
+    * { box-sizing:border-box; }
+    html, body { margin:0; background:var(--bg); color:var(--text); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    a { color:inherit; }
+    button, input, textarea, select { font:inherit; }
+
+    .topbar {
+      height:58px; padding:0 1rem; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between; gap:1rem;
+      background:rgba(11,13,16,0.86); backdrop-filter:blur(12px); position:sticky; top:0; z-index:20;
+    }
+    .brand { font-weight:900; letter-spacing:0.01em; font-size:1.05rem; }
+    .brand span { color:var(--accent); }
+    .topnav { display:flex; gap:1rem; align-items:center; font-size:0.85rem; color:var(--muted); }
+    .topnav a { text-decoration:none; }
+    .topnav a.active { color:var(--text); font-weight:700; }
+    .topbar-right { display:flex; align-items:center; gap:0.75rem; }
+    .ghost-btn {
+      border:1px solid var(--border); background:var(--surface2); color:var(--text-2);
+      border-radius:9px; padding:0.42rem 0.72rem; cursor:pointer;
+    }
+
+    #auth-wall {
+      min-height:calc(100vh - 58px); display:none; align-items:center; justify-content:center; padding:1.5rem;
+    }
+    .auth-card {
+      width:min(430px, 100%); background:var(--surface); border:1px solid var(--border);
+      border-radius:18px; padding:1.4rem; box-shadow:var(--shadow);
+    }
+    .auth-card h2 { margin:0 0 0.35rem; font-size:1.1rem; }
+    .auth-card p { margin:0 0 1rem; font-size:0.84rem; color:var(--muted); line-height:1.55; }
+    .auth-card input {
+      width:100%; margin-top:0.45rem; border-radius:10px; border:1px solid var(--border-2);
+      background:var(--bg); color:var(--text); padding:0.7rem 0.85rem; outline:none;
+    }
+    .auth-card button {
+      width:100%; margin-top:0.55rem; border:none; border-radius:10px; background:var(--accent);
+      color:#fff; padding:0.72rem 0.9rem; cursor:pointer; font-weight:800;
+    }
+    .auth-error { min-height:1rem; margin-top:0.45rem; color:var(--red); font-size:0.79rem; text-align:center; }
+
+    #app { display:none; }
+    .workspace-shell {
+      display:grid; grid-template-columns:300px 1fr 320px; min-height:calc(100vh - 58px);
+    }
+    .rail {
+      border-right:1px solid var(--border); background:var(--surface);
+      min-width:0; display:flex; flex-direction:column;
+    }
+    .rail:last-child {
+      border-right:none; border-left:1px solid var(--border);
+    }
+    .rail-head {
+      padding:0.95rem 1rem; border-bottom:1px solid var(--border); background:var(--surface2);
+      display:flex; align-items:center; justify-content:space-between; gap:0.6rem;
+    }
+    .rail-title { font-size:0.8rem; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-2); }
+    .rail-sub { font-size:0.67rem; color:var(--muted); margin-top:0.2rem; line-height:1.45; }
+    .rail-body { flex:1; overflow:auto; padding:0.85rem; display:flex; flex-direction:column; gap:0.7rem; }
+    .search {
+      width:100%; border:1px solid var(--border-2); background:var(--bg); color:var(--text);
+      border-radius:9px; padding:0.6rem 0.75rem;
+    }
+    .team-card, .run-card, .note-card, .summary-card, .perf-card {
+      border:1px solid var(--border); background:var(--surface2); border-radius:12px; padding:0.75rem 0.8rem;
+    }
+    .team-card.active, .run-card.active { border-color:var(--accent); box-shadow:0 0 0 1px rgba(249,115,22,0.25) inset; }
+    .team-card { cursor:pointer; }
+    .team-name, .run-task { font-size:0.82rem; font-weight:800; color:var(--text); line-height:1.4; }
+    .team-meta, .run-meta, .small-meta { font-size:0.7rem; color:var(--muted); margin-top:0.28rem; line-height:1.45; }
+    .run-card { cursor:pointer; }
+    .run-top { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; margin-bottom:0.35rem; }
+    .badge {
+      display:inline-flex; align-items:center; gap:0.25rem; border-radius:999px; padding:0.17rem 0.52rem;
+      font-size:0.63rem; font-weight:800; text-transform:uppercase; letter-spacing:0.05em;
+      border:1px solid transparent;
+    }
+    .badge.planning { background:#e5e7eb1a; color:#d1d5db; border-color:#374151; }
+    .badge.running { background:var(--blue-bg); color:#93c5fd; border-color:#1d4ed8; }
+    .badge.paused_for_user, .badge.paused_for_approval { background:var(--yellow-bg); color:#fbbf24; border-color:#d97706; }
+    .badge.synthesizing { background:var(--purple-bg); color:#c4b5fd; border-color:#7c3aed; }
+    .badge.completed { background:var(--green-bg); color:#6ee7b7; border-color:#047857; }
+    .badge.failed, .badge.cancelled { background:var(--red-bg); color:#fca5a5; border-color:#b91c1c; }
+    .mini-btn {
+      border:1px solid var(--border); background:var(--bg); color:var(--muted);
+      border-radius:8px; padding:0.32rem 0.55rem; cursor:pointer; font-size:0.72rem; font-weight:700;
+    }
+
+    .main {
+      min-width:0; display:flex; flex-direction:column; overflow:hidden;
+      background:
+        radial-gradient(circle at top left, rgba(249,115,22,0.08), transparent 24%),
+        radial-gradient(circle at top right, rgba(59,130,246,0.07), transparent 20%),
+        var(--bg);
+    }
+    .main-scroll { flex:1; overflow:auto; padding:1.1rem; }
+    .hero {
+      border:1px solid var(--border); background:linear-gradient(180deg, rgba(23,28,35,0.95), rgba(18,22,28,0.95));
+      border-radius:18px; padding:1rem 1.05rem; box-shadow:var(--shadow);
+    }
+    .hero-top { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .hero-title { font-size:1.12rem; font-weight:900; letter-spacing:-0.01em; }
+    .hero-sub { font-size:0.77rem; color:var(--muted); line-height:1.5; margin-top:0.25rem; }
+    .hero-actions { display:flex; flex-wrap:wrap; gap:0.5rem; }
+    .action-btn {
+      display:inline-flex; align-items:center; gap:0.35rem; border-radius:9px; border:1px solid var(--border);
+      background:var(--surface2); color:var(--text-2); padding:0.48rem 0.72rem; font-size:0.75rem; font-weight:700; cursor:pointer;
+    }
+    .action-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .hero-kpis {
+      display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:0.6rem; margin-top:0.95rem;
+    }
+    .kpi {
+      border:1px solid var(--border); background:var(--surface2); border-radius:12px; padding:0.65rem 0.7rem;
+    }
+    .kpi-value { font-size:1.05rem; font-weight:900; }
+    .kpi-label { margin-top:0.2rem; font-size:0.64rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; font-weight:800; }
+
+    .main-grid {
+      display:grid; grid-template-columns:1.2fr 0.95fr; gap:0.85rem; margin-top:0.9rem;
+    }
+    .stack { display:flex; flex-direction:column; gap:0.85rem; min-width:0; }
+    .panel {
+      border:1px solid var(--border); background:var(--surface); border-radius:16px; overflow:hidden;
+    }
+    .panel-head {
+      display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.78rem 0.9rem;
+      border-bottom:1px solid var(--border); background:var(--surface2);
+    }
+    .panel-title { font-size:0.74rem; font-weight:900; color:var(--text-2); text-transform:uppercase; letter-spacing:0.06em; }
+    .panel-note { font-size:0.67rem; color:var(--muted); }
+    .panel-body { padding:0.85rem 0.9rem; }
+
+    .mission-copy { font-size:0.84rem; line-height:1.65; color:var(--text); white-space:pre-wrap; }
+    .plan-list, .decision-list, .context-list, .output-list { display:flex; flex-direction:column; gap:0.55rem; }
+    .plan-item, .decision-item, .context-item, .output-item {
+      border:1px solid var(--border); background:var(--bg); border-radius:12px; padding:0.7rem;
+    }
+    .plan-top, .decision-top, .output-top {
+      display:flex; align-items:center; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;
+    }
+    .plan-agent, .decision-label, .output-agent { font-size:0.78rem; font-weight:900; color:var(--text); }
+    .plan-copy, .decision-copy, .context-copy, .output-copy {
+      font-size:0.75rem; color:var(--text-2); line-height:1.5; margin-top:0.35rem; white-space:pre-wrap; word-break:break-word;
+    }
+    .plan-meta, .context-meta, .decision-meta, .output-meta {
+      font-size:0.67rem; color:var(--muted); line-height:1.45; margin-top:0.35rem;
+    }
+    .risk-badge {
+      display:inline-flex; align-items:center; border-radius:999px; padding:0.12rem 0.42rem; font-size:0.62rem; font-weight:800;
+    }
+    .risk-badge.low { background:#d1fae51c; color:#6ee7b7; }
+    .risk-badge.medium { background:#fef3c71a; color:#fbbf24; }
+    .risk-badge.high { background:#fee2e21a; color:#fca5a5; }
+    .trust-chip {
+      display:inline-flex; align-items:center; gap:0.25rem; border-radius:999px; background:var(--surface2);
+      border:1px solid var(--border); padding:0.14rem 0.44rem; font-size:0.62rem; color:var(--muted); font-weight:800;
+    }
+    .ws-pill-row { display:flex; align-items:center; gap:0.3rem; flex-wrap:wrap; flex-shrink:0; }
+
+    .lane-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0.6rem; }
+    .lane {
+      border:1px solid var(--border); background:var(--bg); border-radius:12px; padding:0.65rem;
+      min-height:118px;
+    }
+    .lane-head { display:flex; align-items:center; justify-content:space-between; gap:0.4rem; margin-bottom:0.45rem; }
+    .lane-title { font-size:0.68rem; font-weight:900; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
+    .lane-count { font-size:0.65rem; color:var(--muted); font-weight:800; }
+    .lane-chips { display:flex; flex-wrap:wrap; gap:0.35rem; }
+    .agent-chip {
+      display:inline-flex; align-items:center; gap:0.3rem; border-radius:999px; padding:0.2rem 0.5rem;
+      border:1px solid var(--border); background:var(--surface); font-size:0.66rem; font-weight:800; color:var(--text-2);
+    }
+    .agent-chip .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+    .dot.pending { background:#6b7280; }
+    .dot.assigned { background:#60a5fa; }
+    .dot.working { background:#3b82f6; }
+    .dot.completed { background:#10b981; }
+    .dot.rejected, .dot.reassigned { background:#f59e0b; }
+    .dot.failed { background:#ef4444; }
+
+    .final-panel { border-color:#1f7a5d; background:linear-gradient(180deg, rgba(16,185,129,0.06), rgba(18,22,28,1)); }
+    .final-panel .panel-head { background:rgba(16,185,129,0.08); border-bottom-color:#1f7a5d; }
+    .final-copy { font-size:0.82rem; line-height:1.65; white-space:pre-wrap; word-break:break-word; color:var(--text); }
+    .final-summary { margin-top:0.7rem; padding-top:0.7rem; border-top:1px solid #1f7a5d; font-size:0.72rem; color:var(--muted); font-style:italic; line-height:1.5; }
+    .empty { font-size:0.75rem; color:var(--muted); font-style:italic; }
+    .divider { height:1px; background:var(--border); margin:0.2rem 0; }
+
+    .list-actions { display:flex; gap:0.4rem; flex-wrap:wrap; }
+    .perf-grid { display:flex; flex-direction:column; gap:0.5rem; }
+    .perf-row { border:1px solid var(--border); border-radius:10px; background:var(--bg); padding:0.65rem 0.7rem; }
+    .perf-top { display:flex; justify-content:space-between; gap:0.5rem; align-items:center; }
+    .perf-name { font-size:0.76rem; font-weight:800; }
+    .perf-metrics { margin-top:0.35rem; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0.4rem; }
+    .perf-metric { font-size:0.67rem; color:var(--muted); }
+    .perf-metric strong { display:block; font-size:0.82rem; color:var(--text); margin-bottom:0.08rem; }
+
+    .loading, .empty-state {
+      border:1px dashed var(--border-2); border-radius:14px; padding:1.3rem 1rem; text-align:center;
+      color:var(--muted); font-size:0.82rem; background:rgba(255,255,255,0.02);
+    }
+    .spinner {
+      width:18px; height:18px; border-radius:50%; border:2px solid rgba(255,255,255,0.12);
+      border-top-color:var(--accent); margin:0 auto 0.55rem; animation:spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    #ws-toast {
+      position:fixed; bottom:1.2rem; left:50%; transform:translateX(-50%);
+      background:var(--surface2); border:1px solid var(--border-2); color:var(--text);
+      border-radius:10px; padding:0.6rem 1.1rem; font-size:0.82rem; font-weight:600;
+      box-shadow:var(--shadow); pointer-events:none; opacity:0; transition:opacity 0.2s;
+      z-index:999; max-width:min(420px,90vw); text-align:center;
+    }
+    #ws-toast.show { opacity:1; }
+    #ws-toast.error { border-color:var(--red); color:var(--red); }
+
+    @media (max-width: 1320px) {
+      .workspace-shell { grid-template-columns:280px 1fr; }
+      .rail:last-child { grid-column:1 / -1; border-left:none; border-top:1px solid var(--border); }
+    }
+    @media (max-width: 980px) {
+      .workspace-shell { grid-template-columns:1fr; }
+      .rail { border-right:none; border-bottom:1px solid var(--border); }
+      .main-grid { grid-template-columns:1fr; }
+      .hero-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">Agent<span>ID</span></div>
+    <div class="topnav">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="messages.html">Messages</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="team-workspace.html" class="active">Team Workspace</a>
+    </div>
+    <div class="topbar-right">
+      <div id="topbar-user" style="font-size:0.8rem;color:var(--muted);"></div>
+    </div>
+  </div>
+
+  <div id="ws-toast"></div>
+
+  <div id="auth-wall">
+    <div class="auth-card">
+      <h2>Open Team Workspace</h2>
+      <p>This workspace is for live multi-agent runs. Sign in with your session or API key to inspect plans, context, trust, and execution as one workspace.</p>
+      <input id="apikey-input" type="password" placeholder="Paste your API key (agentid_...)" autocomplete="off" spellcheck="false" />
+      <button id="apikey-submit">Sign in with API key</button>
+      <div class="auth-error" id="auth-error"></div>
+    </div>
+  </div>
+
+  <div id="app">
+    <div class="workspace-shell">
+      <aside class="rail">
+        <div class="rail-head">
+          <div>
+            <div class="rail-title">Teams</div>
+            <div class="rail-sub">Choose a team, then a run. The workspace follows the active run, not a chat thread.</div>
+          </div>
+        </div>
+        <div class="rail-body">
+          <input class="search" id="team-search" placeholder="Search teams..." />
+          <div id="team-list" class="stack"></div>
+          <div class="divider"></div>
+          <div>
+            <div class="rail-title" style="margin-bottom:0.55rem;">Runs</div>
+            <div id="run-list" class="stack"></div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="main-scroll" id="workspace-root">
+          <div class="empty-state">
+            <div style="font-size:1.4rem;margin-bottom:0.45rem;">⚡</div>
+            Pick a team to open its agentic workspace.
+          </div>
+        </div>
+      </main>
+
+      <aside class="rail">
+        <div class="rail-head">
+          <div>
+            <div class="rail-title">Memory And Trust</div>
+            <div class="rail-sub">Persistent notes, recent summaries, and per-agent reliability for the selected team.</div>
+          </div>
+        </div>
+        <div class="rail-body" id="side-insights">
+          <div class="empty-state">Select a team to load memory and performance.</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+  "use strict";
+
+  const BASE = "https://api.agentid-protocol.com";
+  const _origFetch = window.fetch.bind(window);
+  const _query = new URLSearchParams(window.location.search);
+
+  let apiKey = sessionStorage.getItem("agentid_key")
+            || localStorage.getItem("agentid_persisted_key")
+            || localStorage.getItem("agentid_key")
+            || "";
+
+  // NOTE FOR FOLLOW-ON LLMS:
+  // This page intentionally prefers a single source of truth from the backend.
+  // We still listen to SSE, but we debounce full run-detail refreshes after new
+  // events arrive so the workspace stays consistent across plan/execution/context.
+  const state = {
+    groups: [],
+    filteredGroups: [],
+    runs: [],
+    memory: { team_notes: [], run_summaries: [] },
+    performance: [],
+    analytics: null,
+    selectedGroupId: null,
+    selectedRunId: null,
+    run: null,
+    lastEventId: 0,
+    refreshTimer: null,
+    stream: null,
+    sseCancelled: false,
+  };
+
+  window.fetch = function(url, opts = {}) {
+    if (typeof url === "string" && url.startsWith(BASE)) {
+      const headers = { ...(opts.headers || {}) };
+      if (apiKey && !headers["x-api-key"]) headers["x-api-key"] = apiKey;
+      opts = { ...opts, credentials: "include", headers };
+    }
+    return _origFetch(url, opts);
+  };
+
+  function esc(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function relTime(iso) {
+    if (!iso) return "";
+    const delta = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+    if (delta < 60) return `${delta}s ago`;
+    if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
+    if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
+    return `${Math.floor(delta / 86400)}d ago`;
+  }
+
+  function fmtDuration(sec) {
+    if (!Number.isFinite(sec) || sec < 0) return "0s";
+    if (sec < 60) return `${Math.round(sec)}s`;
+    if (sec < 3600) return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
+    return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`;
+  }
+
+  function runBadge(status) {
+    return `<span class="badge ${esc(status || "planning")}">${esc((status || "planning").replace(/_/g, " "))}</span>`;
+  }
+
+  function requireAuthWall() {
+    document.getElementById("auth-wall").style.display = "flex";
+    document.getElementById("app").style.display = "none";
+  }
+
+  function showApp(email) {
+    document.getElementById("auth-wall").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    document.getElementById("topbar-user").textContent = email || "";
+  }
+
+  async function initAuth() {
+    try {
+      const headers = apiKey ? { "x-api-key": apiKey } : {};
+      const r = await _origFetch(`${BASE}/auth/me`, { credentials: "include", headers });
+      if (r.ok) {
+        const me = await r.json();
+        showApp(me.email || "");
+        boot();
+        return;
+      }
+    } catch (_) {}
+
+    if (apiKey) {
+      localStorage.removeItem("agentid_key");
+      localStorage.removeItem("agentid_persisted_key");
+      sessionStorage.removeItem("agentid_key");
+      apiKey = "";
+    }
+    requireAuthWall();
+  }
+
+  async function signInWithApiKey() {
+    const keyInput = document.getElementById("apikey-input");
+    const submitBtn = document.getElementById("apikey-submit");
+    const errEl = document.getElementById("auth-error");
+    const entered = (keyInput.value || "").trim();
+    if (!entered) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Checking...";
+    errEl.textContent = "";
+
+    try {
+      const r = await _origFetch(`${BASE}/auth/me`, { headers: { "x-api-key": entered } });
+      if (!r.ok) throw new Error("Invalid API key");
+      const me = await r.json();
+      apiKey = entered;
+      sessionStorage.setItem("agentid_key", apiKey);
+      localStorage.setItem("agentid_persisted_key", apiKey);
+      showApp(me.email || "");
+      boot();
+    } catch (e) {
+      errEl.textContent = e.message || "Could not sign in";
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign in with API key";
+    }
+  }
+
+  async function fetchJson(path, opts) {
+    const r = await fetch(`${BASE}${path}`, opts);
+    if (!r.ok) {
+      let detail = `Error ${r.status}`;
+      try {
+        const data = await r.json();
+        detail = data?.detail?.message || data?.detail || data?.error || detail;
+      } catch (_) {}
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    return r.json();
+  }
+
+  async function boot() {
+    if (boot._started) return;
+    boot._started = true;
+
+    document.getElementById("team-search").addEventListener("input", e => {
+      const q = (e.target.value || "").trim().toLowerCase();
+      state.filteredGroups = !q
+        ? state.groups.slice()
+        : state.groups.filter(g =>
+            (g.name || "").toLowerCase().includes(q) ||
+            (g.description || "").toLowerCase().includes(q)
+          );
+      renderTeams();
+    });
+
+    await loadGroups();
+
+    const qGroup = Number(_query.get("group_id")) || null;
+    const qRun = _query.get("run_id");
+    if (qGroup) {
+      await selectGroup(qGroup, { preferredRunId: qRun });
+    } else if (state.groups.length) {
+      await selectGroup(state.groups[0].id, { preferredRunId: qRun });
+    }
+  }
+
+  async function loadGroups() {
+    const data = await fetchJson("/pro/groups?limit=100");
+    state.groups = data.groups || [];
+    state.filteredGroups = state.groups.slice();
+    renderTeams();
+  }
+
+  async function selectGroup(groupId, { preferredRunId = null } = {}) {
+    if (!groupId) return;
+    state.selectedGroupId = Number(groupId);
+    state.selectedRunId = null;
+    state.run = null;
+    stopRunStream();
+    renderTeams();
+    renderRunsLoading();
+    renderSideInsightsLoading();
+    renderWorkspaceLoading("Loading team workspace...");
+
+    const [runsData, memoryData, perfData, analyticsData] = await Promise.all([
+      fetchJson(`/pro/groups/${groupId}/runs?limit=20`),
+      fetchJson(`/pro/groups/${groupId}/memory`),
+      fetchJson(`/pro/groups/${groupId}/performance`).catch(() => ({ agents: [] })),
+      fetchJson(`/pro/groups/${groupId}/analytics`).catch(() => null),
+    ]);
+
+    state.runs = runsData.runs || [];
+    state.memory = memoryData || { team_notes: [], run_summaries: [] };
+    state.performance = perfData.agents || [];
+    state.analytics = analyticsData;
+
+    renderTeams();
+    renderRuns();
+    renderSideInsights();
+
+    const targetRun = preferredRunId
+      || ((state.runs.find(r => !isTerminal(r.status)) || state.runs[0] || {}).id);
+
+    if (targetRun) {
+      await selectRun(targetRun);
+    } else {
+      renderWorkspaceEmpty("No runs yet. Start a team task from Messages or the dashboard to populate this workspace.");
+    }
+  }
+
+  async function selectRun(runId) {
+    if (!runId || !state.selectedGroupId) return;
+    state.selectedRunId = String(runId);
+    stopRunStream();
+    renderRuns();
+    renderWorkspaceLoading("Loading run...");
+
+    const run = await fetchJson(`/pro/groups/runs/${runId}`);
+    state.run = run;
+    state.lastEventId = Math.max(0, ...(run.events || []).map(ev => Number(ev.id) || 0));
+    history.replaceState({}, "", `team-workspace.html?group_id=${state.selectedGroupId}&run_id=${encodeURIComponent(runId)}`);
+
+    renderRuns();
+    renderWorkspace();
+
+    if (!isTerminal(run.status)) startRunStream(runId);
+  }
+
+  function renderTeams() {
+    const root = document.getElementById("team-list");
+    if (!state.filteredGroups.length) {
+      root.innerHTML = `<div class="empty-state">No teams found.</div>`;
+      return;
+    }
+
+    root.innerHTML = state.filteredGroups.map(group => {
+      const active = state.selectedGroupId === Number(group.id);
+      return `<div class="team-card ${active ? "active" : ""}" data-team-id="${group.id}">
+        <div class="team-name">${esc(group.name || `Team ${group.id}`)}</div>
+        <div class="team-meta">${esc(group.description || `${group.member_count || 0} members`)}</div>
+        <div class="small-meta">${group.member_count || 0} agent${group.member_count === 1 ? "" : "s"}</div>
+      </div>`;
+    }).join("");
+
+    root.querySelectorAll(".team-card").forEach(card => {
+      card.addEventListener("click", () => selectGroup(Number(card.dataset.teamId)));
+    });
+  }
+
+  function renderRunsLoading() {
+    document.getElementById("run-list").innerHTML = `<div class="loading"><div class="spinner"></div>Loading runs...</div>`;
+  }
+
+  function renderRuns() {
+    const root = document.getElementById("run-list");
+    if (!state.runs.length) {
+      root.innerHTML = `<div class="empty-state">No runs for this team yet.</div>`;
+      return;
+    }
+
+    root.innerHTML = state.runs.map(run => {
+      const active = state.selectedRunId === String(run.id);
+      return `<div class="run-card ${active ? "active" : ""}" data-run-id="${run.id}">
+        <div class="run-top">
+          ${runBadge(run.status)}
+          <span class="small-meta">${esc(relTime(run.started_at))}</span>
+        </div>
+        <div class="run-task">${esc((run.user_task || "").slice(0, 92))}${(run.user_task || "").length > 92 ? "..." : ""}</div>
+        <div class="run-meta">${run.completed_at && run.started_at ? `Completed in ${esc(fmtDuration((new Date(run.completed_at) - new Date(run.started_at)) / 1000))}` : "Open workspace"}</div>
+      </div>`;
+    }).join("");
+
+    root.querySelectorAll(".run-card").forEach(card => {
+      card.addEventListener("click", () => selectRun(card.dataset.runId));
+    });
+  }
+
+  function renderSideInsightsLoading() {
+    document.getElementById("side-insights").innerHTML = `<div class="loading"><div class="spinner"></div>Loading memory and trust...</div>`;
+  }
+
+  function renderSideInsights() {
+    const root = document.getElementById("side-insights");
+    const notes = state.memory?.team_notes || [];
+    const summaries = state.memory?.run_summaries || [];
+    const perf = state.performance || [];
+    const analytics = state.analytics;
+
+    const analyticsHtml = analytics ? `
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Team Analytics</div>
+          <div class="panel-note">${esc(analytics.runs?.total || 0)} run${analytics.runs?.total === 1 ? "" : "s"}</div>
+        </div>
+        <div class="panel-body">
+          <div class="perf-metrics">
+            <div class="perf-metric"><strong>${Math.round((analytics.runs?.completion_rate || 0) * 100)}%</strong>Completion</div>
+            <div class="perf-metric"><strong>${Math.round((analytics.assignments?.acceptance_rate || 0) * 100)}%</strong>Acceptance</div>
+            <div class="perf-metric"><strong>${Math.round((analytics.assignments?.avg_quality || 0) * 100)}%</strong>Avg quality</div>
+            <div class="perf-metric"><strong>${analytics.assignments?.trust_influenced || 0}</strong>Trust-routed</div>
+          </div>
+        </div>
+      </div>` : "";
+
+    const notesHtml = notes.length
+      ? notes.map(note => `<div class="note-card">
+          <div class="team-name" style="font-size:0.75rem;">${esc(note.created_by || "team note")}</div>
+          <div class="team-meta">${esc(relTime(note.updated_at || note.created_at))}</div>
+          <div class="mission-copy" style="font-size:0.77rem;margin-top:0.45rem;">${esc(note.content)}</div>
+        </div>`).join("")
+      : `<div class="empty">No team notes yet.</div>`;
+
+    const summariesHtml = summaries.length
+      ? summaries.map(summary => `<div class="summary-card">
+          <div class="small-meta">${esc(relTime(summary.created_at))}</div>
+          <div class="mission-copy" style="font-size:0.76rem;margin-top:0.35rem;">${esc(summary.content)}</div>
+        </div>`).join("")
+      : `<div class="empty">No run summaries yet.</div>`;
+
+    const perfHtml = perf.length
+      ? perf.map(agent => `<div class="perf-card">
+          <div class="perf-top">
+            <div class="perf-name">${esc(agent.name || (agent.did || "").slice(-14))}</div>
+            <div class="trust-chip">${agent.avg_quality_score != null ? `${Math.round(agent.avg_quality_score * 100)}% quality` : "No quality yet"}</div>
+          </div>
+          <div class="perf-metrics">
+            <div class="perf-metric"><strong>${agent.total_assigned || 0}</strong>Assigned</div>
+            <div class="perf-metric"><strong>${agent.total_completed || 0}</strong>Done</div>
+            <div class="perf-metric"><strong>${agent.total_rejected || 0}</strong>Rejected</div>
+            <div class="perf-metric"><strong>${Math.round((agent.completion_rate || 0) * 100)}%</strong>Completion</div>
+          </div>
+        </div>`).join("")
+      : `<div class="empty">No performance history yet.</div>`;
+
+    root.innerHTML = `
+      ${analyticsHtml}
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Team Notes</div>
+          <div class="panel-note">${notes.length}</div>
+        </div>
+        <div class="panel-body"><div class="stack">${notesHtml}</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Recent Summaries</div>
+          <div class="panel-note">${summaries.length}</div>
+        </div>
+        <div class="panel-body"><div class="stack">${summariesHtml}</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Agent Reliability</div>
+          <div class="panel-note">${perf.length} tracked</div>
+        </div>
+        <div class="panel-body"><div class="perf-grid">${perfHtml}</div></div>
+      </div>`;
+  }
+
+  function renderWorkspaceLoading(label) {
+    document.getElementById("workspace-root").innerHTML = `<div class="loading"><div class="spinner"></div>${esc(label || "Loading...")}</div>`;
+  }
+
+  function renderWorkspaceEmpty(label) {
+    document.getElementById("workspace-root").innerHTML = `<div class="empty-state">${esc(label || "Nothing selected.")}</div>`;
+  }
+
+  function isTerminal(status) {
+    return ["completed", "failed", "cancelled"].includes(status);
+  }
+
+  function derivePlan(run) {
+    const plan = run?.orchestrator_plan;
+    if (Array.isArray(plan)) return plan;
+    if (Array.isArray(plan?.plan)) return plan.plan;
+    const eventPlan = (run?.events || []).find(ev => ev.event_type === "orchestrator_plan");
+    return eventPlan?.event_data?.plan || eventPlan?.data?.plan || [];
+  }
+
+  function deriveContextList(run) {
+    const latestByKey = new Map();
+
+    (run.assignments || []).forEach(assign => {
+      const ctx = assign.contributing_context;
+      if (!ctx || typeof ctx !== "object") return;
+      Object.entries(ctx).forEach(([key, value]) => latestByKey.set(key, value));
+    });
+
+    if (!latestByKey.size) {
+      const newestSnapshotCarrier = [...(run.events || [])].reverse().find(ev => ev.context_snapshot && typeof ev.context_snapshot === "object");
+      const snap = newestSnapshotCarrier?.context_snapshot || {};
+      Object.entries(snap).forEach(([key, value]) => latestByKey.set(key, value));
+    }
+
+    return [...latestByKey.entries()].slice(0, 10);
+  }
+
+  function deriveDecisionList(run) {
+    const interesting = new Set([
+      "orchestrator_rejected",
+      "agent_reassigned",
+      "clarification_requested",
+      "clarification_received",
+      "approval_requested",
+      "approval_granted",
+      "run_failed",
+      "run_cancelled",
+      "synthesis_started",
+      "run_completed",
+    ]);
+
+    return (run.events || [])
+      .filter(ev => interesting.has(ev.event_type))
+      .slice(-12)
+      .reverse();
+  }
+
+  function deriveOutputList(run) {
+    return (run.assignments || [])
+      .filter(assign => assign.status === "completed" && assign.output)
+      .map(assign => {
+        const raw = assign.output?.result || assign.output?.output || assign.output?.text || JSON.stringify(assign.output);
+        return {
+          did: assign.agent_did,
+          preview: String(raw || "").slice(0, 220),
+          score: assign.quality_score,
+        };
+      });
+  }
+
+  function deriveStatusBuckets(assignments) {
+    const buckets = {
+      assigned: [],
+      working: [],
+      completed: [],
+      attention: [],
+    };
+
+    assignments.forEach(assign => {
+      const entry = {
+        did: assign.agent_did,
+        name: (assign.agent_did || "").slice(-14),
+        status: assign.status || "pending",
+      };
+      if (assign.status === "completed") buckets.completed.push(entry);
+      else if (assign.status === "running") buckets.working.push({ ...entry, status: "working" });
+      else if (["failed", "rejected", "reassigned"].includes(assign.status)) buckets.attention.push(entry);
+      else buckets.assigned.push(entry);
+    });
+
+    return buckets;
+  }
+
+  function renderWorkspace() {
+    const run = state.run;
+    if (!run) {
+      renderWorkspaceEmpty("Select a run to open the workspace.");
+      return;
+    }
+
+    const plan = derivePlan(run);
+    const outputs = deriveOutputList(run);
+    const decisions = deriveDecisionList(run);
+    const contextList = deriveContextList(run);
+    const statusBuckets = deriveStatusBuckets(run.assignments || []);
+
+    const completed = (run.assignments || []).filter(a => a.status === "completed").length;
+    const avgTrust = (run.assignments || []).filter(a => a.trust_score_at_assignment != null);
+    const avgTrustValue = avgTrust.length
+      ? Math.round(avgTrust.reduce((sum, a) => sum + Number(a.trust_score_at_assignment || 0), 0) / avgTrust.length)
+      : null;
+    const retryCount = (run.assignments || []).reduce((sum, a) => sum + Number(a.retry_count || 0), 0);
+    const highRiskCount = (run.assignments || []).filter(a => a.risk_level === "high").length;
+    const elapsedSec = run.started_at
+      ? ((isTerminal(run.status) ? new Date(run.completed_at || run.updated_at || Date.now()) : new Date()) - new Date(run.started_at)) / 1000
+      : 0;
+
+    const selectedGroup = state.groups.find(g => Number(g.id) === Number(state.selectedGroupId));
+
+    const planHtml = plan.length ? plan.map(item => `
+      <div class="plan-item">
+        <div class="plan-top">
+          <div class="plan-agent">${esc(agentName(item.agent_did))}</div>
+          <div class="ws-pill-row">
+            ${item.risk_level ? `<span class="risk-badge ${esc(item.risk_level)}">${esc(item.risk_level)}</span>` : ""}
+            ${item.trust_score != null ? `<span class="trust-chip">Trust ${Math.round(item.trust_score)}</span>` : ""}
+          </div>
+        </div>
+        <div class="plan-copy">${esc(item.subtask || "")}</div>
+        ${item.rationale ? `<div class="plan-meta">Why this agent: ${esc(item.rationale)}</div>` : ""}
+      </div>`).join("") : `<div class="empty">The orchestrator plan has not been recorded yet.</div>`;
+
+    const laneHtml = [
+      ["assigned", "Assigned"],
+      ["working", "Working"],
+      ["completed", "Completed"],
+      ["attention", "Needs Attention"],
+    ].map(([key, label]) => {
+      const entries = statusBuckets[key] || [];
+      const chips = entries.length
+        ? entries.map(entry => `<span class="agent-chip"><span class="dot ${esc(entry.status)}"></span>${esc(agentName(entry.did))}</span>`).join("")
+        : `<div class="empty">No agents here.</div>`;
+      return `<div class="lane">
+        <div class="lane-head">
+          <div class="lane-title">${esc(label)}</div>
+          <div class="lane-count">${entries.length}</div>
+        </div>
+        <div class="lane-chips">${chips}</div>
+      </div>`;
+    }).join("");
+
+    const contextHtml = contextList.length ? contextList.map(([key, value]) => {
+      const val = value?.value || value || {};
+      const preview = typeof val === "object"
+        ? (val.result || val.subtask || JSON.stringify(val)).slice(0, 180)
+        : String(val).slice(0, 180);
+      return `<div class="context-item">
+        <div class="plan-top">
+          <div class="plan-agent">${esc(key)}</div>
+          <div class="small-meta">${esc((value?.by || "").slice(-14) || "shared context")}</div>
+        </div>
+        <div class="context-copy">${esc(preview)}</div>
+        <div class="context-meta">${value?.at ? `Written ${esc(relTime(value.at))}` : "Latest context snapshot"}</div>
+      </div>`;
+    }).join("") : `<div class="empty">No shared context captured yet.</div>`;
+
+    const decisionHtml = decisions.length ? decisions.map(ev => {
+      const data = ev.event_data || ev.data || {};
+      const who = ev.agent_did ? agentName(ev.agent_did) : "Orchestrator";
+      const details =
+        data.reason ||
+        data.question ||
+        data.clarification ||
+        data.output_preview ||
+        data.status ||
+        JSON.stringify(data).slice(0, 160);
+      return `<div class="decision-item">
+        <div class="decision-top">
+          <div class="decision-label">${esc((ev.event_type || "").replace(/_/g, " "))}</div>
+          <div class="small-meta">${esc(relTime(ev.ts))}</div>
+        </div>
+        <div class="decision-copy">${esc(details || who)}</div>
+        <div class="decision-meta">${esc(who)}</div>
+      </div>`;
+    }).join("") : `<div class="empty">No major run decisions logged yet.</div>`;
+
+    const outputsHtml = outputs.length ? outputs.map(output => `
+      <div class="output-item">
+        <div class="output-top">
+          <div class="output-agent">${esc(agentName(output.did))}</div>
+          ${output.score != null ? `<span class="trust-chip">${Math.round(output.score * 100)}% quality</span>` : ""}
+        </div>
+        <div class="output-copy">${esc(output.preview)}${output.preview.length >= 220 ? "..." : ""}</div>
+      </div>`).join("") : `<div class="empty">Accepted agent outputs will appear here.</div>`;
+
+    const root = document.getElementById("workspace-root");
+    root.innerHTML = `
+      <div class="hero">
+        <div class="hero-top">
+          <div>
+            <div class="hero-title">${esc(selectedGroup?.name || `Team ${state.selectedGroupId}`)} · Run Workspace</div>
+            <div class="hero-sub">A run-centered workspace for trusted agent execution. This page keeps plan, context, trust, and outcomes together instead of forcing them through the Messages drawer.</div>
+          </div>
+          <div class="hero-actions">
+            <button class="action-btn" onclick="location.href='messages.html'">Back to Messages</button>
+            <button class="action-btn" onclick="refreshCurrentRun()">Refresh run</button>
+            <button class="action-btn" onclick="downloadRunReport()">Download report</button>
+            ${!isTerminal(run.status) ? `<button class="action-btn primary" onclick="cancelCurrentRun()">Stop run</button>` : ""}
+          </div>
+        </div>
+        <div class="hero-kpis">
+          <div class="kpi"><div class="kpi-value">${runBadge(run.status)}</div><div class="kpi-label">Phase</div></div>
+          <div class="kpi"><div class="kpi-value">${(run.assignments || []).length}</div><div class="kpi-label">Assignments</div></div>
+          <div class="kpi"><div class="kpi-value">${completed}</div><div class="kpi-label">Completed</div></div>
+          <div class="kpi"><div class="kpi-value">${avgTrustValue != null ? avgTrustValue : "—"}</div><div class="kpi-label">Avg trust</div></div>
+          <div class="kpi"><div class="kpi-value">${fmtDuration(elapsedSec)}</div><div class="kpi-label">Elapsed</div></div>
+        </div>
+      </div>
+
+      <div class="main-grid">
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Mission</div>
+              <div class="panel-note">${esc(relTime(run.started_at))}</div>
+            </div>
+            <div class="panel-body">
+              <div class="mission-copy">${esc(run.user_task || "")}</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Execution Board</div>
+              <div class="panel-note">${retryCount} retr${retryCount === 1 ? "y" : "ies"} · ${highRiskCount} high risk</div>
+            </div>
+            <div class="panel-body">
+              <div class="lane-grid">${laneHtml}</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Orchestrator Plan</div>
+              <div class="panel-note">${plan.length} assignment${plan.length === 1 ? "" : "s"}</div>
+            </div>
+            <div class="panel-body"><div class="plan-list">${planHtml}</div></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Shared Context</div>
+              <div class="panel-note">${contextList.length} recent artifact${contextList.length === 1 ? "" : "s"}</div>
+            </div>
+            <div class="panel-body"><div class="context-list">${contextHtml}</div></div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Decision Log</div>
+              <div class="panel-note">Why the run changed shape</div>
+            </div>
+            <div class="panel-body"><div class="decision-list">${decisionHtml}</div></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Accepted Outputs</div>
+              <div class="panel-note">What the team has produced so far</div>
+            </div>
+            <div class="panel-body"><div class="output-list">${outputsHtml}</div></div>
+          </div>
+
+          <div class="panel final-panel">
+            <div class="panel-head">
+              <div class="panel-title">Final Answer</div>
+              <div class="panel-note">${isTerminal(run.status) ? "Terminal state" : "Waiting for synthesis"}</div>
+            </div>
+            <div class="panel-body">
+              ${run.final_output
+                ? `<div class="final-copy">${esc(run.final_output)}</div>
+                   ${run.run_summary ? `<div class="final-summary">${esc(run.run_summary)}</div>` : ""}`
+                : `<div class="empty">The final merged answer will appear here once synthesis finishes.</div>`}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function agentName(did) {
+    const perfMatch = (state.performance || []).find(agent => agent.did === did);
+    return perfMatch?.name || (did || "").slice(-14) || "Agent";
+  }
+
+  function stopRunStream() {
+    if (state.stream) state.stream.close();
+    state.stream = null;
+    state.sseCancelled = true;
+    if (state.refreshTimer) {
+      clearTimeout(state.refreshTimer);
+      state.refreshTimer = null;
+    }
+  }
+
+  function scheduleRunRefresh() {
+    if (state.refreshTimer || !state.selectedRunId) return;
+    state.refreshTimer = setTimeout(async () => {
+      state.refreshTimer = null;
+      try {
+        const run = await fetchJson(`/pro/groups/runs/${state.selectedRunId}`);
+        state.run = run;
+        state.lastEventId = Math.max(state.lastEventId, ...(run.events || []).map(ev => Number(ev.id) || 0));
+        renderRuns();
+        renderWorkspace();
+      } catch (_) {}
+    }, 350);
+  }
+
+  function startRunStream(runId) {
+    stopRunStream();
+    state.sseCancelled = false;
+    const controller = new AbortController();
+    state.stream = { close: () => { state.sseCancelled = true; controller.abort(); } };
+
+    fetch(`${BASE}/pro/groups/runs/${runId}/stream?since_id=${state.lastEventId}`, {
+      headers: apiKey ? { "x-api-key": apiKey } : {},
+      credentials: "include",
+      signal: controller.signal,
+    }).then(async res => {
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done || state.sseCancelled) break;
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split("\n\n");
+        buffer = chunks.pop();
+        for (const chunk of chunks) {
+          if (chunk.trimStart().startsWith(":")) continue;
+          const dataLine = chunk.split("\n").find(line => line.startsWith("data: "));
+          if (!dataLine) continue;
+          try {
+            const ev = JSON.parse(dataLine.slice(6));
+            if (ev.id && ev.id > state.lastEventId) state.lastEventId = ev.id;
+            if (ev.event_type === "stream_end") {
+              await refreshCurrentRun();
+              stopRunStream();
+              break;
+            }
+            scheduleRunRefresh();
+          } catch (_) {}
+        }
+      }
+    }).catch(() => {
+      if (!state.sseCancelled && state.run && !isTerminal(state.run.status)) {
+        setTimeout(() => {
+          if (!state.sseCancelled && state.selectedRunId) startRunStream(state.selectedRunId);
+        }, 2000);
+      }
+    });
+  }
+
+  async function refreshCurrentRun() {
+    if (!state.selectedRunId) return;
+    const run = await fetchJson(`/pro/groups/runs/${state.selectedRunId}`);
+    state.run = run;
+    state.lastEventId = Math.max(0, ...(run.events || []).map(ev => Number(ev.id) || 0));
+    renderRuns();
+    renderWorkspace();
+    if (!isTerminal(run.status) && !state.stream) startRunStream(state.selectedRunId);
+  }
+
+  let _toastTimer = null;
+  function showToast(msg, isError = false) {
+    const el = document.getElementById("ws-toast");
+    if (!el) return;
+    clearTimeout(_toastTimer);
+    el.textContent = msg;
+    el.className = "show" + (isError ? " error" : "");
+    _toastTimer = setTimeout(() => { el.className = ""; }, 3500);
+  }
+
+  async function cancelCurrentRun() {
+    if (!state.selectedRunId) return;
+    try {
+      await fetchJson(`/pro/groups/runs/${state.selectedRunId}/cancel`, { method: "POST" });
+      await refreshCurrentRun();
+    } catch (e) {
+      showToast(e.message || "Could not stop run.", true);
+    }
+  }
+
+  async function downloadRunReport() {
+    if (!state.selectedRunId) return;
+    try {
+      const res = await fetch(`${BASE}/pro/groups/runs/${state.selectedRunId}/report`, {
+        headers: apiKey ? { "x-api-key": apiKey } : {},
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Report not available yet.");
+      const text = await res.text();
+      const blob = new Blob([text], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `team_run_${state.selectedRunId.slice(0, 8)}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Report downloaded.");
+    } catch (e) {
+      showToast(e.message || "Could not download report.", true);
+    }
+  }
+
+  document.getElementById("apikey-submit").addEventListener("click", signInWithApiKey);
+  document.getElementById("apikey-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") signInWithApiKey();
+  });
+
+  initAuth();
+  </script>
+</body>
+</html>
