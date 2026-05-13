@@ -9995,6 +9995,7 @@ async function openRunDrilldown(runId, groupId) {
   const meta  = document.getElementById("grd-meta");
   if (!panel || !body) return;
 
+  _stopDrilldownSSE();
   panel.style.display = "flex";
   body.innerHTML = `<div style="text-align:center;padding:3rem 1rem;"><div style="width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 0.75rem;"></div><div style="font-size:0.85rem;color:var(--muted);">Loading run…</div></div>`;
   title.textContent = "Run Detail";
@@ -10002,37 +10003,32 @@ async function openRunDrilldown(runId, groupId) {
 
   try {
     const run = await apiFetch(`/pro/groups/runs/${runId}`);
+    // preserve groupId across reloads triggered by SSE terminal event
+    if (groupId != null) run._groupId = groupId;
 
     title.textContent = run.user_task ? run.user_task.slice(0, 60) + (run.user_task.length > 60 ? "…" : "") : "Run Detail";
     const startedAt = run.started_at ? new Date(run.started_at).toLocaleString() : "";
     meta.textContent = `${run.status} · ${startedAt}`;
 
-    // Assignments section
+    // Assignments section — data-agent-did + class names for live updates
     const assignments = run.assignments || [];
     const assignmentRows = assignments.map(a => {
       const score = a.quality_score != null ? `${Math.round(a.quality_score * 100)}%` : "—";
       const scoreColor = a.quality_score != null && a.quality_score >= 0.6 ? "var(--green)" : "var(--yellow)";
-      return `<tr style="border-bottom:1px solid var(--border);">
+      return `<tr style="border-bottom:1px solid var(--border);" data-agent-did="${_esc(a.agent_did || "")}">
         <td style="padding:0.45rem 0.6rem;font-size:0.78rem;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc((a.agent_did || "").slice(-14))}</td>
         <td style="padding:0.45rem 0.6rem;font-size:0.78rem;color:var(--text-2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(a.subtask || "")}</td>
-        <td style="padding:0.45rem 0.6rem;">${_runStatusBadge(a.status)}</td>
-        <td style="padding:0.45rem 0.6rem;font-size:0.78rem;font-weight:700;color:${scoreColor};">${_esc(score)}</td>
+        <td style="padding:0.45rem 0.6rem;" class="grd-status-cell">${_runStatusBadge(a.status)}</td>
+        <td style="padding:0.45rem 0.6rem;font-size:0.78rem;font-weight:700;color:${scoreColor};" class="grd-quality-cell">${_esc(score)}</td>
         <td style="padding:0.45rem 0.6rem;font-size:0.72rem;color:var(--muted);">${a.retry_count > 0 ? `${a.retry_count} retr${a.retry_count > 1 ? "ies" : "y"}` : "—"}</td>
       </tr>`;
     }).join("");
 
-    // Events timeline (last 50)
+    // Events timeline — container gets stable ID for live appending
     const events = (run.events || []).slice(-50);
     const eventRows = events.map(ev => {
       const ts = ev.ts ? new Date(ev.ts).toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit", second:"2-digit" }) : "";
-      const typeColors = {
-        orchestrator_plan: "#7c3aed", agent_assigned: "#2563eb", agent_completed: "#059669",
-        orchestrator_rejected: "#d97706", agent_reassigned: "#d97706",
-        clarification_requested: "#b45309", clarification_received: "#b45309",
-        synthesis_started: "#0891b2", synthesis_completed: "#059669",
-        run_completed: "#059669", run_failed: "#dc2626", run_cancelled: "#6b7280",
-      };
-      const col = typeColors[ev.event_type] || "#6b7280";
+      const col = _GRD_EVENT_COLORS[ev.event_type] || "#6b7280";
       const label = (ev.event_type || "").replace(/_/g, " ");
       return `<div style="display:flex;gap:0.6rem;align-items:flex-start;padding:0.35rem 0;border-bottom:1px solid var(--border);">
         <span style="font-size:0.65rem;color:var(--muted);white-space:nowrap;flex-shrink:0;padding-top:0.05rem;min-width:56px;">${_esc(ts)}</span>
@@ -10095,20 +10091,25 @@ async function openRunDrilldown(runId, groupId) {
                 <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Quality</th>
                 <th style="text-align:left;padding:0.4rem 0.6rem;font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Retries</th>
               </tr></thead>
-              <tbody>${assignmentRows}</tbody>
+              <tbody id="grd-assignments-body">${assignmentRows}</tbody>
             </table>
           </div>
         </div>` : ""}
 
-      ${eventRows ? `
+      ${eventRows !== undefined ? `
         <div style="margin-bottom:1.25rem;">
           <div style="font-size:0.8rem;font-weight:700;color:var(--text-2);margin-bottom:0.5rem;">Event timeline</div>
-          <div style="border:1px solid var(--border);border-radius:8px;padding:0.4rem 0.75rem;max-height:280px;overflow-y:auto;">
+          <div id="grd-events-list" style="border:1px solid var(--border);border-radius:8px;padding:0.4rem 0.75rem;max-height:320px;overflow-y:auto;">
             ${eventRows}
           </div>
         </div>` : ""}
 
       ${perfHtml}`;
+
+    // Start live SSE stream if run is still active
+    if (!_GRD_TERMINAL.has(run.status)) {
+      _startDrilldownSSE(runId);
+    }
 
   } catch(e) {
     body.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">Could not load run: ${_esc(e.message)}</div>`;
@@ -10116,6 +10117,147 @@ async function openRunDrilldown(runId, groupId) {
 }
 
 function _closeRunDrilldown() {
+  _stopDrilldownSSE();
   const panel = document.getElementById("group-run-drilldown");
   if (panel) panel.style.display = "none";
+}
+
+// ── Drilldown live SSE ────────────────────────────────────────────────────────
+
+let _drilldownSSE = null;  // { close() }
+const _GRD_TERMINAL = new Set(["completed","failed","cancelled"]);
+
+const _GRD_EVENT_COLORS = {
+  orchestrator_plan:"#7c3aed", agent_assigned:"#2563eb", agent_started:"#2563eb",
+  agent_completed:"#059669", orchestrator_rejected:"#d97706", agent_reassigned:"#d97706",
+  context_written:"#6b7280", clarification_requested:"#b45309", clarification_received:"#b45309",
+  synthesis_started:"#0891b2", synthesis_completed:"#059669",
+  run_completed:"#059669", run_failed:"#dc2626", run_cancelled:"#6b7280",
+};
+
+function _stopDrilldownSSE() {
+  if (_drilldownSSE) { _drilldownSSE.close(); _drilldownSSE = null; }
+  const badge = document.getElementById("grd-live-badge");
+  if (badge) badge.style.display = "none";
+}
+
+function _startDrilldownSSE(runId) {
+  _stopDrilldownSSE();
+  let cancelled = false;
+  const controller = new AbortController();
+  _drilldownSSE = { close: () => { cancelled = true; controller.abort(); } };
+
+  const badge = document.getElementById("grd-live-badge");
+  if (badge) badge.style.display = "flex";
+
+  const key = apiKey || sessionStorage.getItem("agentid_key") || "";
+
+  fetch(`${BASE}/pro/groups/runs/${runId}/stream`, {
+    headers: { "x-api-key": key, "Content-Type": "application/json" },
+    credentials: "include",
+    signal: controller.signal,
+  }).then(async res => {
+    if (!res.ok || !res.body) { _stopDrilldownSSE(); return; }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done || cancelled) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop();
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith("data:")) continue;
+        try {
+          const ev = JSON.parse(line.slice(5).trim());
+          _grdHandleEvent(ev, runId);
+        } catch(_) {}
+      }
+    }
+    _stopDrilldownSSE();
+  }).catch(() => _stopDrilldownSSE());
+}
+
+function _grdHandleEvent(ev, runId) {
+  if (!ev || !ev.event_type) return;
+
+  // Append to event timeline
+  const list = document.getElementById("grd-events-list");
+  if (list) {
+    const ts = ev.ts ? new Date(ev.ts).toLocaleTimeString(undefined,
+      { hour:"2-digit", minute:"2-digit", second:"2-digit" }) : "";
+    const col = _GRD_EVENT_COLORS[ev.event_type] || "#6b7280";
+    const label = (ev.event_type || "").replace(/_/g, " ");
+    const agentLabel = ev.agent_did ? _esc(ev.agent_did.slice(-14)) : "";
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:0.6rem;align-items:flex-start;padding:0.35rem 0;border-bottom:1px solid var(--border);";
+    row.innerHTML = `
+      <span style="font-size:0.65rem;color:var(--muted);white-space:nowrap;flex-shrink:0;padding-top:0.05rem;min-width:56px;">${_esc(ts)}</span>
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-top:0.2rem;"></span>
+      <span style="font-size:0.75rem;font-weight:600;color:${col};flex-shrink:0;min-width:160px;">${_esc(label)}</span>
+      <span style="font-size:0.72rem;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${agentLabel}</span>`;
+    list.appendChild(row);
+    list.scrollTop = list.scrollHeight;
+  }
+
+  // Update assignment badge in place
+  const agentDid = ev.agent_did;
+  if (agentDid) {
+    const tbody = document.getElementById("grd-assignments-body");
+    if (tbody) {
+      const rows = tbody.querySelectorAll("tr[data-agent-did]");
+      rows.forEach(tr => {
+        if (!tr.dataset.agentDid.endsWith(agentDid.slice(-14)) &&
+            tr.dataset.agentDid !== agentDid) return;
+        const badgeCell = tr.querySelector(".grd-status-cell");
+        if (!badgeCell) return;
+        if (ev.event_type === "agent_completed") {
+          badgeCell.innerHTML = _runStatusBadge("completed");
+          const qCell = tr.querySelector(".grd-quality-cell");
+          const score = ev.data?.quality_score;
+          if (qCell && score != null) {
+            const pct = Math.round(score * 100);
+            const c = score >= 0.6 ? "var(--green)" : "var(--yellow)";
+            qCell.innerHTML = `<span style="font-weight:700;color:${c};">${pct}%</span>`;
+          }
+        } else if (ev.event_type === "orchestrator_rejected") {
+          badgeCell.innerHTML = _runStatusBadge("rejected");
+        } else if (ev.event_type === "agent_reassigned") {
+          badgeCell.innerHTML = _runStatusBadge("reassigned");
+        } else if (ev.event_type === "agent_started") {
+          badgeCell.innerHTML = _runStatusBadge("running");
+        }
+      });
+    }
+  }
+
+  // Update run-level status in header meta
+  const terminalMap = {
+    run_completed: "completed", run_failed: "failed", run_cancelled: "cancelled",
+    synthesis_started: "synthesizing",
+  };
+  if (terminalMap[ev.event_type]) {
+    const meta = document.getElementById("grd-meta");
+    if (meta) {
+      const parts = meta.textContent.split(" · ");
+      parts[0] = terminalMap[ev.event_type];
+      meta.textContent = parts.join(" · ");
+    }
+  }
+
+  // On terminal event: stop SSE and reload the full drilldown to show final answer
+  if (ev.event_type === "stream_end" || _GRD_TERMINAL.has(ev.event_type?.replace("run_", "") || "")) {
+    if (_GRD_TERMINAL.has(ev.event_type === "run_completed" ? "completed"
+        : ev.event_type === "run_failed" ? "failed"
+        : ev.event_type === "run_cancelled" ? "cancelled" : "")) {
+      _stopDrilldownSSE();
+      // Reload drilldown after short delay so DB has final data
+      setTimeout(() => openRunDrilldown(runId, null), 800);
+    } else if (ev.event_type === "stream_end") {
+      _stopDrilldownSSE();
+      setTimeout(() => openRunDrilldown(runId, null), 800);
+    }
+  }
 }
