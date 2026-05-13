@@ -414,19 +414,18 @@
           <label for="reg-private" style="margin-bottom:0;font-weight:500;font-size:0.85rem;">Private agent (hidden from public registry)</label>
         </div>
         <p id="reg-step1-msg" style="font-size:0.8rem;min-height:1.2em;margin-bottom:0.75rem;"></p>
-        <button class="btn btn-primary" id="reg-generate-btn" style="width:100%;">Generate Keys & Preview</button>
+        <button class="btn btn-primary" id="reg-generate-btn" style="width:100%;">Continue →</button>
       </div>
 
       <div id="reg-step-2" style="display:none;">
         <div class="step-label">Step 2 of 2 — Save & Register</div>
-        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem;">Your Ed25519 key pair has been generated in-browser. Download the key file before registering.</p>
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem;">The server will generate an Ed25519 key pair for this agent. Your key file will download automatically on registration — keep it secret.</p>
         <div class="field">
           <label>DID (Decentralised Identifier)</label>
-          <div class="did-box" id="reg-did-display"></div>
+          <div class="did-box" id="reg-did-display" style="color:var(--muted);font-style:italic;">Assigned on registration</div>
         </div>
         <div style="display:flex;gap:0.5rem;margin-bottom:0.85rem;flex-wrap:wrap;">
           <button class="btn btn-outline" id="reg-back-btn">← Back</button>
-          <button class="btn btn-outline" id="reg-download-key-btn" style="flex:1;">⬇ Download Key File</button>
         </div>
         <div id="reg-download-warning" style="display:none;font-size:0.78rem;color:var(--red);margin-bottom:0.6rem;">⚠ Download your key file first — you won't be able to retrieve it later.</div>
         <p id="reg-step2-msg" style="font-size:0.8rem;min-height:1.2em;margin-bottom:0.75rem;color:var(--red);"></p>
@@ -1242,7 +1241,7 @@ function addCap() {
   _reg.capsArr.push(val); if (inp) inp.value = ""; renderCapPills();
 }
 function regReset() {
-  Object.assign(_reg, { kp:null, did:null, pubB64:null, seedB64:null, capsArr:[], downloaded:false });
+  Object.assign(_reg, { capsArr: [], downloaded: true });
   document.getElementById("reg-step-1").style.display = "";
   document.getElementById("reg-step-2").style.display = "none";
   document.getElementById("reg-name").value = "";
@@ -1265,50 +1264,29 @@ document.getElementById("reg-back-btn").addEventListener("click", () => {
   document.getElementById("reg-step-1").style.display = "";
   document.getElementById("reg-step-2").style.display = "none";
 });
-document.getElementById("reg-generate-btn").addEventListener("click", async function() {
+document.getElementById("reg-generate-btn").addEventListener("click", function() {
   const name = (document.getElementById("reg-name").value || "").trim();
   const msgEl = document.getElementById("reg-step1-msg");
   msgEl.style.color = "var(--red)"; msgEl.textContent = "";
   if (!name) { msgEl.textContent = "Agent name is required."; return; }
-  this.textContent = "Generating…"; this.disabled = true;
-  try {
-    const kp = await generateKeyPair();
-    Object.assign(_reg, kp);
-    document.getElementById("reg-did-display").textContent = kp.did;
-    document.getElementById("reg-step-1").style.display = "none";
-    document.getElementById("reg-step-2").style.display = "";
-    document.getElementById("reg-success").style.display = "none";
-    document.getElementById("reg-register-btn").style.display = "";
-  } catch(e) {
-    msgEl.textContent = "Key generation failed — try Chrome 113+ or Firefox 130+.";
-  } finally { this.textContent = "Generate Keys & Preview"; this.disabled = false; }
-});
-document.getElementById("reg-download-key-btn").addEventListener("click", function() {
-  if (!_reg.did) return;
-  const name = (document.getElementById("reg-name").value || "").trim();
-  const payload = JSON.stringify({ did:_reg.did, name, public_key_b64:_reg.pubB64, private_key_b64:_reg.seedB64, created_at:new Date().toISOString(), warning:"Keep this file secret." }, null, 2);
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([payload], { type:"application/json" }));
-  a.download = "agentid-key-" + _reg.did.slice(-12) + ".json";
-  a.click(); URL.revokeObjectURL(a.href);
-  _reg.downloaded = true;
-  document.getElementById("reg-download-warning").style.display = "none";
-  this.textContent = "⬇ Downloaded ✓"; this.style.borderColor = "var(--green)"; this.style.color = "var(--green)";
+  // No browser-side crypto — the server generates the keypair on registration.
+  document.getElementById("reg-did-display").textContent = "Assigned on registration";
+  document.getElementById("reg-did-display").style.cssText = "color:var(--muted);font-style:italic;";
+  document.getElementById("reg-step-1").style.display = "none";
+  document.getElementById("reg-step-2").style.display = "";
+  document.getElementById("reg-success").style.display = "none";
+  document.getElementById("reg-register-btn").style.display = "";
 });
 document.getElementById("reg-register-btn").addEventListener("click", async function() {
-  if (!_reg.did) return;
-  if (!_reg.downloaded) { document.getElementById("reg-download-warning").style.display = ""; return; }
   const name = (document.getElementById("reg-name").value || "").trim();
   const isPrivate = document.getElementById("reg-private").checked;
   const msgEl = document.getElementById("reg-step2-msg");
   msgEl.textContent = ""; this.textContent = "Registering…"; this.disabled = true;
   try {
-    const createdAt = new Date().toISOString();
-    const payload = { did:_reg.did, name, owner:_owner, capabilities:[..._reg.capsArr], public_key:_reg.pubB64, created_at:createdAt, metadata:{}, private:isPrivate };
-    const proof = await signPayload(_reg.kp, payload);
-    const res = await fetch(`${BASE}/agents`, {
-      method:"POST", headers:{"Content-Type":"application/json","x-api-key":apiKey},
-      body: JSON.stringify({ ...payload, proof }),
+    const res = await fetch(`${BASE}/pro/agents/quick-register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, capabilities: [..._reg.capsArr], private: isPrivate, description: "" }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -1318,10 +1296,27 @@ document.getElementById("reg-register-btn").addEventListener("click", async func
         : (typeof detail === "string" ? detail : data.error || JSON.stringify(detail) || res.status);
       throw new Error(msg);
     }
+    // Auto-download the key file the moment we get it back
+    const keyPayload = JSON.stringify({
+      did: data.did,
+      name: data.name,
+      public_key_b64: data.public_key,
+      private_key_b64: data.private_key_b64 || null,
+      created_at: data.created_at,
+      warning: "Keep this file secret. The private key is not stored in plain text on the server.",
+    }, null, 2);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([keyPayload], { type: "application/json" }));
+    a.download = "agentid-key-" + (data.did || "agent").slice(-12) + ".json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+
+    document.getElementById("reg-did-display").textContent = data.did || "";
+    document.getElementById("reg-did-display").style.cssText = "";
     document.getElementById("reg-register-btn").style.display = "none";
     document.getElementById("reg-success").style.display = "";
-    document.getElementById("reg-success-did").textContent = _reg.did;
-    document.getElementById("reg-view-btn").onclick = () => window.open(`agent.html?did=${encodeURIComponent(_reg.did)}`, "_blank");
+    document.getElementById("reg-success-did").textContent = data.did || "";
+    document.getElementById("reg-view-btn").onclick = () => window.open(`agent.html?did=${encodeURIComponent(data.did)}`, "_blank");
     document.getElementById("reg-another-btn").onclick = regReset;
     loadAgents();
   } catch(e) {
