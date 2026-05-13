@@ -2715,6 +2715,7 @@ function _renderFilesView() {
                 ${agentOptions}
               </select>
               <button onclick="_shareFile('${esc(f.id)}', ${i})" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0.25rem 0.55rem;cursor:pointer;font-size:0.75rem;font-weight:600;">Send</button>
+              <button onclick="_downloadFile('${esc(f.id)}','${esc(f.name || f.id)}')" title="Download" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;cursor:pointer;font-size:0.75rem;color:var(--accent);">↓</button>
               <button onclick="_deleteFile('${esc(f.id)}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;cursor:pointer;font-size:0.75rem;color:var(--muted);">🗑</button>
             </div>
           </div>`;
