@@ -223,7 +223,16 @@
 
     .final-panel { border-color:#1f7a5d; background:linear-gradient(180deg, rgba(16,185,129,0.06), rgba(18,22,28,1)); }
     .final-panel .panel-head { background:rgba(16,185,129,0.08); border-bottom-color:#1f7a5d; }
-    .final-copy { font-size:0.82rem; line-height:1.65; white-space:pre-wrap; word-break:break-word; color:var(--text); }
+    .final-copy { font-size:0.86rem; line-height:1.7; word-break:break-word; color:var(--text); }
+    .final-copy h1,.final-copy h2,.final-copy h3,.final-copy h4 { margin:1rem 0 0.35rem; font-weight:700; color:var(--text); }
+    .final-copy h1 { font-size:1.15rem; } .final-copy h2 { font-size:1rem; } .final-copy h3 { font-size:0.94rem; }
+    .final-copy p { margin:0 0 0.55rem; }
+    .final-copy ul,.final-copy ol { padding-left:1.4rem; margin:0 0 0.55rem; }
+    .final-copy li { margin-bottom:0.25rem; }
+    .final-copy pre { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:0.65rem 0.8rem; overflow-x:auto; margin:0.5rem 0; font-size:0.78rem; }
+    .final-copy code { font-family:monospace; background:var(--bg); padding:0.1em 0.35em; border-radius:4px; font-size:0.8em; }
+    .final-copy hr { border:none; border-top:1px solid var(--border); margin:0.9rem 0; }
+    .final-copy strong { font-weight:700; } .final-copy em { font-style:italic; }
     .final-summary { margin-top:0.7rem; padding-top:0.7rem; border-top:1px solid #1f7a5d; font-size:0.72rem; color:var(--muted); font-style:italic; line-height:1.5; }
     .empty { font-size:0.75rem; color:var(--muted); font-style:italic; }
     .divider { height:1px; background:var(--border); margin:0.2rem 0; }
@@ -1053,17 +1062,6 @@
       line-height: 1.7;
       color: var(--text);
     }
-    .final-copy h1,.final-copy h2,.final-copy h3,.final-copy h4{font-family:"Source Serif 4",Georgia,serif;color:var(--text);margin:1rem 0 0.3rem;line-height:1.3;}
-    .final-copy h1{font-size:1.25rem;} .final-copy h2{font-size:1.08rem;} .final-copy h3{font-size:0.97rem;font-weight:700;}
-    .final-copy h4{font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
-    .final-copy p{margin:0.45rem 0;} .final-copy ul,.final-copy ol{margin:.4rem 0 .4rem 1.2rem;padding:0;} .final-copy li{margin:.2rem 0;}
-    .final-copy hr{border:none;border-top:1px solid rgba(29,122,58,0.3);margin:.9rem 0;}
-    .final-copy strong{font-weight:700;} .final-copy em{font-style:italic;}
-    .final-copy code{background:rgba(0,0,0,0.18);border-radius:3px;padding:.1em .35em;font-size:.83em;font-family:ui-monospace,monospace;}
-    .final-copy pre{background:rgba(0,0,0,0.22);border-radius:6px;padding:.7rem .9rem;overflow-x:auto;margin:.6rem 0;}
-    .final-copy pre code{background:none;padding:0;} .final-copy .md-gap{height:.45rem;}
-    .final-edit-area{width:100%;min-height:260px;font-size:0.85rem;line-height:1.65;resize:vertical;background:rgba(0,0,0,0.15);border:1.5px solid var(--border-2);border-radius:8px;padding:.7rem .85rem;color:var(--text);font-family:ui-monospace,monospace;}
-    .final-edit-actions{display:flex;gap:.5rem;margin-top:.55rem;}
     .final-summary {
       margin-top: 0.8rem;
       padding-top: 0.8rem;
@@ -1222,7 +1220,7 @@
       <a href="team-workspace.html" class="active">Team Workspace</a>
     </div>
     <div class="topbar-right">
-      <button id="theme-toggle" class="ghost-btn theme-toggle" type="button" onclick="toggleTheme()">White theme</button>
+      <button id="theme-toggle" class="ghost-btn theme-toggle" type="button" onclick="toggleTheme()">Light theme</button>
       <div id="topbar-user" style="font-size:0.8rem;color:var(--muted);"></div>
     </div>
   </div>
@@ -1340,54 +1338,6 @@
       .replace(/"/g, "&quot;");
   }
 
-  function formatEventLabel(type) {
-    const labels = {
-      orchestrator_plan:"Plan Created", orchestrator_rejected:"Output Rejected",
-      agent_assigned:"Agent Assigned", agent_started:"Agent Started",
-      agent_completed:"Agent Completed", agent_reassigned:"Agent Reassigned",
-      context_written:"Context Written", clarification_requested:"Clarification Requested",
-      clarification_received:"Clarification Received", approval_requested:"Plan Approval Requested",
-      approval_granted:"Plan Approved", synthesis_started:"Synthesis Started",
-      synthesis_completed:"Synthesis Completed", run_completed:"Run Completed",
-      run_failed:"Run Failed", run_cancelled:"Run Cancelled",
-    };
-    return labels[type] || (type || "").replace(/_/g, " ");
-  }
-
-  function applyInline(s) {
-    return s
-      .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*([^\s*][^*]*?)\*/g, "<em>$1</em>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>");
-  }
-
-  function renderMd(raw) {
-    if (!raw) return "";
-    const lines = raw.split("\n");
-    const out = [];
-    let inList = false, listTag = "ul", inCode = false, codeBuf = [];
-    const flush = () => { if (inList) { out.push(`</${listTag}>`); inList = false; } };
-    for (const line of lines) {
-      if (line.trimStart().startsWith("```")) {
-        if (!inCode) { flush(); inCode = true; codeBuf = []; continue; }
-        out.push(`<pre><code>${esc(codeBuf.join("\n"))}</code></pre>`); inCode = false; codeBuf = []; continue;
-      }
-      if (inCode) { codeBuf.push(line); continue; }
-      const hm = line.match(/^(#{1,4})\s+(.*)/);
-      if (hm) { flush(); out.push(`<h${hm[1].length}>${applyInline(esc(hm[2]))}</h${hm[1].length}>`); continue; }
-      if (/^(-{2,}|_{3,}|\*{3,})\s*$/.test(line.trim())) { flush(); out.push("<hr>"); continue; }
-      const lim = line.match(/^[-*•]\s+(.*)/);
-      if (lim) { if (!inList||listTag!=="ul"){flush();out.push("<ul>");inList=true;listTag="ul";} out.push(`<li>${applyInline(esc(lim[1]))}</li>`); continue; }
-      const olm = line.match(/^\d+\.\s+(.*)/);
-      if (olm) { if (!inList||listTag!=="ol"){flush();out.push("<ol>");inList=true;listTag="ol";} out.push(`<li>${applyInline(esc(olm[1]))}</li>`); continue; }
-      if (!line.trim()) { flush(); out.push('<div class="md-gap"></div>'); continue; }
-      flush(); out.push(`<p>${applyInline(esc(line))}</p>`);
-    }
-    flush();
-    return out.join("");
-  }
-
   function relTime(iso) {
     if (!iso) return "";
     const delta = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
@@ -1408,6 +1358,107 @@
     return `<span class="badge ${esc(status || "planning")}">${esc((status || "planning").replace(/_/g, " "))}</span>`;
   }
 
+  function applyInline(s) {
+    return s
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  }
+
+  function renderMd(raw) {
+    if (!raw) return "";
+    const lines = raw.replace(/\r\n/g, "\n").split("\n");
+    const out = [];
+    let inCode = false, inList = false, listTag = "";
+    const closeList = () => { if (inList) { out.push(`</${listTag}>`); inList = false; listTag = ""; } };
+    lines.forEach(line => {
+      if (/^```/.test(line)) {
+        if (!inCode) { closeList(); out.push("<pre><code>"); inCode = true; }
+        else { out.push("</code></pre>"); inCode = false; }
+        return;
+      }
+      if (inCode) { out.push(line.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")); return; }
+      if (/^#### /.test(line)) { closeList(); out.push(`<h4>${applyInline(line.slice(5))}</h4>`); return; }
+      if (/^### /.test(line)) { closeList(); out.push(`<h3>${applyInline(line.slice(4))}</h3>`); return; }
+      if (/^## /.test(line)){ closeList(); out.push(`<h2>${applyInline(line.slice(3))}</h2>`); return; }
+      if (/^# /.test(line)) { closeList(); out.push(`<h1>${applyInline(line.slice(2))}</h1>`); return; }
+      if (/^[-*] /.test(line)) {
+        if (!inList || listTag !== "ul") { closeList(); out.push("<ul>"); inList = true; listTag = "ul"; }
+        out.push(`<li>${applyInline(line.slice(2))}</li>`); return;
+      }
+      if (/^\d+\. /.test(line)) {
+        if (!inList || listTag !== "ol") { closeList(); out.push("<ol>"); inList = true; listTag = "ol"; }
+        out.push(`<li>${applyInline(line.replace(/^\d+\. /,""))}</li>`); return;
+      }
+      if (/^---*$/.test(line.trim())) { closeList(); out.push("<hr>"); return; }
+      if (line.trim() === "") { closeList(); return; }
+      closeList();
+      out.push(`<p>${applyInline(line)}</p>`);
+    });
+    closeList();
+    if (inCode) out.push("</code></pre>");
+    return out.join("\n");
+  }
+
+  async function beginEditFinalOutput() {
+    const run = state.run;
+    if (!run) return;
+    state.editingFinalOutput = true;
+    renderWorkspace();
+    const ta = document.getElementById("final-output-editor");
+    if (ta) ta.focus();
+  }
+
+  function cancelEditFinalOutput() {
+    state.editingFinalOutput = false;
+    renderWorkspace();
+  }
+
+  async function saveFinalOutput() {
+    const run = state.run;
+    if (!run) return;
+    const ta = document.getElementById("final-output-editor");
+    const ts = document.getElementById("run-summary-editor");
+    const newOutput = ta ? ta.value : run.final_output;
+    const newSummary = ts ? ts.value : run.run_summary;
+    try {
+      await fetchJson(`/pro/groups/runs/${run.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ final_output: newOutput, run_summary: newSummary }),
+      });
+      run.final_output = newOutput;
+      run.run_summary = newSummary;
+      state.editingFinalOutput = false;
+      showToast("Final answer saved.");
+      renderWorkspace();
+    } catch (err) {
+      showToast(`Save failed: ${err.message}`);
+    }
+  }
+
+  function formatEventLabel(type) {
+    const MAP = {
+      orchestrator_plan: "Plan created",
+      agent_assigned: "Agent assigned",
+      agent_started: "Agent started",
+      agent_completed: "Agent completed",
+      orchestrator_rejected: "Output rejected",
+      agent_reassigned: "Agent reassigned",
+      context_written: "Context written",
+      clarification_requested: "Clarification needed",
+      clarification_received: "Clarification received",
+      approval_requested: "Approval requested",
+      approval_granted: "Approval granted",
+      synthesis_started: "Synthesis started",
+      synthesis_completed: "Synthesis done",
+      run_completed: "Run completed",
+      run_failed: "Run failed",
+      run_cancelled: "Run cancelled",
+    };
+    return MAP[type] || (type || "Event").replace(/_/g, " ");
+  }
+
   function currentTheme() {
     return document.documentElement.dataset.theme === "light" ? "light" : "dark";
   }
@@ -1416,9 +1467,9 @@
     const btn = document.getElementById("theme-toggle");
     if (!btn) return;
     const theme = currentTheme();
-    btn.textContent = theme === "dark" ? "White theme" : "Dark theme";
-    btn.setAttribute("aria-label", theme === "dark" ? "Switch to white theme" : "Switch to dark theme");
-    btn.title = theme === "dark" ? "Switch to white theme" : "Switch to dark theme";
+    btn.textContent = theme === "dark" ? "Light theme" : "Dark theme";
+    btn.setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
+    btn.title = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
   }
 
   function applyTheme(theme) {
@@ -1505,7 +1556,6 @@
       } catch (_) {}
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
-    if (r.status === 204) return null;
     return r.json();
   }
 
@@ -1573,7 +1623,6 @@
     state.capabilityProfiles = Array.isArray(profilesData) ? profilesData : [];
     state.editingNoteId = null;
     state.editingProfileId = null;
-    state.editingFinalOutput = false;
     state.taskDraft = null;
 
     renderTeams();
@@ -1770,7 +1819,7 @@
 
     const profileListHtml = profiles.length
       ? profiles.map(p => {
-          const isEditing = String(state.editingProfileId) === String(p.id);
+          const isEditing = state.editingProfileId === p.id;
           return `<div class="note-card">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
               <div>
@@ -1835,40 +1884,91 @@
         </div>
       </div>`;
 
+    // ── 3-panel consolidated layout ──────────────────────────────────────
     root.innerHTML = `
-      ${settingsHtml}
-      ${analyticsHtml}
-      ${profilesHtml}
       <div class="panel">
         <div class="panel-head">
-          <div class="panel-title">Team Notes</div>
-          <div class="panel-note">${notes.length}</div>
+          <div class="panel-title">Team</div>
+          <div class="panel-note">${profiles.length} profile${profiles.length === 1 ? "" : "s"}</div>
+        </div>
+        <div class="panel-body">
+          ${analytics ? `<div class="perf-metrics" style="margin-bottom:0.6rem;">
+            <div class="perf-metric"><strong>${Math.round((analytics.runs?.completion_rate || 0) * 100)}%</strong>Completion</div>
+            <div class="perf-metric"><strong>${Math.round((analytics.assignments?.acceptance_rate || 0) * 100)}%</strong>Accepted</div>
+            <div class="perf-metric"><strong>${Math.round((analytics.assignments?.avg_quality || 0) * 100)}%</strong>Quality</div>
+            <div class="perf-metric"><strong>${analytics.runs?.total || 0}</strong>Runs</div>
+          </div>` : ""}
+          ${settings ? `<details style="margin-bottom:0.7rem;">
+            <summary style="font-size:0.74rem;font-weight:700;cursor:pointer;color:var(--text-2);list-style:none;display:flex;justify-content:space-between;">
+              Guardrails <span style="color:var(--muted);font-weight:400;">${settings.require_plan_approval ? "Approval on" : "Approval off"} · trust ≥${settings.high_risk_trust_threshold ?? 70}</span>
+            </summary>
+            <div class="side-form" style="margin-top:0.55rem;">
+              <label class="checkbox-row">
+                <input id="ws-require-approval" type="checkbox" ${settings.require_plan_approval ? "checked" : ""} />
+                Require plan approval before agents start
+              </label>
+              <div>
+                <label class="field-label" for="ws-trust-threshold">High-risk trust threshold</label>
+                <input id="ws-trust-threshold" class="inline-input" type="number" min="0" max="100" value="${esc(settings.high_risk_trust_threshold ?? 70)}" />
+              </div>
+              <div class="note-actions">
+                <button class="tiny-btn primary" onclick="saveGroupSettings()">Save</button>
+              </div>
+            </div>
+          </details>` : ""}
+          <details>
+            <summary style="font-size:0.74rem;font-weight:700;cursor:pointer;color:var(--text-2);list-style:none;display:flex;justify-content:space-between;">
+              Capability profiles <span style="color:var(--muted);font-weight:400;">${profiles.length}</span>
+            </summary>
+            <div style="margin-top:0.55rem;">
+              <div class="stack" id="profile-list">${profileListHtml}</div>
+              <div class="side-form" style="margin-top:0.75rem;" id="new-profile-form">
+                <label class="field-label">Capability slug</label>
+                <input id="np-capability" class="inline-input" type="text" placeholder="e.g. regulatory_compliance" />
+                <label class="field-label" style="margin-top:0.4rem;">Prompt injection</label>
+                <textarea id="np-injection" rows="3" placeholder="Role guidance prepended to the agent's subtask prompt…"></textarea>
+                <label class="field-label" style="margin-top:0.4rem;">Quality rubric <span style="color:var(--muted);font-weight:400;">(Phase 2)</span></label>
+                <textarea id="np-rubric" rows="2" placeholder="Criteria for scoring outputs…"></textarea>
+                <label class="field-label" style="margin-top:0.4rem;">Permission level</label>
+                <select id="np-perm" class="inline-input">
+                  ${Object.entries(PERM_LABELS).map(([v,l]) => `<option value="${v}"${v==="contribute"?" selected":""}>${l}</option>`).join("")}
+                </select>
+                <div class="note-actions">
+                  <button class="tiny-btn primary" onclick="createCapabilityProfile()">Add profile</button>
+                </div>
+                <div id="np-msg" style="font-size:0.75rem;margin-top:0.3rem;"></div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Team Memory</div>
+          <div class="panel-note">${notes.length + summaries.length}</div>
         </div>
         <div class="panel-body">
           <div class="side-form" style="margin-bottom:0.8rem;">
-            <label class="field-label" for="new-team-note">Add note for future runs</label>
+            <label class="field-label" for="new-team-note">New note for future runs</label>
             <textarea id="new-team-note" placeholder="Capture routing guidance, team preferences, or lessons learned..."></textarea>
             <div class="note-actions">
               <button class="tiny-btn primary" onclick="createTeamNote()">Save note</button>
             </div>
           </div>
           <div class="stack">${notesHtml}</div>
+          ${summaries.length ? `<div style="margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--border);">
+            <div class="panel-title" style="font-size:0.72rem;margin-bottom:0.45rem;">Run summaries</div>
+            <div class="stack">${summariesHtml}</div>
+          </div>` : ""}
         </div>
       </div>
-      <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">Recent Summaries</div>
-          <div class="panel-note">${summaries.length}</div>
-        </div>
-        <div class="panel-body"><div class="stack">${summariesHtml}</div></div>
-      </div>
-      <div class="panel">
+      ${perf.length ? `<div class="panel">
         <div class="panel-head">
           <div class="panel-title">Agent Reliability</div>
           <div class="panel-note">${perf.length} tracked</div>
         </div>
         <div class="panel-body"><div class="perf-grid">${perfHtml}</div></div>
-      </div>`;
+      </div>` : ""}`;
   }
 
   function renderWorkspaceLoading(label) {
@@ -2062,18 +2162,31 @@
     return eventPlan?.event_data?.plan || eventPlan?.data?.plan || [];
   }
 
+  function _parseJsonIfNeeded(v) {
+    if (!v) return null;
+    if (typeof v === "object") return v;
+    if (typeof v === "string") {
+      try { const p = JSON.parse(v); return p && typeof p === "object" ? p : null; } catch (_) {}
+    }
+    return null;
+  }
+
   function deriveContextList(run) {
     const latestByKey = new Map();
 
     (run.assignments || []).forEach(assign => {
-      const ctx = assign.contributing_context;
-      if (!ctx || typeof ctx !== "object") return;
+      const raw = assign.contributing_context;
+      const ctx = _parseJsonIfNeeded(raw);
+      if (!ctx) return;
       Object.entries(ctx).forEach(([key, value]) => latestByKey.set(key, value));
     });
 
     if (!latestByKey.size) {
-      const newestSnapshotCarrier = [...(run.events || [])].reverse().find(ev => ev.context_snapshot && typeof ev.context_snapshot === "object");
-      const snap = newestSnapshotCarrier?.context_snapshot || {};
+      const newestSnapshotCarrier = [...(run.events || [])].reverse().find(ev => {
+        const snap = _parseJsonIfNeeded(ev.context_snapshot);
+        return snap && Object.keys(snap).length;
+      });
+      const snap = _parseJsonIfNeeded(newestSnapshotCarrier?.context_snapshot) || {};
       Object.entries(snap).forEach(([key, value]) => latestByKey.set(key, value));
     }
 
@@ -2580,47 +2693,52 @@
             <div class="output-list">${assignmentHtml}</div>
           </section>
           <section class="doc-section final-panel" data-doc-section="final">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
-              <div>
-                <h3>Final answer</h3>
-                <p class="lede">${isTerminal(run.status) ? "The run is in a terminal state." : "Waiting for synthesis to merge accepted work into one answer."}</p>
-              </div>
-              ${run.final_output && !state.editingFinalOutput ? `<button class="tiny-btn" style="flex-shrink:0;margin-top:0.2rem;" onclick="beginEditFinalOutput()">Edit</button>` : ""}
-            </div>
+            <h3>Final answer</h3>
+            <p class="lede">${isTerminal(run.status) ? "The run is in a terminal state." : "Waiting for synthesis to merge accepted work into one answer."}</p>
             ${run.final_output
-              ? state.editingFinalOutput
-                ? `<div><textarea class="final-edit-area" id="final-output-edit">${esc(run.final_output)}</textarea><div class="final-edit-actions"><button class="tiny-btn primary" onclick="saveFinalOutput()">Save</button><button class="tiny-btn" onclick="cancelEditFinalOutput()">Cancel</button></div></div>`
-                : `<div class="final-copy">${renderMd(run.final_output)}</div>${run.run_summary ? `<div class="final-summary">${esc(run.run_summary)}</div>` : ""}`
+              ? (state.editingFinalOutput
+                ? `<div style="display:flex;flex-direction:column;gap:0.55rem;">
+                     <label class="field-label">Final answer (markdown)</label>
+                     <textarea id="final-output-editor" style="min-height:18rem;font-size:0.82rem;">${esc(run.final_output)}</textarea>
+                     <label class="field-label" style="margin-top:0.3rem;">Run summary <span style="color:var(--muted);font-weight:400;">(auto-generated — editable)</span></label>
+                     <textarea id="run-summary-editor" style="min-height:4rem;font-size:0.8rem;">${esc(run.run_summary || "")}</textarea>
+                     <div style="display:flex;gap:0.5rem;">
+                       <button class="tiny-btn primary" onclick="saveFinalOutput()">Save</button>
+                       <button class="tiny-btn" onclick="cancelEditFinalOutput()">Cancel</button>
+                     </div>
+                   </div>`
+                : `<div style="display:flex;justify-content:flex-end;margin-bottom:0.55rem;">
+                     <button class="tiny-btn" onclick="beginEditFinalOutput()">Edit answer</button>
+                   </div>
+                   <div class="final-copy">${renderMd(run.final_output)}</div>
+                   ${run.run_summary ? `<div class="final-summary">${esc(run.run_summary)}</div>` : ""}`)
               : `<div class="empty">The final merged answer will appear here once synthesis finishes.</div>`}
           </section>
         </div>
         <aside class="doc-side">
           <div class="panel">
-            <div class="panel-head"><div class="panel-title">Quick actions</div></div>
+            <div class="panel-head"><div class="panel-title">Run</div></div>
             <div class="panel-body">
-              <div class="stack">
-                <button class="tiny-btn" onclick="refreshCurrentRun()">↺ Refresh run</button>
+              <div class="stack" style="margin-bottom:0.7rem;">
+                <button class="tiny-btn" onclick="refreshCurrentRun()">↺ Refresh</button>
                 <button class="tiny-btn" onclick="downloadRunReport()">▸ Download report</button>
-                ${run?.user_task ? `<button class="tiny-btn primary" onclick="createTeamRunFromCurrent()">Run this mission again</button>` : ""}
+                ${run?.user_task ? `<button class="tiny-btn primary" onclick="createTeamRunFromCurrent()">Run again</button>` : ""}
                 ${!isTerminal(run.status) ? `<button class="tiny-btn" onclick="cancelCurrentRun()">■ Stop run</button>` : ""}
+              </div>
+              <div class="leader-row" style="border-top:1px solid var(--border);padding-top:0.6rem;">
+                <div><strong>Avg trust</strong><div class="small-meta">At assignment time</div></div>
+                <div class="leader-score">${avgTrustValue != null ? avgTrustValue : "—"}</div>
               </div>
             </div>
           </div>
           <div class="panel">
-            <div class="panel-head"><div class="panel-title">Contribution</div></div>
-            <div class="panel-body">${contributionHtml}</div>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><div class="panel-title">Accepted outputs</div></div>
-            <div class="panel-body"><div class="stack">${acceptedOutputsHtml}</div></div>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><div class="panel-title">Run trust</div></div>
+            <div class="panel-head"><div class="panel-title">Contributors</div></div>
             <div class="panel-body">
-              <div class="leader-row">
-                <div><strong>Average assignment trust</strong><div class="small-meta">Trust at assignment time across this run</div></div>
-                <div class="leader-score">${avgTrustValue != null ? avgTrustValue : "—"}</div>
-              </div>
+              <div style="margin-bottom:0.55rem;">${contributionHtml}</div>
+              ${outputs.length ? `<div style="border-top:1px solid var(--border);padding-top:0.55rem;">
+                <div class="panel-title" style="font-size:0.72rem;margin-bottom:0.45rem;">Accepted outputs</div>
+                <div class="stack">${acceptedOutputsHtml}</div>
+              </div>` : ""}
             </div>
           </div>
         </aside>
@@ -2677,7 +2795,7 @@
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      streamLoop: while (true) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done || state.sseCancelled) break;
         buffer += decoder.decode(value, { stream: true });
@@ -2693,7 +2811,7 @@
             if (ev.event_type === "stream_end") {
               await refreshCurrentRun();
               stopRunStream();
-              break streamLoop;
+              break;
             }
             scheduleRunRefresh();
           } catch (_) {}
@@ -2702,7 +2820,7 @@
     }).catch(() => {
       if (!state.sseCancelled && state.run && !isTerminal(state.run.status)) {
         setTimeout(() => {
-          if (!state.sseCancelled && state.selectedRunId === runId) startRunStream(runId);
+          if (!state.sseCancelled && state.selectedRunId) startRunStream(state.selectedRunId);
         }, 2000);
       }
     });
@@ -2710,21 +2828,17 @@
 
   async function refreshCurrentRun() {
     if (!state.selectedRunId) return;
-    try {
-      const prevStatus = state.run?.status;
-      const run = await fetchJson(`/pro/groups/runs/${state.selectedRunId}`);
-      state.run = run;
-      state.lastEventId = Math.max(0, ...(run.events || []).map(ev => Number(ev.id) || 0));
-      syncRunIntoList(run);
-      renderRuns();
-      renderWorkspace();
-      if (prevStatus !== run.status || isTerminal(run.status)) {
-        await refreshGroupSignals({ includeMemory: isTerminal(run.status) });
-      }
-      if (!isTerminal(run.status) && !state.stream) startRunStream(state.selectedRunId);
-    } catch (e) {
-      showToast(e.message || "Could not refresh run.", true);
+    const prevStatus = state.run?.status;
+    const run = await fetchJson(`/pro/groups/runs/${state.selectedRunId}`);
+    state.run = run;
+    state.lastEventId = Math.max(0, ...(run.events || []).map(ev => Number(ev.id) || 0));
+    syncRunIntoList(run);
+    renderRuns();
+    renderWorkspace();
+    if (prevStatus !== run.status || isTerminal(run.status)) {
+      await refreshGroupSignals({ includeMemory: isTerminal(run.status) });
     }
+    if (!isTerminal(run.status) && !state.stream) startRunStream(state.selectedRunId);
   }
 
   let _toastTimer = null;
@@ -2735,34 +2849,6 @@
     el.textContent = msg;
     el.className = "show" + (isError ? " error" : "");
     _toastTimer = setTimeout(() => { el.className = ""; }, 3500);
-  }
-
-  function beginEditFinalOutput() {
-    state.editingFinalOutput = true;
-    renderWorkspace();
-    requestAnimationFrame(() => document.getElementById("final-output-edit")?.focus());
-  }
-  function cancelEditFinalOutput() {
-    state.editingFinalOutput = false;
-    renderWorkspace();
-  }
-  async function saveFinalOutput() {
-    const textarea = document.getElementById("final-output-edit");
-    if (!textarea || !state.selectedRunId) return;
-    const newText = textarea.value;
-    try {
-      await fetchJson(`/pro/groups/runs/${state.selectedRunId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ final_output: newText }),
-      });
-      state.editingFinalOutput = false;
-      if (state.run) state.run.final_output = newText;
-      renderWorkspace();
-      showToast("Final answer updated.");
-    } catch (e) {
-      showToast(e.message || "Could not save changes.", true);
-    }
   }
 
   async function cancelCurrentRun() {
@@ -2883,8 +2969,8 @@
       });
       state.settings = {
         ...(state.settings || {}),
-        require_plan_approval: data?.require_plan_approval ?? requireApproval,
-        high_risk_trust_threshold: data?.high_risk_trust_threshold ?? highRiskTrustThreshold,
+        require_plan_approval: data.require_plan_approval,
+        high_risk_trust_threshold: data.high_risk_trust_threshold,
       };
       renderSideInsights();
       showToast("Guardrails updated.");
@@ -3037,8 +3123,8 @@
     if (!confirm("Delete this capability profile?")) return;
     try {
       await fetchJson(`/pro/capability-profiles/${profileId}`, { method: "DELETE" });
-      state.capabilityProfiles = state.capabilityProfiles.filter(p => String(p.id) !== String(profileId));
-      if (String(state.editingProfileId) === String(profileId)) state.editingProfileId = null;
+      state.capabilityProfiles = state.capabilityProfiles.filter(p => p.id !== profileId);
+      if (state.editingProfileId === profileId) state.editingProfileId = null;
       renderSideInsights();
     } catch(e) {
       showToast(e.message || "Failed to delete profile.", true);
