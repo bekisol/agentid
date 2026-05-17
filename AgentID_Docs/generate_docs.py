@@ -39,6 +39,29 @@ GENERATED = NOW.strftime("%Y-%m-%d %H:%M")   # e.g. "2026-05-06 14:32"
 
 # ── Version changelog (newest first) ──────────────────────────────────────────
 CHANGELOG = [
+    ("v1.7.1", "2026-05-17",
+     "Security follow-up: address 3 Codex P1/P2 findings in rate limiting. "
+     "[P1a] Auth choke-point bypass fixed — 4 routes called get_key_info() directly, skipping "
+     "the rate-limit hook, expiry/IP-allowlist checks, and RLS setup. "
+     "Affected routes: POST /agents (register), POST /agents/{did}/brain/trigger, "
+     "GET /agents/{did}/brain/status, POST /agents/quick-register. "
+     "All 4 now call require_api_key(request) which handles both API key and session cookie paths, "
+     "runs expiry/IP-allowlist enforcement, sets RLS owner context, and fires the rate-limit hook. "
+     "[P1b] Enterprise unlimited now works on undecorated routes — SlowAPI default_limits was "
+     "'300/minute' which stacked on top of the hook (enterprise hook=unlimited, but SlowAPI still "
+     "applied 300rpm on any route without an explicit decorator). "
+     "Fix: default_limits raised to '10000/minute' (a pure single-source DoS floor, not a tier "
+     "limit). Tier enforcement (free=60rpm, pro=300rpm, enterprise=unlimited) is handled entirely "
+     "by the hook in require_api_key(). Per-route explicit decorators (e.g. SSE 10/min) are "
+     "unaffected and apply to all tiers. rate_limit.py docstring updated to explain the two-layer "
+     "design. "
+     "[P2] idle_in_transaction_session_timeout moved from per-checkout cursor to pool options "
+     "string (connect-time) alongside statement_timeout. The per-checkout cursor approach left "
+     "connections returned to the pool with an open SET transaction for ownerless/public callers. "
+     "Moving to options='-c ... -c idle_in_transaction_session_timeout=30000' is session-global, "
+     "zero transaction overhead, and applies equally to all checkouts. "
+     "Tests: 46/46. "
+     "Files: agentid-pro/server_pro.py, agentid-pro/rate_limit.py, agentid-pro/db.py."),
     ("v1.7.0", "2026-05-17",
      "Security: Per-API-key rate limiting (5 changes). "
      "1. auth.py: key_hash now returned in get_key_info() dict (was computed internally but not exposed). "
