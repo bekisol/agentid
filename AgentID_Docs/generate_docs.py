@@ -39,6 +39,134 @@ GENERATED = NOW.strftime("%Y-%m-%d %H:%M")   # e.g. "2026-05-06 14:32"
 
 # ── Version changelog (newest first) ──────────────────────────────────────────
 CHANGELOG = [
+    ("v1.7.0", "2026-05-17",
+     "Security: Per-API-key rate limiting (5 changes). "
+     "1. auth.py: key_hash now returned in get_key_info() dict (was computed internally but not exposed). "
+     "_rate_limit_hook module-level callable (None by default); require_api_key() calls it after key "
+     "resolution — on 429, raises HTTPException with Retry-After:60 header. "
+     "Session-cookie callers (no key_hash) skip rate limiting. "
+     "2. server_pro.py: startup wires auth._rate_limit_hook = ratelimits.check_rate_limit after "
+     "init_ratelimits_schema(). Hook pattern avoids circular import (auth→ratelimits is safe; "
+     "ratelimits must not import auth). Graceful: ImportError does not crash startup. "
+     "3. rate_limit.py: _get_rate_limit_key() replaces get_remote_address as slowapi key function. "
+     "Extracts raw API key from x-api-key / X-Api-Key / Authorization:Bearer, hashes it "
+     "(sha256 hex[:16] with 'key:' prefix), falls back to IP for unauthed requests. "
+     "Each tenant now gets its own bucket regardless of shared IPs. "
+     "4. group_runs.py: SSE stream endpoint gains @limiter.limit('10/minute') — was the only "
+     "endpoint without a rate limit (open DoS vector). "
+     "5. db.py: ThreadedConnectionPool size now configurable via DB_POOL_MIN/DB_POOL_MAX env vars "
+     "(default 3/20). idle_in_transaction_session_timeout='30s' set on every connection checkout — "
+     "prevents hung background threads from holding pool slots indefinitely. "
+     "Tests: 46/46 passing. "
+     "Files: agentid-pro/auth.py, agentid-pro/server_pro.py, agentid-pro/rate_limit.py, "
+     "agentid-pro/group_runs.py, agentid-pro/db.py."),
+    ("v1.6.5", "2026-05-17",
+     "Refactor: route review_queue insertions through enqueue_sync() shared helper. "
+     "review_queue.py: enqueue_sync(owner, agent_did, operation, payload_summary, risk_level, "
+     "reason, source, expires_hours, agent_name) — same INSERT logic as the enqueue() HTTP "
+     "endpoint, callable from background threads without a Request object. Returns review_id. "
+     "group_orchestrator.py: direct INSERT INTO review_queue in _run_policy_gate() replaced "
+     "with review_queue.enqueue_sync(..., source=SOURCE_ORCHESTRATOR). "
+     "Orchestrator now contains zero direct review_queue SQL. "
+     "All four control-plane modules (policy, budget, delegation, review_queue) fully routed "
+     "through shared helpers. 46/46 tests passing."),
+    ("v1.6.4", "2026-05-17",
+     "Refactor: full control-plane module delegation — no duplicated logic in orchestrator. "
+     "budget.py: record_spend_sync() + cancel_budget_sync() extracted from async HTTP endpoints "
+     "(full risk-cap enforcement, exhausted/warning webhooks, sync-callable from threads). "
+     "delegation.py: check_delegation_for_capability() public sync function (queries "
+     "delegation_tokens, returns {has_any,has_valid,count,reason}, never raises). "
+     "group_orchestrator.py: _check_delegation_tokens/record_spend/cancel_hold wrappers now "
+     "delegate to shared modules — no bespoke SQL; _set_run_status cancel is one-liner via "
+     "wrapper; review_queue INSERT uses SOURCE_ORCHESTRATOR constant; file header fixed "
+     "(no longer claims dispatch via _dispatch_task). "
+     "review_queue.py: SOURCE_ORCHESTRATOR constant + MERGED DESIGN docstring entry. "
+     "Tests: 46/46. test_control_plane_wiring.py mocks at shared-module boundaries. "
+     "Files: budget.py, delegation.py, group_orchestrator.py, review_queue.py, "
+     "tests/test_control_plane_wiring.py."),
+    ("v1.6.3", "2026-05-17",
+     "Complete control-plane wiring — budget lifecycle + delegation verification. "
+     "Budget cancel: _set_run_status() fires UPDATE budget_holds SET status='cancelled' for "
+     "completed/failed/cancelled runs; no-op when no hold exists. "
+     "Budget spend: _budget_record_spend_direct() writes to budget_spends and increments hold "
+     "spent counter after each accepted subtask (_SUBTASK_ESTIMATED_SPEND=0.01); no-op when "
+     "no hold exists so budget enforcement is fully opt-in. "
+     "Delegation verification: _check_delegation_tokens() queries delegation_tokens for "
+     "non-expired non-revoked tokens covering (agent_did, owner, capability). Integrated into "
+     "_run_policy_gate(): require_verifier + no valid token → deny; require_verifier + valid "
+     "token → allow; tokens exist but all expired/revoked → warn only; no tokens → pass "
+     "(owner-direct). "
+     "Tests: 9 new tests in test_control_plane_wiring.py. Total: 48/48 passing. "
+     "Files: agentid-pro/group_orchestrator.py, agentid-pro/tests/test_control_plane_wiring.py."),
+    ("v1.6.2", "2026-05-17",
+     "P1/P2 remediation (Codex audit findings). "
+     "P1a: required_capability and resolved_permission_level added to both SELECT lists in "
+     "GET /pro/groups/runs/{run_id} and the report endpoint — workspace was falling back to "
+     "'general'/'contribute' even when richer data was stored. "
+     "P1b: _run_policy_gate() wires the full unified policy engine (identity, capability "
+     "contract, scope, budget, trust, ACP, region) into the group dispatch loop. Called after "
+     "profile resolution, before _execute_subtask. Deny → assignment failed + policy_denied "
+     "event. require_approval → review_queue row inserted directly (no HTTP round-trip), "
+     "assignment failed. All policy errors degrade gracefully. "
+     "P2: workspace team-workspace.html now shows 'suit. X%' suitability chip in plan-row meta "
+     "and output-item pill-row; falls back gracefully when value is null. "
+     "P3 (deferred): stale parallel copies under mock-docs/ flagged for cleanup. "
+     "tests/test_group_orchestrator_xalgo.py (5 tests) now tracked in git. "
+     "Files: agentid-pro/group_orchestrator.py, agentid-pro/group_runs.py, "
+     "agentid-pro/tests/test_group_orchestrator_xalgo.py, agentid/docs/team-workspace.html."),
+    ("v1.6.1", "2026-05-17",
+     "Fix: expose candidate_score in run-detail and report endpoints. "
+     "candidate_score was stored on every group_run_assignments row by the X-algo scorer "
+     "but the GET /pro/groups/runs/{run_id} and GET /pro/groups/runs/{run_id}/report endpoints "
+     "did not SELECT it. Added column to both SELECT lists and response dicts. "
+     "Files: agentid-pro/group_runs.py."),
+    ("v1.6.0", "2026-05-16",
+     "X-Algorithm Phase 4 — Two-Tower Semantic Retrieval. "
+     "NEW FILE: capability_embeddings.py. "
+     "TWO-STEP PIPELINE: Step 1 = cheap LLM intent extraction (gpt-4o-mini / ANTHROPIC_DEFAULT, "
+     "max_tokens=150) extracts required capability slugs from task; falls back to raw task text. "
+     "Step 2 = each intent embedded with text-embedding-3-small, queried against "
+     "agent_capability_embeddings via cosine similarity; per-agent score = max sim across intents. "
+     "Members sorted by score; top TOP_K_SEMANTIC=20 sent to LLM planner. "
+     "Planning prompt gains semantic_fit:X% per member. "
+     "SCHEMA: agent_capability_embeddings(agent_did, capability, embedding vector(1536), model, "
+     "updated_at) PRIMARY KEY (agent_did, capability). HNSW index. "
+     "capability_profiles gains description TEXT column (embedding source; raw slug fallback). "
+     "INDEXING: capability_profiles POST/PATCH with description → daemon thread calls "
+     "reindex_capability_for_all_agents(). quick_register_agent → per-capability background tasks. "
+     "GRACEFUL DEGRADATION: SEMANTIC_ROUTING_ENABLED=False when pgvector unavailable or "
+     "OPENAI_API_KEY unset; {} returned on any error so all members pass through unchanged. "
+     "TESTS: TestSemanticRetrieval (10 tests) — disabled flag, intent parsing/fallbacks, "
+     "max-similarity aggregation, empty embeddings, DB error isolation, raw-task fallback. "
+     "Total test count: 34/34 passing. "
+     "Files: capability_embeddings.py (new), capability_profiles.py, group_orchestrator.py, "
+     "server_pro.py, tests/test_xalgo_pipeline.py."),
+    ("v1.5.0", "2026-05-16",
+     "X-Algorithm Adaptations (Phases 1-3) + RLS + Tight Test Suite. "
+     "DATABASE RLS: rls_migration.py applies ENABLE/FORCE ROW LEVEL SECURITY + per-owner "
+     "policy to 65+ tables. Policy: current_setting('app.current_owner',true)='' OR "
+     "owner=current_setting('app.current_owner',true). Child tables (group_run_assignments, "
+     "group_run_events, group_shared_context) use subquery via group_run_id FK. "
+     "db.py: ContextVar _rls_owner + set_rls_owner(); get_conn() injects SET app.current_owner "
+     "on checkout, RESET before pool return. auth.py: require_api_key() calls set_rls_owner(). "
+     "X-ALGO PHASE 1 (Pre-filter / Post-plan trust gate): _filter_eligible_candidates() filters "
+     "members by trust threshold for high-risk hint. _enforce_plan_trust_gate() is a pure function "
+     "that enforces the trust gate post-LLM — replaces any high-risk assignment to a below-threshold "
+     "agent with the highest-suitability qualifying agent; falls back to highest-trust if none qualify. "
+     "Logs orchestrator_plan_corrected event with full corrections list. "
+     "X-ALGO PHASE 2 (Weighted scorer): _compute_candidate_score() produces [0,1] composite from "
+     "quality(0.35) + completion_rate(0.25) + trust/100(0.25) - rejection_rate(0.15). "
+     "Planning prompt shows suitability:X/100 instead of raw numbers. _get_best_alternative_agent() "
+     "ranks by composite score; applies trust gate on high-risk retries. candidate_score column "
+     "stored per assignment. _handle_failed_output() reads risk_level from assignment and passes "
+     "to _get_best_alternative_agent(). "
+     "X-ALGO PHASE 3 (Quality rubric): _process_completion() loads capability profile; injects "
+     "quality_rubric into scoring prompt when present; zero regression when no profile exists. "
+     "TIGHT TESTS: tests/test_xalgo_pipeline.py — 24 tests, 5 classes: "
+     "TestHighRiskPlanCorrection (6), TestHighRiskFallbackPath (3), TestRetryTrustEnforcement (3), "
+     "TestCandidateScoreSanity (6), TestMediumRiskRegression (6). All 24 pass. "
+     "Files: agentid-pro/rls_migration.py (new), agentid-pro/db.py, agentid-pro/auth.py, "
+     "agentid-pro/group_orchestrator.py, agentid-pro/tests/test_xalgo_pipeline.py (new)."),
     ("v1.4.0", "2026-05-13",
      "Phase 3 — Enterprise Agent Operations. "
      "Goal: observable, controlled, auditable team runs for enterprise users. "
@@ -1197,6 +1325,180 @@ def build_tracker():
              "now decrypt before use. Warning logged on startup when key is not set.",
              "agentid-pro/server_pro.py  _encrypt_api_key() + _decrypt_api_key()\n"
              "                           + all 6 write/read sites",
+             "done"),
+        ]),
+        ("v1.6.5", "review_queue.enqueue_sync() — zero direct SQL in orchestrator (2026-05-17)", GREEN, [
+            ("enqueue_sync() in review_queue.py",
+             "New public sync callable (before HTTP endpoints). Same INSERT logic as enqueue() "
+             "but without Request object — safe for background/daemon threads. "
+             "Returns review_id (int). Raises on DB error.",
+             "agentid-pro/review_queue.py  enqueue_sync()",
+             "done"),
+            ("_run_policy_gate() uses enqueue_sync()",
+             "Direct INSERT INTO review_queue replaced with "
+             "review_queue.enqueue_sync(..., source=SOURCE_ORCHESTRATOR). "
+             "Orchestrator now has zero direct review_queue SQL. "
+             "All four control-plane modules now routed through shared helpers.",
+             "agentid-pro/group_orchestrator.py  _run_policy_gate()",
+             "done"),
+        ]),
+        ("v1.6.4", "Full control-plane module delegation (2026-05-17)", GREEN, [
+            ("record_spend_sync() + cancel_budget_sync() in budget.py",
+             "Sync-callable equivalents of record_spend and cancel_budget HTTP endpoints. "
+             "Includes per-capability risk-cap enforcement, exhausted/warning status flip, "
+             "fire-and-forget webhook delivery. Callable from background threads.",
+             "agentid-pro/budget.py  record_spend_sync() + cancel_budget_sync()",
+             "done"),
+            ("check_delegation_for_capability() in delegation.py",
+             "New public sync function: queries delegation_tokens for non-expired non-revoked "
+             "tokens covering (agent_did, owner, capability, run_id). Returns {has_any, "
+             "has_valid, count, reason}. Single source of truth for delegation checks.",
+             "agentid-pro/delegation.py  check_delegation_for_capability()",
+             "done"),
+            ("Orchestrator wrappers now delegate — no bespoke SQL",
+             "_check_delegation_tokens → delegation.check_delegation_for_capability(). "
+             "_budget_record_spend_direct → budget.record_spend_sync(). "
+             "_budget_cancel_hold_direct → budget.cancel_budget_sync(). "
+             "_set_run_status terminal cancel → one-liner. "
+             "review_queue INSERT uses SOURCE_ORCHESTRATOR constant. "
+             "Header docstring fixed: _dispatch_task() reference removed.",
+             "agentid-pro/group_orchestrator.py  5 functions updated",
+             "done"),
+            ("SOURCE_ORCHESTRATOR in review_queue.py",
+             "SOURCE_ORCHESTRATOR = 'orchestrator' constant alongside SOURCE_CHECKPOINT and "
+             "SOURCE_EU_AI_ACT. MERGED DESIGN docstring entry added for orchestrator source.",
+             "agentid-pro/review_queue.py  constant + docstring",
+             "done"),
+        ]),
+        ("v1.6.3", "Complete control-plane wiring (2026-05-17)", GREEN, [
+            ("Budget cancel at run terminal",
+             "_set_run_status() fires UPDATE budget_holds SET status='cancelled' when status "
+             "is completed/failed/cancelled. Inline try/except; no-op when no hold exists.",
+             "agentid-pro/group_orchestrator.py  _set_run_status()",
+             "done"),
+            ("Budget spend after task acceptance",
+             "_budget_record_spend_direct(run_id, capability, amount): writes budget_spends row, "
+             "increments hold spent, flips to exhausted when limit reached. Called from "
+             "_accept_output() with _SUBTASK_ESTIMATED_SPEND=0.01. No-op when no hold → opt-in.",
+             "agentid-pro/group_orchestrator.py  _budget_record_spend_direct() + _accept_output()",
+             "done"),
+            ("Delegation token verification in policy gate",
+             "_check_delegation_tokens(agent_did, owner, capability, run_id): queries "
+             "delegation_tokens for non-expired non-revoked tokens covering capability. "
+             "In _run_policy_gate(): require_verifier+no valid token → deny; "
+             "require_verifier+valid token → allow; tokens exist but all invalid → warn; "
+             "no tokens → pass (owner-direct assignment).",
+             "agentid-pro/group_orchestrator.py  _check_delegation_tokens() + _run_policy_gate()",
+             "done"),
+            ("Tests: 9 new (48 total passing)",
+             "test_control_plane_wiring.py: TestBudgetRecordSpendDirect (2), "
+             "TestBudgetCancelHoldDirect (2), TestDelegationCheck (3), "
+             "TestPolicyGateDelegation (2).",
+             "agentid-pro/tests/test_control_plane_wiring.py  (new)",
+             "done"),
+        ]),
+        ("v1.6.2", "P1/P2 Remediation — Control-plane + API + UI (2026-05-17)", GREEN, [
+            ("P1a: required_capability + resolved_permission_level in API",
+             "Both GET /pro/groups/runs/{run_id} and /report endpoints now SELECT and return "
+             "required_capability and resolved_permission_level. Workspace was falling back to "
+             "'general'/'contribute' for every assignment because those columns were missing "
+             "from the SELECT list despite being stored on the assignment row.",
+             "agentid-pro/group_runs.py  get_run() + get_run_report() SELECT lists",
+             "done"),
+            ("P1b: _run_policy_gate() — control-plane wired into dispatch",
+             "_run_policy_gate(agent_did, owner, capability, risk_level, run_id): calls "
+             "make_policy_decision() + check_budget_remaining(). "
+             "Outcomes: allow/restrict_scope → proceed; deny/require_verifier → mark assignment "
+             "failed, log policy_denied event; require_approval → insert review_queue row "
+             "directly (daemon thread, no HTTP layer), mark assignment failed. "
+             "Degrades gracefully on ImportError or exception — allow so misconfiguration "
+             "never silently blocks all group runs.",
+             "agentid-pro/group_orchestrator.py  _run_policy_gate() + call site in dispatch loop",
+             "done"),
+            ("P2: suitability chip in team-workspace.html",
+             "Plan-row meta chips and output-item pill-row now show 'suit. X%' when "
+             "candidate_score is non-null. Graceful fallback when value absent (older runs).",
+             "agentid/docs/team-workspace.html  two rendering spots",
+             "done"),
+            ("Track tests/test_group_orchestrator_xalgo.py",
+             "5 tests were untracked in git; now committed (3 files in agentid-pro commit).",
+             "agentid-pro/tests/test_group_orchestrator_xalgo.py  (tracked)",
+             "done"),
+        ]),
+        ("v1.6.1", "Fix: candidate_score exposed in API (2026-05-17)", GREEN, [
+            ("candidate_score in run-detail and report endpoints",
+             "candidate_score was stored per assignment by X-algo scorer but not returned "
+             "by GET /pro/groups/runs/{run_id} or /report. Added to both SELECT lists and "
+             "response dicts so dashboard and audit tools can inspect scoring decisions.",
+             "agentid-pro/group_runs.py  run-detail + report endpoints",
+             "done"),
+        ]),
+        ("v1.6.0", "X-Algorithm Phase 4 — Two-Tower Semantic Retrieval (2026-05-16)", GREEN, [
+            ("capability_embeddings.py (new module)",
+             "Two-step pipeline: Step 1 = cheap LLM intent extraction (gpt-4o-mini, max_tokens=150) "
+             "extracts capability slugs from task; Step 2 = cosine similarity per intent against "
+             "agent_capability_embeddings. Per-agent score = max sim across intents. "
+             "Members sorted and trimmed to TOP_K_SEMANTIC=20 before LLM prompt. "
+             "Planning prompt shows semantic_fit:X% per member. "
+             "Graceful degradation: {} on any failure, all members pass through unchanged.",
+             "agentid-pro/capability_embeddings.py  (new)\n"
+             "agentid-pro/group_orchestrator.py  Phase 4 block in _orchestrate()\n"
+             "agentid-pro/server_pro.py  init_capability_embeddings_schema() call",
+             "done"),
+            ("Schema: agent_capability_embeddings + capability_profiles.description",
+             "agent_capability_embeddings(agent_did, capability, embedding vector(1536), "
+             "model, updated_at) PRIMARY KEY (agent_did, capability). HNSW index. "
+             "capability_profiles gains description TEXT column (embedding source). "
+             "Indexing triggers: capability_profiles POST/PATCH with description → "
+             "reindex_capability_for_all_agents() daemon thread. "
+             "quick_register_agent → per-capability background tasks for profiles with descriptions.",
+             "agentid-pro/capability_embeddings.py  init_capability_embeddings_schema()\n"
+             "agentid-pro/capability_profiles.py  description field + reindex triggers",
+             "done"),
+            ("TestSemanticRetrieval (10 tests, 34 total passing)",
+             "Tests: disabled flag, intent JSON parsing, bad-JSON fallback, LLM exception fallback, "
+             "case normalisation, empty embeddings, max-similarity aggregation across intents, "
+             "DB error isolation, raw-task fallback path.",
+             "agentid-pro/tests/test_xalgo_pipeline.py  TestSemanticRetrieval class",
+             "done"),
+        ]),
+        ("v1.5.0", "X-Algorithm Adaptations + RLS + Tight Tests (2026-05-16)", GREEN, [
+            ("Row Level Security",
+             "rls_migration.py applies ENABLE/FORCE ROW LEVEL SECURITY + owner isolation "
+             "policy to 65+ tables. Policy bypasses on empty app.current_owner for background ops. "
+             "Child tables (group_run_assignments/events/shared_context) use subquery via FK. "
+             "db.py: ContextVar + set_rls_owner(); get_conn() injects/resets app.current_owner. "
+             "auth.py: require_api_key() calls set_rls_owner().",
+             "agentid-pro/rls_migration.py  (new)\n"
+             "agentid-pro/db.py  _rls_owner ContextVar + set_rls_owner() + get_conn() injection\n"
+             "agentid-pro/auth.py  set_rls_owner() call in require_api_key()\n"
+             "agentid-pro/server_pro.py  run_rls_migration() call on boot",
+             "done"),
+            ("X-algo Phase 1 — Post-plan trust gate",
+             "_enforce_plan_trust_gate(plan, members, settings): pure function, replaces "
+             "high-risk assignments to below-threshold agents with highest-suitability qualifier. "
+             "Falls back to highest-trust if no agent clears threshold. Logs "
+             "orchestrator_plan_corrected event with full corrections list.",
+             "agentid-pro/group_orchestrator.py  _enforce_plan_trust_gate() + inline call in _orchestrate()",
+             "done"),
+            ("X-algo Phase 2 — Weighted multi-signal scorer",
+             "_compute_candidate_score(): [0,1] composite from quality(0.35) + completion(0.25) "
+             "+ trust(0.25) - rejection(0.15). candidate_score stored per assignment. "
+             "Planning prompt shows suitability:X/100. _get_best_alternative_agent() ranks by "
+             "composite + applies trust gate on high-risk retries. _handle_failed_output() passes "
+             "risk_level from assignment to retry selection.",
+             "agentid-pro/group_orchestrator.py  _compute_candidate_score() + _get_best_alternative_agent() update",
+             "done"),
+            ("X-algo Phase 3 — Capability-aware quality rubric",
+             "_process_completion() loads capability profile for required_capability; injects "
+             "quality_rubric into scoring prompt when present. Zero regression when no profile.",
+             "agentid-pro/group_orchestrator.py  _process_completion() rubric injection",
+             "done"),
+            ("Tight test suite (24/24)",
+             "tests/test_xalgo_pipeline.py — 5 classes: TestHighRiskPlanCorrection (6), "
+             "TestHighRiskFallbackPath (3), TestRetryTrustEnforcement (3, mocked DB), "
+             "TestCandidateScoreSanity (6), TestMediumRiskRegression (6). All 24 pass.",
+             "agentid-pro/tests/test_xalgo_pipeline.py  (new)",
              "done"),
         ]),
         ("v1.4.0", "Phase 3 — Enterprise Agent Operations (2026-05-13)", GREEN, [
