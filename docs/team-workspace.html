@@ -1210,7 +1210,9 @@
     }
 
   /* ── Causal Audit Graph ───────────────────────────────────────────── */
-  .cg-wrap { position:relative; overflow:auto; cursor:grab; user-select:none; }
+  .cg-split { display:grid; grid-template-columns:1fr 288px; gap:1rem; align-items:start; }
+  .cg-wrap { position:relative; overflow:auto; cursor:grab; user-select:none;
+    max-height:520px; border:1px solid var(--border); border-radius:10px; }
   .cg-wrap:active { cursor:grabbing; }
   .cg-canvas { position:relative; min-width:100%; }
   .cg-edges { position:absolute; inset:0; pointer-events:none; overflow:visible; }
@@ -3424,17 +3426,32 @@
       </div>`;
     }).join("");
 
+    const noEdgesNotice = edges.length === 0 ? `
+      <div style="font-size:0.72rem;color:var(--muted);padding:6px 8px;margin-bottom:8px;
+        background:rgba(249,115,22,0.07);border:1px solid rgba(249,115,22,0.18);
+        border-radius:7px;line-height:1.45;">
+        ⚠️ No causal links — this run predates Phase 1.2. Events are shown as an audit log.
+        Start a new run to see the full graph with edges.
+      </div>` : "";
+
     container.innerHTML = `
-      <div class="cg-wrap" id="cg-wrap">
-        <div class="cg-canvas" style="width:${canvasW}px;height:${canvasH}px;">
-          <svg class="cg-edges" width="${canvasW}" height="${canvasH}">
-            <defs>${defs}</defs>
-            ${svgEdges}
-          </svg>
-          ${nodesHtml}
+      ${noEdgesNotice}
+      <div class="cg-split">
+        <div class="cg-wrap" id="cg-wrap">
+          <div class="cg-canvas" style="width:${canvasW}px;height:${canvasH}px;">
+            <svg class="cg-edges" width="${canvasW}" height="${canvasH}">
+              <defs>${defs}</defs>
+              ${svgEdges}
+            </svg>
+            ${nodesHtml}
+          </div>
         </div>
-      </div>
-      <div id="cg-detail-panel"></div>`;
+        <div id="cg-detail-panel" style="position:sticky;top:1rem;">
+          <div class="cg-detail" style="color:var(--muted);font-size:0.8rem;text-align:center;padding:2rem 1rem;">
+            Click any node to inspect its trust state and event data.
+          </div>
+        </div>
+      </div>`;
 
     // Pan/drag on the canvas
     const wrap = document.getElementById("cg-wrap");
@@ -3524,6 +3541,7 @@
           <div style="font-size:0.7rem;color:var(--muted);margin-top:0.5rem;">Causal weight: ${node.causal_weight}</div>
         ` : ""}
       </div>`;
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   async function showTraceModal(eventId) {
