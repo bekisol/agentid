@@ -1208,6 +1208,78 @@
       .hero-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
       .assignment-meta-grid, .contrib-breakdown, .perf-metrics, .timeline-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
     }
+
+  /* ── Causal Audit Graph ───────────────────────────────────────────── */
+  .cg-wrap { position:relative; overflow:auto; cursor:grab; user-select:none; }
+  .cg-wrap:active { cursor:grabbing; }
+  .cg-canvas { position:relative; min-width:100%; }
+  .cg-edges { position:absolute; inset:0; pointer-events:none; overflow:visible; }
+  .cg-edge { fill:none; stroke-width:2; opacity:0.7; }
+  .cg-edge-label { font-size:10px; fill:var(--muted); font-family:inherit; }
+  .cg-node {
+    position:absolute; width:172px; box-sizing:border-box;
+    background:var(--surface2); border:1.5px solid var(--border-2);
+    border-radius:10px; padding:9px 11px; cursor:pointer;
+    transition:border-color 0.15s, box-shadow 0.15s;
+    display:flex; align-items:flex-start; gap:8px;
+  }
+  .cg-node:hover { border-color:var(--accent); box-shadow:0 0 0 2px rgba(249,115,22,0.15); }
+  .cg-node.selected { border-color:var(--accent); box-shadow:0 0 0 3px rgba(249,115,22,0.2); }
+  .cg-node-icon { font-size:1.1rem; line-height:1; flex-shrink:0; margin-top:1px; }
+  .cg-node-body { min-width:0; }
+  .cg-node-type { font-size:0.72rem; font-weight:600; color:var(--text); line-height:1.3;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cg-node-agent { font-size:0.68rem; color:var(--muted); margin-top:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cg-node-time { font-size:0.65rem; color:var(--border-2); margin-top:1px; }
+  /* detail panel */
+  .cg-detail {
+    border:1px solid var(--border-2); border-radius:12px;
+    background:var(--surface2); padding:1rem; margin-top:1rem;
+  }
+  .cg-detail-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.65rem; }
+  .cg-detail-title { font-size:0.9rem; font-weight:600; color:var(--text); }
+  .cg-dim-bar-wrap { display:grid; gap:4px; margin:0.55rem 0; }
+  .cg-dim-row { display:grid; grid-template-columns:95px 1fr 30px; align-items:center; gap:6px; }
+  .cg-dim-name { font-size:0.67rem; color:var(--muted); }
+  .cg-dim-track { background:var(--border); border-radius:99px; height:5px; overflow:hidden; }
+  .cg-dim-fill { height:100%; border-radius:99px; background:var(--green); transition:width 0.3s; }
+  .cg-dim-val { font-size:0.67rem; color:var(--text-2); text-align:right; }
+  .cg-ev-data { font-size:0.72rem; color:var(--text-2); background:var(--surface);
+    border-radius:7px; padding:8px 10px; margin-top:0.5rem; overflow:auto; max-height:160px; }
+  .cg-ev-data pre { margin:0; white-space:pre-wrap; word-break:break-all; }
+  /* trace modal */
+  .cg-trace-backdrop {
+    position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:2000;
+    display:flex; align-items:flex-start; justify-content:center; padding:3rem 1rem 1rem;
+    overflow-y:auto;
+  }
+  .cg-trace-modal {
+    background:var(--surface); border:1px solid var(--border-2); border-radius:16px;
+    padding:1.5rem; width:100%; max-width:640px; position:relative;
+  }
+  .cg-trace-modal h3 { margin:0 0 0.25rem; font-size:1rem; }
+  .cg-trace-modal .lede { font-size:0.8rem; color:var(--muted); margin:0 0 1rem; }
+  .cg-trace-chain { display:flex; flex-direction:column; gap:0; }
+  .cg-trace-node {
+    display:flex; gap:12px; padding:10px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .cg-trace-node:last-child { border-bottom:none; }
+  .cg-trace-spine { display:flex; flex-direction:column; align-items:center; flex-shrink:0; }
+  .cg-trace-dot { width:10px; height:10px; border-radius:50%; background:var(--accent);
+    flex-shrink:0; margin-top:3px; }
+  .cg-trace-line { width:2px; flex:1; background:var(--border); min-height:20px; margin-top:3px; }
+  .cg-trace-body { flex:1; min-width:0; }
+  .cg-trace-type { font-size:0.78rem; font-weight:600; color:var(--text); }
+  .cg-trace-meta { font-size:0.71rem; color:var(--muted); margin-top:2px; }
+  .cg-trace-trust { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+  .cg-trace-chip {
+    font-size:0.65rem; padding:2px 7px; border-radius:99px;
+    background:rgba(249,115,22,0.12); color:var(--accent); border:1px solid rgba(249,115,22,0.2);
+  }
+  .cg-empty { color:var(--muted); font-size:0.85rem; text-align:center; padding:2rem 0; }
+  .cg-load-btn { display:flex; align-items:center; justify-content:center; padding:2.5rem 0; }
   </style>
 </head>
 <body>
@@ -2470,6 +2542,7 @@
       { id: "decisions", title: "Decisions", note: "Why the run changed course" },
       { id: "assignments", title: "Assignments", note: "Role, status, and quality" },
       { id: "final", title: "Final answer", note: "Merged output and summary" },
+      { id: "graph", title: "Audit Graph", note: "Causal event DAG" },
     ];
 
     const completed = (run.assignments || []).filter(a => a.status === "completed").length;
@@ -2693,6 +2766,15 @@
             <h3>Assignments</h3>
             <p class="lede">Role, status, quality, and permission history for each agent task in this run.</p>
             <div class="output-list">${assignmentHtml}</div>
+          </section>
+          <section class="doc-section" data-doc-section="graph" id="graph-section">
+            <h3>Audit Graph</h3>
+            <p class="lede">Causal event DAG — every decision traced back to its source. Click a node to inspect trust state. Use Trace to walk any event back to the run root.</p>
+            <div id="cg-container">
+              <div class="cg-load-btn">
+                <button class="tiny-btn primary" onclick="loadCausalGraph()">Load causal graph</button>
+              </div>
+            </div>
           </section>
           <section class="doc-section final-panel" data-doc-section="final">
             <h3>Final answer</h3>
@@ -3155,6 +3237,368 @@
     } catch (e) {
       showToast(e.message || "Could not download report.", true);
     }
+  }
+
+  // ── Causal Audit Graph ────────────────────────────────────────────────────
+
+  const CG_NODE_W  = 172;
+  const CG_NODE_H  = 70;
+  const CG_COL_GAP = 72;   // horizontal gap between node columns
+  const CG_ROW_GAP = 22;   // vertical gap between nodes in same column
+  const CG_PAD     = 20;
+
+  const CG_EVENT_ICONS = {
+    run_created:                              "🚀",
+    orchestrator_plan:                        "📋",
+    orchestrator_plan_corrected:              "⚙️",
+    orchestrator_plan_dim_policy_corrected:   "🛡",
+    orchestrator_plan_dim_policy_all_blocked: "🚫",
+    approval_requested:                       "⏳",
+    approval_granted:                         "✅",
+    agent_assigned:                           "👤",
+    agent_completed:                          "✓",
+    orchestrator_rejected:                    "✗",
+    synthesis_started:                        "⚡",
+    synthesis_completed:                      "⚡",
+    run_completed:                            "🏁",
+    run_failed:                               "💥",
+    policy_denied:                            "🚫",
+  };
+
+  const CG_EDGE_COLORS = {
+    planning:          "#f97316",
+    correction:        "#f59e0b",
+    policy_correction: "#f59e0b",
+    dispatch:          "#3b82f6",
+    execution:         "#10b981",
+    approval_pending:  "#8b5cf6",
+    approval:          "#8b5cf6",
+    contribution:      "#06b6d4",
+    finalization:      "#06b6d4",
+    completion:        "#10b981",
+    failure:           "#ef4444",
+    rejection:         "#ef4444",
+    quality_fail:      "#ef4444",
+    sequence:          "#4b5563",
+  };
+
+  const CG_DIM_LABELS = {
+    d1: "Identity",
+    d2: "Reliability",
+    d3: "Peer rep.",
+    d4: "Task perf.",
+    d5: "Compliance",
+    d6: "Capability",
+    composite: "Composite",
+  };
+
+  let cgState = { graph: null, selectedNodeId: null, loading: false };
+
+  async function loadCausalGraph() {
+    const runId = state.selectedRunId;
+    if (!runId) return;
+    const container = document.getElementById("cg-container");
+    if (!container) return;
+    container.innerHTML = `<div class="cg-empty">Loading graph…</div>`;
+    cgState.selectedNodeId = null;
+    cgState.graph = null;
+    try {
+      const data = await fetchJson(`/pro/groups/runs/${runId}/causal-graph`);
+      cgState.graph = data;
+      renderCausalGraph(data);
+    } catch (e) {
+      container.innerHTML = `<div class="cg-empty">Could not load graph: ${esc(e.message || "unknown error")}</div>`;
+    }
+  }
+
+  function cgLayout(nodes, edges) {
+    // Build adjacency: nodeId → [childNodeId]
+    const childMap = {};
+    const parentMap = {};
+    nodes.forEach(n => { childMap[n.id] = []; parentMap[n.id] = []; });
+    edges.forEach(e => {
+      if (childMap[e.from_id] !== undefined) childMap[e.from_id].push(e.to_id);
+      if (parentMap[e.to_id] !== undefined) parentMap[e.to_id].push(e.from_id);
+    });
+    // BFS from roots to assign depth
+    const depth = {};
+    const roots = nodes.filter(n => !edges.some(e => e.to_id === n.id));
+    const queue = roots.map(n => ({ id: n.id, d: 0 }));
+    while (queue.length) {
+      const { id, d } = queue.shift();
+      if (depth[id] !== undefined && depth[id] >= d) continue;
+      depth[id] = d;
+      (childMap[id] || []).forEach(cid => queue.push({ id: cid, d: d + 1 }));
+    }
+    // Assign nodes without a depth (disconnected / pre-1.2)
+    nodes.forEach(n => { if (depth[n.id] === undefined) depth[n.id] = 0; });
+    // Group by depth, sort within each depth by id
+    const byDepth = {};
+    nodes.forEach(n => {
+      const d = depth[n.id];
+      if (!byDepth[d]) byDepth[d] = [];
+      byDepth[d].push(n);
+    });
+    Object.values(byDepth).forEach(arr => arr.sort((a, b) => a.id - b.id));
+    // Assign (col, row) → pixel positions
+    const pos = {};
+    Object.entries(byDepth).forEach(([d, arr]) => {
+      arr.forEach((n, row) => {
+        pos[n.id] = {
+          x: CG_PAD + Number(d) * (CG_NODE_W + CG_COL_GAP),
+          y: CG_PAD + row * (CG_NODE_H + CG_ROW_GAP),
+        };
+      });
+    });
+    const maxDepth = Math.max(0, ...Object.keys(byDepth).map(Number));
+    const maxRows  = Math.max(1, ...Object.values(byDepth).map(a => a.length));
+    const canvasW  = CG_PAD * 2 + (maxDepth + 1) * (CG_NODE_W + CG_COL_GAP);
+    const canvasH  = CG_PAD * 2 + maxRows * (CG_NODE_H + CG_ROW_GAP);
+    return { pos, canvasW, canvasH };
+  }
+
+  function renderCausalGraph(data) {
+    const container = document.getElementById("cg-container");
+    if (!container) return;
+    const nodes = data.nodes || [];
+    const edges = data.edges || [];
+
+    if (!nodes.length) {
+      container.innerHTML = `<div class="cg-empty">No events found for this run.</div>`;
+      return;
+    }
+
+    const { pos, canvasW, canvasH } = cgLayout(nodes, edges);
+    const nodeById = {};
+    nodes.forEach(n => { nodeById[n.id] = n; });
+
+    // Build SVG edges
+    let svgEdges = "";
+    edges.forEach(e => {
+      const from = pos[e.from_id];
+      const to   = pos[e.to_id];
+      if (!from || !to) return;
+      const x1 = from.x + CG_NODE_W;
+      const y1 = from.y + CG_NODE_H / 2;
+      const x2 = to.x;
+      const y2 = to.y + CG_NODE_H / 2;
+      const cx1 = x1 + (x2 - x1) * 0.5;
+      const cy1 = y1;
+      const cx2 = x1 + (x2 - x1) * 0.5;
+      const cy2 = y2;
+      const color = CG_EDGE_COLORS[e.edge_type] || CG_EDGE_COLORS.sequence;
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2 - 7;
+      svgEdges += `
+        <path class="cg-edge" d="M${x1},${y1} C${cx1},${cy1} ${cx2},${cy2} ${x2},${y2}"
+          stroke="${color}" marker-end="url(#arr-${e.edge_type || "sequence"})"/>
+        <text class="cg-edge-label" x="${mx}" y="${my}" text-anchor="middle">${esc(e.edge_type || "")}</text>`;
+    });
+
+    // Arrow marker defs for each edge type
+    const markerColors = [...new Set(edges.map(e => e.edge_type || "sequence"))];
+    const defs = markerColors.map(et => {
+      const color = CG_EDGE_COLORS[et] || CG_EDGE_COLORS.sequence;
+      return `<marker id="arr-${et}" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="${color}" opacity="0.75"/>
+      </marker>`;
+    }).join("");
+
+    // Build node divs
+    const nodesHtml = nodes.map(n => {
+      const p = pos[n.id];
+      const icon = CG_EVENT_ICONS[n.event_type] || "◦";
+      const shortType = (n.event_type || "").replace(/_/g, " ").replace("orchestrator ", "");
+      const agentLabel = n.agent_did ? agentName(n.agent_did) : "Orchestrator";
+      const timeLabel = n.ts ? new Date(n.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+      const isSelected = String(n.id) === String(cgState.selectedNodeId);
+      return `<div class="cg-node${isSelected ? " selected" : ""}"
+          style="left:${p.x}px;top:${p.y}px;width:${CG_NODE_W}px;"
+          onclick="selectGraphNode(${n.id})" title="${esc(n.event_type)}">
+        <div class="cg-node-icon">${icon}</div>
+        <div class="cg-node-body">
+          <div class="cg-node-type">${esc(shortType)}</div>
+          <div class="cg-node-agent">${esc(agentLabel)}</div>
+          <div class="cg-node-time">${esc(timeLabel)}</div>
+        </div>
+      </div>`;
+    }).join("");
+
+    container.innerHTML = `
+      <div class="cg-wrap" id="cg-wrap">
+        <div class="cg-canvas" style="width:${canvasW}px;height:${canvasH}px;">
+          <svg class="cg-edges" width="${canvasW}" height="${canvasH}">
+            <defs>${defs}</defs>
+            ${svgEdges}
+          </svg>
+          ${nodesHtml}
+        </div>
+      </div>
+      <div id="cg-detail-panel"></div>`;
+
+    // Pan/drag on the canvas
+    const wrap = document.getElementById("cg-wrap");
+    if (wrap) {
+      let dragging = false, startX, startY, scrollLeft, scrollTop;
+      wrap.addEventListener("mousedown", e => {
+        if (e.target.classList.contains("cg-node") || e.target.closest(".cg-node")) return;
+        dragging = true; startX = e.pageX - wrap.offsetLeft; startY = e.pageY - wrap.offsetTop;
+        scrollLeft = wrap.scrollLeft; scrollTop = wrap.scrollTop;
+      });
+      wrap.addEventListener("mouseleave", () => dragging = false);
+      wrap.addEventListener("mouseup", () => dragging = false);
+      wrap.addEventListener("mousemove", e => {
+        if (!dragging) return;
+        e.preventDefault();
+        wrap.scrollLeft = scrollLeft - (e.pageX - wrap.offsetLeft - startX);
+        wrap.scrollTop  = scrollTop  - (e.pageY - wrap.offsetTop  - startY);
+      });
+    }
+
+    // Show detail for already-selected node
+    if (cgState.selectedNodeId) {
+      const n = (data.nodes || []).find(x => String(x.id) === String(cgState.selectedNodeId));
+      if (n) renderNodeDetail(n);
+    }
+  }
+
+  function selectGraphNode(nodeId) {
+    cgState.selectedNodeId = nodeId;
+    // Re-render to update selection highlight
+    if (cgState.graph) renderCausalGraph(cgState.graph);
+    const node = (cgState.graph?.nodes || []).find(n => n.id === nodeId);
+    if (node) renderNodeDetail(node);
+  }
+
+  function renderNodeDetail(node) {
+    const panel = document.getElementById("cg-detail-panel");
+    if (!panel) return;
+    const snap = node.trust_snapshot || {};
+    const dims = snap.dimension_scores || {};
+    const dimHtml = Object.keys(CG_DIM_LABELS)
+      .filter(k => dims[k] != null)
+      .map(k => {
+        const v = typeof dims[k] === "object" ? (dims[k]?.score ?? dims[k]) : dims[k];
+        const pct = Math.max(0, Math.min(100, Math.round(Number(v) * 100)));
+        const color = pct >= 70 ? "var(--green)" : pct >= 40 ? "var(--yellow)" : "var(--red)";
+        return `<div class="cg-dim-row">
+          <div class="cg-dim-name">${esc(CG_DIM_LABELS[k] || k)}</div>
+          <div class="cg-dim-track"><div class="cg-dim-fill" style="width:${pct}%;background:${color};"></div></div>
+          <div class="cg-dim-val">${pct}</div>
+        </div>`;
+      }).join("");
+    const trustScore = snap.trust_score != null ? Math.round(Number(snap.trust_score)) : null;
+    const evData = node.event_data || {};
+    const evDataClean = Object.fromEntries(
+      Object.entries(evData).filter(([k]) => !["trust_score","dimension_scores"].includes(k))
+    );
+    const snapSource = snap.snapshot_source === "latest"
+      ? `<span style="font-size:0.67rem;color:var(--muted);margin-left:6px;">(latest snapshot)</span>` : "";
+
+    panel.innerHTML = `
+      <div class="cg-detail">
+        <div class="cg-detail-head">
+          <div class="cg-detail-title">
+            ${CG_EVENT_ICONS[node.event_type] || "◦"}&nbsp;${esc((node.event_type || "").replace(/_/g, " "))}
+          </div>
+          <button class="tiny-btn" onclick="showTraceModal(${node.id})">Trace to root</button>
+        </div>
+        ${node.agent_did ? `<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem;">
+          👤 ${esc(agentName(node.agent_did))}
+        </div>` : ""}
+        ${node.ts ? `<div style="font-size:0.72rem;color:var(--muted);margin-bottom:0.65rem;">
+          🕐 ${esc(new Date(node.ts).toLocaleString())}
+        </div>` : ""}
+        ${(trustScore != null || Object.keys(dims).length) ? `
+          <div style="font-size:0.75rem;font-weight:600;color:var(--text);margin-bottom:0.35rem;">
+            Trust snapshot${snapSource}
+            ${trustScore != null ? `<span style="float:right;color:var(--accent);">${trustScore}</span>` : ""}
+          </div>
+          ${dimHtml ? `<div class="cg-dim-bar-wrap">${dimHtml}</div>` : ""}
+        ` : ""}
+        ${Object.keys(evDataClean).length ? `
+          <div style="font-size:0.75rem;font-weight:600;color:var(--text);margin-top:0.55rem;margin-bottom:0.3rem;">Event data</div>
+          <div class="cg-ev-data"><pre>${esc(JSON.stringify(evDataClean, null, 2))}</pre></div>
+        ` : ""}
+        ${node.causal_weight != null ? `
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:0.5rem;">Causal weight: ${node.causal_weight}</div>
+        ` : ""}
+      </div>`;
+  }
+
+  async function showTraceModal(eventId) {
+    const runId = state.selectedRunId;
+    if (!runId) return;
+    // Create backdrop
+    const backdrop = document.createElement("div");
+    backdrop.className = "cg-trace-backdrop";
+    backdrop.id = "cg-trace-backdrop";
+    backdrop.onclick = e => { if (e.target === backdrop) closeTraceModal(); };
+    backdrop.innerHTML = `
+      <div class="cg-trace-modal">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.25rem;">
+          <h3>Causal Trace</h3>
+          <button class="tiny-btn" onclick="closeTraceModal()">✕ Close</button>
+        </div>
+        <p class="lede">Ancestor chain from root to this event, oldest first.</p>
+        <div id="cg-trace-body"><div class="cg-empty">Loading trace…</div></div>
+      </div>`;
+    document.body.appendChild(backdrop);
+    try {
+      const data = await fetchJson(`/pro/groups/runs/${runId}/causal-graph/trace?event_id=${eventId}`);
+      const chain = data.ancestor_chain || [];
+      const body  = document.getElementById("cg-trace-body");
+      if (!body) return;
+      if (!chain.length) {
+        body.innerHTML = `<div class="cg-empty">No ancestor chain found.</div>`;
+        return;
+      }
+      const chainHtml = chain.map((n, idx) => {
+        const snap = n.trust_snapshot || {};
+        const dims = snap.dimension_scores || {};
+        const trustScore = snap.trust_score != null ? Math.round(Number(snap.trust_score)) : null;
+        const dimChips = Object.keys(CG_DIM_LABELS)
+          .filter(k => dims[k] != null)
+          .map(k => {
+            const v = typeof dims[k] === "object" ? (dims[k]?.score ?? dims[k]) : dims[k];
+            const pct = Math.round(Number(v) * 100);
+            return `<span class="cg-trace-chip" title="${esc(CG_DIM_LABELS[k] || k)}">${(CG_DIM_LABELS[k]||k).slice(0,3)} ${pct}</span>`;
+          }).join("");
+        const isLast = idx === chain.length - 1;
+        return `
+          <div class="cg-trace-node">
+            <div class="cg-trace-spine">
+              <div class="cg-trace-dot" style="background:${isLast ? "var(--accent)" : "var(--blue)"}"></div>
+              ${!isLast ? `<div class="cg-trace-line"></div>` : ""}
+            </div>
+            <div class="cg-trace-body">
+              <div class="cg-trace-type">
+                ${CG_EVENT_ICONS[n.event_type] || "◦"} ${esc((n.event_type || "").replace(/_/g, " "))}
+                ${isLast ? `<span style="font-size:0.65rem;color:var(--accent);margin-left:6px;">← target</span>` : ""}
+              </div>
+              <div class="cg-trace-meta">
+                ${n.agent_did ? esc(agentName(n.agent_did)) + " · " : ""}
+                ${n.ts ? esc(new Date(n.ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"})) : ""}
+                ${n.depth_from_target != null ? ` · depth ${n.depth_from_target}` : ""}
+              </div>
+              ${(trustScore != null || dimChips) ? `
+                <div class="cg-trace-trust">
+                  ${trustScore != null ? `<span class="cg-trace-chip">trust ${trustScore}</span>` : ""}
+                  ${dimChips}
+                </div>` : ""}
+            </div>
+          </div>`;
+      }).join("");
+      body.innerHTML = `<div class="cg-trace-chain">${chainHtml}</div>`;
+    } catch (e) {
+      const body = document.getElementById("cg-trace-body");
+      if (body) body.innerHTML = `<div class="cg-empty">Trace failed: ${esc(e.message || "unknown error")}</div>`;
+    }
+  }
+
+  function closeTraceModal() {
+    const el = document.getElementById("cg-trace-backdrop");
+    if (el) el.remove();
   }
 
   document.getElementById("apikey-submit").addEventListener("click", signInWithApiKey);
