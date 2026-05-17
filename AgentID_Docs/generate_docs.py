@@ -39,6 +39,25 @@ GENERATED = NOW.strftime("%Y-%m-%d %H:%M")   # e.g. "2026-05-06 14:32"
 
 # ── Version changelog (newest first) ──────────────────────────────────────────
 CHANGELOG = [
+    ("v1.7.2", "2026-05-17",
+     "Security follow-up (Codex P1/P2) + test suite fully green (61 passed). "
+     "[P1] PATCH /agents/{did} still had two direct get_key_info() calls — one for owner "
+     "validation (line 2659) and one for owner transfer (line 2680). Both now replaced by a "
+     "single `key_info = require_api_key(request) if x_api_key else None` call so expiry, "
+     "IP-allowlist, new-IP webhook, RLS owner binding, and the rate-limit hook all fire when "
+     "a key is supplied. Unauthenticated PATCH (proof-of-ownership only) is unchanged. "
+     "[P2] get_conn() finalizer now explicitly calls conn.rollback() for ownerless/public "
+     "checkouts in the else branch. Previously the success path fell through with no "
+     "commit/rollback, returning connections in 'idle in transaction' state. The new else "
+     "branch closes any open implicit transaction before pool.putconn(), which is required "
+     "even though idle_in_transaction_session_timeout=30s is set at connect time. "
+     "[Test] tests/test_capability_contracts.py collection was broken — the auth stub only "
+     "provided require_scope but capability_contracts.py also imports require_api_key. "
+     "Added require_api_key=MagicMock() to the stub, plus missing stubs for rate_limit "
+     "(slowapi not installed locally), eu_compliance, and action_approvals. "
+     "Full suite: 61/61 passed (was 46/46 ignoring broken collection). "
+     "Files: agentid-pro/server_pro.py, agentid-pro/db.py, "
+     "agentid-pro/tests/test_capability_contracts.py."),
     ("v1.7.1", "2026-05-17",
      "Security follow-up: address 3 Codex P1/P2 findings in rate limiting. "
      "[P1a] Auth choke-point bypass fixed — 4 routes called get_key_info() directly, skipping "
