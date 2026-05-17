@@ -3267,6 +3267,62 @@
     policy_denied:                            "🚫",
   };
 
+  // Human-readable labels shown on node cards and detail panel headline
+  const CG_EVENT_LABELS = {
+    run_created:                              "Run started",
+    orchestrator_plan:                        "Plan created",
+    orchestrator_plan_corrected:              "Plan corrected",
+    orchestrator_plan_dim_policy_corrected:   "Policy corrected plan",
+    orchestrator_plan_dim_policy_all_blocked: "All agents blocked",
+    approval_requested:                       "Awaiting approval",
+    approval_granted:                         "Approved",
+    agent_assigned:                           "Agent dispatched",
+    agent_completed:                          "Task completed",
+    orchestrator_rejected:                    "Output rejected",
+    synthesis_started:                        "Merging outputs",
+    synthesis_completed:                      "Outputs merged",
+    run_completed:                            "Run completed",
+    run_failed:                               "Run failed",
+    policy_denied:                            "Agent blocked",
+  };
+
+  // Human-readable descriptions shown in the detail panel below the headline
+  const CG_EVENT_DESC = {
+    run_created:                              "The run was created and queued for orchestration.",
+    orchestrator_plan:                        "The orchestrator produced a task plan and assigned subtasks to agents.",
+    orchestrator_plan_corrected:              "The orchestrator's original plan was modified because one or more agents didn't meet the trust threshold for their assigned subtask.",
+    orchestrator_plan_dim_policy_corrected:   "A dimension policy rule (e.g. low reliability score) blocked one or more agents. The plan was corrected to route around them.",
+    orchestrator_plan_dim_policy_all_blocked: "Every agent in the plan was blocked by a dimension policy. The run could not proceed.",
+    approval_requested:                       "The plan requires human approval before agents are dispatched. Waiting for sign-off.",
+    approval_granted:                         "A human approved the plan. Agents are now being dispatched.",
+    agent_assigned:                           "An agent was dispatched with a subtask. The trust state at this moment is captured in the snapshot.",
+    agent_completed:                          "The agent submitted its output. The orchestrator evaluated it against the quality rubric.",
+    orchestrator_rejected:                    "The agent's output did not meet the quality bar. It may be retried with a different agent.",
+    synthesis_started:                        "All accepted outputs are being merged into a single coherent final answer.",
+    synthesis_completed:                      "The synthesis model produced a merged output from all agent contributions.",
+    run_completed:                            "The run finished successfully. The final answer is ready.",
+    run_failed:                               "The run encountered an unrecoverable error and stopped.",
+    policy_denied:                            "This agent was blocked by a capability policy or dimension restriction before being dispatched.",
+  };
+
+  // Human-readable edge labels shown on graph connections
+  const CG_EDGE_LABELS = {
+    planning:          "planned",
+    correction:        "corrected",
+    policy_correction: "policy fix",
+    dispatch:          "dispatched",
+    execution:         "executed",
+    approval_pending:  "needs approval",
+    approval:          "approved",
+    contribution:      "contributed",
+    finalization:      "finalized",
+    completion:        "completed",
+    failure:           "failed",
+    rejection:         "rejected",
+    quality_fail:      "quality fail",
+    sequence:          "then",
+  };
+
   const CG_EDGE_COLORS = {
     planning:          "#f97316",
     correction:        "#f59e0b",
@@ -3394,7 +3450,7 @@
       svgEdges += `
         <path class="cg-edge" d="M${x1},${y1} C${cx1},${cy1} ${cx2},${cy2} ${x2},${y2}"
           stroke="${color}" marker-end="url(#arr-${e.edge_type || "sequence"})"/>
-        <text class="cg-edge-label" x="${mx}" y="${my}" text-anchor="middle">${esc(e.edge_type || "")}</text>`;
+        <text class="cg-edge-label" x="${mx}" y="${my}" text-anchor="middle">${esc(CG_EDGE_LABELS[e.edge_type] || e.edge_type || "")}</text>`;
     });
 
     // Arrow marker defs for each edge type
@@ -3410,7 +3466,7 @@
     const nodesHtml = nodes.map(n => {
       const p = pos[n.id];
       const icon = CG_EVENT_ICONS[n.event_type] || "◦";
-      const shortType = (n.event_type || "").replace(/_/g, " ").replace("orchestrator ", "");
+      const humanLabel = CG_EVENT_LABELS[n.event_type] || (n.event_type || "").replace(/_/g, " ");
       const agentLabel = n.agent_did ? agentName(n.agent_did) : "Orchestrator";
       const timeLabel = n.ts ? new Date(n.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
       const isSelected = String(n.id) === String(cgState.selectedNodeId);
@@ -3419,7 +3475,7 @@
           onclick="selectGraphNode(${n.id})" title="${esc(n.event_type)}">
         <div class="cg-node-icon">${icon}</div>
         <div class="cg-node-body">
-          <div class="cg-node-type">${esc(shortType)}</div>
+          <div class="cg-node-type">${esc(humanLabel)}</div>
           <div class="cg-node-agent">${esc(agentLabel)}</div>
           <div class="cg-node-time">${esc(timeLabel)}</div>
         </div>
@@ -3512,14 +3568,20 @@
     const snapSource = snap.snapshot_source === "latest"
       ? `<span style="font-size:0.67rem;color:var(--muted);margin-left:6px;">(latest snapshot)</span>` : "";
 
+    const humanLabel = CG_EVENT_LABELS[node.event_type] || (node.event_type || "").replace(/_/g, " ");
+    const humanDesc  = CG_EVENT_DESC[node.event_type] || null;
     panel.innerHTML = `
       <div class="cg-detail">
         <div class="cg-detail-head">
           <div class="cg-detail-title">
-            ${CG_EVENT_ICONS[node.event_type] || "◦"}&nbsp;${esc((node.event_type || "").replace(/_/g, " "))}
+            ${CG_EVENT_ICONS[node.event_type] || "◦"}&nbsp;${esc(humanLabel)}
           </div>
           <button class="tiny-btn" onclick="showTraceModal(${node.id})">Trace to root</button>
         </div>
+        ${humanDesc ? `<div style="font-size:0.77rem;color:var(--text-2);line-height:1.5;margin-bottom:0.55rem;">${esc(humanDesc)}</div>` : ""}
+        <div style="font-size:0.67rem;color:var(--muted);font-family:monospace;
+          background:var(--surface);border-radius:5px;padding:3px 7px;display:inline-block;
+          margin-bottom:0.65rem;">${esc(node.event_type || "")}</div>
         ${node.agent_did ? `<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem;">
           👤 ${esc(agentName(node.agent_did))}
         </div>` : ""}
@@ -3591,9 +3653,11 @@
             </div>
             <div class="cg-trace-body">
               <div class="cg-trace-type">
-                ${CG_EVENT_ICONS[n.event_type] || "◦"} ${esc((n.event_type || "").replace(/_/g, " "))}
+                ${CG_EVENT_ICONS[n.event_type] || "◦"}
+                ${esc(CG_EVENT_LABELS[n.event_type] || (n.event_type || "").replace(/_/g, " "))}
                 ${isLast ? `<span style="font-size:0.65rem;color:var(--accent);margin-left:6px;">← target</span>` : ""}
               </div>
+              <div style="font-size:0.65rem;color:var(--muted);font-family:monospace;margin-top:1px;">${esc(n.event_type || "")}</div>
               <div class="cg-trace-meta">
                 ${n.agent_did ? esc(agentName(n.agent_did)) + " · " : ""}
                 ${n.ts ? esc(new Date(n.ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"})) : ""}
