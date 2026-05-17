@@ -2499,6 +2499,7 @@
             ${runBadge(assign?.status || "assigned")}
             <span class="chip ${esc(risk === "high" ? "failed" : risk === "low" ? "done" : "waiting")}">${esc(risk)} risk</span>
             ${trustScore != null ? `<span class="chip">trust ${Math.round(Number(trustScore))}</span>` : ""}
+            ${assign?.candidate_score != null ? `<span class="chip" title="X-algo composite suitability score">suit. ${Math.round(assign.candidate_score * 100)}%</span>` : ""}
             ${assign?.resolved_permission_level ? `<span class="chip">${esc(assign.resolved_permission_level)}</span>` : ""}
           </div>
           ${item.rationale || assign?.rationale ? `<div class="plan-meta">${esc(item.rationale || assign?.rationale)}</div>` : ""}
@@ -2604,6 +2605,7 @@
           <div class="ws-pill-row">
             ${runBadge(assign.status || "assigned")}
             ${assign.quality_score != null ? `<span class="trust-chip">${Math.round(assign.quality_score * 100)}% quality</span>` : ""}
+            ${assign.candidate_score != null ? `<span class="trust-chip" title="X-algo suitability at assignment time">suit. ${Math.round(assign.candidate_score * 100)}%</span>` : ""}
           </div>
         </div>
         <div class="output-copy">${esc(assign.subtask || "")}</div>
