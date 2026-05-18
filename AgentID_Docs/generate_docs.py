@@ -39,6 +39,31 @@ GENERATED = NOW.strftime("%Y-%m-%d %H:%M")   # e.g. "2026-05-06 14:32"
 
 # ── Version changelog (newest first) ──────────────────────────────────────────
 CHANGELOG = [
+    ("v2.0.0", "2026-05-18",
+     "Phase 1.3 — Capability Contracts as Runtime Primitives; 162/162 tests passing. "
+     "Contracts now act as a live trust event source feeding Phase 1.1 enforcement. "
+     "Data flow: SLA breach → breach_consequence demotion applied to sla_compliance_score "
+     "→ contract_breach_penalties record inserted → take_snapshot_for_did() triggered in "
+     "background thread → apply_score_update_enforcement() fires (Phase 1.1) → capability "
+     "restriction applied if threshold crossed. "
+     "Schema: breach_consequence JSONB and expires_at TIMESTAMPTZ added to "
+     "capability_contracts; new contract_breach_penalties table (did, capability, "
+     "contract_id, dimension, magnitude, breach_type, source, applied_at); status FSM "
+     "extended with 'suspended'; sla_breach_events extended with breach_type + contract_id. "
+     "breach_consequence fields: dimension (d2|d6), demotion_magnitude (0-1.0), "
+     "trigger_threshold (1-100 breaches in 30-day rolling window before auto-suspension). "
+     "Contract suspension fast-path: after N breaches in 30-day window (N = trigger_threshold), "
+     "_suspend_contract() sets status='suspended' and fires contract.suspended webhook. "
+     "Suspended contracts block all capability calls with HTTP 403. "
+     "Auto-expiry: _check_contract_gate() checks expires_at at call time; expired contracts "
+     "return HTTP 402, fire contract.expired webhook, insert D6 demotion in "
+     "contract_breach_penalties, and trigger take_snapshot_for_did(). "
+     "New endpoint: GET /pro/contracts/{contract_id}/enforcement-history returns breach events, "
+     "dimension penalties applied, and Phase 1.1 policy restriction events — full causation "
+     "chain from SLA breach to capability restriction. "
+     "13 new regression tests (test_contract_enforcement.py). "
+     "Files: agentid-pro/capability_contracts.py, "
+     "agentid-pro/tests/test_contract_enforcement.py."),
     ("v1.9.8", "2026-05-17",
      "Phase 1.2 — Causal Audit Graph round-8 review fixes; 149/149 tests passing. "
      "[High] Approval dispatch (_dispatch_pending_assignments) did not call "
@@ -1724,6 +1749,45 @@ def build_tracker():
              "now decrypt before use. Warning logged on startup when key is not set.",
              "agentid-pro/server_pro.py  _encrypt_api_key() + _decrypt_api_key()\n"
              "                           + all 6 write/read sites",
+             "done"),
+        ]),
+        ("v2.0.x", "Phase 1.3 — Capability Contracts as Runtime Primitives (2026-05-18)", GREEN, [
+            ("Schema: breach_consequence + expires_at + contract_breach_penalties",
+             "breach_consequence JSONB on capability_contracts: {dimension: d2|d6, "
+             "demotion_magnitude: float 0-1.0, trigger_threshold: int 1-100}. "
+             "expires_at TIMESTAMPTZ on capability_contracts. "
+             "New contract_breach_penalties table: records every applied dimension demotion "
+             "(did, capability, contract_id, dimension, magnitude, breach_type, source, applied_at). "
+             "status FSM extended: 'suspended' added to cc_status_check constraint. "
+             "sla_breach_events extended with breach_type + contract_id columns.",
+             "agentid-pro/capability_contracts.py  init_capability_contracts_schema()",
+             "done"),
+            ("SLA breach → dimension demotion → Phase 1.1 enforcement",
+             "_check_sla_breach() now applies breach_consequence after webhook fire: "
+             "reduces sla_compliance_score by demotion_magnitude (floor 0), inserts into "
+             "contract_breach_penalties, counts 30-day rolling breaches vs trigger_threshold "
+             "→ calls _suspend_contract() if threshold crossed. "
+             "_trigger_dimension_enforcement() fires take_snapshot_for_did() in daemon thread "
+             "after every breach, triggering apply_score_update_enforcement() (Phase 1.1). "
+             "Contract suspension: _suspend_contract() sets status='suspended', fires "
+             "contract.suspended webhook. Blocked calls return HTTP 403.",
+             "agentid-pro/capability_contracts.py  _check_sla_breach() + new helpers",
+             "done"),
+            ("Auto-expiry enforcement at call time",
+             "_check_contract_gate() called in log_call_endpoint before log_capability_call(). "
+             "Checks status='suspended' → HTTP 403. "
+             "Checks expires_at < NOW() → fires contract.expired webhook, inserts D6 demotion "
+             "in contract_breach_penalties (magnitude=0.1), triggers dimension enforcement, "
+             "returns HTTP 402. Active non-expired contracts pass through unchanged.",
+             "agentid-pro/capability_contracts.py  _check_contract_gate() + log_call_endpoint",
+             "done"),
+            ("GET /pro/contracts/{id}/enforcement-history",
+             "Returns full causation chain: breach_events (from sla_breach_events), "
+             "dimension_penalties (from contract_breach_penalties), policy_restrictions "
+             "(from agent_capability_restrictions + dimension_policies JOIN). "
+             "Owner-gated (403 if not owner or admin). 162/162 tests passing.",
+             "agentid-pro/capability_contracts.py  contract_enforcement_history()\n"
+             "agentid-pro/tests/test_contract_enforcement.py  13 new tests",
              "done"),
         ]),
         ("v1.9.x", "Phase 1.2 — Causal Audit Graph (round-8 complete, 2026-05-17)", GREEN, [
