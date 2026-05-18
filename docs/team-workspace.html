@@ -570,18 +570,23 @@
     }
     .doc-shell {
       display: grid;
-      grid-template-columns: 200px minmax(0, 1fr) 300px;
+      grid-template-columns: minmax(0, 1fr);
       gap: 16px;
       align-items: start;
     }
-    .doc-nav,
-    .doc-side {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      position: sticky;
-      top: 94px;
+    /* Jump-bar: horizontal section nav below hero */
+    .doc-jumpbar {
+      display: flex; gap: 0.3rem; flex-wrap: wrap;
+      padding: 0.5rem 0; margin-bottom: 0.2rem;
+      border-bottom: 1px solid var(--border);
     }
+    .doc-jump {
+      padding: 0.3rem 0.72rem; border-radius: 999px; font-size: 0.76rem; font-weight: 600;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+      cursor: pointer; transition: color 0.13s, border-color 0.13s, background 0.13s;
+    }
+    .doc-jump:hover { color: var(--text-2); border-color: var(--border-2); background: var(--surface); }
+    .doc-jump.active { color: var(--accent-2); border-color: rgba(249,115,22,0.45); background: rgba(249,115,22,0.09); }
     .doc-nav-card,
     .doc-side .panel {
       padding: 0.95rem 1rem;
@@ -2495,7 +2500,7 @@
 
   function updateDocNavActive(sectionId) {
     state.activeDocSection = sectionId || state.activeDocSection || "mission";
-    document.querySelectorAll(".doc-nav-link").forEach(node => {
+    document.querySelectorAll(".doc-jump").forEach(node => {
       node.classList.toggle("active", node.dataset.section === state.activeDocSection);
     });
   }
@@ -2505,16 +2510,6 @@
       state.sectionObserver.disconnect();
       state.sectionObserver = null;
     }
-
-    document.querySelectorAll(".doc-nav-link").forEach(node => {
-      node.addEventListener("click", () => {
-        const targetId = node.dataset.section;
-        const section = document.querySelector(`[data-doc-section="${targetId}"]`);
-        if (!section) return;
-        section.scrollIntoView({ behavior: "smooth", block: "start" });
-        updateDocNavActive(targetId);
-      });
-    });
 
     document.querySelectorAll(".timeline-mini-item").forEach(node => {
       node.addEventListener("click", () => {
@@ -3029,23 +3024,14 @@
           <div class="kpi"><div class="kpi-value">${completed}</div><div class="kpi-label">Completed</div></div>
           <div class="kpi"><div class="kpi-value">${runBadge(run.status)}</div><div class="kpi-label">Run phase</div></div>
           <div class="kpi"><div class="kpi-value">${fmtDuration(elapsedSec)}</div><div class="kpi-label">Elapsed</div></div>
+          ${avgTrustValue != null ? `<div class="kpi"><div class="kpi-value">${avgTrustValue}</div><div class="kpi-label">Avg trust</div></div>` : ""}
         </div>
       </div>
       ${interventionHtml}
+      <nav class="doc-jumpbar">
+        ${navSections.map(s => `<button class="doc-jump${s.id === (state.activeDocSection || "mission") ? " active" : ""}" data-section="${s.id}" onclick="document.querySelector('[data-doc-section=${s.id}]')?.scrollIntoView({behavior:'smooth',block:'start'})">${s.title}</button>`).join("")}
+      </nav>
       <div class="doc-shell">
-        <aside class="doc-nav">
-          <div class="panel doc-nav-card">
-            <h4>On this run</h4>
-            <div class="doc-nav-links">${navHtml}</div>
-          </div>
-          <div class="panel doc-nav-card">
-            <h4>Live timeline</h4>
-            <div class="timeline-mini">${sidebarTimelineHtml}</div>
-            <hr style="border:none;border-top:1px dashed rgba(43,36,27,0.25);margin:12px 0;" />
-            <h4 style="margin-top:0;">Past runs</h4>
-            <div class="past-run-list">${pastRunsHtml}</div>
-          </div>
-        </aside>
         <div class="doc-body">
           <section class="doc-section" data-doc-section="mission">
             <h3>Mission</h3>
@@ -3131,33 +3117,6 @@
               : `<div class="empty">The final merged answer will appear here once synthesis finishes.</div>`}
           </section>
         </div>
-        <aside class="doc-side">
-          <div class="panel">
-            <div class="panel-head"><div class="panel-title">Run</div></div>
-            <div class="panel-body">
-              <div class="stack" style="margin-bottom:0.7rem;">
-                <button class="tiny-btn" onclick="refreshCurrentRun()">↺ Refresh</button>
-                <button class="tiny-btn" onclick="downloadRunReport()">▸ Download report</button>
-                ${run?.user_task ? `<button class="tiny-btn primary" onclick="createTeamRunFromCurrent()">Run again</button>` : ""}
-                ${!isTerminal(run.status) ? `<button class="tiny-btn" onclick="cancelCurrentRun()">■ Stop run</button>` : ""}
-              </div>
-              <div class="leader-row" style="border-top:1px solid var(--border);padding-top:0.6rem;">
-                <div><strong>Avg trust</strong><div class="small-meta">At assignment time</div></div>
-                <div class="leader-score">${avgTrustValue != null ? avgTrustValue : "—"}</div>
-              </div>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><div class="panel-title">Contributors</div></div>
-            <div class="panel-body">
-              <div style="margin-bottom:0.55rem;">${contributionHtml}</div>
-              ${outputs.length ? `<div style="border-top:1px solid var(--border);padding-top:0.55rem;">
-                <div class="panel-title" style="font-size:0.72rem;margin-bottom:0.45rem;">Accepted outputs</div>
-                <div class="stack">${acceptedOutputsHtml}</div>
-              </div>` : ""}
-            </div>
-          </div>
-        </aside>
       </div>
       <div class="doc-foot">
         <a onclick="downloadEvidencePack('${esc(String(run.id || ""))}')">Evidence pack</a>
