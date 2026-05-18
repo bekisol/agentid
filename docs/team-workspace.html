@@ -2619,16 +2619,181 @@
     return labels[t] || t.replace(/_/g, " ");
   }
 
-  function buildLiveTimeline(events) {
+  function tlRichBody(ev, run) {
+    const t  = ev.event_type || ev.type || "";
+    const d  = ev.event_data || {};
+    const did = ev.agent_did || "";
+    const nm  = did ? agentName(did) : "Orchestrator";
+    const who = `<span class="tl-who">${esc(nm)}</span>`;
+    const what = s => `<span class="tl-what">${s}</span>`;
+    const pill = s => `<code>${esc(s)}</code>`;
+
+    // Cross-reference assignments for richer data
+    const assign = did
+      ? ((run.assignments || []).find(a => a.agent_did === did && a.status === "completed")
+         || (run.assignments || []).find(a => a.agent_did === did))
+      : null;
+
+    switch (t) {
+      case "run_created": {
+        const runId = String(run.id || "").slice(0, 14);
+        return `${who} created run ${pill("run_" + runId + "…")}`;
+      }
+      case "orchestrator_plan": {
+        const plan = Array.isArray(d.plan) ? d.plan : (run.assignments || []);
+        const agentSet = new Set((run.assignments || []).map(a => a.agent_did).filter(Boolean));
+        return `${what("Orchestrator")} dispatched ${what(plan.length + " subtask" + (plan.length === 1 ? "" : "s"))} across ${what(agentSet.size + " agent" + (agentSet.size === 1 ? "" : "s"))}`;
+      }
+      case "orchestrator_plan_corrected":
+        return `${what("Orchestrator")} corrected plan ${what("· trust policy violation")}`;
+      case "orchestrator_plan_dim_policy_corrected":
+        return `${what("Orchestrator")} plan dim-policy corrected`;
+      case "orchestrator_plan_dim_policy_all_blocked":
+        return `${what("Orchestrator")} ${what("all candidates blocked by policy")}`;
+      case "agent_assigned": {
+        const cap = d.required_capability || assign?.required_capability || "";
+        const actorLine = cap ? ` — ${pill(cap)}` : "";
+        return `${who} accepted assignment${actorLine} ${what("· dispatched by @orchestrator")}`;
+      }
+      case "agent_completed": {
+        const q = d.quality_score ?? assign?.quality_score;
+        const qStr = q != null ? ` · quality ${Math.round(Number(q) * (q <= 1 ? 100 : 1))}%` : "";
+        return `${who} completed task${qStr} · ${what("accepted by @orchestrator")}`;
+      }
+      case "orchestrator_rejected": {
+        const cap  = d.capability || d.required_capability || assign?.required_capability || "write-*";
+        const dim  = d.dimension || d.triggered_dim || "";
+        const val  = d.triggered_value ?? d.dimension_score;
+        const thr  = d.threshold;
+        const dimInfo = (dim && val != null && thr != null)
+          ? ` · ${dim} = ${val} &lt; threshold ${thr}`
+          : (d.rejection_reason ? ` · ${esc(String(d.rejection_reason).slice(0, 60))}` : "");
+        return `${what("Orchestrator")} restricted ${who} from ${pill(cap)}${dimInfo}`;
+      }
+      case "approval_requested": {
+        const cap = d.capability || d.required_capability || "action";
+        return `${who} requested capability ${pill(cap)} · ${what("awaiting approval")}`;
+      }
+      case "approval_granted":
+        return `${what("Approval granted")} for ${who}`;
+      case "clarification_requested":
+        return `${what("Orchestrator")} requested clarification ${what("· run paused")}`;
+      case "clarification_received":
+        return `${who} provided clarification · ${what("run resumed")}`;
+      case "synthesis_started":
+        return `${what("Orchestrator")} started synthesis — merging accepted outputs`;
+      case "synthesis_completed":
+        return `${what("Orchestrator")} completed synthesis`;
+      case "run_completed":
+        return `${what("Run completed")} ✓`;
+      case "run_failed":
+        return `${what("Run failed")} — ${esc(d.reason || d.error || "see decisions")}`;
+      case "run_cancelled":
+        return `${what("Run cancelled")}`;
+      case "context_written":
+      case "shared_context_updated":
+        return `${who} updated shared context`;
+      default:
+        return `${who} — ${what(t.replace(/_/g, " "))}`;
+    }
+  }
+
+  function tlActorLine(ev, run) {
+    const t = ev.event_type || ev.type || "";
+    const did = ev.agent_did || "";
+    const d = ev.event_data || {};
+    const parts = [];
+    if (did) parts.push(`actor: ${did.length > 42 ? did.slice(0, 42) + "…" : did}`);
+    if (d.policy_id || d.policy) parts.push(`policy: ${esc(d.policy_id || d.policy || "")}`);
+    if (t === "agent_assigned") parts.push("dispatched by @orchestrator");
+    if (t === "approval_requested") parts.push("policy: ACP/require_approval");
+    if (t === "orchestrator_rejected") {
+      const pol = d.policy || d.policy_id;
+      if (pol) parts.push(`policy: ${esc(pol)}`);
+      else parts.push("enforcement: dispatch + score_update");
+    }
+    if (t === "orchestrator_plan") {
+      const ver = d.plan_version || d.version;
+      if (ver) parts.push(`plan version: ${ver}`);
+    }
+    return parts.length ? parts.join(" · ") : "";
+  }
+
+  function tlDetailRows(ev, run) {
+    const t = ev.event_type || ev.type || "";
+    const d = ev.event_data || {};
+    const did = ev.agent_did || "";
+    const assign = did ? ((run.assignments || []).find(a => a.agent_did === did && a.status === "completed")
+                         || (run.assignments || []).find(a => a.agent_did === did)) : null;
+    const rows = [];
+    const row = (k, v) => `<div class="tl-detail-row"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+    const code = s => `<code>${esc(String(s))}</code>`;
+
+    if (did) rows.push(row("actor DID", code(did)));
+
+    switch (t) {
+      case "approval_requested": {
+        const cap = d.capability || d.required_capability || "";
+        if (cap) rows.push(row("capability", code(cap)));
+        rows.push(row("policy fired", `${code('require_approval_for("' + (cap || '*') + '")')} on this run`));
+        const escalated = d.escalated_to || d.reviewers;
+        if (escalated) rows.push(row("escalated to", esc(Array.isArray(escalated) ? escalated.join(", ") : escalated)));
+        break;
+      }
+      case "agent_completed": {
+        const q = d.quality_score ?? assign?.quality_score;
+        if (q != null) rows.push(row("quality score", Math.round(Number(q) * (q <= 1 ? 100 : 1)) + "%"));
+        const cw = d.causal_weight;
+        if (cw != null) rows.push(row("causal weight", cw));
+        if (assign?.subtask) rows.push(row("subtask", esc(String(assign.subtask).slice(0, 100))));
+        break;
+      }
+      case "agent_assigned": {
+        const cap = d.required_capability || assign?.required_capability;
+        if (cap) rows.push(row("capability", code(cap)));
+        const subtask = d.subtask || assign?.subtask;
+        if (subtask) rows.push(row("subtask", esc(String(subtask).slice(0, 120))));
+        const trust = d.trust_score || assign?.trust_score_at_assignment;
+        if (trust != null) rows.push(row("trust at assignment", trust));
+        break;
+      }
+      case "orchestrator_rejected": {
+        const cap = d.capability || d.required_capability || assign?.required_capability;
+        if (cap) rows.push(row("capability", code(cap)));
+        const dim = d.triggered_dim || d.dimension;
+        const val = d.triggered_value ?? d.dimension_score;
+        const thr = d.threshold;
+        if (dim) rows.push(row("dimension", dim));
+        if (val != null) rows.push(row("score", val));
+        if (thr != null) rows.push(row("threshold", thr));
+        if (d.rejection_reason) rows.push(row("reason", esc(d.rejection_reason)));
+        break;
+      }
+      case "orchestrator_plan": {
+        const plan = Array.isArray(d.plan) ? d.plan : [];
+        if (plan.length) rows.push(row("subtask count", plan.length));
+        const planner = d.planner || d.model;
+        if (planner) rows.push(row("planner", esc(planner)));
+        break;
+      }
+      default:
+        if (d.trust_score != null) rows.push(row("trust score", d.trust_score));
+        if (d.causal_weight != null) rows.push(row("causal weight", d.causal_weight));
+        if (d.rejection_reason) rows.push(row("reason", esc(d.rejection_reason)));
+    }
+    return rows;
+  }
+
+  function buildLiveTimeline(events, run) {
     if (!events || !events.length) return `<div style="color:var(--muted);font-size:0.83rem;">No events yet.</div>`;
 
     const filterDefs = [
-      { key: "all",       label: "All" },
-      { key: "decision",  label: "Decisions" },
-      { key: "output",    label: "Outputs" },
-      { key: "review",    label: "Reviews" },
-      { key: "policy",    label: "Policy" },
-      { key: "bad",       label: "Failures" },
+      { key: "all",      label: "All" },
+      { key: "decision", label: "Decisions" },
+      { key: "output",   label: "Outputs" },
+      { key: "review",   label: "Reviews" },
+      { key: "override", label: "Overrides" },
+      { key: "policy",   label: "Policy" },
     ];
 
     const filtersHtml = filterDefs.map((f, i) =>
@@ -2636,34 +2801,37 @@
     ).join("");
 
     const eventsHtml = events.map(ev => {
-      const t = ev.event_type || ev.type || "";
+      const t   = ev.event_type || ev.type || "";
       const cat = TL_CATEGORY[t] || "meta";
       const dotClass = TL_DOT_CLASS[cat] || "";
-      const did = ev.agent_did || "";
-      const ts = ev.created_at || ev.ts || "";
+      const ts  = ev.created_at || ev.ts || "";
       const tsLabel = ts ? (() => { try { return new Date(ts).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" }); } catch(_) { return ts; } })() : "";
-      const name = did ? agentName(did) : "Orchestrator";
 
-      // Detail rows
-      const detailRows = [];
-      if (did) detailRows.push(`<div class="tl-detail-row"><div class="k">actor DID</div><div class="v"><code>${esc(did)}</code></div></div>`);
-      if (ev.event_data?.subtask) detailRows.push(`<div class="tl-detail-row"><div class="k">subtask</div><div class="v">${esc(String(ev.event_data.subtask).slice(0, 120))}</div></div>`);
-      if (ev.event_data?.causal_weight != null) detailRows.push(`<div class="tl-detail-row"><div class="k">causal weight</div><div class="v">${ev.event_data.causal_weight}</div></div>`);
-      if (ev.event_data?.trust_score != null) detailRows.push(`<div class="tl-detail-row"><div class="k">trust score</div><div class="v">${ev.event_data.trust_score}</div></div>`);
-      if (ev.event_data?.rejection_reason) detailRows.push(`<div class="tl-detail-row"><div class="k">reason</div><div class="v">${esc(ev.event_data.rejection_reason)}</div></div>`);
-      if (ev.event_data?.quality_score != null) detailRows.push(`<div class="tl-detail-row"><div class="k">quality</div><div class="v">${ev.event_data.quality_score}</div></div>`);
-      const hasDetail = detailRows.length > 0;
+      const body   = tlRichBody(ev, run);
+      const actor  = tlActorLine(ev, run);
+      const rows   = tlDetailRows(ev, run);
+      const isLiveEvent = t === "approval_requested" && !isTerminal(run?.status);
+
+      const actionBtns = isLiveEvent ? `
+        <div class="tl-detail-actions">
+          <button class="tiny-btn primary" onclick="approveCurrentPlan();event.stopPropagation()">Approve</button>
+          <button class="tiny-btn" onclick="event.stopPropagation()">Reject &amp; reassign</button>
+          <button class="tiny-btn" onclick="document.querySelector('[data-doc-section=graph]')?.scrollIntoView({behavior:'smooth'});event.stopPropagation()">Inspect chain →</button>
+        </div>` : "";
+
+      const detailHtml = (rows.length || actionBtns)
+        ? `<div class="tl-detail">${rows.join("")}${actionBtns}</div>` : "";
 
       return `
-        <div class="tl-event ${dotClass}" data-tl-cat="${cat}">
+        <div class="tl-event ${dotClass}${isLiveEvent ? " tl-expanded" : ""}" data-tl-cat="${cat}">
           <div class="tl-row">
-            <div>
-              <div class="tl-line"><span class="tl-who">${esc(name)}</span> — ${esc(tlEventLabel(ev))}</div>
-              ${did ? `<div class="tl-actor">${esc(did.slice(0, 40))}${did.length > 40 ? "…" : ""}</div>` : ""}
+            <div class="tl-line-wrap">
+              <div class="tl-line">${body}</div>
+              ${actor ? `<div class="tl-actor">${actor}</div>` : ""}
             </div>
             <div class="tl-time">${tsLabel}</div>
           </div>
-          ${hasDetail ? `<div class="tl-detail">${detailRows.join("")}</div>` : ""}
+          ${detailHtml}
         </div>`;
     }).join("");
 
@@ -3073,7 +3241,7 @@
           <section class="doc-section" data-doc-section="timeline">
             <h3>Live timeline</h3>
             <p class="lede">Full event stream — every orchestrator decision, agent action, and policy enforcement in order. Click an event to expand detail.</p>
-            ${buildLiveTimeline(timelineEvents)}
+            ${buildLiveTimeline(timelineEvents, run)}
           </section>
           <section class="doc-section" data-doc-section="assignments">
             <h3>Assignments</h3>
