@@ -1209,6 +1209,136 @@
       .assignment-meta-grid, .contrib-breakdown, .perf-metrics, .timeline-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
     }
 
+  /* ── Live timeline (full section) ────────────────────────────────── */
+  .tl-filters { display:flex; gap:0.3rem; margin-bottom:0.85rem; flex-wrap:wrap; }
+  .tl-filter {
+    padding:0.22rem 0.55rem; border-radius:999px; font-size:0.72rem;
+    color:var(--muted); border:1px solid var(--border); background:var(--surface2);
+    cursor:pointer; transition:color 0.13s, border-color 0.13s, background 0.13s;
+    font-family:ui-monospace, monospace;
+  }
+  .tl-filter:hover { color:var(--text-2); border-color:var(--border-2); }
+  .tl-filter.active { color:var(--accent-2); border-color:rgba(249,115,22,0.45); background:rgba(249,115,22,0.09); }
+  .timeline-full { position:relative; padding-left:1.15rem; }
+  .timeline-full::before {
+    content:""; position:absolute; left:4px; top:8px; bottom:8px;
+    width:1px; background:var(--border);
+  }
+  .tl-event {
+    position:relative; padding:0.5rem 0.6rem; margin:0.05rem 0;
+    border-radius:8px; cursor:pointer; transition:background 0.13s;
+  }
+  .tl-event:hover { background:var(--surface2); }
+  .tl-event::before {
+    content:""; position:absolute; left:-1.06rem; top:0.9rem;
+    width:9px; height:9px; border-radius:50%;
+    background:var(--border-2); border:2px solid var(--bg);
+  }
+  .tl-event.tl-ok::before  { background:var(--green); }
+  .tl-event.tl-live::before { background:var(--accent); box-shadow:0 0 0 4px rgba(249,115,22,0.18); }
+  .tl-event.tl-warn::before { background:var(--yellow); }
+  .tl-event.tl-bad::before  { background:var(--red); }
+  .tl-event.tl-info::before { background:var(--blue); }
+  .tl-row { display:flex; align-items:baseline; justify-content:space-between; gap:0.5rem; }
+  .tl-time { font-family:ui-monospace,monospace; font-size:0.69rem; color:var(--muted); flex-shrink:0; }
+  .tl-actor { font-family:ui-monospace,monospace; font-size:0.65rem; color:var(--border-2); margin-top:0.18rem; }
+  .tl-line { font-size:0.87rem; color:var(--text); margin-top:0.2rem; line-height:1.5; }
+  .tl-line .tl-who { color:var(--text-2); font-weight:600; }
+  .tl-line code { font-size:0.76rem; background:var(--surface3); padding:0.04rem 0.36rem; border-radius:4px; color:var(--accent-2); border:1px solid var(--border); }
+  .tl-detail {
+    margin-top:0.5rem; padding:0.6rem 0.7rem; background:var(--surface3);
+    border:1px solid var(--border); border-radius:8px; font-size:0.78rem;
+    color:var(--text-2); line-height:1.5; display:none;
+  }
+  .tl-event.tl-expanded .tl-detail { display:block; }
+  .tl-detail-row { display:grid; grid-template-columns:100px 1fr; gap:0.4rem; padding:0.12rem 0; }
+  .tl-detail-row .k { font-family:ui-monospace,monospace; font-size:0.69rem; color:var(--muted); }
+  .tl-detail-row .v { font-size:0.79rem; color:var(--text-2); }
+  .tl-detail-row .v code { background:var(--bg); border:1px solid var(--border); color:var(--accent-2); padding:0.03rem 0.36rem; border-radius:4px; font-size:0.72rem; }
+  .tl-detail-actions { margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border); display:flex; gap:0.32rem; flex-wrap:wrap; }
+  .tl-hidden { display:none !important; }
+
+  /* ── Approval callout ─────────────────────────────────────────────── */
+  .approval-callout {
+    display:grid; grid-template-columns:auto 1fr auto; gap:0.9rem; align-items:center;
+    padding:0.85rem 1rem; border-radius:14px; margin-bottom:1.1rem;
+    border:1px solid rgba(249,115,22,0.40);
+    background:linear-gradient(180deg, rgba(249,115,22,0.10), rgba(249,115,22,0.03));
+  }
+  .approval-callout .ac-ico {
+    width:32px; height:32px; border-radius:9px; background:var(--accent);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:0.9rem; flex-shrink:0;
+  }
+  .approval-callout .ac-body { min-width:0; }
+  .approval-callout .ac-body strong { color:var(--text); font-weight:600; }
+  .approval-callout .ac-why { display:block; margin-top:0.16rem; font-size:0.7rem; color:var(--muted); font-family:ui-monospace,monospace; }
+  .approval-callout .ac-actions { display:flex; gap:0.4rem; flex-shrink:0; flex-wrap:wrap; }
+
+  /* ── Sign-off lane ────────────────────────────────────────────────── */
+  .signoff-lane {
+    border:1.5px solid var(--border); border-radius:14px;
+    background:linear-gradient(180deg, var(--surface2), var(--surface));
+    padding:0.95rem 1.1rem;
+  }
+  .signoff-head { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; margin-bottom:0.85rem; flex-wrap:wrap; }
+  .signoff-title { font-weight:600; font-size:0.95rem; }
+  .signoff-sub { font-family:ui-monospace,monospace; font-size:0.69rem; color:var(--muted); margin-top:0.16rem; }
+  .signer-row { display:grid; grid-template-columns:30px 1fr auto; gap:0.65rem; align-items:center; padding:0.5rem 0; border-top:1px solid var(--border); }
+  .signer-row:first-of-type { border-top:none; padding-top:0; }
+  .signer-av {
+    width:28px; height:28px; border-radius:50%; background:var(--surface3);
+    color:var(--text-2); border:1px solid var(--border-2); font-size:0.7rem; font-weight:600;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .signer-av.signed { background:var(--green-bg); color:var(--green); border-color:rgba(16,185,129,0.4); }
+  .signer-name { font-size:0.85rem; color:var(--text); font-weight:500; }
+  .signer-role { font-family:ui-monospace,monospace; font-size:0.69rem; color:var(--muted); margin-top:0.1rem; }
+  .signer-status { font-family:ui-monospace,monospace; font-size:0.69rem; padding:0.16rem 0.4rem; border-radius:4px; }
+  .signer-status.signed  { color:var(--green); background:var(--green-bg); }
+  .signer-status.pending { color:var(--muted); background:var(--surface3); }
+  .signer-status.you    { color:var(--accent-2); background:rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.3); }
+
+  /* ── Floating dock ────────────────────────────────────────────────── */
+  .ws-dock { position:fixed; right:1.25rem; bottom:1.25rem; display:flex; flex-direction:column; gap:0.45rem; z-index:50; }
+  .ws-dock button {
+    width:42px; height:42px; border-radius:11px; background:var(--surface2); border:1px solid var(--border-2);
+    color:var(--text-2); cursor:pointer; font-size:0.75rem; font-family:ui-monospace,monospace; font-weight:600;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 20px rgba(0,0,0,0.35); transition:border-color 0.13s, color 0.13s; position:relative;
+  }
+  .ws-dock button:hover { border-color:rgba(249,115,22,0.55); color:var(--accent-2); }
+  .ws-dock button.has-dot::after {
+    content:""; position:absolute; top:7px; right:7px; width:7px; height:7px;
+    border-radius:50%; background:var(--accent); box-shadow:0 0 0 2px var(--bg);
+  }
+  .ws-dock .d-label {
+    position:absolute; right:50px; top:50%; transform:translateY(-50%);
+    background:var(--surface3); border:1px solid var(--border-2);
+    padding:0.28rem 0.52rem; border-radius:6px; font-size:0.72rem; color:var(--text-2);
+    font-family:inherit; font-weight:400; white-space:nowrap;
+    opacity:0; pointer-events:none; transition:opacity 0.13s;
+  }
+  .ws-dock button:hover .d-label { opacity:1; }
+
+  /* ── Doc footer ───────────────────────────────────────────────────── */
+  .doc-foot {
+    margin-top:1.6rem; padding-top:1rem; border-top:1px solid var(--border);
+    font-family:ui-monospace,monospace; font-size:0.71rem; color:var(--muted);
+    display:flex; gap:0.85rem; flex-wrap:wrap; align-items:center;
+  }
+  .doc-foot a { color:var(--accent-2); cursor:pointer; }
+  .doc-foot a:hover { text-decoration:underline; }
+  .doc-foot .sep { color:var(--border-2); }
+
+  /* ── Pulse animation ──────────────────────────────────────────────── */
+  @keyframes ws-pulse {
+    0%   { box-shadow:0 0 0 0 rgba(16,185,129,0.55); }
+    80%  { box-shadow:0 0 0 8px rgba(16,185,129,0); }
+    100% { box-shadow:0 0 0 0 rgba(16,185,129,0); }
+  }
+  .live-dot { width:7px; height:7px; border-radius:50%; background:var(--green); display:inline-block; animation:ws-pulse 2.2s ease-out infinite; }
+
   /* ── Causal Audit Graph ───────────────────────────────────────────── */
   .cg-split { display:grid; grid-template-columns:1fr 288px; gap:1rem; align-items:start; }
   .cg-wrap { position:relative; overflow:auto; cursor:grab; user-select:none;
@@ -2396,6 +2526,30 @@
       });
     });
 
+    // Live timeline filter chips
+    document.querySelectorAll(".tl-filter").forEach(chip => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll(".tl-filter").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        const key = chip.dataset.tlFilter;
+        document.querySelectorAll(".tl-event").forEach(ev => {
+          if (key === "all") {
+            ev.classList.remove("tl-hidden");
+          } else {
+            ev.classList.toggle("tl-hidden", ev.dataset.tlCat !== key);
+          }
+        });
+      });
+    });
+
+    // Live timeline event expansion
+    document.querySelectorAll(".tl-event").forEach(ev => {
+      ev.addEventListener("click", e => {
+        if (e.target.closest("button")) return;
+        ev.classList.toggle("tl-expanded");
+      });
+    });
+
     const scrollRoot = document.querySelector(".main-scroll");
     const sections = [...document.querySelectorAll("[data-doc-section]")];
     if (!scrollRoot || !sections.length) return;
@@ -2416,6 +2570,172 @@
     updateDocNavActive(state.activeDocSection || sections[0]?.dataset.docSection || "mission");
   }
 
+  // ── Live timeline builder ─────────────────────────────────────────────────
+
+  const TL_CATEGORY = {
+    run_created:                    "meta",
+    run_completed:                  "meta",
+    run_failed:                     "bad",
+    run_cancelled:                  "bad",
+    orchestrator_plan:              "decision",
+    orchestrator_plan_corrected:    "decision",
+    orchestrator_plan_dim_policy_corrected: "policy",
+    orchestrator_plan_dim_policy_all_blocked: "policy",
+    agent_assigned:                 "output",
+    agent_completed:                "output",
+    orchestrator_rejected:          "decision",
+    agent_reassigned:               "decision",
+    synthesis_started:              "output",
+    synthesis_completed:            "output",
+    approval_requested:             "review",
+    approval_granted:               "review",
+    clarification_requested:        "review",
+    clarification_received:         "review",
+    context_written:                "meta",
+    shared_context_updated:         "meta",
+  };
+
+  const TL_DOT_CLASS = { decision:"tl-live", output:"tl-ok", review:"tl-info", policy:"tl-warn", bad:"tl-bad", meta:"" };
+
+  function tlEventLabel(ev) {
+    const t = ev.event_type || ev.type || "";
+    const labels = {
+      run_created:              "Run created",
+      run_completed:            "Run completed",
+      run_failed:               "Run failed",
+      run_cancelled:            "Run cancelled",
+      orchestrator_plan:        "Orchestrator planned",
+      orchestrator_plan_corrected: "Plan corrected (policy)",
+      orchestrator_plan_dim_policy_corrected: "Plan dim-policy corrected",
+      orchestrator_plan_dim_policy_all_blocked: "All candidates blocked by policy",
+      agent_assigned:           "Agent assigned",
+      agent_completed:          "Agent completed",
+      orchestrator_rejected:    "Orchestrator rejected",
+      agent_reassigned:         "Agent reassigned",
+      synthesis_started:        "Synthesis started",
+      synthesis_completed:      "Synthesis completed",
+      approval_requested:       "Approval requested",
+      approval_granted:         "Approval granted",
+      clarification_requested:  "Clarification requested",
+      clarification_received:   "Clarification received",
+      context_written:          "Context updated",
+      shared_context_updated:   "Shared context updated",
+    };
+    return labels[t] || t.replace(/_/g, " ");
+  }
+
+  function buildLiveTimeline(events) {
+    if (!events || !events.length) return `<div style="color:var(--muted);font-size:0.83rem;">No events yet.</div>`;
+
+    const filterDefs = [
+      { key: "all",       label: "All" },
+      { key: "decision",  label: "Decisions" },
+      { key: "output",    label: "Outputs" },
+      { key: "review",    label: "Reviews" },
+      { key: "policy",    label: "Policy" },
+      { key: "bad",       label: "Failures" },
+    ];
+
+    const filtersHtml = filterDefs.map((f, i) =>
+      `<button class="tl-filter${i === 0 ? " active" : ""}" data-tl-filter="${f.key}">${f.label}</button>`
+    ).join("");
+
+    const eventsHtml = events.map(ev => {
+      const t = ev.event_type || ev.type || "";
+      const cat = TL_CATEGORY[t] || "meta";
+      const dotClass = TL_DOT_CLASS[cat] || "";
+      const did = ev.agent_did || "";
+      const ts = ev.created_at || ev.ts || "";
+      const tsLabel = ts ? (() => { try { return new Date(ts).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" }); } catch(_) { return ts; } })() : "";
+      const name = did ? agentName(did) : "Orchestrator";
+
+      // Detail rows
+      const detailRows = [];
+      if (did) detailRows.push(`<div class="tl-detail-row"><div class="k">actor DID</div><div class="v"><code>${esc(did)}</code></div></div>`);
+      if (ev.event_data?.subtask) detailRows.push(`<div class="tl-detail-row"><div class="k">subtask</div><div class="v">${esc(String(ev.event_data.subtask).slice(0, 120))}</div></div>`);
+      if (ev.event_data?.causal_weight != null) detailRows.push(`<div class="tl-detail-row"><div class="k">causal weight</div><div class="v">${ev.event_data.causal_weight}</div></div>`);
+      if (ev.event_data?.trust_score != null) detailRows.push(`<div class="tl-detail-row"><div class="k">trust score</div><div class="v">${ev.event_data.trust_score}</div></div>`);
+      if (ev.event_data?.rejection_reason) detailRows.push(`<div class="tl-detail-row"><div class="k">reason</div><div class="v">${esc(ev.event_data.rejection_reason)}</div></div>`);
+      if (ev.event_data?.quality_score != null) detailRows.push(`<div class="tl-detail-row"><div class="k">quality</div><div class="v">${ev.event_data.quality_score}</div></div>`);
+      const hasDetail = detailRows.length > 0;
+
+      return `
+        <div class="tl-event ${dotClass}" data-tl-cat="${cat}">
+          <div class="tl-row">
+            <div>
+              <div class="tl-line"><span class="tl-who">${esc(name)}</span> — ${esc(tlEventLabel(ev))}</div>
+              ${did ? `<div class="tl-actor">${esc(did.slice(0, 40))}${did.length > 40 ? "…" : ""}</div>` : ""}
+            </div>
+            <div class="tl-time">${tsLabel}</div>
+          </div>
+          ${hasDetail ? `<div class="tl-detail">${detailRows.join("")}</div>` : ""}
+        </div>`;
+    }).join("");
+
+    return `
+      <div class="tl-filters">${filtersHtml}</div>
+      <div class="timeline-full">${eventsHtml}</div>`;
+  }
+
+  // ── Sign-off section builder ──────────────────────────────────────────────
+
+  function buildSignoffSection(run) {
+    if (!run) return "";
+    const runId = run.id || run.run_id || "";
+    const isLive = !isTerminal(run.status);
+    const apiBase = state.apiBase || "";
+    const key = state.apiKey || "";
+
+    const packLink = (runId && apiBase && key)
+      ? `<a onclick="downloadEvidencePack('${esc(runId)}')" style="cursor:pointer;">Download evidence pack</a>`
+      : `<span style="color:var(--muted);">Evidence pack (run must be complete)</span>`;
+
+    return `
+      <div class="signoff-lane">
+        <div class="signoff-head">
+          <div>
+            <div class="signoff-title">Sign-off &amp; compliance export</div>
+            <div class="signoff-sub">run_id: ${esc(String(runId))} · evidence pack includes causal graph + platform signature</div>
+          </div>
+          ${isLive ? `<button class="tiny-btn" onclick="refreshCurrentRun()">↺ Refresh to sign</button>` : `<button class="tiny-btn primary" onclick="downloadRunReport()">▸ Download report</button>`}
+        </div>
+        <div class="signer-row">
+          <div class="signer-av signed">✓</div>
+          <div>
+            <div class="signer-name">Orchestrator (automated)</div>
+            <div class="signer-role">plan integrity + causal graph signed at run creation</div>
+          </div>
+          <div class="signer-status signed">signed</div>
+        </div>
+        <div class="signer-row">
+          <div class="signer-av${isLive ? "" : " signed"}">${isLive ? "?" : "✓"}</div>
+          <div>
+            <div class="signer-name">Run owner · platform attestation</div>
+            <div class="signer-role">evidence pack HMAC-SHA256 over canonical JSON</div>
+          </div>
+          <div class="signer-status${isLive ? " you" : " signed"}">${isLive ? "awaiting completion" : "signed — via evidence pack"}</div>
+        </div>
+        <div style="margin-top:0.85rem;padding-top:0.7rem;border-top:1px solid var(--border);display:flex;gap:0.5rem;flex-wrap:wrap;font-size:0.79rem;">
+          ${packLink}
+          <a onclick="downloadRunReport()" style="cursor:pointer;">Export audit log (CSV)</a>
+          ${runId ? `<span style="color:var(--muted);margin-left:auto;font-family:ui-monospace,monospace;font-size:0.68rem;">run_${esc(String(runId).slice(0,12))}…</span>` : ""}
+        </div>
+      </div>`;
+  }
+
+  async function downloadEvidencePack(runId) {
+    try {
+      const res = await apiFetch(`/pro/groups/runs/${runId}/evidence-pack`);
+      const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `evidence-pack-${runId}.json`; a.click();
+      URL.revokeObjectURL(url);
+    } catch(e) {
+      alert("Evidence pack: " + (e.message || "error"));
+    }
+  }
+
   // NOTE FOR FOLLOW-ON LLMS:
   // Paused states live here on purpose. A true run workspace should let the
   // operator intervene without bouncing back into Messages for approvals or
@@ -2424,17 +2744,15 @@
     if (!run || isTerminal(run.status)) return "";
     if (run.status === "paused_for_approval") {
       return `
-        <div class="control-panel">
-          <div class="control-top">
-            <div>
-              <div class="control-title">Run Waiting For Approval</div>
-              <div class="control-copy">The orchestrator has planned ${plan.length} assignment${plan.length === 1 ? "" : "s"} and is waiting for an explicit approval before dispatching work.</div>
-            </div>
-            ${runBadge(run.status)}
+        <div class="approval-callout">
+          <div class="ac-ico">!</div>
+          <div class="ac-body">
+            <strong>${plan.length} assignment${plan.length === 1 ? "" : "s"} planned — approval required before dispatch</strong>
+            <span class="ac-why">policy: require_plan_approval · orchestrator is holding work until you sign off</span>
           </div>
-          <div class="control-row" style="margin-top:0.8rem;">
-            <button class="tiny-btn primary" onclick="approveCurrentPlan()">Approve plan and start work</button>
-            <button class="tiny-btn" onclick="refreshCurrentRun()">Refresh state</button>
+          <div class="ac-actions">
+            <button class="tiny-btn" onclick="refreshCurrentRun()">Refresh</button>
+            <button class="tiny-btn primary" onclick="approveCurrentPlan()">Approve &amp; dispatch</button>
           </div>
         </div>`;
     }
@@ -2535,16 +2853,18 @@
     const statusBuckets = deriveStatusBuckets(run.assignments || []);
     const interventionHtml = buildInterventionPanel(run, plan);
     const contributions = Array.isArray(run.contributions) ? run.contributions : [];
-    const timelineEvents = (run.events || []).slice(-16).reverse();
+    const timelineEvents = (run.events || []).slice(-60).reverse();
     const navSections = [
       { id: "mission", title: "Mission", note: "What the team is solving" },
       { id: "plan", title: "The Plan", note: "How work was split" },
       { id: "happening", title: "What's happening", note: "Live narrative and intervention" },
       { id: "context", title: "Context used", note: "Shared artifacts shaping work" },
       { id: "decisions", title: "Decisions", note: "Why the run changed course" },
+      { id: "timeline", title: "Live timeline", note: "Full filterable event log" },
       { id: "assignments", title: "Assignments", note: "Role, status, and quality" },
       { id: "final", title: "Final answer", note: "Merged output and summary" },
       { id: "graph", title: "Audit Graph", note: "Causal event DAG" },
+      { id: "signoff", title: "Sign-off & export", note: "Evidence pack and compliance" },
     ];
 
     const completed = (run.assignments || []).filter(a => a.status === "completed").length;
@@ -2764,6 +3084,11 @@
             <p class="lede">Why the run changed shape: rejections, reassignments, approvals, and clarifications.</p>
             <div class="decision-list">${decisionHtml}</div>
           </section>
+          <section class="doc-section" data-doc-section="timeline">
+            <h3>Live timeline</h3>
+            <p class="lede">Full event stream — every orchestrator decision, agent action, and policy enforcement in order. Click an event to expand detail.</p>
+            ${buildLiveTimeline(timelineEvents)}
+          </section>
           <section class="doc-section" data-doc-section="assignments">
             <h3>Assignments</h3>
             <p class="lede">Role, status, quality, and permission history for each agent task in this run.</p>
@@ -2777,6 +3102,11 @@
                 <button class="tiny-btn primary" onclick="loadCausalGraph()">Load causal graph</button>
               </div>
             </div>
+          </section>
+          <section class="doc-section" data-doc-section="signoff">
+            <h3>Sign-off &amp; export</h3>
+            <p class="lede">Evidence pack bundles the causal graph, participant trust snapshots, and a platform HMAC-SHA256 signature over canonical JSON — suitable for compliance review.</p>
+            ${buildSignoffSection(run)}
           </section>
           <section class="doc-section final-panel" data-doc-section="final">
             <h3>Final answer</h3>
@@ -2828,6 +3158,29 @@
             </div>
           </div>
         </aside>
+      </div>
+      <div class="doc-foot">
+        <a onclick="downloadEvidencePack('${esc(String(run.id || ""))}')">Evidence pack</a>
+        <span class="sep">·</span>
+        <a onclick="downloadRunReport()">Export audit log (CSV)</a>
+        <span class="sep">·</span>
+        <a onclick="loadCausalGraph()">Causal graph</a>
+        <span class="sep">·</span>
+        <span>${esc(String(run.id || ""))} · ${esc(run.status || "")} · ${esc(run.created_at ? new Date(run.created_at).toLocaleString() : "")}</span>
+      </div>
+      <div class="ws-dock">
+        <button class="${timelineEvents.length ? "has-dot" : ""}" onclick="document.querySelector('[data-doc-section=timeline]')?.scrollIntoView({behavior:'smooth',block:'start'})">
+          <span class="d-label">Live timeline · ${timelineEvents.length} events</span>T
+        </button>
+        <button onclick="document.querySelector('[data-doc-section=graph]')?.scrollIntoView({behavior:'smooth',block:'start'})">
+          <span class="d-label">Audit graph</span>G
+        </button>
+        <button onclick="document.querySelector('[data-doc-section=signoff]')?.scrollIntoView({behavior:'smooth',block:'start'})">
+          <span class="d-label">Sign-off &amp; export</span>S
+        </button>
+        <button onclick="document.querySelector('[data-doc-section=decisions]')?.scrollIntoView({behavior:'smooth',block:'start'})">
+          <span class="d-label">Decisions</span>D
+        </button>
       </div>`;
     requestAnimationFrame(bindWorkspaceSidebarInteractions);
   }
