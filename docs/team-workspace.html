@@ -1261,6 +1261,11 @@
   .tl-detail-row .v { font-size:0.79rem; color:var(--text-2); }
   .tl-detail-row .v code { background:var(--bg); border:1px solid var(--border); color:var(--accent-2); padding:0.03rem 0.36rem; border-radius:4px; font-size:0.72rem; }
   .tl-detail-actions { margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border); display:flex; gap:0.32rem; flex-wrap:wrap; }
+  .tl-inspect { margin-top:0.35rem; }
+  .tl-inspect summary { font-family:ui-monospace,monospace; font-size:0.67rem; color:var(--muted); cursor:pointer; list-style:none; user-select:none; opacity:0.65; }
+  .tl-inspect summary::-webkit-details-marker { display:none; }
+  .tl-inspect summary::before { content:"⧉ "; }
+  .tl-inspect[open] summary { opacity:1; }
   .tl-hidden { display:none !important; }
 
   /* ── Approval callout ─────────────────────────────────────────────── */
@@ -2729,8 +2734,6 @@
     const row = (k, v) => `<div class="tl-detail-row"><div class="k">${k}</div><div class="v">${v}</div></div>`;
     const code = s => `<code>${esc(String(s))}</code>`;
 
-    if (did) rows.push(row("actor DID", code(did)));
-
     switch (t) {
       case "approval_requested": {
         const cap = d.capability || d.required_capability || "";
@@ -2781,6 +2784,7 @@
         if (d.causal_weight != null) rows.push(row("causal weight", d.causal_weight));
         if (d.rejection_reason) rows.push(row("reason", esc(d.rejection_reason)));
     }
+    if (did) rows.push(`<details class="tl-inspect"><summary>inspect</summary>${row("actor DID", code(did))}</details>`);
     return rows;
   }
 
