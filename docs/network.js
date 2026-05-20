@@ -1441,42 +1441,134 @@ function computeBridgeAgents() {
     });
 }
 
-function renderInsightsTab(){
-  const container=document.getElementById("insights-list");if(!container)return;
+function ins_viewModeFor(ins){
+  if(!ins)return"default";
+  const t=(ins.title||"").toLowerCase();
+  const icon=ins.icon||"";
+  if(ins.sev==="critical"||icon==="🚨"||t.includes("flag")||t.includes("compromis"))return"risk";
+  if(icon==="⚠"&&(t.includes("trust")||t.includes("sybil")))return"trust";
+  if(icon==="⇌"||t.includes("bridge"))return"risk";
+  if(icon==="📊"||t.includes("volume")||t.includes("spike")||t.includes("activity"))return"activity";
+  if(icon==="↓"||t.includes("low-trust")||t.includes("trust drop"))return"trust";
+  return"default";
+}
+
+function renderEvidenceHeader(){
+  const hdr=document.getElementById("evidence-header");
+  const lbl=document.getElementById("evidence-label");
+  if(!hdr||!lbl)return;
+  if(_activeInsightIdx>=0){
+    const ins=_insights[_activeInsightIdx];
+    const verb=_focusInsight?"Evidence for":"Highlighting";
+    lbl.innerHTML=`${verb}: <strong>${esc(ins?.title||"finding")}</strong>`;
+    hdr.classList.add("visible");
+  }else{
+    hdr.classList.remove("visible");
+  }
+}
+
+function renderNetworkBrief(){
+  const prose=document.getElementById("net-brief-prose");
+  const agentEl=document.getElementById("brief-agents");
+  const riskEl=document.getElementById("brief-risks");
+  const changeEl=document.getElementById("brief-changes");
+  const n=_net.nodes.length;
+  const flagCount=_net.nodes.filter(nd=>_compromised.has(nd.did)).length;
+  const lowTrust=_net.nodes.filter(nd=>{const ts=_trustScoreCache[nd.did];return ts&&ts.score<30;}).length;
+  const riskCount=flagCount+lowTrust;
+  let changeCount=0;
+  if(_netDiff){
+    changeCount=(_netDiff.new_external_agents||[]).length+(_netDiff.new_connections||[]).length+
+      (_netDiff.activity_changes||[]).length+(_netDiff.trust_changes||[]).length;
+  }
+  if(agentEl)agentEl.textContent=n||"—";
+  if(riskEl)riskEl.textContent=riskCount||"—";
+  if(changeEl)changeEl.textContent=changeCount||"—";
+  if(!prose)return;
+  const parts=[];
+  if(flagCount)parts.push(`<strong>${flagCount} flagged agent${flagCount>1?"s":""}</strong> — review needed`);
+  if(lowTrust)parts.push(`<strong>${lowTrust}</strong> below trust threshold`);
+  const agStats=Object.entries(_agentStats).filter(([,s])=>s.interactions>0);
+  if(agStats.length>=3){
+    agStats.sort((a,b)=>b[1].interactions-a[1].interactions);
+    const total=agStats.reduce((s,[,v])=>s+v.interactions,0)||1;
+    const[topDid,topStat]=agStats[0];
+    const topPct=Math.round(topStat.interactions/total*100);
+    if(topPct>=30){
+      const topName=_net.allNodes.find(nd=>nd.did===topDid)?.name||topDid.slice(-8);
+      parts.push(`<strong>${esc(topName)}</strong> handling ${topPct}% of traffic`);
+    }
+  }
+  if(_netDiff){
+    const ne=(_netDiff.new_external_agents||[]).length;
+    const nc=(_netDiff.new_connections||[]).length;
+    if(ne>0)parts.push(`<strong>${ne}</strong> new external agent${ne>1?"s":""} this period`);
+    else if(nc>0)parts.push(`<strong>${nc}</strong> new connection${nc>1?"s":""} this period`);
+  }
+  if(!parts.length){
+    prose.innerHTML=`<strong>${n}</strong> agent${n!==1?"s":""} · no anomalies detected in this window`;
+  }else{
+    prose.innerHTML=parts.join(" &nbsp;·&nbsp; ");
+  }
+}
+
+function renderFindingsPanel(){
+  const container=document.getElementById("findings-list");if(!container)return;
   if(!_insights.length){
-    container.innerHTML=`<div class="insight-empty">No insights for this window.<br>Load more data or extend the time range.</div>`;
+    container.innerHTML=`<div class="insight-empty">No findings for this window.<br>Load more data or extend the time range.</div>`;
     return;
   }
   const sevColor={critical:"#ef4444",warn:"#f59e0b",info:"#3b82f6"};
   const isFocused=idx=>_focusInsight!==null&&_activeInsightIdx===idx;
-  container.innerHTML=_insights.map((ins,i)=>`
+
+  container.innerHTML=_insights.map((ins,i)=>{
+    const chipClass=ins.sev==="critical"?"chip-red":ins.sev==="warn"?"chip-amber":"";
+    const didsArr=ins.dids?[...ins.dids]:[];
+    const chipsHtml=didsArr.length?(()=>{
+      const maxChips=4;
+      const shown=didsArr.slice(0,maxChips);
+      const rest=didsArr.length-maxChips;
+      const chips=shown.map(did=>{
+        const node=_net.allNodes.find(n=>n.did===did);
+        const name=node?.name||did.slice(-8);
+        return`<span class="find-chip ${chipClass}" title="${esc(did)}">${esc(name)}</span>`;
+      }).join("");
+      const more=rest>0?`<span class="find-chip chip-more">+${rest} more</span>`:"";
+      return`<div class="find-chips">${chips}${more}</div>`;
+    })():"";
+    return`
     <div class="insight-card${_activeInsightIdx===i?" ins-active":""}" data-idx="${i}">
       <div class="insight-card-head">
         <span class="insight-sev" style="background:${sevColor[ins.sev]||"#64748b"};"></span>
         <span class="insight-title">${esc(ins.title)}</span>
         <span class="insight-icon">${ins.icon}</span>
       </div>
-      <div class="insight-body">${esc(ins.body)}</div>
-      ${ins.action?`<div class="insight-action">→ ${esc(ins.action)}</div>`:""}
+      <div class="find-section">
+        <div class="find-section-label">What</div>
+        <div class="find-section-body">${esc(ins.body)}</div>
+      </div>
+      ${ins.action?`<div class="find-section">
+        <div class="find-section-label">Action</div>
+        <div class="find-action-text">${esc(ins.action)}</div>
+      </div>`:""}
+      ${chipsHtml}
       <div class="insight-footer">
-        <span class="insight-agent-count">${ins.dids?.size||0} agent${ins.dids?.size!==1?"s":""}</span>
         <button class="insight-focus-btn${isFocused(i)?" focus-active":""}" data-idx="${i}">${isFocused(i)?"Exit Focus":"Focus View"}</button>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
+
   container.querySelectorAll(".insight-card").forEach(card=>{
     card.addEventListener("click",e=>{
-      if(e.target.classList.contains("insight-focus-btn"))return; // handled below
+      if(e.target.classList.contains("insight-focus-btn"))return;
       const idx=parseInt(card.dataset.idx,10);
       if(_activeInsightIdx===idx&&!_focusInsight){
-        _activeInsightIdx=-1;_highlightDids=null;
-        document.getElementById("highlight-clear").style.display="none";
+        _activeInsightIdx=-1;_highlightDids=null;_viewMode="default";
       }else{
-        _activeInsightIdx=idx;
-        _highlightDids=_insights[idx]?.dids||null;
-        _focusInsight=null; // highlight only — not full focus
-        document.getElementById("highlight-clear").style.display="";
+        _activeInsightIdx=idx;_highlightDids=_insights[idx]?.dids||null;
+        _focusInsight=null;_viewMode=ins_viewModeFor(_insights[idx]);
       }
-      renderInsightsTab();draw();
+      renderFindingsPanel();renderEvidenceHeader();draw();
     });
   });
   container.querySelectorAll(".insight-focus-btn").forEach(btn=>{
@@ -1484,58 +1576,14 @@ function renderInsightsTab(){
       e.stopPropagation();
       const idx=parseInt(btn.dataset.idx,10);
       if(_focusInsight&&_activeInsightIdx===idx){
-        // Exit focus mode
-        _focusInsight=null;_highlightDids=null;_activeInsightIdx=-1;
-        document.getElementById("highlight-clear").style.display="none";
+        _focusInsight=null;_highlightDids=null;_activeInsightIdx=-1;_viewMode="default";
       }else{
-        _activeInsightIdx=idx;
-        _highlightDids=_insights[idx]?.dids||null;
-        _focusInsight=_highlightDids; // full focus — hide unrelated nodes
-        document.getElementById("highlight-clear").style.display="";
+        _activeInsightIdx=idx;_highlightDids=_insights[idx]?.dids||null;
+        _focusInsight=_highlightDids;_viewMode=ins_viewModeFor(_insights[idx]);
       }
-      renderInsightsTab();draw();
+      renderFindingsPanel();renderEvidenceHeader();draw();
     });
   });
-}
-
-function updateSummaryBand(){
-  const el=document.getElementById("net-summary-text");if(!el)return;
-  const n=_net.nodes.length,e=_net.edges.length;
-  const parts=[];
-
-  // Critical: flagged agents
-  const flagCount=_net.nodes.filter(nd=>_compromised.has(nd.did)).length;
-  if(flagCount) parts.push(`⚠ ${flagCount} flagged agent${flagCount>1?"s":""} — review needed`);
-
-  // Warn: low-trust count (only once trust scores loaded)
-  const lowTrust=_net.nodes.filter(nd=>{const ts=_trustScoreCache[nd.did];return ts&&ts.score<30;}).length;
-  if(lowTrust) parts.push(`${lowTrust} low-trust (<30)`);
-
-  // Traffic concentration: who handles most interactions?
-  const agStats=Object.entries(_agentStats).filter(([,s])=>s.interactions>0);
-  if(agStats.length>=3){
-    agStats.sort((a,b)=>b[1].interactions-a[1].interactions);
-    const total=agStats.reduce((s,[,v])=>s+v.interactions,0)||1;
-    const [topDid,topStat]=agStats[0];
-    const topPct=Math.round(topStat.interactions/total*100);
-    if(topPct>=30){
-      const topName=_net.allNodes.find(nd=>nd.did===topDid)?.name||topDid.slice(-8);
-      parts.push(`${esc(topName)} handling ${topPct}% of traffic`);
-    }
-  }
-
-  // Change context from diff
-  if(_netDiff){
-    const ne=(_netDiff.new_external_agents||[]).length;
-    const nc=(_netDiff.new_connections||[]).length;
-    if(ne>0) parts.push(`${ne} new external agent${ne>1?"s":""} this period`);
-    else if(nc>0) parts.push(`${nc} new connection${nc>1?"s":""} this period`);
-  }
-
-  // Fallback telemetry when nothing notable
-  if(!parts.length) parts.push(`${n} agent${n!==1?"s":""} · ${e} edge${e!==1?"s":""}`);
-
-  el.textContent=parts.join(" · ");
 }
 
 async function loadNetworkDiff() {
@@ -1628,11 +1676,10 @@ function renderChangeInsights() {
   });
 
   // Permanently merge: change insights at front, static (non-change) at back.
-  // This fixes the click handler bug where restoring _insights broke index mapping.
   _insights = [...changeInsights, ..._insights.filter(i => !i._isChange)];
-  _activeInsightIdx = -1; // reset selection since indices changed
-  renderInsightsTab();
-  updateSummaryBand();
+  _activeInsightIdx = -1;
+  renderFindingsPanel();
+  renderNetworkBrief();
   const badge = document.getElementById("insight-count-badge");
   if (badge) {
     const crit = _insights.filter(i => i.sev === "critical" || i.sev === "warn").length;
@@ -1798,19 +1845,29 @@ async function loadNetwork(){
   // Start physics — runs until settled
   startSimulation(1);
 
-  // Compute insights & update summary band
+  // Compute findings & update brief strip
   computeInsights();
-  renderInsightsTab();
-  updateSummaryBand();
-  // Update insight badge count
+  renderFindingsPanel();
+  renderNetworkBrief();
+  // Update badge count
   const badge=document.getElementById("insight-count-badge");
   if(badge){
     const crit=_insights.filter(i=>i.sev==="critical"||i.sev==="warn").length;
     if(crit>0){badge.textContent=crit;badge.style.display="";}
     else badge.style.display="none";
   }
+  // Auto-activate first critical or warn finding
+  if(_insights.length&&_activeInsightIdx<0){
+    const firstIdx=_insights.findIndex(i=>i.sev==="critical"||i.sev==="warn");
+    if(firstIdx>=0){
+      _activeInsightIdx=firstIdx;
+      _highlightDids=_insights[firstIdx].dids||null;
+      _viewMode=ins_viewModeFor(_insights[firstIdx]);
+      renderFindingsPanel();renderEvidenceHeader();
+    }
+  }
 
-  loadNetworkDiff(); // async — updates insights panel when diff arrives
+  loadNetworkDiff(); // async — updates findings panel when diff arrives
 
   // Prefetch trust scores for ALL owned agents in ONE call (dimensions included)
   _authFetch("/pro/trust-scores")
@@ -1823,16 +1880,17 @@ async function loadNetwork(){
           _detailFetched:true,
         };
       });
-      // Recompute insights now that trust data is available (low-trust insight was empty before)
+      // Recompute findings now that trust data is available
       computeInsights();
-      renderInsightsTab();
-      updateSummaryBand();
+      renderFindingsPanel();
+      renderNetworkBrief();
       const badge=document.getElementById("insight-count-badge");
       if(badge){
         const crit=_insights.filter(i=>i.sev==="critical"||i.sev==="warn").length;
         if(crit>0){badge.textContent=crit;badge.style.display="";}
         else badge.style.display="none";
       }
+      renderEvidenceHeader();
       draw(); // refresh node colors with real trust data
     }).catch(()=>{});
 }
@@ -1891,44 +1949,21 @@ async function _initNetwork() {
   });
   window.addEventListener("resize",resizeCanvas);
 
-  // ── Sidebar tabs ──────────────────────────────────────────────────────
+  // ── Intel panel tabs ──────────────────────────────────────────────────
   document.querySelectorAll(".stab").forEach(btn=>{
     btn.addEventListener("click",()=>{
       document.querySelectorAll(".stab").forEach(b=>b.classList.remove("active"));
       btn.classList.add("active");
       const tab=btn.dataset.tab;
+      document.getElementById("tab-findings").hidden=(tab!=="findings");
       document.getElementById("tab-agents").hidden=(tab!=="agents");
-      document.getElementById("tab-insights").hidden=(tab!=="insights");
     });
   });
 
-  // ── View mode bar ─────────────────────────────────────────────────────
-  document.querySelectorAll(".vmode-btn").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      document.querySelectorAll(".vmode-btn").forEach(b=>b.classList.remove("active"));
-      btn.classList.add("active");
-      _viewMode=btn.dataset.mode;
-      draw();
-    });
-  });
-
-  // ── Legend toggle ─────────────────────────────────────────────────────
-  document.getElementById("legend-btn")?.addEventListener("click",()=>{
-    const pop=document.getElementById("legend-pop");
-    if(pop)pop.hidden=!pop.hidden;
-  });
-  // Close legend on outside click
-  document.addEventListener("click",e=>{
-    const pop=document.getElementById("legend-pop");
-    const btn=document.getElementById("legend-btn");
-    if(pop&&!pop.hidden&&!pop.contains(e.target)&&e.target!==btn)pop.hidden=true;
-  });
-
-  // ── Highlight clear ───────────────────────────────────────────────────
-  document.getElementById("highlight-clear")?.addEventListener("click",()=>{
-    _highlightDids=null;_focusInsight=null;_activeInsightIdx=-1;
-    document.getElementById("highlight-clear").style.display="none";
-    renderInsightsTab();draw();
+  // ── Evidence header clear ─────────────────────────────────────────────
+  document.getElementById("evidence-clear")?.addEventListener("click",()=>{
+    _highlightDids=null;_focusInsight=null;_activeInsightIdx=-1;_viewMode="default";
+    renderFindingsPanel();renderEvidenceHeader();draw();
   });
   // Fetch account tier once — used to gate Pro/Enterprise features in the detail panel
   _authFetch("/pro/keys/me").then(r=>r.ok?r.json():null).then(d=>{

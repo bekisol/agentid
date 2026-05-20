@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AgentID — Agent Network</title>
+<title>AgentID — Network Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 
 :root {
   --bg:       #0f172a;
@@ -22,7 +23,11 @@
   --green:    #10b981;
 }
 
-html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', ui-sans-serif, sans-serif; overflow: hidden; }
+html, body {
+  height: 100%; background: var(--bg); color: var(--text);
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  overflow: hidden; display: flex; flex-direction: column;
+}
 
 /* ── Header ─────────────────────────────────────────────────────── */
 #header {
@@ -56,20 +61,36 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 #refresh-btn:hover { color: var(--text); border-color: var(--muted); }
 
-/* ── Body ───────────────────────────────────────────────────────── */
-#body { display: flex; height: calc(100vh - 80px); overflow: hidden; }
+/* ── Network Brief strip — structural, always-visible ───────────── */
+#net-brief {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
+  padding: 0.5rem 1.25rem;
+  background: var(--surface2); border-bottom: 1px solid var(--border2);
+}
+#net-brief-prose {
+  flex: 1; min-width: 0;
+  font-size: 0.72rem; color: #94a3b8; line-height: 1.5;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#net-brief-prose strong { color: #e2e8f0; }
+#net-brief-metrics { display: flex; gap: 1.25rem; flex-shrink: 0; }
+.nbm { text-align: right; }
+.nbm-num { font-size: 1rem; font-weight: 800; color: #e2e8f0; line-height: 1; }
+.nbm-num.nbm-red { color: #ef4444; }
+.nbm-label { font-size: 0.52rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 2px; }
 
-/* ── Left sidebar ───────────────────────────────────────────────── */
-#sidebar {
-  width: 280px; flex-shrink: 0;
+/* ── Body ───────────────────────────────────────────────────────── */
+#body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+/* ── Intel panel (left) ─────────────────────────────────────────── */
+#intel-panel {
+  width: 320px; flex-shrink: 0;
   display: flex; flex-direction: column;
   background: var(--surface); border-right: 1px solid var(--border2);
   overflow: hidden;
 }
-#search-wrap {
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--border2);
-}
+#search-wrap { padding: 0.75rem; border-bottom: 1px solid var(--border2); }
 #search-input {
   width: 100%; padding: 0.45rem 0.75rem 0.45rem 2rem;
   background: var(--bg); border: 1px solid var(--border2);
@@ -79,10 +100,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 #search-input::placeholder { color: var(--muted); }
 #search-input:focus { border-color: var(--accent); }
-
 #filter-row {
-  padding: 0.6rem 0.75rem;
-  display: flex; flex-wrap: wrap; gap: 0.4rem;
+  padding: 0.6rem 0.75rem; display: flex; flex-wrap: wrap; gap: 0.4rem;
   border-bottom: 1px solid var(--border2);
 }
 .sort-btn {
@@ -93,18 +112,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .sort-btn:hover { color: var(--text); border-color: var(--muted); }
 .sort-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-
 #agent-list { flex: 1; overflow-y: auto; padding: 0.25rem 0; }
-
 .sidebar-agent-row {
   display: flex; align-items: center; gap: 0.6rem;
   padding: 0.5rem 0.85rem; cursor: pointer;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
-  transition: background .1s;
+  border-bottom: 1px solid rgba(255,255,255,0.03); transition: background .1s;
 }
 .sidebar-agent-row:hover   { background: rgba(255,255,255,0.04); }
 .sidebar-agent-row.selected { background: rgba(59,130,246,0.12); border-left: 3px solid var(--accent); padding-left: calc(0.85rem - 3px); }
-
 .agent-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .agent-info { min-width: 0; flex: 1; }
 .agent-name { font-size: 0.78rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -112,50 +127,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .agent-stats { font-size: 0.62rem; color: var(--accent); margin-top: 1px; }
 .agent-count-badge { font-size: 0.62rem; color: var(--muted); margin-left: auto; flex-shrink: 0; }
 
-/* ── Canvas area ─────────────────────────────────────────────────── */
-#canvas-wrap { flex: 1; position: relative; overflow: hidden; background: var(--bg); }
-#network-canvas { display: block; cursor: grab; }
-#canvas-wrap:active { cursor: grabbing; }
-
-.zoom-controls {
-  position: absolute; bottom: 14px; right: 14px;
-  display: flex; flex-direction: column; gap: 4px; z-index: 10;
-}
-.zoom-btn {
-  width: 30px; height: 30px; border-radius: 7px;
-  background: rgba(15,23,42,0.9); border: 1px solid var(--border2);
-  color: var(--text); font-size: 17px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(6px); line-height: 1;
-}
-.zoom-btn:hover { background: var(--surface); }
-
-#canvas-hint {
-  position: absolute; bottom: 14px; left: 14px;
-  font-size: 0.6rem; color: rgba(100,116,139,0.55);
-  pointer-events: none; user-select: none; line-height: 1.6;
-}
-
-#loading-overlay {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--bg); z-index: 30;
-  flex-direction: column; gap: 1rem;
-}
-.spinner { width: 36px; height: 36px; border: 3px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Summary band */
-#net-summary-band {
-  height: 28px; flex-shrink: 0;
-  display: flex; align-items: center;
-  padding: 0 1.25rem;
-  background: rgba(15,23,42,0.7);
-  border-bottom: 1px solid var(--border2);
-  font-size: 0.7rem; color: var(--muted);
-  gap: 0.5rem; overflow: hidden; white-space: nowrap;
-}
-/* ── Sidebar tabs */
+/* ── Sidebar tabs ────────────────────────────────────────────────── */
 #sidebar-tabs { display: flex; border-bottom: 1px solid var(--border2); flex-shrink: 0; }
 .stab {
   flex: 1; padding: 0.5rem 0.5rem;
@@ -170,9 +142,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   background: #ef4444; color: #fff; border-radius: 8px;
   padding: 0 5px; line-height: 1.55; margin-left: 3px; vertical-align: middle;
 }
-#tab-agents { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
-#tab-insights { flex: 1; overflow-y: auto; padding: 0.35rem 0; min-height: 0; }
-/* ── Insight cards */
+#tab-findings { flex: 1; overflow-y: auto; padding: 0.35rem 0; min-height: 0; }
+#tab-agents   { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
+
+/* ── Finding cards ───────────────────────────────────────────────── */
 .insight-card {
   margin: 0.3rem 0.55rem; border-radius: 9px;
   border: 1px solid var(--border2); background: var(--surface2);
@@ -182,22 +155,31 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .insight-card.ins-active { border-color: var(--accent); background: rgba(59,130,246,0.08); }
 .insight-card-head {
   display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.45rem 0.6rem 0.25rem;
+  padding: 0.5rem 0.65rem 0.3rem;
 }
 .insight-sev { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.insight-title { font-size: 0.72rem; font-weight: 700; flex: 1; min-width: 0; }
-.insight-icon { font-size: 0.78rem; flex-shrink: 0; }
-.insight-body { padding: 0 0.6rem 0.3rem; font-size: 0.66rem; color: var(--muted); line-height: 1.5; }
-.insight-action {
-  padding: 0.2rem 0.6rem 0.3rem; font-size: 0.63rem; color: #10b981;
-  line-height: 1.4; font-style: italic;
+.insight-title { font-size: 0.74rem; font-weight: 700; flex: 1; min-width: 0; }
+.insight-icon { font-size: 0.82rem; flex-shrink: 0; }
+.find-section { padding: 0 0.65rem 0.25rem; }
+.find-section-label {
+  font-size: 0.57rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--muted); margin-bottom: 0.12rem;
 }
+.find-section-body { font-size: 0.67rem; color: #94a3b8; line-height: 1.5; }
+.find-action-text { font-size: 0.67rem; color: #10b981; line-height: 1.5; font-style: italic; }
+.find-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0.1rem 0.65rem 0.4rem; }
+.find-chip {
+  font-size: 0.61rem; font-weight: 600; padding: 1px 7px; border-radius: 12px;
+  background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);
+  color: #93c5fd; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis;
+}
+.find-chip.chip-red   { background: rgba(239,68,68,0.1);  border-color: rgba(239,68,68,0.25);  color: #fca5a5; }
+.find-chip.chip-amber { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.25); color: #fcd34d; }
+.find-chip.chip-more  { background: rgba(100,116,139,0.1); border-color: rgba(100,116,139,0.25); color: #94a3b8; }
 .insight-footer {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.25rem 0.6rem 0.45rem; border-top: 1px solid var(--border2);
-  margin-top: 0.1rem;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0.2rem 0.65rem 0.45rem;
 }
-.insight-agent-count { font-size: 0.61rem; color: var(--muted); }
 .insight-focus-btn {
   font-size: 0.61rem; font-weight: 600; padding: 2px 8px;
   background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3);
@@ -211,49 +193,56 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   padding: 2rem 1rem; text-align: center;
   font-size: 0.73rem; color: var(--muted); line-height: 1.7;
 }
-/* ── View mode bar */
-#view-mode-bar {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 2px; z-index: 10;
+
+/* ── Canvas area ─────────────────────────────────────────────────── */
+#canvas-wrap { flex: 1; position: relative; overflow: hidden; background: var(--bg); }
+#network-canvas { display: block; cursor: grab; }
+#canvas-wrap:active { cursor: grabbing; }
+
+/* ── Evidence header ─────────────────────────────────────────────── */
+#evidence-header {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+  height: 36px; padding: 0 1rem;
+  background: rgba(15,23,42,0.92); border-bottom: 1px solid var(--border2);
+  backdrop-filter: blur(8px);
+  display: none; align-items: center; gap: 0.75rem;
+}
+#evidence-header.visible { display: flex; }
+#evidence-label { flex: 1; font-size: 0.71rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#evidence-label strong { color: #cbd5e1; }
+#evidence-clear {
+  font-size: 0.61rem; font-weight: 600; padding: 2px 9px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border2);
+  color: var(--muted); border-radius: 6px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+#evidence-clear:hover { color: var(--text); border-color: var(--muted); }
+
+.zoom-controls {
+  position: absolute; bottom: 14px; right: 14px;
+  display: flex; flex-direction: column; gap: 4px; z-index: 10;
+}
+.zoom-btn {
+  width: 30px; height: 30px; border-radius: 7px;
   background: rgba(15,23,42,0.9); border: 1px solid var(--border2);
-  border-radius: 10px; padding: 3px; backdrop-filter: blur(8px);
+  color: var(--text); font-size: 17px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(6px); line-height: 1;
 }
-.vmode-btn {
-  font-size: 0.65rem; font-weight: 600; padding: 0.2rem 0.6rem;
-  border-radius: 7px; border: none; background: none;
-  color: var(--muted); cursor: pointer; transition: all .15s; white-space: nowrap;
+.zoom-btn:hover { background: var(--surface); }
+#canvas-hint {
+  position: absolute; bottom: 14px; left: 14px;
+  font-size: 0.6rem; color: rgba(100,116,139,0.55);
+  pointer-events: none; user-select: none; line-height: 1.6;
 }
-.vmode-btn:hover { color: var(--text); }
-.vmode-btn.active { background: var(--accent); color: #fff; }
-/* ── Legend */
-#legend-btn {
-  position: absolute; bottom: 50px; left: 14px; z-index: 10;
-  width: 26px; height: 26px; border-radius: 50%;
-  background: rgba(15,23,42,0.9); border: 1px solid var(--border2);
-  color: var(--muted); font-size: 0.73rem; font-weight: 700;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(6px);
+#loading-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); z-index: 30;
+  flex-direction: column; gap: 1rem;
 }
-#legend-btn:hover { color: var(--text); border-color: var(--muted); }
-#legend-pop {
-  position: absolute; bottom: 82px; left: 14px; z-index: 20;
-  background: var(--surface); border: 1px solid var(--border2);
-  border-radius: 10px; padding: 0.7rem; width: 215px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4); backdrop-filter: blur(8px);
-}
-.leg-sec { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.3rem; margin-top: 0.5rem; }
-.leg-sec:first-child { margin-top: 0; }
-.leg-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.22rem; font-size: 0.67rem; color: #94a3b8; }
-.leg-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-/* ── Highlight clear */
-#highlight-clear {
-  display: none; position: absolute; top: 46px; left: 50%; transform: translateX(-50%);
-  z-index: 10; font-size: 0.66rem; padding: 0.18rem 0.75rem;
-  border-radius: 20px; border: 1px solid var(--border2);
-  background: rgba(15,23,42,0.9); color: var(--muted); cursor: pointer;
-  backdrop-filter: blur(6px); transition: color .15s; white-space: nowrap;
-}
-#highlight-clear:hover { color: var(--text); }
+.spinner { width: 36px; height: 36px; border: 3px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ── Detail panel ────────────────────────────────────────────────── */
 #detail-panel {
   width: 0; flex-shrink: 0;
@@ -262,11 +251,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; flex-direction: column;
 }
 #detail-panel.open { width: 310px; overflow-y: auto; }
-
 .detail-header {
   display: flex; align-items: flex-start; gap: 0.75rem;
-  padding: 1rem 1rem 0.75rem;
-  border-bottom: 1px solid var(--border2);
+  padding: 1rem 1rem 0.75rem; border-bottom: 1px solid var(--border2);
   position: sticky; top: 0; background: var(--surface); z-index: 5;
 }
 .detail-icon { font-size: 1.8rem; line-height: 1; flex-shrink: 0; }
@@ -279,18 +266,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; align-items: center; justify-content: center;
 }
 .detail-close:hover { color: var(--text); background: var(--bg); }
-
 .detail-desc { padding: 0.65rem 1rem; font-size: 0.75rem; color: var(--muted); border-bottom: 1px solid var(--border2); }
 .tag-row { display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0.6rem 1rem; border-bottom: 1px solid var(--border2); }
 .tag { font-size: 0.68rem; padding: 0.12rem 0.45rem; border-radius: 4px; background: var(--bg); border: 1px solid var(--border2); color: var(--muted); }
-
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px,1fr)); gap: 0.5rem; padding: 0.85rem 1rem; border-bottom: 1px solid var(--border2); }
 .stat-box { background: var(--bg); border-radius: 8px; padding: 0.5rem 0.4rem; text-align: center; }
 .stat-val { font-size: 1.3rem; font-weight: 700; }
 .stat-lbl { font-size: 0.6rem; color: var(--muted); margin-top: 2px; }
-
 .detail-section-title { padding: 0.7rem 1rem 0.35rem; font-size: 0.63rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-
 .conn-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer; transition: background .1s; }
 .conn-row:hover { background: rgba(255,255,255,0.04); }
 .conn-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -298,16 +281,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .conn-op   { font-size: 0.62rem; margin-top: 1px; }
 .conn-count { margin-left: auto; font-size: 0.72rem; font-weight: 700; color: var(--muted); flex-shrink: 0; }
 .conn-dir  { font-size: 0.58rem; color: var(--muted); }
-
 .detail-footer { padding: 0.75rem 1rem; font-size: 0.7rem; color: var(--muted); border-top: 1px solid var(--border2); margin-top: auto; }
 </style>
 <style>
 /* ── Auth wall ───────────────────────────────────────────────────── */
 #net-auth-wall {
-  display: none;
-  position: fixed; inset: 0; z-index: 9999;
-  background: var(--bg);
-  align-items: center; justify-content: center;
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg); align-items: center; justify-content: center;
 }
 #net-auth-wall .auth-card {
   background: var(--surface); border: 1px solid var(--border2);
@@ -319,8 +299,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 #net-auth-wall input {
   width: 100%; padding: 0.55rem 0.75rem; border-radius: 8px;
   border: 1px solid var(--border2); background: var(--bg);
-  color: var(--text); font-size: 0.85rem; font-family: inherit;
-  box-sizing: border-box;
+  color: var(--text); font-size: 0.85rem; font-family: inherit; box-sizing: border-box;
 }
 #net-auth-wall button {
   width: 100%; padding: 0.6rem; border-radius: 8px; border: none;
@@ -328,10 +307,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   font-weight: 600; cursor: pointer; font-family: inherit;
 }
 #net-auth-wall .auth-err { color: #ef4444; font-size: 0.8rem; min-height: 1rem; }
-#net-auth-wall .auth-or {
-  display: flex; align-items: center; gap: 0.5rem;
-  font-size: 0.75rem; color: var(--muted);
-}
+#net-auth-wall .auth-or { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--muted); }
 #net-auth-wall .auth-or span { flex: 1; height: 1px; background: var(--border2); display: block; }
 #net-auth-wall .oauth-link {
   display: flex; align-items: center; justify-content: center; gap: 0.6rem;
@@ -343,13 +319,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 </head>
 <body style="visibility:hidden;">
 <script>
-  // Reveal body only after auth is confirmed — prevents login flash
   const _k = sessionStorage.getItem("agentid_key") || localStorage.getItem("agentid_persisted_key");
   const _m = sessionStorage.getItem("agentid_auth_mode");
   if (_k || _m === "session") document.body.style.visibility = "";
 </script>
 
-<!-- Auth wall: shown when session is missing on this page -->
+<!-- Auth wall -->
 <div id="net-auth-wall">
   <div class="auth-card">
     <div style="font-size:2rem;">🕸️</div>
@@ -376,7 +351,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 <div id="header">
   <a href="dashboard.html" class="back-link">← Dashboard</a>
-  <span class="title">Agent Interaction Network</span>
+  <span class="title">Network Intelligence</span>
   <span id="status-pill">loading…</span>
   <div class="spacer"></div>
   <select id="range-select">
@@ -388,19 +363,28 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <button id="refresh-btn" title="Refresh">↻</button>
 </div>
 
-<div id="net-summary-band">
-  <span id="net-summary-text">—</span>
+<!-- Network Brief strip: structured prose + 3 key metrics -->
+<div id="net-brief">
+  <div id="net-brief-prose">Loading network…</div>
+  <div id="net-brief-metrics">
+    <div class="nbm"><div class="nbm-num" id="brief-agents">—</div><div class="nbm-label">Agents</div></div>
+    <div class="nbm"><div class="nbm-num nbm-red" id="brief-risks">—</div><div class="nbm-label">Risks</div></div>
+    <div class="nbm"><div class="nbm-num" id="brief-changes">—</div><div class="nbm-label">Changes</div></div>
+  </div>
 </div>
 
 <div id="body">
 
-  <!-- Left sidebar -->
-  <aside id="sidebar">
+  <!-- Intel panel (left) -->
+  <aside id="intel-panel">
     <div id="sidebar-tabs">
-      <button class="stab active" data-tab="agents">Agents</button>
-      <button class="stab" data-tab="insights">Insights <span id="insight-count-badge" style="display:none;"></span></button>
+      <button class="stab active" data-tab="findings">Findings <span id="insight-count-badge" style="display:none;"></span></button>
+      <button class="stab" data-tab="agents">Agents</button>
     </div>
-    <div id="tab-agents">
+    <div id="tab-findings">
+      <div id="findings-list"></div>
+    </div>
+    <div id="tab-agents" hidden>
       <div id="search-wrap">
         <input id="search-input" type="search" placeholder="Search by name, DID, capability…" autocomplete="off" spellcheck="false">
       </div>
@@ -412,40 +396,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       </div>
       <div id="agent-list"></div>
     </div>
-    <div id="tab-insights" hidden>
-      <div id="insights-list"></div>
-    </div>
   </aside>
 
   <!-- Canvas -->
   <div id="canvas-wrap">
     <canvas id="network-canvas"></canvas>
-    <div id="view-mode-bar">
-      <button class="vmode-btn active" data-mode="default">Default</button>
-      <button class="vmode-btn" data-mode="trust">Trust</button>
-      <button class="vmode-btn" data-mode="activity">Activity</button>
-      <button class="vmode-btn" data-mode="role">Role</button>
-      <button class="vmode-btn" data-mode="risk">Risk</button>
-      <button class="vmode-btn" data-mode="flow">Flow</button>
-    </div>
-    <button id="highlight-clear">✕ Clear highlight</button>
-    <button id="legend-btn" title="Legend">?</button>
-    <div id="legend-pop" hidden>
-      <div class="leg-sec">Node color (Default / Trust)</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#10b981;"></span> Trust ≥ 80 — Excellent</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#22c55e;"></span> Trust 60–79 — Good</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#f59e0b;"></span> Trust 30–59 — Moderate</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#ef4444;"></span> Trust &lt; 30 — Low</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#f59e0b;box-shadow:0 0 0 2px #ef4444;"></span> External agent</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:transparent;border:2px dashed #ef4444;"></span> Flagged ring</div>
-      <div class="leg-sec">Edge color</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#3b82f6;border-radius:2px;height:4px;width:14px;"></span> Verify</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#10b981;border-radius:2px;height:4px;width:14px;"></span> Task</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#22d3ee;border-radius:2px;height:4px;width:14px;"></span> Message / Send</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#f59e0b;border-radius:2px;height:4px;width:14px;"></span> Delegate</div>
-      <div class="leg-row"><span class="leg-swatch" style="background:#ef4444;border-radius:2px;height:4px;width:14px;"></span> Review / Flagged</div>
-      <div class="leg-sec">View modes</div>
-      <div class="leg-row" style="font-size:0.63rem;color:#475569;line-height:1.55;display:block;">Activity: size = volume · Role: color = role type · Risk: dims safe nodes · Flow: orange=sends, blue=receives, green=balanced</div>
+    <!-- Evidence header: visible when a finding is focused -->
+    <div id="evidence-header">
+      <span id="evidence-label">Full network view</span>
+      <button id="evidence-clear">× Exit focus</button>
     </div>
     <div class="zoom-controls">
       <button class="zoom-btn" id="zoom-in"  title="Zoom in">+</button>
@@ -466,6 +425,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 </div>
 
-<script src="network.js?v=20260520-3"></script>
+<script src="network.js?v=20260520-4"></script>
 </body>
 </html>
