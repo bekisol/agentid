@@ -99,6 +99,7 @@ let _viewMode = "default";   // "default"|"trust"|"activity"|"role"|"risk"|"flow
 let _highlightDids = null;   // Set<string> | null — insight canvas highlight
 let _insights = [];
 let _activeInsightIdx = -1;
+let _netDiff = null; // cached diff response from /pro/network/diff
 
 // ── Canvas helpers ─────────────────────────────────────────────────────────
 function s2w(sx,sy){return[(sx-_net.tx)/_net.zoom,(sy-_net.ty)/_net.zoom];}
@@ -819,6 +820,70 @@ function renderSidebar(){
   });
 }
 
+// ── Explain This helper ────────────────────────────────────────────────────
+function _explainNode(node, stats, inbound, outbound, totalConns, ts, isComp) {
+  const parts = [];
+  const interactions = stats.interactions || 0;
+  const totalNet = Object.values(_agentStats).reduce((s, a) => s + (a.interactions || 0), 0);
+  const pct = totalNet > 0 ? Math.round(interactions / totalNet * 100) : 0;
+  const bridges = computeBridgeAgents();
+  const isBridge = bridges.some(b => b.did === node.did);
+
+  // Role sentence
+  if (totalConns === 0) {
+    parts.push("This agent has no recorded interactions in this period.");
+  } else if (pct >= 20) {
+    parts.push(`This agent handles ${pct}% of all network activity — it is a critical hub.`);
+  } else if (pct >= 5) {
+    parts.push(`This agent accounts for ${pct}% of interactions, making it a significant participant.`);
+  } else {
+    parts.push(`This agent has had ${interactions} events across ${totalConns} connection${totalConns > 1 ? 's' : ''} this period.`);
+  }
+
+  // Bridge sentence
+  if (isBridge) {
+    parts.push("It is a structural bridge — removing it would split the network into disconnected parts.");
+  }
+
+  // Direction sentence
+  if (outbound.length > 0 && inbound.length === 0) {
+    parts.push("It only initiates interactions and never receives them.");
+  } else if (inbound.length > 0 && outbound.length === 0) {
+    parts.push("It only receives interactions and never initiates them.");
+  } else if (outbound.length > inbound.length * 2) {
+    parts.push(`It mostly initiates (${outbound.length} outbound vs ${inbound.length} inbound).`);
+  } else if (inbound.length > outbound.length * 2) {
+    parts.push(`It mostly receives (${inbound.length} inbound vs ${outbound.length} outbound).`);
+  }
+
+  // Trust sentence
+  if (isComp) {
+    parts.push("⚠ This agent has been flagged as compromised.");
+  } else if (ts) {
+    if (ts.score < 30) {
+      parts.push(`Its trust score is critically low (${Math.round(ts.score)}) — treat its outputs with caution.`);
+    } else if (ts.score >= 80) {
+      parts.push(`It has an excellent trust record (${Math.round(ts.score)}).`);
+    }
+  }
+
+  // Diff-based sentence
+  if (_netDiff) {
+    const ac = (_netDiff.activity_changes || []).find(a => a.did === node.did);
+    if (ac && ac.direction === "spike") {
+      parts.push(`Activity spiked ${Math.round(ac.pct)}% vs the previous period.`);
+    } else if (ac && (ac.direction === "drop" || ac.pct <= -50)) {
+      parts.push(`Activity dropped ${Math.abs(Math.round(ac.pct))}% vs the previous period.`);
+    }
+    const tc = (_netDiff.trust_changes || []).find(t => t.did === node.did);
+    if (tc && tc.delta < -5) {
+      parts.push(`Trust fell ${Math.abs(tc.delta)} points since last period (${tc.score_before} → ${tc.score_after}).`);
+    }
+  }
+
+  return parts.join(' ') || "No pattern detected for this agent in the current window.";
+}
+
 // ── Detail panel — redesigned for high signal, low noise ─────────────────
 function renderDetailPanel(node){
   const panel=document.getElementById("detail-panel");if(!panel)return;
@@ -1035,6 +1100,12 @@ function renderDetailPanel(node){
         ${avgConnTrust!=null&&connTrustScores.length>=2?`<span style="margin-left:auto;font-size:0.63rem;color:var(--muted);">${highTrustConns} high · ${lowTrustConns} low</span>`:""}
       </div>
     </div>
+  </div>
+
+  <!-- ── Explain This ── -->
+  <div style="padding:0.6rem 1rem;border-bottom:1px solid var(--border2);">
+    <div style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);margin-bottom:0.45rem;">Why this agent matters</div>
+    <div style="font-size:0.73rem;color:#cbd5e1;line-height:1.6;">${_explainNode(node, stats, inbound, outbound, totalConns, ts, isComp)}</div>
   </div>
 
   <!-- ── Operation breakdown ── -->
@@ -1264,7 +1335,69 @@ function computeInsights(){
     });
   }
 
+  // Bridge agents
+  try {
+    const bridges = computeBridgeAgents();
+    if (bridges.length) {
+      _insights.push({
+        sev: "warn", icon: "⇌",
+        title: `Bridge Agent${bridges.length > 1 ? 's' : ''} (${bridges.length})`,
+        body: `${bridges.map(b => b.name).slice(0, 3).join(', ')}${bridges.length > 3 ? ` +${bridges.length - 3} more` : ''} — removing ${bridges.length > 1 ? 'these' : 'this'} agent would split the network`,
+        dids: new Set(bridges.map(b => b.did)),
+      });
+    }
+  } catch(_) {}
+
   return _insights;
+}
+
+function computeBridgeAgents() {
+  // Finds articulation points: nodes whose removal disconnects the graph.
+  // Uses Tarjan's DFS algorithm. Returns array of {did, name, componentsBridged}.
+  const nodes = _net.allNodes;
+  if (nodes.length < 3) return [];
+
+  const adj = {};
+  nodes.forEach(n => { adj[n.did] = []; });
+  Object.values(_edgeMap).forEach(e => {
+    if (adj[e.src] !== undefined) adj[e.src].push(e.dst);
+    if (adj[e.dst] !== undefined) adj[e.dst].push(e.src);
+  });
+
+  const visited = {}, disc = {}, low = {}, parent = {};
+  let timer = 0;
+  const bridges = new Set();
+
+  function dfs(u) {
+    visited[u] = true;
+    disc[u] = low[u] = timer++;
+    let children = 0;
+    for (const v of (adj[u] || [])) {
+      if (!visited[v]) {
+        children++;
+        parent[v] = u;
+        dfs(v);
+        low[u] = Math.min(low[u], low[v]);
+        // u is an articulation point if:
+        // (a) u is root and has 2+ children, or
+        // (b) u is not root and low[v] >= disc[u]
+        if (parent[u] === undefined && children > 1) bridges.add(u);
+        if (parent[u] !== undefined && low[v] >= disc[u]) bridges.add(u);
+      } else if (v !== parent[u]) {
+        low[u] = Math.min(low[u], disc[v]);
+      }
+    }
+  }
+
+  nodes.forEach(n => { if (!visited[n.did]) dfs(n.did); });
+
+  const ownedDids = new Set(_allAgents.map(a => a.did));
+  return [...bridges]
+    .filter(did => ownedDids.has(did) && (_agentStats[did]?.interactions || 0) >= 3)
+    .map(did => {
+      const n = nodes.find(x => x.did === did);
+      return { did, name: n?.name || did.slice(-10) };
+    });
 }
 
 function renderInsightsTab(){
@@ -1309,6 +1442,92 @@ function updateSummaryBand(){
   const highTrustN=_net.nodes.filter(nd=>{const ts=_trustScoreCache[nd.did];return ts&&ts.score>=80;}).length;
   if(highTrustN)parts.push(`${highTrustN} excellent trust`);
   el.textContent=parts.join(" · ");
+}
+
+async function loadNetworkDiff() {
+  try {
+    const res = await _authFetch(`/pro/network/diff?days=${_days}`);
+    if (!res.ok) return;
+    _netDiff = await res.json();
+    renderChangeInsights();
+  } catch(_) {}
+}
+
+function renderChangeInsights() {
+  // Converts _netDiff data into additional insight cards and injects them at top of insights list
+  if (!_netDiff) return;
+  const diff = _netDiff;
+
+  const changeInsights = [];
+
+  // Activity spikes/drops
+  (diff.activity_changes || []).forEach(ac => {
+    if (ac.direction === "spike" || ac.pct >= 100) {
+      changeInsights.push({
+        sev: "warn", icon: "⚡",
+        title: `Activity Spike: ${ac.name}`,
+        body: `${ac.current} events vs ${ac.previous} last period (+${ac.pct}%) — ${Math.round(ac.pct / 100)}× busier`,
+        dids: new Set([ac.did]), _isChange: true,
+      });
+    } else if (ac.direction === "drop" || ac.pct <= -50) {
+      changeInsights.push({
+        sev: "info", icon: "↘",
+        title: `Activity Drop: ${ac.name}`,
+        body: `${ac.current} events vs ${ac.previous} last period (${ac.pct}%)`,
+        dids: new Set([ac.did]), _isChange: true,
+      });
+    }
+  });
+
+  // Trust changes
+  (diff.trust_changes || []).forEach(tc => {
+    if (tc.delta < -5) {
+      changeInsights.push({
+        sev: "critical", icon: "↓",
+        title: `Trust Dropped: ${tc.name}`,
+        body: `Score fell from ${tc.score_before} → ${tc.score_after} (${tc.delta}) since last period`,
+        dids: new Set([tc.did]), _isChange: true,
+      });
+    } else if (tc.delta > 5) {
+      changeInsights.push({
+        sev: "info", icon: "↑",
+        title: `Trust Improved: ${tc.name}`,
+        body: `Score rose from ${tc.score_before} → ${tc.score_after} (+${tc.delta})`,
+        dids: new Set([tc.did]), _isChange: true,
+      });
+    }
+  });
+
+  // New connections
+  if ((diff.new_connections || []).length) {
+    const nc = diff.new_connections;
+    changeInsights.push({
+      sev: "info", icon: "→",
+      title: `New Connections (${nc.length})`,
+      body: nc.slice(0, 2).map(c => `${c.src_name} → ${c.dst_name}`).join(' · ') + (nc.length > 2 ? ` +${nc.length - 2} more` : ''),
+      dids: new Set(nc.slice(0, 5).flatMap(c => [c.src, c.dst])),
+      _isChange: true,
+    });
+  }
+
+  // New external agents
+  if ((diff.new_external_agents || []).length) {
+    const ne = diff.new_external_agents;
+    changeInsights.push({
+      sev: "warn", icon: "👥",
+      title: `New External Agents (${ne.length})`,
+      body: `${ne.length} external agent${ne.length > 1 ? 's' : ''} appeared this period that weren't active before`,
+      dids: new Set(ne.map(a => a.did)), _isChange: true,
+    });
+  }
+
+  // Merge: changes go first (with a "Changes" label), then static insights
+  const allInsights = [...changeInsights, ..._insights.filter(i => !i._isChange)];
+  // Re-render with merged list (temporarily replace _insights)
+  const saved = _insights;
+  _insights = allInsights;
+  renderInsightsTab();
+  _insights = saved;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -1479,6 +1698,8 @@ async function loadNetwork(){
     if(crit>0){badge.textContent=crit;badge.style.display="";}
     else badge.style.display="none";
   }
+
+  loadNetworkDiff(); // async — updates insights panel when diff arrives
 
   // Prefetch trust scores for ALL owned agents in ONE call (dimensions included)
   _authFetch("/pro/trust-scores")
