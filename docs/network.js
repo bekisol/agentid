@@ -101,6 +101,7 @@ let _insights = [];
 let _activeInsightIdx = -1;
 let _netDiff = null; // cached diff response from /pro/network/diff
 let _focusInsight = null; // Set<string> | null — focus mode: only these nodes visible
+let _loadId = 0; // incremented on every loadNetwork(); async callbacks drop stale responses
 
 // ── Canvas helpers ─────────────────────────────────────────────────────────
 function s2w(sx,sy){return[(sx-_net.tx)/_net.zoom,(sy-_net.ty)/_net.zoom];}
@@ -1713,10 +1714,11 @@ function renderFindingsPanel(){
   });
 }
 
-async function loadNetworkDiff() {
+async function loadNetworkDiff(loadId) {
   try {
     const res = await _authFetch(`/pro/network/diff?days=${_days}`);
     if (!res.ok) return;
+    if(loadId!==_loadId)return; // stale — user changed range while request was in flight
     _netDiff = await res.json();
     renderChangeInsights();
   } catch(_) {}
@@ -1873,6 +1875,7 @@ async function loadNetwork(){
   if(pill)pill.textContent="loading…";
 
   stopSimulation();
+  const loadId=++_loadId;
   _focusInsight=null;_highlightDids=null;_activeInsightIdx=-1;
   _viewMode="default";_netDiff=null;_insights=[];
   renderEvidenceHeader();
@@ -1999,11 +2002,12 @@ async function loadNetwork(){
     }
   }
 
-  loadNetworkDiff(); // async — updates findings panel when diff arrives
+  loadNetworkDiff(loadId); // async — updates findings panel when diff arrives
 
   // Prefetch trust scores for ALL owned agents in ONE call (dimensions included)
   _authFetch("/pro/trust-scores")
     .then(r=>r.ok?r.json():null).then(bulk=>{
+      if(loadId!==_loadId)return; // stale response — user changed range
       if(!bulk||!Array.isArray(bulk.agents))return;
       bulk.agents.forEach(a=>{
         _trustScoreCache[a.did]={
