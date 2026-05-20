@@ -95,6 +95,10 @@ let _compromised=new Set(),_compromisedInfo={};
 let _sortBy="interactions",_searchQ="",_days=7;
 let _trustScoreCache={};  // did → {score,level,dimensions}
 let _accountTier=null;    // "free" | "pro" | "enterprise" — fetched once on load
+let _viewMode = "default";   // "default"|"trust"|"activity"|"role"|"risk"|"flow"
+let _highlightDids = null;   // Set<string> | null — insight canvas highlight
+let _insights = [];
+let _activeInsightIdx = -1;
 
 // ── Canvas helpers ─────────────────────────────────────────────────────────
 function s2w(sx,sy){return[(sx-_net.tx)/_net.zoom,(sy-_net.ty)/_net.zoom];}
@@ -285,6 +289,50 @@ function computeEgoLayout(center,neighbours,W,H){
   });
 }
 
+// ── Node visual override by view mode ─────────────────────────────────────
+function getNodeVisual(node) {
+  const ts = _trustScoreCache[node.did];
+  const interactions = _agentStats[node.did]?.interactions || 0;
+
+  switch (_viewMode) {
+    case "trust":
+      return { color: ts ? trustColor(ts.score) : "#475569", r: node.r, dimmed: false };
+
+    case "activity": {
+      const maxI = Math.max(1, ...Object.values(_agentStats).map(s => s.interactions || 0));
+      const ratio = interactions / maxI;
+      const minDim = Math.min(
+        (_net.canvas?.width  || 900) / (window.devicePixelRatio || 1),
+        (_net.canvas?.height || 600) / (window.devicePixelRatio || 1)
+      );
+      const r = Math.round(Math.max(7, Math.min(minDim * 0.055, minDim * 0.016 + ratio * minDim * 0.048)));
+      const col = ratio > 0.65 ? "#ef4444" : ratio > 0.3 ? "#f59e0b" : ratio > 0.06 ? "#3b82f6" : "#475569";
+      return { color: col, r, dimmed: false };
+    }
+
+    case "role":
+      return { color: node.external ? "#f59e0b" : roleMeta(node.name).color, r: node.r, dimmed: false };
+
+    case "risk": {
+      const isFlagged = _compromised.has(node.did);
+      const isLow = ts && ts.score < 30;
+      return { color: isFlagged ? "#ef4444" : isLow ? "#f59e0b" : "#1e293b", r: node.r, dimmed: !isFlagged && !isLow };
+    }
+
+    case "flow": {
+      const em = Object.values(_edgeMap);
+      const outC = em.filter(e => e.src === node.did).reduce((s, e) => s + e.count, 0);
+      const inC  = em.filter(e => e.dst === node.did).reduce((s, e) => s + e.count, 0);
+      const total = outC + inC || 1;
+      const ratio = outC / total;
+      return { color: ratio > 0.65 ? "#f59e0b" : ratio < 0.35 ? "#3b82f6" : "#10b981", r: node.r, dimmed: false };
+    }
+
+    default:
+      return { color: ts ? trustColor(ts.score) : node.color, r: node.r, dimmed: false };
+  }
+}
+
 // ── Draw ──────────────────────────────────────────────────────────────────
 function draw(){
   const c=_net.canvas;if(!c)return;
@@ -383,10 +431,15 @@ function draw(){
     let alpha=1;
     if(sel&&!selNeighbors.has(node.did))alpha=0.07;
     else if(searchSet&&!searchSet.has(node.did))alpha=0.08;
-    const r=isSel?node.r*1.25:node.r;
     const isComp=_compromised.has(node.did);
     const ts=_trustScoreCache[node.did];
-    const nodeColor=ts?trustColor(ts.score):node.color;
+    // Apply view-mode visual overrides
+    const vis=getNodeVisual(node);
+    const nodeColor=vis.color;
+    const r=isSel?vis.r*1.25:vis.r;
+    // Insight highlight: dim nodes not in the highlight set
+    if(_highlightDids&&!_highlightDids.has(node.did)&&!isSel)alpha=Math.min(alpha,0.1);
+    if(vis.dimmed&&!isSel)alpha=Math.min(alpha,0.12);
 
     ctx.globalAlpha=alpha;
 
@@ -1134,6 +1187,130 @@ function renderDetailPanel(node){
   });
 }
 
+// ── Insights engine ──────────────────────────────────────────────────────
+function computeInsights(){
+  _insights=[];
+  const allDids=_net.allNodes.map(n=>n.did);
+
+  // 1. Flagged agents
+  const flagged=allDids.filter(d=>_compromised.has(d));
+  if(flagged.length){
+    _insights.push({
+      sev:"critical",icon:"🚨",
+      title:`${flagged.length} flagged agent${flagged.length>1?"s":""}`,
+      body:"These agents are marked compromised and may pose a trust risk.",
+      dids:new Set(flagged),
+    });
+  }
+
+  // 2. Low-trust agents (score < 30)
+  const lowTrust=allDids.filter(d=>{const ts=_trustScoreCache[d];return ts&&ts.score<30;});
+  if(lowTrust.length){
+    _insights.push({
+      sev:"warn",icon:"⚠",
+      title:`${lowTrust.length} low-trust agent${lowTrust.length>1?"s":""}`,
+      body:"Agents with trust score below 30. Consider reviewing their activity.",
+      dids:new Set(lowTrust),
+    });
+  }
+
+  // 3. Possible Sybil pattern: ≥5 one-time-only verifiers all pointing at same target
+  const inboundOnce={};
+  for(const e of Object.values(_edgeMap)){
+    if(e.count===1){
+      const op=Object.keys(e.ops)[0]||"";
+      if(op.startsWith("verify")){
+        inboundOnce[e.dst]=(inboundOnce[e.dst]||[]).concat(e.src);
+      }
+    }
+  }
+  for(const [target,sources] of Object.entries(inboundOnce)){
+    if(sources.length>=5){
+      _insights.push({
+        sev:"warn",icon:"⚠",
+        title:`Possible Sybil ring around ${_net.allNodes.find(n=>n.did===target)?.name||target.slice(-8)}`,
+        body:`${sources.length} agents each sent exactly one verify event to this agent.`,
+        dids:new Set([target,...sources]),
+      });
+      break; // show at most one such insight
+    }
+  }
+
+  // 4. High-volume agent (top 1 has 3× the interactions of average)
+  const stats=Object.entries(_agentStats).filter(([,s])=>s.interactions>0);
+  if(stats.length>=3){
+    stats.sort((a,b)=>b[1].interactions-a[1].interactions);
+    const avg=stats.reduce((s,[,v])=>s+v.interactions,0)/stats.length;
+    const [topDid,topStat]=stats[0];
+    if(topStat.interactions>avg*3){
+      _insights.push({
+        sev:"info",icon:"📊",
+        title:`High-volume: ${_net.allNodes.find(n=>n.did===topDid)?.name||topDid.slice(-8)}`,
+        body:`${topStat.interactions.toLocaleString()} events — ${Math.round(topStat.interactions/avg)}× the average.`,
+        dids:new Set([topDid]),
+      });
+    }
+  }
+
+  // 5. Isolated registered agents (no edges)
+  const connected=new Set(Object.values(_edgeMap).flatMap(e=>[e.src,e.dst]));
+  const isolated=_allAgents.map(a=>a.did).filter(d=>!connected.has(d));
+  if(isolated.length){
+    _insights.push({
+      sev:"info",icon:"◎",
+      title:`${isolated.length} isolated agent${isolated.length>1?"s":""}`,
+      body:"Registered agents with no recorded interactions in this window.",
+      dids:new Set(isolated),
+    });
+  }
+
+  return _insights;
+}
+
+function renderInsightsTab(){
+  const container=document.getElementById("insights-list");if(!container)return;
+  if(!_insights.length){
+    container.innerHTML=`<div class="insight-empty">No insights for this window.<br>Load more data or extend the time range.</div>`;
+    return;
+  }
+  const sevColor={critical:"#ef4444",warn:"#f59e0b",info:"#3b82f6"};
+  container.innerHTML=_insights.map((ins,i)=>`
+    <div class="insight-card${_activeInsightIdx===i?" ins-active":""}" data-idx="${i}">
+      <div class="insight-card-head">
+        <span class="insight-sev" style="background:${sevColor[ins.sev]||"#64748b"};"></span>
+        <span class="insight-title">${esc(ins.title)}</span>
+        <span class="insight-icon">${ins.icon}</span>
+      </div>
+      <div class="insight-body">${esc(ins.body)}</div>
+    </div>`).join("");
+  container.querySelectorAll(".insight-card").forEach(card=>{
+    card.addEventListener("click",()=>{
+      const idx=parseInt(card.dataset.idx,10);
+      if(_activeInsightIdx===idx){
+        // Toggle off
+        _activeInsightIdx=-1;_highlightDids=null;
+        document.getElementById("highlight-clear").style.display="none";
+      }else{
+        _activeInsightIdx=idx;
+        _highlightDids=_insights[idx]?.dids||null;
+        document.getElementById("highlight-clear").style.display="";
+      }
+      renderInsightsTab();draw();
+    });
+  });
+}
+
+function updateSummaryBand(){
+  const el=document.getElementById("net-summary-text");if(!el)return;
+  const n=_net.nodes.length,e=_net.edges.length;
+  const flagCount=_net.nodes.filter(nd=>_compromised.has(nd.did)).length;
+  const parts=[`${n} agents`,`${e} edges`];
+  if(flagCount)parts.push(`⚠ ${flagCount} flagged`);
+  const highTrustN=_net.nodes.filter(nd=>{const ts=_trustScoreCache[nd.did];return ts&&ts.score>=80;}).length;
+  if(highTrustN)parts.push(`${highTrustN} excellent trust`);
+  el.textContent=parts.join(" · ");
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 function relTime(ts){
   const d=Date.now()-ts;
@@ -1291,6 +1468,18 @@ async function loadNetwork(){
   // Start physics — runs until settled
   startSimulation(1);
 
+  // Compute insights & update summary band
+  computeInsights();
+  renderInsightsTab();
+  updateSummaryBand();
+  // Update insight badge count
+  const badge=document.getElementById("insight-count-badge");
+  if(badge){
+    const crit=_insights.filter(i=>i.sev==="critical"||i.sev==="warn").length;
+    if(crit>0){badge.textContent=crit;badge.style.display="";}
+    else badge.style.display="none";
+  }
+
   // Prefetch trust scores for ALL owned agents in ONE call (dimensions included)
   _authFetch("/pro/trust-scores")
     .then(r=>r.ok?r.json():null).then(bulk=>{
@@ -1302,6 +1491,7 @@ async function loadNetwork(){
           _detailFetched:true,
         };
       });
+      updateSummaryBand();
       draw(); // refresh node colors with real trust data
     }).catch(()=>{});
 }
@@ -1359,6 +1549,46 @@ async function _initNetwork() {
     if(_net.egoMode)exitEgoMode();else{fitView();draw();}
   });
   window.addEventListener("resize",resizeCanvas);
+
+  // ── Sidebar tabs ──────────────────────────────────────────────────────
+  document.querySelectorAll(".stab").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      document.querySelectorAll(".stab").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab=btn.dataset.tab;
+      document.getElementById("tab-agents").hidden=(tab!=="agents");
+      document.getElementById("tab-insights").hidden=(tab!=="insights");
+    });
+  });
+
+  // ── View mode bar ─────────────────────────────────────────────────────
+  document.querySelectorAll(".vmode-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      document.querySelectorAll(".vmode-btn").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      _viewMode=btn.dataset.mode;
+      draw();
+    });
+  });
+
+  // ── Legend toggle ─────────────────────────────────────────────────────
+  document.getElementById("legend-btn")?.addEventListener("click",()=>{
+    const pop=document.getElementById("legend-pop");
+    if(pop)pop.hidden=!pop.hidden;
+  });
+  // Close legend on outside click
+  document.addEventListener("click",e=>{
+    const pop=document.getElementById("legend-pop");
+    const btn=document.getElementById("legend-btn");
+    if(pop&&!pop.hidden&&!pop.contains(e.target)&&e.target!==btn)pop.hidden=true;
+  });
+
+  // ── Highlight clear ───────────────────────────────────────────────────
+  document.getElementById("highlight-clear")?.addEventListener("click",()=>{
+    _highlightDids=null;_activeInsightIdx=-1;
+    document.getElementById("highlight-clear").style.display="none";
+    renderInsightsTab();draw();
+  });
   // Fetch account tier once — used to gate Pro/Enterprise features in the detail panel
   _authFetch("/pro/keys/me").then(r=>r.ok?r.json():null).then(d=>{
     if(d?.tier)_accountTier=d.tier;

@@ -57,7 +57,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 #refresh-btn:hover { color: var(--text); border-color: var(--muted); }
 
 /* ── Body ───────────────────────────────────────────────────────── */
-#body { display: flex; height: calc(100vh - 52px); overflow: hidden; }
+#body { display: flex; height: calc(100vh - 80px); overflow: hidden; }
 
 /* ── Left sidebar ───────────────────────────────────────────────── */
 #sidebar {
@@ -145,6 +145,96 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .spinner { width: 36px; height: 36px; border: 3px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Summary band */
+#net-summary-band {
+  height: 28px; flex-shrink: 0;
+  display: flex; align-items: center;
+  padding: 0 1.25rem;
+  background: rgba(15,23,42,0.7);
+  border-bottom: 1px solid var(--border2);
+  font-size: 0.7rem; color: var(--muted);
+  gap: 0.5rem; overflow: hidden; white-space: nowrap;
+}
+/* ── Sidebar tabs */
+#sidebar-tabs { display: flex; border-bottom: 1px solid var(--border2); flex-shrink: 0; }
+.stab {
+  flex: 1; padding: 0.5rem 0.5rem;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--muted); font-size: 0.72rem; font-weight: 600; cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+.stab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.stab:hover:not(.active) { color: var(--text); }
+#insight-count-badge {
+  display: inline-block; font-size: 0.58rem; font-weight: 700;
+  background: #ef4444; color: #fff; border-radius: 8px;
+  padding: 0 5px; line-height: 1.55; margin-left: 3px; vertical-align: middle;
+}
+#tab-agents { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
+#tab-insights { flex: 1; overflow-y: auto; padding: 0.35rem 0; min-height: 0; }
+/* ── Insight cards */
+.insight-card {
+  margin: 0.3rem 0.55rem; border-radius: 9px;
+  border: 1px solid var(--border2); background: var(--surface2);
+  cursor: pointer; transition: border-color .15s, background .15s; overflow: hidden;
+}
+.insight-card:hover { border-color: var(--muted); background: rgba(255,255,255,0.04); }
+.insight-card.ins-active { border-color: var(--accent); background: rgba(59,130,246,0.08); }
+.insight-card-head {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.45rem 0.6rem 0.25rem;
+}
+.insight-sev { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.insight-title { font-size: 0.72rem; font-weight: 700; flex: 1; min-width: 0; }
+.insight-icon { font-size: 0.78rem; flex-shrink: 0; }
+.insight-body { padding: 0 0.6rem 0.45rem; font-size: 0.66rem; color: var(--muted); line-height: 1.5; }
+.insight-empty {
+  padding: 2rem 1rem; text-align: center;
+  font-size: 0.73rem; color: var(--muted); line-height: 1.7;
+}
+/* ── View mode bar */
+#view-mode-bar {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 2px; z-index: 10;
+  background: rgba(15,23,42,0.9); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 3px; backdrop-filter: blur(8px);
+}
+.vmode-btn {
+  font-size: 0.65rem; font-weight: 600; padding: 0.2rem 0.6rem;
+  border-radius: 7px; border: none; background: none;
+  color: var(--muted); cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.vmode-btn:hover { color: var(--text); }
+.vmode-btn.active { background: var(--accent); color: #fff; }
+/* ── Legend */
+#legend-btn {
+  position: absolute; bottom: 50px; left: 14px; z-index: 10;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(15,23,42,0.9); border: 1px solid var(--border2);
+  color: var(--muted); font-size: 0.73rem; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(6px);
+}
+#legend-btn:hover { color: var(--text); border-color: var(--muted); }
+#legend-pop {
+  position: absolute; bottom: 82px; left: 14px; z-index: 20;
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 0.7rem; width: 215px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4); backdrop-filter: blur(8px);
+}
+.leg-sec { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.3rem; margin-top: 0.5rem; }
+.leg-sec:first-child { margin-top: 0; }
+.leg-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.22rem; font-size: 0.67rem; color: #94a3b8; }
+.leg-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+/* ── Highlight clear */
+#highlight-clear {
+  display: none; position: absolute; top: 46px; left: 50%; transform: translateX(-50%);
+  z-index: 10; font-size: 0.66rem; padding: 0.18rem 0.75rem;
+  border-radius: 20px; border: 1px solid var(--border2);
+  background: rgba(15,23,42,0.9); color: var(--muted); cursor: pointer;
+  backdrop-filter: blur(6px); transition: color .15s; white-space: nowrap;
+}
+#highlight-clear:hover { color: var(--text); }
 /* ── Detail panel ────────────────────────────────────────────────── */
 #detail-panel {
   width: 0; flex-shrink: 0;
@@ -279,25 +369,65 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <button id="refresh-btn" title="Refresh">↻</button>
 </div>
 
+<div id="net-summary-band">
+  <span id="net-summary-text">—</span>
+</div>
+
 <div id="body">
 
   <!-- Left sidebar -->
   <aside id="sidebar">
-    <div id="search-wrap">
-      <input id="search-input" type="search" placeholder="Search by name, DID, capability…" autocomplete="off" spellcheck="false">
+    <div id="sidebar-tabs">
+      <button class="stab active" data-tab="agents">Agents</button>
+      <button class="stab" data-tab="insights">Insights <span id="insight-count-badge" style="display:none;"></span></button>
     </div>
-    <div id="filter-row">
-      <button class="sort-btn active" data-sort="interactions">Most interactions</button>
-      <button class="sort-btn" data-sort="verified">Most verified</button>
-      <button class="sort-btn" data-sort="recent">Recently active</button>
-      <button class="sort-btn" data-sort="flagged">Flagged</button>
+    <div id="tab-agents">
+      <div id="search-wrap">
+        <input id="search-input" type="search" placeholder="Search by name, DID, capability…" autocomplete="off" spellcheck="false">
+      </div>
+      <div id="filter-row">
+        <button class="sort-btn active" data-sort="interactions">Most interactions</button>
+        <button class="sort-btn" data-sort="verified">Most verified</button>
+        <button class="sort-btn" data-sort="recent">Recently active</button>
+        <button class="sort-btn" data-sort="flagged">Flagged</button>
+      </div>
+      <div id="agent-list"></div>
     </div>
-    <div id="agent-list"></div>
+    <div id="tab-insights" hidden>
+      <div id="insights-list"></div>
+    </div>
   </aside>
 
   <!-- Canvas -->
   <div id="canvas-wrap">
     <canvas id="network-canvas"></canvas>
+    <div id="view-mode-bar">
+      <button class="vmode-btn active" data-mode="default">Default</button>
+      <button class="vmode-btn" data-mode="trust">Trust</button>
+      <button class="vmode-btn" data-mode="activity">Activity</button>
+      <button class="vmode-btn" data-mode="role">Role</button>
+      <button class="vmode-btn" data-mode="risk">Risk</button>
+      <button class="vmode-btn" data-mode="flow">Flow</button>
+    </div>
+    <button id="highlight-clear">✕ Clear highlight</button>
+    <button id="legend-btn" title="Legend">?</button>
+    <div id="legend-pop" hidden>
+      <div class="leg-sec">Node color (Default / Trust)</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#10b981;"></span> Trust ≥ 80 — Excellent</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#22c55e;"></span> Trust 60–79 — Good</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#f59e0b;"></span> Trust 30–59 — Moderate</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#ef4444;"></span> Trust &lt; 30 — Low</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#f59e0b;box-shadow:0 0 0 2px #ef4444;"></span> External agent</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:transparent;border:2px dashed #ef4444;"></span> Flagged ring</div>
+      <div class="leg-sec">Edge color</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#3b82f6;border-radius:2px;height:4px;width:14px;"></span> Verify</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#10b981;border-radius:2px;height:4px;width:14px;"></span> Task</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#22d3ee;border-radius:2px;height:4px;width:14px;"></span> Message / Send</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#f59e0b;border-radius:2px;height:4px;width:14px;"></span> Delegate</div>
+      <div class="leg-row"><span class="leg-swatch" style="background:#ef4444;border-radius:2px;height:4px;width:14px;"></span> Review / Flagged</div>
+      <div class="leg-sec">View modes</div>
+      <div class="leg-row" style="font-size:0.63rem;color:#475569;line-height:1.55;display:block;">Activity: size = volume · Role: color = role type · Risk: dims safe nodes · Flow: orange=sends, blue=receives, green=balanced</div>
+    </div>
     <div class="zoom-controls">
       <button class="zoom-btn" id="zoom-in"  title="Zoom in">+</button>
       <button class="zoom-btn" id="zoom-fit" title="Fit all" style="font-size:13px;">⊡</button>
@@ -317,6 +447,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 </div>
 
-<script src="network.js?v=20260511-1"></script>
+<script src="network.js?v=20260520-1"></script>
 </body>
 </html>
