@@ -583,6 +583,7 @@ function draw(){
 // ── Cluster view (far zoom) — connected-component topology ──────────────────
 function computeConnectedComponents(){
   const adj={};
+  const nodeMap=Object.fromEntries(_net.nodes.map(n=>[n.did,n])); // O(1) lookup instead of O(n) find
   _net.nodes.forEach(n=>{adj[n.did]=[];});
   Object.values(_edgeMap).forEach(e=>{
     if(adj[e.src]!==undefined&&adj[e.dst]!==undefined){
@@ -598,7 +599,7 @@ function computeConnectedComponents(){
     visited.add(node.did);
     while(queue.length){
       const did=queue.shift();
-      const n=_net.nodes.find(x=>x.did===did);
+      const n=nodeMap[did]; // O(1)
       if(n)comp.push(n);
       for(const nbr of(adj[did]||[])){
         if(!visited.has(nbr)){visited.add(nbr);queue.push(nbr);}
@@ -1551,11 +1552,14 @@ function ins_viewModeFor(ins){
   if(!ins)return"default";
   const t=(ins.title||"").toLowerCase();
   const icon=ins.icon||"";
-  if(ins.sev==="critical"||icon==="🚨"||t.includes("flag")||t.includes("compromis"))return"risk";
+  // Trust-related checks first — before the severity catch-all, since "Trust Dropped"
+  // carries sev:"critical" and would otherwise incorrectly return "risk".
+  if(icon==="↓"||t.includes("low-trust")||t.includes("trust drop")||t.includes("trust dropped"))return"trust";
+  if(icon==="↑")return"default"; // trust improved — no canvas mode needed
   if(icon==="⚠"&&(t.includes("trust")||t.includes("sybil")))return"trust";
   if(icon==="⇌"||t.includes("bridge"))return"risk";
   if(icon==="📊"||t.includes("volume")||t.includes("spike")||t.includes("activity"))return"activity";
-  if(icon==="↓"||t.includes("low-trust")||t.includes("trust drop"))return"trust";
+  if(ins.sev==="critical"||icon==="🚨"||t.includes("flag")||t.includes("compromis"))return"risk";
   return"default";
 }
 
