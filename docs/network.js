@@ -383,7 +383,7 @@ function draw(){
     const a=nmap[edge.src],b=nmap[edge.dst];if(!a||!b)continue;
     if(!inViewport(a)&&!inViewport(b))continue;
     // Focus mode: skip edges not involving a focused node
-    if(_focusInsight&&!_focusInsight.has(edge.src)&&!_focusInsight.has(edge.dst))continue;
+    if(_focusInsight&&(!_focusInsight.has(edge.src)||!_focusInsight.has(edge.dst)))continue;
 
     let alpha=sel?0:(edge.flagged?0.75:0.35);
     if(sel&&selNeighbors.has(edge.src)&&selNeighbors.has(edge.dst))alpha=0.9;
@@ -1805,6 +1805,8 @@ function renderChangeInsights() {
   // Permanently merge: change insights at front, static (non-change) at back.
   _insights = [...changeInsights, ..._insights.filter(i => !i._isChange)];
   _activeInsightIdx = -1;
+  _highlightDids=null;_focusInsight=null;_viewMode="default";
+  renderEvidenceHeader();
   renderFindingsPanel();
   renderNetworkBrief();
   const badge = document.getElementById("insight-count-badge");
@@ -1871,6 +1873,9 @@ async function loadNetwork(){
   if(pill)pill.textContent="loading…";
 
   stopSimulation();
+  _focusInsight=null;_highlightDids=null;_activeInsightIdx=-1;
+  _viewMode="default";_netDiff=null;_insights=[];
+  renderEvidenceHeader();
   _net.egoMode=false;_net.selected=null;
   _days=parseInt(document.getElementById("range-select")?.value||"7",10);
 
@@ -2009,15 +2014,18 @@ async function loadNetwork(){
       });
       // Recompute findings now that trust data is available
       computeInsights();
-      renderFindingsPanel();
-      renderNetworkBrief();
+      if(_netDiff){
+        renderChangeInsights(); // re-merges diff insights + clears stale active state
+      }else{
+        _activeInsightIdx=-1;_highlightDids=null;_focusInsight=null;_viewMode="default";
+        renderFindingsPanel();renderNetworkBrief();renderEvidenceHeader();
+      }
       const badge=document.getElementById("insight-count-badge");
       if(badge){
         const crit=_insights.filter(i=>i.sev==="critical"||i.sev==="warn").length;
         if(crit>0){badge.textContent=crit;badge.style.display="";}
         else badge.style.display="none";
       }
-      renderEvidenceHeader();
       draw(); // refresh node colors with real trust data
     }).catch(()=>{});
 }
