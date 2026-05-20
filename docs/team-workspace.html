@@ -1426,57 +1426,74 @@
   .cg-load-btn { display:flex; align-items:center; justify-content:center; padding:2.5rem 0; }
 
   /* ── New teams rail ───────────────────────────────────────────────────── */
-  .teams-rail-body { padding:0.4rem 0 0; gap:0; }
+  .teams-rail-body { padding:0.5rem 0 0; gap:0; }
   .team-row {
-    display:flex; align-items:center; gap:0.6rem;
-    padding:0.54rem 1rem;
+    display:flex; align-items:center; gap:0.65rem;
+    padding:0.6rem 1rem;
     cursor:pointer;
-    border-left:2px solid transparent;
+    border-left:3px solid transparent;
     transition:background 0.12s, border-color 0.12s;
   }
   .team-row:hover { background:var(--surface2); }
   .team-row.active {
-    background:rgba(249,115,22,0.06);
+    background:rgba(249,115,22,0.09);
     border-left-color:var(--accent);
   }
   .team-dot {
-    width:8px; height:8px; border-radius:50%; flex-shrink:0;
+    width:9px; height:9px; border-radius:50%; flex-shrink:0;
   }
-  .team-dot.dot-green  { background:var(--green); }
-  .team-dot.dot-yellow { background:var(--yellow); }
-  .team-dot.dot-red    { background:var(--red); }
-  .team-dot.dot-gray   { background:var(--muted); }
+  .team-dot.dot-green  { background:var(--green); box-shadow:0 0 5px rgba(16,185,129,0.55); }
+  .team-dot.dot-yellow { background:var(--yellow); box-shadow:0 0 5px rgba(245,158,11,0.55); }
+  .team-dot.dot-red    { background:var(--red); box-shadow:0 0 5px rgba(239,68,68,0.55); }
+  .team-dot.dot-gray   { background:#4b5563; border:1.5px solid #6b7280; }
   .team-row-name {
-    flex:1; font-size:0.84rem; font-weight:600; color:var(--text);
+    flex:1; font-size:0.84rem; font-weight:700; color:var(--text);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-  .team-row-badge { font-size:0.68rem; font-weight:700; color:var(--muted); white-space:nowrap; }
+  .team-row.active .team-row-name { color:#fff; }
+  .team-row-badge { font-size:0.68rem; font-weight:700; color:#4b5563; white-space:nowrap; }
   .team-row-badge.badge-live   { color:var(--green); }
   .team-row-badge.badge-paused { color:var(--yellow); }
   .team-row-badge.badge-failed { color:var(--red); }
-  .team-runs-inline { display:flex; flex-direction:column; }
+  .team-runs-inline {
+    display:flex; flex-direction:column;
+    background:rgba(0,0,0,0.18);
+    border-left:3px solid rgba(249,115,22,0.25);
+    margin-bottom:0.2rem;
+  }
   .team-run-row {
     display:flex; align-items:center; justify-content:space-between;
-    padding:0.38rem 1rem 0.38rem 2.2rem; gap:0.5rem; cursor:pointer;
+    padding:0.42rem 1rem 0.42rem 1.85rem; gap:0.5rem; cursor:pointer;
+    border-left:2px solid transparent;
+    transition:background 0.1s;
   }
-  .team-run-row:hover { background:var(--surface2); }
+  .team-run-row:hover { background:rgba(255,255,255,0.04); }
+  .team-run-row.active {
+    background:rgba(249,115,22,0.07);
+    border-left-color:var(--accent);
+  }
   .team-run-name {
-    flex:1; font-size:0.77rem; color:var(--text-2); font-weight:500;
+    flex:1; font-size:0.76rem; color:var(--muted); font-weight:500;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   .team-run-row.active .team-run-name { color:var(--text); font-weight:700; }
-  .team-run-time { font-size:0.7rem; color:var(--muted); white-space:nowrap; flex-shrink:0; }
-  .rail-new-mission { padding:0.75rem 0.85rem; margin-top:auto; }
+  .team-run-row:hover .team-run-name { color:var(--text-2); }
+  .team-run-time { font-size:0.68rem; color:#4b5563; white-space:nowrap; flex-shrink:0; }
+  .team-run-row.active .team-run-time { color:var(--muted); }
+  .rail-new-mission {
+    padding:0.75rem 0.85rem; margin-top:auto;
+    border-top:1px solid var(--border);
+  }
   .new-mission-btn {
     width:100%; padding:0.62rem 1rem;
-    background:rgba(120,40,10,0.3);
-    border:1.5px dashed var(--accent);
+    background:rgba(120,40,10,0.28);
+    border:1.5px dashed rgba(249,115,22,0.6);
     border-radius:10px;
     color:var(--accent); font-size:0.82rem; font-weight:700;
     cursor:pointer; text-align:center;
-    transition:background 0.15s;
+    transition:background 0.15s, border-color 0.15s;
   }
-  .new-mission-btn:hover { background:rgba(249,115,22,0.14); }
+  .new-mission-btn:hover { background:rgba(249,115,22,0.14); border-color:var(--accent); }
   </style>
 </head>
 <body>
