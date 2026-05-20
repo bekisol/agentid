@@ -457,6 +457,21 @@ function draw(){
     }
   }
 
+  // ── Exposure rings: 1-hop neighbors of highlighted risk nodes ─────────────
+  if(_highlightDids&&(_viewMode==="risk"||(_insights[_activeInsightIdx]?.sev==="critical"))){
+    const exposed=new Set();
+    _net.edges.forEach(e=>{
+      if(_highlightDids.has(e.src)&&!_highlightDids.has(e.dst))exposed.add(e.dst);
+      if(_highlightDids.has(e.dst)&&!_highlightDids.has(e.src))exposed.add(e.src);
+    });
+    exposed.forEach(did=>{
+      const n=nmap[did];if(!n||!inViewport(n))return;
+      ctx.beginPath();ctx.arc(n.x,n.y,n.r+10,0,Math.PI*2);
+      ctx.strokeStyle="#f59e0b";ctx.lineWidth=2.2;ctx.globalAlpha=0.42;ctx.stroke();
+      ctx.globalAlpha=1;
+    });
+  }
+
   // ── Nodes ──────────────────────────────────────────────────────────────
   for(const node of _net.nodes){
     if(!inViewport(node))continue;
@@ -489,6 +504,14 @@ function draw(){
     if(isComp){
       ctx.beginPath();ctx.arc(node.x,node.y,r+5,0,Math.PI*2);
       ctx.strokeStyle="#ef4444";ctx.lineWidth=2.5;ctx.setLineDash([4,3]);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Diff overlay: new agents from network diff get a green pulsing ring
+    const isNewAgent=_netDiff&&(_netDiff.new_external_agents||[]).some(a=>a.did===node.did);
+    if(isNewAgent&&!isComp){
+      ctx.beginPath();ctx.arc(node.x,node.y,r+5,0,Math.PI*2);
+      ctx.strokeStyle="#10b981";ctx.lineWidth=2;ctx.setLineDash([3,3]);ctx.stroke();
       ctx.setLineDash([]);
     }
 
@@ -557,30 +580,64 @@ function draw(){
   }
 }
 
-// ── Cluster view (far zoom) ────────────────────────────────────────────────
-function drawClusterView(ctx,W,H){
-  const groups={};
-  _net.nodes.forEach(n=>{
-    const key=n.external?"external":(Object.keys(ROLE_META).find(k=>n.color===ROLE_META[k].color)||"agent");
-    if(!groups[key])groups[key]={nodes:[],color:n.color,icon:n.icon};
-    groups[key].nodes.push(n);
+// ── Cluster view (far zoom) — connected-component topology ──────────────────
+function computeConnectedComponents(){
+  const adj={};
+  _net.nodes.forEach(n=>{adj[n.did]=[];});
+  Object.values(_edgeMap).forEach(e=>{
+    if(adj[e.src]!==undefined&&adj[e.dst]!==undefined){
+      adj[e.src].push(e.dst);adj[e.dst].push(e.src);
+    }
   });
+  const visited=new Set();
+  const components=[];
+  for(const node of _net.nodes){
+    if(visited.has(node.did))continue;
+    const comp=[];
+    const queue=[node.did];
+    visited.add(node.did);
+    while(queue.length){
+      const did=queue.shift();
+      const n=_net.nodes.find(x=>x.did===did);
+      if(n)comp.push(n);
+      for(const nbr of(adj[did]||[])){
+        if(!visited.has(nbr)){visited.add(nbr);queue.push(nbr);}
+      }
+    }
+    const hasRisk=comp.some(n=>_compromised.has(n.did)||(_trustScoreCache[n.did]?.score<30));
+    const hasNew=!!(_netDiff&&comp.some(n=>(_netDiff.new_external_agents||[]).some(a=>a.did===n.did)));
+    const cx=comp.reduce((s,n)=>s+n.x,0)/comp.length;
+    const cy=comp.reduce((s,n)=>s+n.y,0)/comp.length;
+    components.push({nodes:comp,hasRisk,hasNew,cx,cy});
+  }
+  return components.sort((a,b)=>b.nodes.length-a.nodes.length);
+}
+
+function drawClusterView(ctx,W,H){
+  const components=computeConnectedComponents();
   ctx.save();ctx.translate(_net.tx,_net.ty);ctx.scale(_net.zoom,_net.zoom);
-  Object.entries(groups).forEach(([,g])=>{
-    if(!g.nodes.length)return;
-    const cx=g.nodes.reduce((s,n)=>s+n.x,0)/g.nodes.length;
-    const cy=g.nodes.reduce((s,n)=>s+n.y,0)/g.nodes.length;
-    const br=Math.sqrt(g.nodes.length)*40+45;
+  for(const comp of components){
+    const{nodes,hasRisk,hasNew,cx,cy}=comp;
+    const br=Math.sqrt(nodes.length)*42+50;
+    const color=hasRisk?"#ef4444":hasNew?"#10b981":"#3b82f6";
     const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,br);
-    grad.addColorStop(0,g.color+"28");grad.addColorStop(1,g.color+"08");
+    grad.addColorStop(0,color+"20");grad.addColorStop(1,color+"05");
     ctx.beginPath();ctx.arc(cx,cy,br,0,Math.PI*2);
     ctx.fillStyle=grad;ctx.fill();
-    ctx.strokeStyle=g.color+"66";ctx.lineWidth=1.5;ctx.stroke();
-    ctx.font=`bold 20px serif`;ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.fillStyle="#fff";ctx.fillText(g.icon,cx,cy-10);
-    ctx.font=`bold 12px Inter,sans-serif`;ctx.fillStyle=g.color;
-    ctx.fillText(g.nodes.length,cx,cy+12);
-  });
+    ctx.strokeStyle=color+(hasRisk?"66":hasNew?"55":"28");
+    ctx.lineWidth=hasRisk?2.5:hasNew?2:1.5;
+    if(hasRisk)ctx.setLineDash([6,3]);
+    ctx.stroke();ctx.setLineDash([]);
+    const fontSize=Math.min(26,Math.max(13,Math.sqrt(nodes.length)*5.5));
+    ctx.font=`bold ${fontSize}px Inter,sans-serif`;
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillStyle=hasRisk?"#ef4444":hasNew?"#10b981":"#94a3b8";
+    ctx.fillText(nodes.length,cx,cy);
+    ctx.font="10px Inter,sans-serif";
+    if(hasRisk){ctx.fillStyle="#ef4444aa";ctx.fillText("⚠ risk",cx,cy+fontSize*0.75);}
+    else if(hasNew){ctx.fillStyle="#10b981aa";ctx.fillText("new",cx,cy+fontSize*0.75);}
+    else if(nodes.length===1){ctx.fillStyle="#64748b";ctx.fillText(nodes[0].name.slice(0,14),cx,cy+fontSize*0.75);}
+  }
   ctx.restore();
 }
 
@@ -1389,6 +1446,55 @@ function computeInsights(){
     }
   } catch(_) {}
 
+  // 7. Unverified high-activity agents (>5 interactions, zero verify ops)
+  try{
+    const unverified=allDids.filter(did=>{
+      const stats=_agentStats[did];
+      if(!stats||stats.interactions<6)return false;
+      return !stats.verifyCount&&_net.allNodes.find(n=>n.did===did)&&!_compromised.has(did);
+    });
+    if(unverified.length){
+      _insights.push({
+        sev:"warn",icon:"🔓",
+        title:`${unverified.length} unverified active agent${unverified.length>1?"s":""}`,
+        body:`${unverified.length>1?"These agents have":"This agent has"} significant interaction volume but no verification events — operating without identity attestation.`,
+        action:"Trigger a verification cycle or confirm these agents operate within a trusted scope.",
+        dids:new Set(unverified),
+      });
+    }
+  }catch(_){}
+
+  // 8. Circular delegation: detect A→B→...→A task/delegation loops (depth ≤ 4)
+  try{
+    const delegationEdges=Object.values(_edgeMap).filter(e=>{
+      const topOp=Object.entries(e.ops).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
+      return topOp.includes("delegate")||topOp.startsWith("task");
+    });
+    if(delegationEdges.length>=2){
+      const dadj={};
+      delegationEdges.forEach(e=>{if(!dadj[e.src])dadj[e.src]=[];dadj[e.src].push(e.dst);});
+      const ownedSet=new Set(_allAgents.map(a=>a.did));
+      const cycles=new Set();
+      function _dfsLoop(start,cur,path,depth){
+        if(depth>4)return;
+        for(const next of(dadj[cur]||[])){
+          if(next===start&&path.length>=2){cycles.add(start);return;}
+          if(!path.includes(next))_dfsLoop(start,next,[...path,next],depth+1);
+        }
+      }
+      allDids.filter(d=>ownedSet.has(d)&&dadj[d]).forEach(d=>_dfsLoop(d,d,[d],0));
+      if(cycles.size){
+        _insights.push({
+          sev:"warn",icon:"🔄",
+          title:`Circular delegation (${cycles.size} agent${cycles.size>1?"s":""})`,
+          body:`Task delegation loops detected — these agents delegate back to earlier nodes in the chain, which may cause infinite loops or duplicate work.`,
+          action:"Review orchestrator routing logic for these agents and add cycle-break conditions.",
+          dids:new Set([...cycles]),
+        });
+      }
+    }
+  }catch(_){}
+
   return _insights;
 }
 
@@ -1505,11 +1611,28 @@ function renderNetworkBrief(){
     if(ne>0)parts.push(`<strong>${ne}</strong> new external agent${ne>1?"s":""} this period`);
     else if(nc>0)parts.push(`<strong>${nc}</strong> new connection${nc>1?"s":""} this period`);
   }
+  // Network health score
+  let score=100;
+  score-=(flagCount/Math.max(n,1))*40;
+  score-=(lowTrust/Math.max(n,1))*20;
+  score-=_insights.filter(i=>i.sev==="critical").length*8;
+  score-=_insights.filter(i=>i.sev==="warn").length*3;
+  score=Math.max(0,Math.round(score));
+  const scoreColor=score>=80?"#10b981":score>=55?"#f59e0b":"#ef4444";
+
   if(!parts.length){
-    prose.innerHTML=`<strong>${n}</strong> agent${n!==1?"s":""} · no anomalies detected in this window`;
+    prose.innerHTML=`<strong>${n}</strong> agent${n!==1?"s":""} · no anomalies detected · <span style="color:${scoreColor};font-weight:700;">health ${score}</span>`;
   }else{
-    prose.innerHTML=parts.join(" &nbsp;·&nbsp; ");
+    prose.innerHTML=parts.join(" &nbsp;·&nbsp; ")+` &nbsp;·&nbsp; <span style="color:${scoreColor};font-weight:700;">health ${score}</span>`;
   }
+}
+
+function exportCanvasPNG(){
+  const canvas=_net.canvas;if(!canvas)return;
+  const link=document.createElement("a");
+  link.download=`agentid-network-${new Date().toISOString().slice(0,10)}.png`;
+  link.href=canvas.toDataURL("image/png");
+  link.click();
 }
 
 function renderFindingsPanel(){
@@ -1947,6 +2070,7 @@ async function _initNetwork() {
   document.getElementById("zoom-fit")?.addEventListener("click",()=>{
     if(_net.egoMode)exitEgoMode();else{fitView();draw();}
   });
+  document.getElementById("export-png")?.addEventListener("click",exportCanvasPNG);
   window.addEventListener("resize",resizeCanvas);
 
   // ── Intel panel tabs ──────────────────────────────────────────────────
