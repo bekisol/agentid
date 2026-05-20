@@ -1494,6 +1494,174 @@
     transition:background 0.15s, border-color 0.15s;
   }
   .new-mission-btn:hover { background:rgba(249,115,22,0.14); border-color:var(--accent); }
+
+  /* ── Mission Operations Board ───────────────────────────────────────── */
+  .ops-board { display:flex; flex-direction:column; }
+
+  /* Sticky mission header */
+  .ops-header {
+    position:sticky; top:0; z-index:12;
+    display:flex; align-items:flex-start; justify-content:space-between; gap:1rem;
+    padding:0.8rem 1.1rem; flex-wrap:wrap;
+    background:rgba(11,13,16,0.97); backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--border);
+  }
+  .ops-header-left { flex:1; min-width:0; }
+  .ops-mission-label { font-size:0.62rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:0.18rem; }
+  .ops-mission-title { font-size:0.97rem; font-weight:800; color:var(--text); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ops-mission-meta { font-size:0.7rem; color:var(--muted); margin-top:0.18rem; }
+  .ops-header-right { display:flex; align-items:center; gap:0.4rem; flex-shrink:0; flex-wrap:wrap; }
+  .ops-primary-btn {
+    display:inline-flex; align-items:center; gap:0.3rem;
+    background:var(--accent); color:#fff; border:none;
+    border-radius:8px; padding:0.46rem 0.88rem; font-size:0.79rem; font-weight:800;
+    cursor:pointer; white-space:nowrap; transition:background 0.15s;
+  }
+  .ops-primary-btn:hover { background:var(--accent-2); }
+  .ops-primary-btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .ops-primary-btn.export { background:var(--green); }
+  .ops-icon-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:31px; height:31px; border-radius:7px;
+    border:1px solid var(--border); background:var(--surface2); color:var(--text-2);
+    cursor:pointer; font-size:0.82rem; transition:background 0.12s;
+  }
+  .ops-icon-btn:hover { background:var(--surface3); }
+  .ops-icon-btn.danger { border-color:rgba(239,68,68,0.35); color:var(--red); }
+
+  /* New mission form */
+  .new-mission-form { padding:0.85rem 1.1rem; background:var(--surface2); border-bottom:1px solid var(--border); }
+  .ops-textarea {
+    width:100%; border:1px solid var(--border-2); background:var(--bg); color:var(--text);
+    border-radius:9px; padding:0.62rem 0.82rem; resize:vertical; min-height:4.5rem;
+    font-size:0.82rem; line-height:1.5;
+  }
+  .ops-textarea:disabled { opacity:0.4; cursor:not-allowed; }
+  .ops-form-row { display:flex; align-items:center; gap:0.45rem; margin-top:0.48rem; flex-wrap:wrap; }
+  .ops-ghost-btn {
+    border:1px solid var(--border); background:transparent; color:var(--text-2);
+    border-radius:8px; padding:0.43rem 0.78rem; font-size:0.77rem; font-weight:600; cursor:pointer;
+  }
+  .ops-hint { font-size:0.68rem; color:var(--muted); }
+
+  /* Intervention callout */
+  .intervention-callout {
+    display:flex; align-items:center; gap:0.9rem;
+    padding:0.8rem 1.1rem; border-bottom:1px solid var(--border);
+  }
+  .intervention-callout.approval { background:rgba(249,115,22,0.08); border-left:3px solid var(--accent); }
+  .intervention-callout.info { background:rgba(59,130,246,0.07); border-left:3px solid var(--blue); }
+  .intervention-icon { font-size:1.1rem; flex-shrink:0; }
+  .intervention-body { flex:1; min-width:0; }
+  .intervention-title { font-size:0.84rem; font-weight:800; color:var(--text); }
+  .intervention-copy { font-size:0.75rem; color:var(--muted); margin-top:0.12rem; line-height:1.45; }
+
+  /* Section headers */
+  .ops-section-header {
+    display:flex; align-items:baseline; justify-content:space-between; gap:0.6rem;
+    padding:0.65rem 1.1rem 0.3rem;
+  }
+  .ops-section-label { font-size:0.62rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+  .ops-section-label.needs-attn { color:var(--red); }
+  .ops-section-note { font-size:0.68rem; color:var(--muted); }
+  .ops-empty { padding:0.85rem 1.1rem; color:var(--muted); font-size:0.79rem; font-style:italic; }
+
+  /* Agent board */
+  .agent-board { display:flex; gap:0.7rem; overflow-x:auto; padding:0.3rem 1.1rem 1rem; scrollbar-width:thin; }
+  .agent-op-card {
+    flex-shrink:0; width:205px; background:var(--surface2); border:1px solid var(--border);
+    border-radius:13px; padding:0.82rem 0.88rem; display:flex; flex-direction:column; gap:0.38rem;
+    transition:border-color 0.15s, box-shadow 0.15s;
+  }
+  .agent-op-card.status-working { border-color:var(--blue); box-shadow:0 0 0 1px rgba(59,130,246,0.15); }
+  .agent-op-card.status-done    { border-color:var(--green); }
+  .agent-op-card.status-attention { border-color:var(--red); }
+  .agent-op-header { display:flex; align-items:center; justify-content:space-between; gap:0.35rem; }
+  .agent-op-name { font-size:0.78rem; font-weight:800; color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .agent-op-pulse {
+    width:7px; height:7px; border-radius:50%; background:var(--blue); flex-shrink:0;
+    animation:pulse-ring 1.5s ease-out infinite;
+  }
+  @keyframes pulse-ring {
+    0%   { box-shadow:0 0 0 0 rgba(59,130,246,0.7); }
+    70%  { box-shadow:0 0 0 7px rgba(59,130,246,0); }
+    100% { box-shadow:0 0 0 0 rgba(59,130,246,0); }
+  }
+  .agent-op-cap { font-size:0.63rem; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.05em; }
+  .agent-op-task { font-size:0.73rem; color:var(--text-2); line-height:1.42; flex:1; }
+  .agent-op-scores { display:flex; gap:0.35rem; flex-wrap:wrap; }
+  .agent-score { font-size:0.63rem; font-weight:700; color:var(--muted); background:var(--surface3); border-radius:99px; padding:0.12rem 0.42rem; }
+  .agent-op-rejection { font-size:0.69rem; color:var(--red); line-height:1.38; }
+  .agent-op-preview { font-size:0.69rem; color:var(--muted); line-height:1.38; font-style:italic; }
+  .agent-op-actions { margin-top:0.25rem; }
+  .agent-action-btn {
+    width:100%; padding:0.36rem 0.55rem; border-radius:7px;
+    border:1px solid var(--border); background:var(--surface3); color:var(--text-2);
+    font-size:0.69rem; font-weight:700; cursor:pointer; transition:background 0.12s;
+  }
+  .agent-action-btn:hover:not(:disabled) { background:var(--surface2); border-color:var(--border-2); }
+  .agent-action-btn:disabled { opacity:0.38; cursor:not-allowed; }
+
+  /* Two-column body */
+  .ops-body { display:grid; grid-template-columns:1fr 300px; border-top:1px solid var(--border); min-height:420px; }
+  .ops-products { border-right:1px solid var(--border); padding:0 0 2rem; }
+  .ops-activity { display:flex; flex-direction:column; overflow:hidden; }
+
+  /* Work product cards */
+  .product-card {
+    margin:0 1.1rem 0.95rem; border:1px solid var(--border);
+    background:var(--surface2); border-radius:13px; overflow:hidden;
+  }
+  .product-card.final-card { border-color:rgba(249,115,22,0.5); }
+  .product-header {
+    display:flex; align-items:flex-start; justify-content:space-between; gap:0.7rem;
+    padding:0.7rem 0.88rem; border-bottom:1px solid var(--border); background:var(--surface3);
+  }
+  .product-agent { font-size:0.81rem; font-weight:800; color:var(--text); }
+  .product-meta { font-size:0.68rem; color:var(--muted); margin-top:0.12rem; }
+  .product-body { padding:0.82rem 0.88rem; font-size:0.81rem; line-height:1.65; color:var(--text-2); max-height:22rem; overflow:auto; }
+  .product-body p { margin:0 0 0.6em; }
+  .product-body h1,.product-body h2,.product-body h3 { margin:0.8em 0 0.3em; font-size:0.9rem; color:var(--text); }
+  .product-actions { display:flex; gap:0.4rem; padding:0.55rem 0.88rem; border-top:1px solid var(--border); background:var(--surface3); flex-wrap:wrap; }
+
+  /* Attention panel */
+  .attn-panel { border-bottom:1px solid var(--border); padding-bottom:0.5rem; }
+  .attn-item { margin:0.4rem 0.9rem; padding:0.6rem 0.7rem; background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.2); border-radius:9px; }
+  .attn-label { font-size:0.72rem; font-weight:800; color:var(--red); margin-bottom:0.18rem; }
+  .attn-copy { font-size:0.73rem; color:var(--text-2); line-height:1.43; }
+
+  /* Activity feed */
+  .activity-feed { flex:1; overflow-y:auto; padding-bottom:0.5rem; min-height:120px; }
+  .activity-row { display:flex; align-items:flex-start; gap:0.5rem; padding:0.42rem 0.9rem; border-bottom:1px solid rgba(38,48,64,0.5); }
+  .activity-dot { width:6px; height:6px; border-radius:50%; background:var(--muted); flex-shrink:0; margin-top:0.28rem; }
+  .activity-row.activity-output .activity-dot   { background:var(--green); }
+  .activity-row.activity-decision .activity-dot { background:var(--yellow); }
+  .activity-row.activity-bad .activity-dot      { background:var(--red); }
+  .activity-row.activity-review .activity-dot   { background:var(--accent); }
+  .activity-row.activity-policy .activity-dot   { background:var(--purple); }
+  .activity-body { flex:1; min-width:0; }
+  .activity-label { font-size:0.72rem; font-weight:700; color:var(--text-2); }
+  .activity-sub { font-size:0.67rem; color:var(--muted); line-height:1.38; margin-top:0.08rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .activity-time { font-size:0.64rem; color:var(--muted); white-space:nowrap; flex-shrink:0; }
+
+  /* Intervention / context injection */
+  .context-form { padding:0.6rem 0.9rem; border-top:1px solid var(--border); }
+  .memory-snippets { padding:0 0 0.7rem; border-top:1px solid var(--border); }
+  .memory-note { margin:0.38rem 0.9rem 0; padding:0.48rem 0.62rem; background:var(--surface3); border-radius:8px; font-size:0.7rem; color:var(--text-2); line-height:1.43; }
+
+  /* Audit accordion */
+  .ops-audit { border-top:1px solid var(--border); }
+  .ops-audit > summary {
+    display:flex; align-items:center; justify-content:space-between; gap:1rem;
+    padding:0.72rem 1.1rem; cursor:pointer; list-style:none;
+    font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);
+    transition:color 0.12s;
+  }
+  .ops-audit > summary::-webkit-details-marker { display:none; }
+  .ops-audit > summary:hover { color:var(--text-2); }
+  .ops-audit-note { font-size:0.67rem; font-weight:400; text-transform:none; letter-spacing:0; }
+  .ops-audit-body { padding:0.5rem 0 2rem; border-top:1px solid var(--border); }
+
   /* Teams rail header — compact label, not a page heading */
   .teams-rail-head { padding:0.7rem 1rem 0.6rem; border-bottom:1px solid var(--border); }
   .teams-rail-label {
@@ -3102,6 +3270,212 @@
     return buckets;
   }
 
+  /* ── Ops board helper builders ────────────────────────────────────────── */
+
+  function buildPrimaryAction(run) {
+    const s = run.status;
+    if (s === "paused_for_approval")
+      return `<button class="ops-primary-btn" onclick="approveCurrentPlan()">✓ Approve Plan</button>`;
+    if (s === "paused_for_user")
+      return `<button class="ops-primary-btn" onclick="(()=>{const el=document.getElementById('clarification-input');if(el){el.focus();el.scrollIntoView({behavior:'smooth',block:'center'});}})()">Answer Clarification</button>`;
+    if (isTerminal(s) && run.final_output)
+      return `<button class="ops-primary-btn export" onclick="downloadRunReport()">↓ Export Report</button>`;
+    return "";
+  }
+
+  function buildInterventionCallout(run) {
+    if (run.status === "paused_for_approval")
+      return `<div class="intervention-callout approval">
+        <div class="intervention-icon">⏸</div>
+        <div class="intervention-body">
+          <div class="intervention-title">Plan approval required</div>
+          <div class="intervention-copy">The orchestrator has drafted an execution plan. Review the agent board below, then approve to dispatch work.</div>
+        </div>
+        <button class="ops-primary-btn" onclick="approveCurrentPlan()">✓ Approve &amp; Dispatch</button>
+      </div>`;
+    if (run.status === "synthesizing")
+      return `<div class="intervention-callout info">
+        <div class="intervention-icon">⚙</div>
+        <div class="intervention-body">
+          <div class="intervention-title">Synthesis in progress</div>
+          <div class="intervention-copy">The orchestrator is merging accepted outputs into the final deliverable.</div>
+        </div>
+      </div>`;
+    return "";
+  }
+
+  function buildAgentBoardHtml(assignments) {
+    if (!assignments.length) return "";
+    return assignments.map((assign, idx) => {
+      const s = assign.status || "assigned";
+      const isWorking   = s === "running";
+      const isDone      = s === "completed";
+      const isAttention = ["failed","rejected","reassigned"].includes(s);
+      const cls = isWorking ? "status-working" : isDone ? "status-done" : isAttention ? "status-attention" : "status-queued";
+      const trust   = assign.trust_score_at_assignment != null ? Math.round(Number(assign.trust_score_at_assignment)) : null;
+      const quality = assign.quality_score != null ? Math.round(assign.quality_score * 100) : null;
+      const rawOut  = assign.output ? (typeof assign.output === "string" ? assign.output : JSON.stringify(assign.output)) : "";
+      const preview = rawOut.slice(0, 90);
+      const action  = isDone
+        ? `<button class="agent-action-btn" onclick="document.getElementById('product-${idx}')?.scrollIntoView({behavior:'smooth',block:'start'})">Review Output ↓</button>`
+        : isAttention
+        ? `<button class="agent-action-btn" disabled title="Reassign coming in next release">Reassign</button>`
+        : isWorking
+        ? `<button class="agent-action-btn" disabled title="Redirect coming in next release">Redirect</button>`
+        : "";
+      return `<div class="agent-op-card ${cls}">
+        <div class="agent-op-header">
+          <span class="agent-op-name">${esc(agentName(assign.agent_did))}</span>
+          ${isWorking ? `<span class="agent-op-pulse"></span>` : ""}
+          ${runBadge(s)}
+        </div>
+        <div class="agent-op-cap">${esc(assign.required_capability || "general")}</div>
+        <div class="agent-op-task" title="${esc(assign.subtask || "")}">${esc((assign.subtask || "").slice(0, 85))}${(assign.subtask||"").length > 85 ? "…" : ""}</div>
+        <div class="agent-op-scores">
+          ${trust   != null ? `<span class="agent-score">Trust ${trust}</span>` : ""}
+          ${quality != null ? `<span class="agent-score">Q ${quality}%</span>`  : ""}
+        </div>
+        ${assign.rejection_reason ? `<div class="agent-op-rejection">${esc(assign.rejection_reason.slice(0,80))}</div>` : ""}
+        ${preview && isDone ? `<div class="agent-op-preview">${esc(preview)}…</div>` : ""}
+        <div class="agent-op-actions">${action}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function buildProductCardsHtml(assignments) {
+    return assignments
+      .filter(a => a.status === "completed" && a.output)
+      .map((assign, idx) => {
+        const raw     = typeof assign.output === "string" ? assign.output : JSON.stringify(assign.output, null, 2);
+        const quality = assign.quality_score != null ? `${Math.round(assign.quality_score * 100)}% quality · ` : "";
+        return `<div class="product-card" id="product-${idx}">
+          <div class="product-header">
+            <div>
+              <div class="product-agent">${esc(agentName(assign.agent_did))}</div>
+              <div class="product-meta">${quality}${esc(assign.required_capability || "general")} · ${esc(assign.resolved_permission_level || "contribute")}</div>
+            </div>
+            ${runBadge("completed")}
+          </div>
+          <div class="product-body">${renderMd(raw)}</div>
+          <div class="product-actions">
+            <button class="tiny-btn" disabled title="Output approval coming in next release">Approve</button>
+            <button class="tiny-btn" disabled title="Revision requests coming in next release">Request Revision</button>
+            <button class="tiny-btn" onclick="navigator.clipboard?.writeText(this.closest('.product-card').querySelector('.product-body').innerText)">Copy</button>
+          </div>
+        </div>`;
+      }).join("");
+  }
+
+  function buildFinalCardHtml(run) {
+    if (!run.final_output) return "";
+    return `<div class="product-card final-card">
+      <div class="product-header">
+        <div>
+          <div class="product-agent">Final Deliverable</div>
+          <div class="product-meta">Synthesis complete · ${esc(fmtDuration(run.completed_at && run.started_at ? (new Date(run.completed_at)-new Date(run.started_at))/1000 : 0))}</div>
+        </div>
+        ${runBadge("completed")}
+      </div>
+      <div class="product-body">${state.editingFinalOutput
+        ? `<textarea id="final-output-editor" style="width:100%;min-height:16rem;font-size:0.8rem;background:var(--bg);color:var(--text);border:1px solid var(--border-2);border-radius:8px;padding:0.6rem;">${esc(run.final_output)}</textarea>`
+        : renderMd(run.final_output)}
+      </div>
+      ${run.run_summary && !state.editingFinalOutput ? `<div class="product-body" style="border-top:1px solid var(--border);font-size:0.74rem;color:var(--muted);">${esc(run.run_summary)}</div>` : ""}
+      <div class="product-actions">
+        ${state.editingFinalOutput
+          ? `<button class="tiny-btn primary" onclick="saveFinalOutput()">Save</button><button class="tiny-btn" onclick="cancelEditFinalOutput()">Cancel</button>`
+          : `<button class="tiny-btn primary" onclick="downloadRunReport()">↓ Export Report</button>
+             <button class="tiny-btn" onclick="downloadEvidencePack('${esc(String(run.id||""))}')">Evidence Pack</button>
+             <button class="tiny-btn" onclick="beginEditFinalOutput()">Edit Answer</button>`}
+      </div>
+    </div>`;
+  }
+
+  function buildAttentionPanelHtml(run) {
+    const items = [];
+    if (run.status === "paused_for_user")
+      items.push(`<div class="attn-item">
+        <div class="attn-label">Clarification needed</div>
+        <div class="attn-copy">${esc(run.pause_question || "The team needs your input before it can continue.")}</div>
+      </div>`);
+    (run.assignments || [])
+      .filter(a => ["failed","rejected"].includes(a.status))
+      .forEach(a => items.push(`<div class="attn-item">
+        <div class="attn-label">${esc(agentName(a.agent_did))} — ${esc(a.status)}</div>
+        <div class="attn-copy">${esc(a.rejection_reason || "Agent could not complete the assigned task.")}</div>
+      </div>`));
+    if (!items.length) return "";
+    return `<div class="attn-panel">
+      <div class="ops-section-header"><span class="ops-section-label needs-attn">Needs Attention</span></div>
+      ${items.join("")}
+    </div>`;
+  }
+
+  function buildActivityFeedHtml(events) {
+    if (!events.length) return `<div class="ops-empty">Events will stream in as the run progresses.</div>`;
+    return events.slice(0, 18).map(ev => {
+      const cat  = TL_CATEGORY[ev.event_type] || "meta";
+      const data = ev.event_data || ev.data || {};
+      const sub  = data.reason || data.pause_question || data.status || data.clarification || (ev.agent_did ? agentName(ev.agent_did) : "Orchestrator");
+      return `<div class="activity-row activity-${cat}">
+        <div class="activity-dot"></div>
+        <div class="activity-body">
+          <div class="activity-label">${esc(formatEventLabel(ev.event_type))}</div>
+          <div class="activity-sub">${esc(previewText(String(sub || ""), 72))}</div>
+        </div>
+        <div class="activity-time">${esc(relTime(ev.ts || ev.created_at))}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function buildContextFormHtml(run) {
+    const active = run.status === "paused_for_user";
+    return `<div class="context-form">
+      <div class="ops-section-header"><span class="ops-section-label">Intervention</span></div>
+      ${active ? `<div class="attn-copy" style="padding:0 0 0.45rem;">${esc(run.pause_question || "The team is waiting for your input.")}</div>` : ""}
+      <textarea class="ops-textarea" id="clarification-input"
+        placeholder="${active ? "Answer the team's question to continue the run…" : "Intervention available when the run pauses for input"}"
+        ${!active ? 'disabled' : ""}></textarea>
+      <div class="ops-form-row">
+        <button class="ops-primary-btn" ${!active ? 'disabled title="Run must be paused for input"' : 'onclick="submitRunClarification()"'}>Send to Team</button>
+        ${!active ? `<span class="ops-hint">Available when run status is paused_for_user</span>` : ""}
+      </div>
+    </div>`;
+  }
+
+  function buildMemorySnippetsHtml() {
+    const notes = (state.memory?.team_notes || []).slice(0, 3);
+    if (!notes.length) return "";
+    return `<div class="memory-snippets">
+      <div class="ops-section-header"><span class="ops-section-label">Team Memory</span></div>
+      ${notes.map(n => `<div class="memory-note">${esc((n.content || "").slice(0, 120))}${(n.content||"").length > 120 ? "…" : ""}</div>`).join("")}
+    </div>`;
+  }
+
+  function buildAuditAccordionHtml(run, timelineEvents) {
+    return `<details class="ops-audit">
+      <summary>
+        <span>Audit &amp; Export</span>
+        <span class="ops-audit-note">${timelineEvents.length} events · timeline · causal graph · evidence pack · sign-off</span>
+      </summary>
+      <div class="ops-audit-body">
+        <div class="ops-section-header"><span class="ops-section-label">Live Timeline</span></div>
+        ${buildLiveTimeline(timelineEvents, run)}
+        <div class="ops-section-header" style="margin-top:1.4rem;"><span class="ops-section-label">Causal Graph</span></div>
+        <div id="cg-container"><div class="cg-load-btn"><button class="tiny-btn primary" onclick="loadCausalGraph()">Load causal graph</button></div></div>
+        <div class="ops-section-header" style="margin-top:1.4rem;"><span class="ops-section-label">Sign-off &amp; Evidence</span></div>
+        ${buildSignoffSection(run)}
+        <div class="doc-foot" style="margin-top:1rem;padding:0 1.1rem;">
+          <a onclick="downloadEvidencePack('${esc(String(run.id||""))}')">Evidence pack</a>
+          <span class="sep">·</span>
+          <a onclick="downloadRunReport()">Export audit log (CSV)</a>
+          <span class="sep">·</span>
+          <span style="font-size:0.68rem;">${esc(String(run.id||""))} · ${esc(run.status||"")} · ${esc(run.created_at ? new Date(run.created_at).toLocaleString() : "")}</span>
+        </div>
+      </div>
+    </details>`;
+  }
+
   function renderWorkspace() {
     const run = state.run;
     if (!run) {
@@ -3109,306 +3483,90 @@
       return;
     }
 
-    const plan = derivePlan(run);
-    const outputs = deriveOutputList(run);
-    const decisions = deriveDecisionList(run);
-    const contextList = deriveContextList(run);
-    const statusBuckets = deriveStatusBuckets(run.assignments || []);
-    const interventionHtml = buildInterventionPanel(run, plan);
-    const contributions = Array.isArray(run.contributions) ? run.contributions : [];
+    const assignments   = run.assignments || [];
     const timelineEvents = (run.events || []).slice(-60).reverse();
-    const navSections = [
-      { id: "mission", title: "Mission", note: "What the team is solving" },
-      { id: "plan", title: "The Plan", note: "How work was split" },
-      { id: "happening", title: "What's happening", note: "Live narrative and intervention" },
-      { id: "context", title: "Context used", note: "Shared artifacts shaping work" },
-      { id: "decisions", title: "Decisions", note: "Why the run changed course" },
-      { id: "timeline", title: "Live timeline", note: "Full filterable event log" },
-      { id: "assignments", title: "Assignments", note: "Role, status, and quality" },
-      { id: "final", title: "Final answer", note: "Merged output and summary" },
-      { id: "graph", title: "Audit Graph", note: "Causal event DAG" },
-      { id: "signoff", title: "Sign-off & export", note: "Evidence pack and compliance" },
-    ];
+    const statusBuckets  = deriveStatusBuckets(assignments);
+    const selectedGroup  = state.groups.find(g => Number(g.id) === Number(state.selectedGroupId));
 
-    const completed = (run.assignments || []).filter(a => a.status === "completed").length;
-    const avgTrust = (run.assignments || []).filter(a => a.trust_score_at_assignment != null);
-    const avgTrustValue = avgTrust.length
-      ? Math.round(avgTrust.reduce((sum, a) => sum + Number(a.trust_score_at_assignment || 0), 0) / avgTrust.length)
+    const completed      = assignments.filter(a => a.status === "completed").length;
+    const avgTrustArr    = assignments.filter(a => a.trust_score_at_assignment != null);
+    const avgTrustValue  = avgTrustArr.length
+      ? Math.round(avgTrustArr.reduce((s, a) => s + Number(a.trust_score_at_assignment || 0), 0) / avgTrustArr.length)
       : null;
     const elapsedSec = run.started_at
       ? ((isTerminal(run.status) ? new Date(run.completed_at || run.updated_at || Date.now()) : new Date()) - new Date(run.started_at)) / 1000
       : 0;
 
-    const selectedGroup = state.groups.find(g => Number(g.id) === Number(state.selectedGroupId));
-
-    const planHtml = plan.length ? plan.map((item, idx) => {
-      const assign = (run.assignments || []).find(a => a.agent_did === item.agent_did && a.subtask === item.subtask)
-        || (run.assignments || []).find(a => a.agent_did === item.agent_did);
-      const statusClass = assign?.status === "completed" ? "done" : assign?.status === "running" ? "working" : "queued";
-      const trustScore = item.trust_score_at_assignment ?? item.trust_score ?? assign?.trust_score_at_assignment;
-      const risk = item.risk_level || assign?.risk_level || "medium";
-      return `
-      <div class="plan-row ${statusClass}">
-        <div class="pn">${idx + 1}</div>
-        <div>
-          <div class="agent">${esc(agentName(item.agent_did))} — ${esc(item.capability || assign?.required_capability || "general")}</div>
-          <div class="task">${esc(item.subtask || assign?.subtask || "")}</div>
-          <div class="meta">
-            ${runBadge(assign?.status || "assigned")}
-            <span class="chip ${esc(risk === "high" ? "failed" : risk === "low" ? "done" : "waiting")}">${esc(risk)} risk</span>
-            ${trustScore != null ? `<span class="chip">trust ${Math.round(Number(trustScore))}</span>` : ""}
-            ${assign?.candidate_score != null ? `<span class="chip" title="X-algo composite suitability score">suit. ${Math.round(assign.candidate_score * 100)}%</span>` : ""}
-            ${assign?.resolved_permission_level ? `<span class="chip">${esc(assign.resolved_permission_level)}</span>` : ""}
-          </div>
-          ${item.rationale || assign?.rationale ? `<div class="plan-meta">${esc(item.rationale || assign?.rationale)}</div>` : ""}
-        </div>
-        <div class="small-meta">${assign?.reassigned_from ? `Reassigned from ${esc(agentName(assign.reassigned_from))}` : ""}</div>
-      </div>`;
-    }).join("") : `<div class="empty">The orchestrator plan has not been recorded yet.</div>`;
-
-    const contextHtml = contextList.length ? contextList.map(([key, value]) => {
-      const val = value?.value || value || {};
-      const preview = typeof val === "object"
-        ? (val.result || val.subtask || JSON.stringify(val)).slice(0, 180)
-        : String(val).slice(0, 180);
-      return `<div class="context-card">
-        <strong>${esc(key)}</strong>
-        <div class="small-meta" style="margin-top:0.18rem;">${esc((value?.by && agentName(value.by)) || "shared context")}${value?.at ? ` · ${esc(relTime(value.at))}` : ""}</div>
-        <div class="mission-copy" style="font-size:0.8rem;margin-top:0.35rem;">${esc(preview)}</div>
-      </div>`;
-    }).join("") : `<div class="empty">No shared context captured yet.</div>`;
-
-    const decisionHtml = decisions.length ? decisions.map(ev => {
-      const data = ev.event_data || ev.data || {};
-      const details =
-        data.reason ||
-        data.pause_question ||
-        data.clarification ||
-        data.output_preview ||
-        data.status ||
-        JSON.stringify(data).slice(0, 160);
-      return `<div class="decision-row">
-        <div class="when">${esc(relTime(ev.ts || ev.created_at))}</div>
-        <div class="what">
-          <strong>${esc(formatEventLabel(ev.event_type))}</strong>
-          <p>${esc(details || (ev.agent_did ? agentName(ev.agent_did) : "Orchestrator"))}</p>
-        </div>
-      </div>`;
-    }).join("") : `<div class="empty">No major run decisions logged yet.</div>`;
-
-    const outputsHtml = outputs.length ? outputs.map(output => `
-      <blockquote class="story">
-        <span class="who">${esc(agentName(output.did))} · ${esc(relTime(run.updated_at || run.started_at))}</span>
-        ${esc(output.preview)}${output.preview.length >= 220 ? "..." : ""}
-      </blockquote>`).join("") : `<div class="empty">Accepted agent outputs will appear here.</div>`;
-
-    const navHtml = navSections.map(section => `
-      <button class="doc-nav-link${state.activeDocSection === section.id ? " active" : ""}" type="button" data-section="${section.id}">
-        <strong>${esc(section.title)}</strong>
-        <span>${esc(section.note)}</span>
-      </button>`).join("");
-
-    const pastRunsHtml = state.runs
-      .filter(item => String(item.id) !== String(run.id))
-      .slice(0, 4)
-      .map(item => `
-        <button class="past-run-link" type="button" onclick="selectRun('${String(item.id)}')">
-          <strong>${esc((item.user_task || "Untitled run").slice(0, 42))}${(item.user_task || "").length > 42 ? "..." : ""}</strong>
-          <span>${esc((item.status || "planning").replace(/_/g, " "))} · ${esc(relTime(item.updated_at || item.completed_at || item.started_at))}</span>
-        </button>`)
-      .join("") || `<div class="empty">No past runs yet.</div>`;
-
-    const sidebarTimelineHtml = timelineEvents.length
-      ? timelineEvents.slice(0, 6).map(ev => {
-          const targetSection = sectionTargetForEventType(ev.event_type);
-          const data = ev.event_data || ev.data || {};
-          const subtitle =
-            data.reason ||
-            data.pause_question ||
-            data.status ||
-            data.clarification ||
-            (ev.agent_did ? agentName(ev.agent_did) : "Orchestrator");
-          return `
-            <button class="timeline-mini-item${targetSection === "happening" ? " active" : ""}" type="button" data-section="${targetSection}">
-              <div class="timeline-mini-top">
-                <strong>${esc(formatEventLabel(ev.event_type))}</strong>
-                <span>${esc(relTime(ev.ts || ev.created_at))}</span>
-              </div>
-              <div class="timeline-mini-copy">${esc(previewText(subtitle, 96))}</div>
-            </button>`;
-        }).join("")
-      : `<div class="empty">Timeline events will appear once the run starts moving.</div>`;
-
-    const acceptedOutputsHtml = outputs.length ? outputs.map(output => `
-      <div class="summary-mini">
-        <strong>${esc(agentName(output.did))}</strong>
-        <div class="small-meta">${output.score != null ? `${Math.round(output.score * 100)}% quality` : "Accepted output"}</div>
-        <div class="mission-copy" style="font-size:0.78rem;margin-top:0.35rem;">${esc(output.preview)}${output.preview.length >= 220 ? "..." : ""}</div>
-      </div>`).join("") : `<div class="empty">No accepted outputs yet.</div>`;
-
-    const contributionHtml = contributions.length ? contributions.slice(0, 4).map(item => {
-      return `<div class="leader-row">
-        <div>
-          <strong>${esc(agentName(item.did || item.agent_did))}</strong>
-          <div class="small-meta">${Math.round(item.quality_pts || 0)} quality · ${Math.round(item.reuse_pts || 0)} reuse · ${Math.round(item.reliability_pts || item.accepted_pts || 0)} reliability</div>
-        </div>
-        <div class="leader-score">${Math.round(item.score ?? item.total_pts ?? 0)}</div>
-      </div>`;
-    }).join("") : `<div class="empty">Contribution ranking appears once assignments are evaluated.</div>`;
-
-    const assignmentHtml = (run.assignments || []).length ? (run.assignments || []).map(assign => {
-      return `<div class="output-item">
-        <div class="output-top">
-          <div class="output-agent">${esc(agentName(assign.agent_did))}</div>
-          <div class="ws-pill-row">
-            ${runBadge(assign.status || "assigned")}
-            ${assign.quality_score != null ? `<span class="trust-chip">${Math.round(assign.quality_score * 100)}% quality</span>` : ""}
-            ${assign.candidate_score != null ? `<span class="trust-chip" title="X-algo suitability at assignment time">suit. ${Math.round(assign.candidate_score * 100)}%</span>` : ""}
-          </div>
-        </div>
-        <div class="output-copy">${esc(assign.subtask || "")}</div>
-        <div class="output-meta">${esc(assign.required_capability || "general")} · ${esc(assign.resolved_permission_level || "contribute")}${assign.rejection_reason ? ` · Rejected because: ${esc(assign.rejection_reason)}` : ""}</div>
-      </div>`;
-    }).join("") : `<div class="empty">Accepted agent outputs will appear here.</div>`;
+    const missionTitle = (run.user_task || "").slice(0, 130);
 
     const root = document.getElementById("workspace-root");
-    root.innerHTML = `
-      ${buildTeamCommandPanel(run)}
-      <div class="hero">
-        <div class="hero-top">
-          <div>
-            <div class="hero-title">${esc(selectedGroup?.name || `Team ${state.selectedGroupId}`)} · Living Run Memo</div>
-            <div class="hero-sub">Trusted team execution as a readable working document. The run stays inspectable, attributable, and interruptible without dropping back into the Messages drawer.</div>
+    root.innerHTML = `<div class="ops-board">
+
+      <!-- Zone 1: Sticky mission header -->
+      <div class="ops-header">
+        <div class="ops-header-left">
+          <div class="ops-mission-label">${esc(selectedGroup?.name || "Team")} · Mission</div>
+          <div class="ops-mission-title" title="${esc(run.user_task || "")}">${esc(missionTitle)}${(run.user_task||"").length > 130 ? "…" : ""}</div>
+          <div class="ops-mission-meta">${fmtDuration(elapsedSec)} elapsed &nbsp;·&nbsp; ${assignments.length} agent${assignments.length !== 1 ? "s" : ""} &nbsp;·&nbsp; ${completed} of ${assignments.length} done${avgTrustValue != null ? ` &nbsp;·&nbsp; avg trust ${avgTrustValue}` : ""}</div>
+        </div>
+        <div class="ops-header-right">
+          ${runBadge(run.status)}
+          ${buildPrimaryAction(run)}
+          <button class="ops-icon-btn" onclick="refreshCurrentRun()" title="Refresh run">↺</button>
+          ${!isTerminal(run.status) ? `<button class="ops-icon-btn danger" onclick="cancelCurrentRun()" title="Stop run">✕</button>` : ""}
+          <button class="ops-icon-btn" onclick="document.getElementById('ops-new-mission').style.display=document.getElementById('ops-new-mission').style.display==='none'?'block':'none'" title="New mission">＋</button>
+        </div>
+      </div>
+
+      <!-- New mission form (collapsed) -->
+      <div id="ops-new-mission" style="display:none" class="new-mission-form">
+        <textarea class="ops-textarea" id="team-task-input" placeholder="Describe the next mission for this team…"></textarea>
+        <div class="ops-form-row">
+          <button class="ops-primary-btn" onclick="createTeamRun()">Launch Mission</button>
+          <button class="ops-ghost-btn" onclick="document.getElementById('ops-new-mission').style.display='none'">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Intervention callout (approval / synthesis) -->
+      ${buildInterventionCallout(run)}
+
+      <!-- Zone 2: Agent board -->
+      <div class="ops-section-header">
+        <span class="ops-section-label">Team</span>
+        <span class="ops-section-note">${assignments.length} agent${assignments.length!==1?"s":""} &nbsp;·&nbsp; ${statusBuckets.working.length} working &nbsp;·&nbsp; ${statusBuckets.completed.length} done${statusBuckets.attention.length ? ` &nbsp;·&nbsp; <span style="color:var(--red)">${statusBuckets.attention.length} need attention</span>` : ""}</span>
+      </div>
+      <div class="agent-board">
+        ${buildAgentBoardHtml(assignments) || `<div class="ops-empty">Agents will appear once the orchestrator dispatches the plan.</div>`}
+      </div>
+
+      <!-- Zone 3: Two-column body -->
+      <div class="ops-body">
+
+        <!-- Left: Work products -->
+        <div class="ops-products">
+          <div class="ops-section-header">
+            <span class="ops-section-label">Work Products</span>
+            <span class="ops-section-note">${assignments.filter(a=>a.status==="completed"&&a.output).length} output${assignments.filter(a=>a.status==="completed"&&a.output).length!==1?"s":""}</span>
           </div>
-          <div class="hero-actions">
-            <button class="action-btn" onclick="location.href='messages.html'">Back to Messages</button>
-            <button class="action-btn" onclick="refreshCurrentRun()">Refresh run</button>
-            <button class="action-btn" onclick="downloadRunReport()">Download report</button>
-            ${!isTerminal(run.status) ? `<button class="action-btn primary" onclick="cancelCurrentRun()">Stop run</button>` : ""}
-          </div>
+          ${buildProductCardsHtml(assignments) || `<div class="ops-empty">Completed agent outputs appear here as work is delivered.</div>`}
+          ${buildFinalCardHtml(run)}
         </div>
-        <div class="hero-kpis">
-          <div class="kpi"><div class="kpi-value">${(run.assignments || []).length}</div><div class="kpi-label">Assignments</div></div>
-          <div class="kpi"><div class="kpi-value">${completed}</div><div class="kpi-label">Completed</div></div>
-          <div class="kpi"><div class="kpi-value">${runBadge(run.status)}</div><div class="kpi-label">Run phase</div></div>
-          <div class="kpi"><div class="kpi-value">${fmtDuration(elapsedSec)}</div><div class="kpi-label">Elapsed</div></div>
-          ${avgTrustValue != null ? `<div class="kpi"><div class="kpi-value">${avgTrustValue}</div><div class="kpi-label">Avg trust</div></div>` : ""}
+
+        <!-- Right: Intervention + activity -->
+        <div class="ops-activity">
+          ${buildAttentionPanelHtml(run)}
+          <div class="ops-section-header"><span class="ops-section-label">Live Activity</span></div>
+          <div class="activity-feed">${buildActivityFeedHtml(timelineEvents)}</div>
+          ${buildContextFormHtml(run)}
+          ${buildMemorySnippetsHtml()}
         </div>
       </div>
-      ${interventionHtml}
-      <nav class="doc-jumpbar">
-        ${navSections.map(s => `<button class="doc-jump${s.id === (state.activeDocSection || "mission") ? " active" : ""}" data-section="${s.id}" onclick="document.querySelector('[data-doc-section=${s.id}]')?.scrollIntoView({behavior:'smooth',block:'start'})">${s.title}</button>`).join("")}
-      </nav>
-      <div class="doc-shell">
-        <div class="doc-body">
-          <section class="doc-section" data-doc-section="mission">
-            <h3>Mission</h3>
-            <p class="lede">What the team is trying to accomplish right now.</p>
-            <div class="mission-copy">${esc(run.user_task || "")}</div>
-          </section>
-          <section class="doc-section" data-doc-section="plan">
-            <h3>The Plan</h3>
-            <p class="lede">What the orchestrator broke the mission into, and why each agent.</p>
-            ${planHtml}
-          </section>
-          <section class="doc-section" data-doc-section="happening">
-            <h3>What's happening</h3>
-            <p class="lede">Live narrative. Agent work lands here as readable run updates instead of raw system noise.</p>
-            ${run.status === "paused_for_user" ? `
-              <blockquote class="story warning">
-                <span class="who">Needs you now</span>
-                ${esc(run.pause_question || "The team needs clarification before it can continue.")}
-                <div class="inline-reply">
-                  <textarea id="clarification-input" placeholder="Reply inline to keep the run moving..."></textarea>
-                  <div style="display:flex;gap:0.5rem;align-items:flex-start;">
-                    <button class="tiny-btn primary" onclick="submitRunClarification()">Send</button>
-                    <button class="tiny-btn" onclick="refreshCurrentRun()">Refresh</button>
-                  </div>
-                </div>
-              </blockquote>` : ""}
-            ${outputsHtml}
-          </section>
-          <section class="doc-section" data-doc-section="context">
-            <h3>Context used</h3>
-            <p class="lede">Shared artifacts and context that shaped the run.</p>
-            <div class="col-2">${contextHtml}</div>
-          </section>
-          <section class="doc-section" data-doc-section="decisions">
-            <h3>Decisions</h3>
-            <p class="lede">Why the run changed shape: rejections, reassignments, approvals, and clarifications.</p>
-            <div class="decision-list">${decisionHtml}</div>
-          </section>
-          <section class="doc-section" data-doc-section="timeline">
-            <h3>Live timeline</h3>
-            <p class="lede">Full event stream — every orchestrator decision, agent action, and policy enforcement in order. Click an event to expand detail.</p>
-            ${buildLiveTimeline(timelineEvents, run)}
-          </section>
-          <section class="doc-section" data-doc-section="assignments">
-            <h3>Assignments</h3>
-            <p class="lede">Role, status, quality, and permission history for each agent task in this run.</p>
-            <div class="output-list">${assignmentHtml}</div>
-          </section>
-          <section class="doc-section" data-doc-section="graph" id="graph-section">
-            <h3>Audit Graph</h3>
-            <p class="lede">Causal event DAG — every decision traced back to its source. Click a node to inspect trust state. Use Trace to walk any event back to the run root.</p>
-            <div id="cg-container">
-              <div class="cg-load-btn">
-                <button class="tiny-btn primary" onclick="loadCausalGraph()">Load causal graph</button>
-              </div>
-            </div>
-          </section>
-          <section class="doc-section" data-doc-section="signoff">
-            <h3>Sign-off &amp; export</h3>
-            <p class="lede">Evidence pack bundles the causal graph, participant trust snapshots, and a platform HMAC-SHA256 signature over canonical JSON — suitable for compliance review.</p>
-            ${buildSignoffSection(run)}
-          </section>
-          <section class="doc-section final-panel" data-doc-section="final">
-            <h3>Final answer</h3>
-            <p class="lede">${isTerminal(run.status) ? "The run is in a terminal state." : "Waiting for synthesis to merge accepted work into one answer."}</p>
-            ${run.final_output
-              ? (state.editingFinalOutput
-                ? `<div style="display:flex;flex-direction:column;gap:0.55rem;">
-                     <label class="field-label">Final answer (markdown)</label>
-                     <textarea id="final-output-editor" style="min-height:18rem;font-size:0.82rem;">${esc(run.final_output)}</textarea>
-                     <label class="field-label" style="margin-top:0.3rem;">Run summary <span style="color:var(--muted);font-weight:400;">(auto-generated — editable)</span></label>
-                     <textarea id="run-summary-editor" style="min-height:4rem;font-size:0.8rem;">${esc(run.run_summary || "")}</textarea>
-                     <div style="display:flex;gap:0.5rem;">
-                       <button class="tiny-btn primary" onclick="saveFinalOutput()">Save</button>
-                       <button class="tiny-btn" onclick="cancelEditFinalOutput()">Cancel</button>
-                     </div>
-                   </div>`
-                : `<div style="display:flex;justify-content:flex-end;margin-bottom:0.55rem;">
-                     <button class="tiny-btn" onclick="beginEditFinalOutput()">Edit answer</button>
-                   </div>
-                   <div class="final-copy">${renderMd(run.final_output)}</div>
-                   ${run.run_summary ? `<div class="final-summary">${esc(run.run_summary)}</div>` : ""}`)
-              : `<div class="empty">The final merged answer will appear here once synthesis finishes.</div>`}
-          </section>
-        </div>
-      </div>
-      <div class="doc-foot">
-        <a onclick="downloadEvidencePack('${esc(String(run.id || ""))}')">Evidence pack</a>
-        <span class="sep">·</span>
-        <a onclick="downloadRunReport()">Export audit log (CSV)</a>
-        <span class="sep">·</span>
-        <a onclick="loadCausalGraph()">Causal graph</a>
-        <span class="sep">·</span>
-        <span>${esc(String(run.id || ""))} · ${esc(run.status || "")} · ${esc(run.created_at ? new Date(run.created_at).toLocaleString() : "")}</span>
-      </div>
-      <div class="ws-dock">
-        <button class="${timelineEvents.length ? "has-dot" : ""}" onclick="document.querySelector('[data-doc-section=timeline]')?.scrollIntoView({behavior:'smooth',block:'start'})">
-          <span class="d-label">Live timeline · ${timelineEvents.length} events</span>T
-        </button>
-        <button onclick="document.querySelector('[data-doc-section=graph]')?.scrollIntoView({behavior:'smooth',block:'start'})">
-          <span class="d-label">Audit graph</span>G
-        </button>
-        <button onclick="document.querySelector('[data-doc-section=signoff]')?.scrollIntoView({behavior:'smooth',block:'start'})">
-          <span class="d-label">Sign-off &amp; export</span>S
-        </button>
-        <button onclick="document.querySelector('[data-doc-section=decisions]')?.scrollIntoView({behavior:'smooth',block:'start'})">
-          <span class="d-label">Decisions</span>D
-        </button>
-      </div>`;
+
+      <!-- Zone 4: Audit & Export accordion -->
+      ${buildAuditAccordionHtml(run, timelineEvents)}
+
+    </div>`;
+
     requestAnimationFrame(bindWorkspaceSidebarInteractions);
   }
 
