@@ -187,7 +187,26 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .insight-sev { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .insight-title { font-size: 0.72rem; font-weight: 700; flex: 1; min-width: 0; }
 .insight-icon { font-size: 0.78rem; flex-shrink: 0; }
-.insight-body { padding: 0 0.6rem 0.45rem; font-size: 0.66rem; color: var(--muted); line-height: 1.5; }
+.insight-body { padding: 0 0.6rem 0.3rem; font-size: 0.66rem; color: var(--muted); line-height: 1.5; }
+.insight-action {
+  padding: 0.2rem 0.6rem 0.3rem; font-size: 0.63rem; color: #10b981;
+  line-height: 1.4; font-style: italic;
+}
+.insight-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.25rem 0.6rem 0.45rem; border-top: 1px solid var(--border2);
+  margin-top: 0.1rem;
+}
+.insight-agent-count { font-size: 0.61rem; color: var(--muted); }
+.insight-focus-btn {
+  font-size: 0.61rem; font-weight: 600; padding: 2px 8px;
+  background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3);
+  color: #93c5fd; border-radius: 6px; cursor: pointer; transition: background .15s;
+}
+.insight-focus-btn:hover { background: rgba(59,130,246,0.22); }
+.insight-focus-btn.focus-active {
+  background: rgba(59,130,246,0.28); border-color: rgba(59,130,246,0.6); color: #bfdbfe;
+}
 .insight-empty {
   padding: 2rem 1rem; text-align: center;
   font-size: 0.73rem; color: var(--muted); line-height: 1.7;
@@ -447,6 +466,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 </div>
 
-<script src="network.js?v=20260520-2"></script>
+<script src="network.js?v=20260520-3"></script>
 </body>
 </html>

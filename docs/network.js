@@ -100,6 +100,7 @@ let _highlightDids = null;   // Set<string> | null — insight canvas highlight
 let _insights = [];
 let _activeInsightIdx = -1;
 let _netDiff = null; // cached diff response from /pro/network/diff
+let _focusInsight = null; // Set<string> | null — focus mode: only these nodes visible
 
 // ── Canvas helpers ─────────────────────────────────────────────────────────
 function s2w(sx,sy){return[(sx-_net.tx)/_net.zoom,(sy-_net.ty)/_net.zoom];}
@@ -381,12 +382,43 @@ function draw(){
   for(const edge of _net.edges){
     const a=nmap[edge.src],b=nmap[edge.dst];if(!a||!b)continue;
     if(!inViewport(a)&&!inViewport(b))continue;
+    // Focus mode: skip edges not involving a focused node
+    if(_focusInsight&&!_focusInsight.has(edge.src)&&!_focusInsight.has(edge.dst))continue;
 
     let alpha=sel?0:(edge.flagged?0.75:0.35);
     if(sel&&selNeighbors.has(edge.src)&&selNeighbors.has(edge.dst))alpha=0.9;
     else if(!sel&&searchSet)alpha=(searchSet.has(edge.src)||searchSet.has(edge.dst))?0.8:0.04;
     if(edge.flagged&&!sel)alpha=Math.max(alpha,0.75);
     if(a===_net.hover||b===_net.hover)alpha=0.98;
+
+    // View-mode edge overrides: recolor and re-weight edges by mode
+    let edgeColor=null;
+    if(!sel&&!edge.flagged){
+      if(_viewMode==="risk"){
+        const srcRisk=_compromised.has(edge.src)||(_trustScoreCache[edge.src]?.score<30);
+        const dstRisk=_compromised.has(edge.dst)||(_trustScoreCache[edge.dst]?.score<30);
+        if(srcRisk||dstRisk){edgeColor="#ef4444";alpha=Math.max(alpha,0.75);}
+        else alpha=Math.min(alpha,0.06);
+      }else if(_viewMode==="trust"){
+        const sScore=_trustScoreCache[edge.src]?.score;
+        const dScore=_trustScoreCache[edge.dst]?.score;
+        if(sScore!=null||dScore!=null){
+          const minScore=Math.min(sScore??100,dScore??100);
+          edgeColor=trustColor(minScore);
+          alpha=minScore<30?Math.max(alpha,0.7):minScore<60?Math.max(alpha,0.4):Math.min(alpha,0.3);
+        }
+      }else if(_viewMode==="flow"){
+        const outC=Object.values(_edgeMap).filter(em=>em.src===edge.src).reduce((s,em)=>s+em.count,0);
+        const inC=Object.values(_edgeMap).filter(em=>em.dst===edge.src).reduce((s,em)=>s+em.count,0);
+        const total=outC+inC||1;
+        const ratio=outC/total;
+        edgeColor=ratio>0.65?"#f59e0b":ratio<0.35?"#3b82f6":"#10b981";
+      }
+    }
+    // Highlight-set dim for edges not touching a highlighted node
+    if(_highlightDids&&!_highlightDids.has(edge.src)&&!_highlightDids.has(edge.dst)&&!sel)
+      alpha=Math.min(alpha,0.04);
+
     if(alpha<0.01)continue;
 
     const dx=b.x-a.x,dy=b.y-a.y,len=Math.sqrt(dx*dx+dy*dy)||1;
@@ -398,13 +430,13 @@ function draw(){
     const sx2=a.x+ux*a.r+ox,sy2=a.y+uy*a.r+oy;
     const ex2=b.x-ux*b.r+ox,ey2=b.y-uy*b.r+oy;
 
-    // Gradient edge — adds depth
+    // Gradient edge — adds depth; use edgeColor if view-mode set one
     const grad=ctx.createLinearGradient(sx2,sy2,ex2,ey2);
-    grad.addColorStop(0,a.color+"bb");
-    grad.addColorStop(1,edge.flagged?"#ef4444bb":b.color+"bb");
+    grad.addColorStop(0,edgeColor?(edgeColor+"cc"):a.color+"bb");
+    grad.addColorStop(1,edgeColor?(edgeColor+"88"):edge.flagged?"#ef4444bb":b.color+"bb");
 
     ctx.beginPath();ctx.moveTo(sx2,sy2);ctx.lineTo(ex2,ey2);
-    ctx.strokeStyle=edge.flagged?"#ef4444":grad;
+    ctx.strokeStyle=edge.flagged?"#ef4444":(edgeColor||grad);
     ctx.lineWidth=edge.lw;ctx.globalAlpha=alpha;ctx.stroke();
 
     // Arrow head
@@ -429,6 +461,8 @@ function draw(){
   for(const node of _net.nodes){
     if(!inViewport(node))continue;
     const isHov=node===_net.hover,isSel=node.did===sel;
+    // Focus mode: hide nodes outside the focused set (allow selected node through)
+    if(_focusInsight&&!_focusInsight.has(node.did)&&!isSel)continue;
     let alpha=1;
     if(sel&&!selNeighbors.has(node.did))alpha=0.07;
     else if(searchSet&&!searchSet.has(node.did))alpha=0.08;
@@ -1269,7 +1303,8 @@ function computeInsights(){
     _insights.push({
       sev:"critical",icon:"🚨",
       title:`${flagged.length} flagged agent${flagged.length>1?"s":""}`,
-      body:"These agents are marked compromised and may pose a trust risk.",
+      body:"These agents are marked compromised and may pose a trust risk to any workflow they participate in.",
+      action:"Suspend operations for flagged agents and review their recent audit logs before re-enabling.",
       dids:new Set(flagged),
     });
   }
@@ -1280,7 +1315,8 @@ function computeInsights(){
     _insights.push({
       sev:"warn",icon:"⚠",
       title:`${lowTrust.length} low-trust agent${lowTrust.length>1?"s":""}`,
-      body:"Agents with trust score below 30. Consider reviewing their activity.",
+      body:"Score below 30 indicates failing on one or more trust dimensions — identity, reliability, or behavioral history.",
+      action:"Open each agent's profile to see which dimension is pulling the score down.",
       dids:new Set(lowTrust),
     });
   }
@@ -1300,7 +1336,8 @@ function computeInsights(){
       _insights.push({
         sev:"warn",icon:"⚠",
         title:`Possible Sybil ring around ${_net.allNodes.find(n=>n.did===target)?.name||target.slice(-8)}`,
-        body:`${sources.length} agents each sent exactly one verify event to this agent.`,
+        body:`${sources.length} agents each sent exactly one verify event to this agent — a pattern consistent with coordinated attestation fraud.`,
+        action:"Audit the verification chain. Check if the verifying agents share an owner or were registered around the same time.",
         dids:new Set([target,...sources]),
       });
       break; // show at most one such insight
@@ -1314,10 +1351,12 @@ function computeInsights(){
     const avg=stats.reduce((s,[,v])=>s+v.interactions,0)/stats.length;
     const [topDid,topStat]=stats[0];
     if(topStat.interactions>avg*3){
+      const topPct=Math.round(topStat.interactions/(stats.reduce((s,[,v])=>s+v.interactions,0)||1)*100);
       _insights.push({
         sev:"info",icon:"📊",
         title:`High-volume: ${_net.allNodes.find(n=>n.did===topDid)?.name||topDid.slice(-8)}`,
-        body:`${topStat.interactions.toLocaleString()} events — ${Math.round(topStat.interactions/avg)}× the average.`,
+        body:`Handling ${topPct}% of all interactions — ${Math.round(topStat.interactions/avg)}× the average. This agent is a single point of load concentration.`,
+        action:"Verify this concentration is intentional. If it's an orchestrator, ensure it has redundancy.",
         dids:new Set([topDid]),
       });
     }
@@ -1330,7 +1369,8 @@ function computeInsights(){
     _insights.push({
       sev:"info",icon:"◎",
       title:`${isolated.length} isolated agent${isolated.length>1?"s":""}`,
-      body:"Registered agents with no recorded interactions in this window.",
+      body:"Registered agents with no recorded interactions in this time window. They may be new, idle, or broken.",
+      action:"Confirm these agents are intentionally inactive, or check if they're failing silently.",
       dids:new Set(isolated),
     });
   }
@@ -1342,7 +1382,8 @@ function computeInsights(){
       _insights.push({
         sev: "warn", icon: "⇌",
         title: `Bridge Agent${bridges.length > 1 ? 's' : ''} (${bridges.length})`,
-        body: `${bridges.map(b => b.name).slice(0, 3).join(', ')}${bridges.length > 3 ? ` +${bridges.length - 3} more` : ''} — removing ${bridges.length > 1 ? 'these' : 'this'} agent would split the network`,
+        body: `${bridges.map(b => b.name).slice(0, 3).join(', ')}${bridges.length > 3 ? ` +${bridges.length - 3} more` : ''} — removing this agent would split the network into disconnected clusters.`,
+        action: "Plan redundancy before routing critical workflows through a bridge agent.",
         dids: new Set(bridges.map(b => b.did)),
       });
     }
@@ -1407,6 +1448,7 @@ function renderInsightsTab(){
     return;
   }
   const sevColor={critical:"#ef4444",warn:"#f59e0b",info:"#3b82f6"};
+  const isFocused=idx=>_focusInsight!==null&&_activeInsightIdx===idx;
   container.innerHTML=_insights.map((ins,i)=>`
     <div class="insight-card${_activeInsightIdx===i?" ins-active":""}" data-idx="${i}">
       <div class="insight-card-head">
@@ -1415,17 +1457,40 @@ function renderInsightsTab(){
         <span class="insight-icon">${ins.icon}</span>
       </div>
       <div class="insight-body">${esc(ins.body)}</div>
+      ${ins.action?`<div class="insight-action">→ ${esc(ins.action)}</div>`:""}
+      <div class="insight-footer">
+        <span class="insight-agent-count">${ins.dids?.size||0} agent${ins.dids?.size!==1?"s":""}</span>
+        <button class="insight-focus-btn${isFocused(i)?" focus-active":""}" data-idx="${i}">${isFocused(i)?"Exit Focus":"Focus View"}</button>
+      </div>
     </div>`).join("");
   container.querySelectorAll(".insight-card").forEach(card=>{
-    card.addEventListener("click",()=>{
+    card.addEventListener("click",e=>{
+      if(e.target.classList.contains("insight-focus-btn"))return; // handled below
       const idx=parseInt(card.dataset.idx,10);
-      if(_activeInsightIdx===idx){
-        // Toggle off
+      if(_activeInsightIdx===idx&&!_focusInsight){
         _activeInsightIdx=-1;_highlightDids=null;
         document.getElementById("highlight-clear").style.display="none";
       }else{
         _activeInsightIdx=idx;
         _highlightDids=_insights[idx]?.dids||null;
+        _focusInsight=null; // highlight only — not full focus
+        document.getElementById("highlight-clear").style.display="";
+      }
+      renderInsightsTab();draw();
+    });
+  });
+  container.querySelectorAll(".insight-focus-btn").forEach(btn=>{
+    btn.addEventListener("click",e=>{
+      e.stopPropagation();
+      const idx=parseInt(btn.dataset.idx,10);
+      if(_focusInsight&&_activeInsightIdx===idx){
+        // Exit focus mode
+        _focusInsight=null;_highlightDids=null;_activeInsightIdx=-1;
+        document.getElementById("highlight-clear").style.display="none";
+      }else{
+        _activeInsightIdx=idx;
+        _highlightDids=_insights[idx]?.dids||null;
+        _focusInsight=_highlightDids; // full focus — hide unrelated nodes
         document.getElementById("highlight-clear").style.display="";
       }
       renderInsightsTab();draw();
@@ -1436,11 +1501,40 @@ function renderInsightsTab(){
 function updateSummaryBand(){
   const el=document.getElementById("net-summary-text");if(!el)return;
   const n=_net.nodes.length,e=_net.edges.length;
+  const parts=[];
+
+  // Critical: flagged agents
   const flagCount=_net.nodes.filter(nd=>_compromised.has(nd.did)).length;
-  const parts=[`${n} agents`,`${e} edges`];
-  if(flagCount)parts.push(`⚠ ${flagCount} flagged`);
-  const highTrustN=_net.nodes.filter(nd=>{const ts=_trustScoreCache[nd.did];return ts&&ts.score>=80;}).length;
-  if(highTrustN)parts.push(`${highTrustN} excellent trust`);
+  if(flagCount) parts.push(`⚠ ${flagCount} flagged agent${flagCount>1?"s":""} — review needed`);
+
+  // Warn: low-trust count (only once trust scores loaded)
+  const lowTrust=_net.nodes.filter(nd=>{const ts=_trustScoreCache[nd.did];return ts&&ts.score<30;}).length;
+  if(lowTrust) parts.push(`${lowTrust} low-trust (<30)`);
+
+  // Traffic concentration: who handles most interactions?
+  const agStats=Object.entries(_agentStats).filter(([,s])=>s.interactions>0);
+  if(agStats.length>=3){
+    agStats.sort((a,b)=>b[1].interactions-a[1].interactions);
+    const total=agStats.reduce((s,[,v])=>s+v.interactions,0)||1;
+    const [topDid,topStat]=agStats[0];
+    const topPct=Math.round(topStat.interactions/total*100);
+    if(topPct>=30){
+      const topName=_net.allNodes.find(nd=>nd.did===topDid)?.name||topDid.slice(-8);
+      parts.push(`${esc(topName)} handling ${topPct}% of traffic`);
+    }
+  }
+
+  // Change context from diff
+  if(_netDiff){
+    const ne=(_netDiff.new_external_agents||[]).length;
+    const nc=(_netDiff.new_connections||[]).length;
+    if(ne>0) parts.push(`${ne} new external agent${ne>1?"s":""} this period`);
+    else if(nc>0) parts.push(`${nc} new connection${nc>1?"s":""} this period`);
+  }
+
+  // Fallback telemetry when nothing notable
+  if(!parts.length) parts.push(`${n} agent${n!==1?"s":""} · ${e} edge${e!==1?"s":""}`);
+
   el.textContent=parts.join(" · ");
 }
 
@@ -1516,18 +1610,35 @@ function renderChangeInsights() {
     changeInsights.push({
       sev: "warn", icon: "👥",
       title: `New External Agents (${ne.length})`,
-      body: `${ne.length} external agent${ne.length > 1 ? 's' : ''} appeared this period that weren't active before`,
+      body: `${ne.length} external agent${ne.length > 1 ? 's' : ''} appeared this period that weren't active before.`,
+      action: "Review the new external DIDs and confirm they were authorized to interact with your agents.",
       dids: new Set(ne.map(a => a.did)), _isChange: true,
     });
   }
 
-  // Merge: changes go first (with a "Changes" label), then static insights
-  const allInsights = [...changeInsights, ..._insights.filter(i => !i._isChange)];
-  // Re-render with merged list (temporarily replace _insights)
-  const saved = _insights;
-  _insights = allInsights;
+  // Add action text to activity/trust change insights
+  changeInsights.forEach(ci => {
+    if (!ci.action) {
+      if (ci.icon === "⚡") ci.action = "Inspect recent logs for unexpected task types or elevated error rates.";
+      else if (ci.icon === "↘") ci.action = "Confirm this agent is still responsive — it may be throttled or failing silently.";
+      else if (ci.icon === "↓") ci.action = "Check which trust dimension fell — behavioral_history and governance are common culprits.";
+      else if (ci.icon === "↑") ci.action = "No action needed — score improvement is a positive signal.";
+      else if (ci.icon === "→") ci.action = "Verify these connections were expected and authorized in your workflow.";
+    }
+  });
+
+  // Permanently merge: change insights at front, static (non-change) at back.
+  // This fixes the click handler bug where restoring _insights broke index mapping.
+  _insights = [...changeInsights, ..._insights.filter(i => !i._isChange)];
+  _activeInsightIdx = -1; // reset selection since indices changed
   renderInsightsTab();
-  _insights = saved;
+  updateSummaryBand();
+  const badge = document.getElementById("insight-count-badge");
+  if (badge) {
+    const crit = _insights.filter(i => i.sev === "critical" || i.sev === "warn").length;
+    if (crit > 0) { badge.textContent = crit; badge.style.display = ""; }
+    else badge.style.display = "none";
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -1712,7 +1823,16 @@ async function loadNetwork(){
           _detailFetched:true,
         };
       });
+      // Recompute insights now that trust data is available (low-trust insight was empty before)
+      computeInsights();
+      renderInsightsTab();
       updateSummaryBand();
+      const badge=document.getElementById("insight-count-badge");
+      if(badge){
+        const crit=_insights.filter(i=>i.sev==="critical"||i.sev==="warn").length;
+        if(crit>0){badge.textContent=crit;badge.style.display="";}
+        else badge.style.display="none";
+      }
       draw(); // refresh node colors with real trust data
     }).catch(()=>{});
 }
@@ -1806,7 +1926,7 @@ async function _initNetwork() {
 
   // ── Highlight clear ───────────────────────────────────────────────────
   document.getElementById("highlight-clear")?.addEventListener("click",()=>{
-    _highlightDids=null;_activeInsightIdx=-1;
+    _highlightDids=null;_focusInsight=null;_activeInsightIdx=-1;
     document.getElementById("highlight-clear").style.display="none";
     renderInsightsTab();draw();
   });
