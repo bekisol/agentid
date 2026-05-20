@@ -1494,6 +1494,20 @@
     transition:background 0.15s, border-color 0.15s;
   }
   .new-mission-btn:hover { background:rgba(249,115,22,0.14); border-color:var(--accent); }
+  /* Teams rail header — compact label, not a page heading */
+  .teams-rail-head { padding:0.7rem 1rem 0.6rem; border-bottom:1px solid var(--border); }
+  .teams-rail-label {
+    font-size:0.7rem; font-weight:800; letter-spacing:0.09em;
+    text-transform:uppercase; color:var(--muted);
+  }
+  /* Per-run status dot */
+  .run-status-dot {
+    width:6px; height:6px; border-radius:50%; flex-shrink:0; margin-right:2px;
+  }
+  .run-status-dot.dot-green  { background:var(--green); box-shadow:0 0 4px rgba(16,185,129,0.6); }
+  .run-status-dot.dot-yellow { background:var(--yellow); }
+  .run-status-dot.dot-red    { background:var(--red); }
+  .run-status-dot.dot-gray   { background:#374151; border:1px solid #4b5563; }
   </style>
 </head>
 <body>
@@ -1526,8 +1540,8 @@
   <div id="app">
     <div class="workspace-shell">
       <aside class="rail">
-        <div class="rail-head">
-          <div class="rail-title">Teams</div>
+        <div class="teams-rail-head">
+          <div class="teams-rail-label">Teams</div>
         </div>
         <div class="rail-body teams-rail-body">
           <div id="team-list"></div>
@@ -1957,7 +1971,13 @@
         const active = state.selectedRunId === String(run.id);
         const label  = (run.user_task || "Run " + run.id).slice(0, 40);
         const t      = run.started_at ? relTime(run.started_at) : "";
+        const s      = run.status || "";
+        const dotCls = ["running","assigned","planning","synthesizing"].includes(s) ? "dot-green"
+                     : s.startsWith("paused") ? "dot-yellow"
+                     : (s === "failed" || s === "cancelled") ? "dot-red"
+                     : "dot-gray";
         return `<div class="team-run-row${active ? " active" : ""}" data-run-id="${run.id}">
+          <span class="run-status-dot ${dotCls}"></span>
           <span class="team-run-name">${esc(label)}</span>
           <span class="team-run-time">${esc(t)}</span>
         </div>`;
