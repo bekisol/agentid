@@ -252,6 +252,7 @@
     }
     .field-label {
       font-size:0.68rem; color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:0.05em;
+      display:block;
     }
     .tiny-btn {
       border:1px solid var(--border); background:var(--surface2); color:var(--text-2);
@@ -1743,6 +1744,15 @@
     border-color:var(--green);
     background:linear-gradient(180deg, rgba(29,122,58,0.06), var(--paper));
   }
+  .artifact-card-click {
+    cursor:pointer;
+    transition:border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  }
+  .artifact-card-click:hover {
+    border-color:var(--accent);
+    transform:translateY(-1px);
+    box-shadow:var(--shadow);
+  }
   .work-card-head {
     display:flex;
     align-items:flex-start;
@@ -1791,6 +1801,16 @@
     padding:0.65rem;
     background:var(--surface2);
   }
+  .artifact-preview {
+    border:1.4px solid var(--border);
+    background:rgba(255,255,255,0.34);
+    border-radius:14px;
+    padding:0.75rem 0.82rem;
+    color:var(--text-2);
+    font-size:0.84rem;
+    line-height:1.58;
+    max-width:72ch;
+  }
   .ops-side {
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -1836,6 +1856,113 @@
   }
   .context-injector textarea {
     min-height:86px;
+    width:100%;
+    display:block;
+    margin-top:0.45rem;
+  }
+  .artifact-modal-backdrop {
+    position:fixed;
+    inset:0;
+    z-index:3000;
+    background:rgba(6,8,12,0.78);
+    backdrop-filter:blur(10px);
+    padding:1rem;
+    display:flex;
+    align-items:stretch;
+    justify-content:center;
+  }
+  .artifact-modal {
+    width:min(1180px,100%);
+    height:100%;
+    border:1.7px solid var(--border-2);
+    border-radius:22px;
+    background:var(--paper);
+    box-shadow:0 28px 90px rgba(0,0,0,0.44);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .artifact-modal-head {
+    padding:1rem 1.1rem;
+    border-bottom:1px solid var(--border);
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.85rem;
+    background:var(--surface);
+  }
+  .artifact-modal-title {
+    font-family:"Source Serif 4", Georgia, serif;
+    font-size:1.65rem;
+    line-height:1.08;
+    color:var(--text);
+    font-weight:700;
+  }
+  .artifact-modal-meta {
+    color:var(--muted);
+    font-size:0.78rem;
+    line-height:1.45;
+    margin-top:0.2rem;
+  }
+  .artifact-modal-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.45rem;
+    justify-content:flex-end;
+  }
+  .artifact-modal-body {
+    flex:1;
+    overflow:auto;
+    padding:1.15rem;
+  }
+  .artifact-reader {
+    max-width:88ch;
+    margin:0 auto;
+    color:var(--text-2);
+    font-size:0.95rem;
+    line-height:1.78;
+  }
+  .artifact-reader h1,
+  .artifact-reader h2,
+  .artifact-reader h3,
+  .artifact-reader h4 {
+    color:var(--text);
+    margin:1rem 0 0.38rem;
+  }
+  .artifact-reader p {
+    margin:0 0 0.72rem;
+  }
+  .artifact-reader ul,
+  .artifact-reader ol {
+    margin:0 0 0.72rem;
+    padding-left:1.35rem;
+  }
+  .artifact-reader pre {
+    overflow:auto;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:0.8rem;
+    background:var(--surface2);
+  }
+  .artifact-editor {
+    display:flex;
+    flex-direction:column;
+    gap:0.7rem;
+    height:100%;
+  }
+  .artifact-editor textarea {
+    width:100%;
+    min-height:0;
+    resize:none;
+    font-size:0.9rem;
+    line-height:1.65;
+  }
+  #final-output-editor {
+    flex:1;
+  }
+  .artifact-summary-editor {
+    min-height:92px !important;
+    height:92px !important;
   }
   .activity-feed {
     display:flex;
@@ -1917,6 +2044,19 @@
       position:static;
       width:100%;
       margin-top:0.55rem;
+    }
+    .artifact-modal-backdrop {
+      padding:0;
+    }
+    .artifact-modal {
+      border-radius:0;
+      width:100%;
+    }
+    .artifact-modal-head {
+      flex-direction:column;
+    }
+    .artifact-modal-actions {
+      justify-content:flex-start;
     }
   }
   </style>
@@ -2021,6 +2161,7 @@
     editingNoteId: null,
     editingProfileId: null,
     editingFinalOutput: false,
+    finalArtifactOpen: false,
     taskDraft: null,
     activeDocSection: "mission",
     sectionObserver: null,
@@ -2109,6 +2250,7 @@
   async function beginEditFinalOutput() {
     const run = state.run;
     if (!run) return;
+    state.finalArtifactOpen = true;
     state.editingFinalOutput = true;
     renderWorkspace();
     const ta = document.getElementById("final-output-editor");
@@ -2116,6 +2258,26 @@
   }
 
   function cancelEditFinalOutput() {
+    state.editingFinalOutput = false;
+    renderWorkspace();
+  }
+
+  function openFinalArtifact(mode = "view") {
+    if (!state.run?.final_output) {
+      showToast("Final result is not ready yet.", true);
+      return;
+    }
+    state.finalArtifactOpen = true;
+    state.editingFinalOutput = mode === "edit";
+    renderWorkspace();
+    const focusTarget = mode === "edit"
+      ? document.getElementById("final-output-editor")
+      : document.querySelector(".artifact-modal-body");
+    if (focusTarget) focusTarget.focus?.();
+  }
+
+  function closeFinalArtifact() {
+    state.finalArtifactOpen = false;
     state.editingFinalOutput = false;
     renderWorkspace();
   }
@@ -3684,33 +3846,26 @@
     const outputCards = assignments
       .map((assign, idx) => ({ assign, idx, outputText: toPlainText(assign.output) }))
       .filter(item => item.outputText);
+    const finalPreview = run.final_output
+      ? (run.run_summary || previewText(run.final_output, 520))
+      : "";
 
     const finalCard = `
-      <article class="work-card final-work" data-doc-section="final">
+      <article class="work-card final-work${run.final_output ? " artifact-card-click" : ""}" data-doc-section="final" ${run.final_output ? `onclick="openFinalArtifact('view')"` : ""}>
         <div class="work-card-head">
           <div>
-            <div class="work-card-title">Final Deliverable</div>
-            <div class="work-card-meta">${isTerminal(run.status) ? "Terminal run state" : "Synthesis output appears here when ready."}</div>
+            <div class="work-card-title">Final Result Artifact</div>
+            <div class="work-card-meta">${run.final_output ? "Click to open the full-screen result and editor." : "Synthesis output appears here when ready."}</div>
           </div>
           <div class="ws-pill-row">
-            ${run.final_output ? `<button class="tiny-btn" onclick="beginEditFinalOutput()">Edit answer</button>` : ""}
-            <button class="tiny-btn" onclick="downloadRunReport()">Export</button>
+            ${run.final_output ? `<button class="tiny-btn primary" onclick="event.stopPropagation();openFinalArtifact('view')">Open result</button>` : ""}
+            ${run.final_output ? `<button class="tiny-btn" onclick="event.stopPropagation();openFinalArtifact('edit')">Edit</button>` : ""}
+            <button class="tiny-btn" onclick="event.stopPropagation();downloadRunReport()">Export</button>
           </div>
         </div>
-        ${state.editingFinalOutput
-          ? `<div style="display:flex;flex-direction:column;gap:0.55rem;">
-               <label class="field-label">Final answer (markdown)</label>
-               <textarea id="final-output-editor" style="min-height:18rem;font-size:0.82rem;">${esc(run.final_output || "")}</textarea>
-               <label class="field-label" style="margin-top:0.3rem;">Run summary <span style="color:var(--muted);font-weight:400;">(auto-generated - editable)</span></label>
-               <textarea id="run-summary-editor" style="min-height:4rem;font-size:0.8rem;">${esc(run.run_summary || "")}</textarea>
-               <div style="display:flex;gap:0.5rem;">
-                 <button class="tiny-btn primary" onclick="saveFinalOutput()">Save</button>
-                 <button class="tiny-btn" onclick="cancelEditFinalOutput()">Cancel</button>
-               </div>
-             </div>`
-          : (run.final_output
-              ? `<div class="work-card-body">${renderMd(run.final_output)}</div>${run.run_summary ? `<div class="final-summary">${esc(run.run_summary)}</div>` : ""}`
-              : `<div class="empty">The final merged answer will appear once accepted agent outputs are synthesized.</div>`)}
+        ${run.final_output
+          ? `<div class="artifact-preview">${esc(finalPreview)}</div>`
+          : `<div class="empty">The final merged answer will appear once accepted agent outputs are synthesized.</div>`}
       </article>`;
 
     const outputHtml = outputCards.length
@@ -3747,7 +3902,43 @@
         </div>
         ${finalCard}
         ${outputHtml}
+        ${buildFinalArtifactModal(run)}
       </section>`;
+  }
+
+  function buildFinalArtifactModal(run) {
+    if (!state.finalArtifactOpen || !run.final_output) return "";
+    return `
+      <div class="artifact-modal-backdrop" onclick="closeFinalArtifact()" role="presentation">
+        <div class="artifact-modal" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Final result artifact">
+          <div class="artifact-modal-head">
+            <div>
+              <div class="artifact-modal-title">Final Result Artifact</div>
+              <div class="artifact-modal-meta">${esc(String(run.id || ""))} · ${esc((run.status || "").replace(/_/g, " "))}${run.run_summary ? " · summary included" : ""}</div>
+            </div>
+            <div class="artifact-modal-actions">
+              ${state.editingFinalOutput
+                ? `<button class="tiny-btn primary" onclick="saveFinalOutput()">Save changes</button>
+                   <button class="tiny-btn" onclick="cancelEditFinalOutput()">Cancel edit</button>`
+                : `<button class="tiny-btn primary" onclick="beginEditFinalOutput()">Edit result</button>
+                   <button class="tiny-btn" onclick="downloadRunReport()">Export</button>`}
+              <button class="tiny-btn" onclick="closeFinalArtifact()">Close</button>
+            </div>
+          </div>
+          <div class="artifact-modal-body" tabindex="-1">
+            ${state.editingFinalOutput
+              ? `<div class="artifact-editor">
+                   <label class="field-label" for="final-output-editor">Final answer (markdown)</label>
+                   <textarea id="final-output-editor">${esc(run.final_output || "")}</textarea>
+                   <div>
+                     <label class="field-label" for="run-summary-editor">Run summary <span style="color:var(--muted);font-weight:400;">(auto-generated - editable)</span></label>
+                     <textarea id="run-summary-editor" class="artifact-summary-editor">${esc(run.run_summary || "")}</textarea>
+                   </div>
+                 </div>`
+              : `<div class="artifact-reader">${renderMd(run.final_output)}</div>${run.run_summary ? `<div class="artifact-reader final-summary">${esc(run.run_summary)}</div>` : ""}`}
+          </div>
+        </div>
+      </div>`;
   }
 
   function buildInterventionColumn(run, plan, timelineEvents) {
