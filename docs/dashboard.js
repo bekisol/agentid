@@ -3276,6 +3276,220 @@ async function _secChangePassword() {
   }
 }
 
+// ── Connections tab ──────────────────────────────────────────────────────────
+
+let _connectionsCatalog = null;
+let _connectionSetupProvider = null;
+
+function _connectionActionLabel(action) {
+  return action?.label || action?.key || String(action || "").replace(/_/g, " ");
+}
+
+function _connectionBadge(provider) {
+  const connected = provider.connected || (provider.installations || []).some(item => item.status === "active");
+  if (connected) return { text: "Connected", color: "var(--green)" };
+  if (provider.availability === "available") return { text: "Ready", color: "var(--accent)" };
+  if (provider.availability === "planned") return { text: "Planned", color: "var(--muted)" };
+  return { text: "Setup needed", color: "var(--blue)" };
+}
+
+function _renderConnections(data) {
+  const list = document.getElementById("connections-list");
+  const summary = document.getElementById("connections-summary");
+  if (!list) return;
+
+  const providers = data?.providers || [];
+  const connected = providers.filter(p => p.connected || (p.installations || []).some(i => i.status === "active")).length;
+  if (summary) {
+    summary.textContent = `${connected} connected · ${providers.length} providers available from the registry`;
+  }
+
+  if (!providers.length) {
+    list.innerHTML = `<p style="font-size:0.82rem;color:var(--muted);">No connector definitions returned by the API.</p>`;
+    return;
+  }
+
+  list.innerHTML = providers.map(provider => {
+    const badge = _connectionBadge(provider);
+    const actions = (provider.actions || [])
+      .map(action => `<span style="font-size:0.68rem;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:0.12rem 0.4rem;color:var(--text-2);">${esc(_connectionActionLabel(action))}</span>`)
+      .join(" ");
+    const canConnect = provider.connection_mode === "form" && provider.availability === "available";
+    const connectBtn = canConnect
+      ? `<button class="btn btn-primary" data-connection-connect="${esc(provider.provider)}" style="font-size:0.74rem;padding:0.25rem 0.65rem;">${esc(provider.setup_label || "Connect")}</button>`
+      : `<button class="btn btn-outline" disabled style="font-size:0.74rem;padding:0.25rem 0.65rem;">${esc(provider.setup_label || "Unavailable")}</button>`;
+    const fallbackBtn = provider.provider !== "webhook"
+      ? `<button class="btn btn-outline" data-connection-connect="webhook" style="font-size:0.74rem;padding:0.25rem 0.65rem;">Use webhook</button>`
+      : "";
+    const installs = (provider.installations || []).length
+      ? (provider.installations || []).map(install => {
+          const target = install.config?.default_target || install.config?.endpoint_url || "No default target";
+          const tested = install.last_tested_at ? `Tested ${timeAgo(install.last_tested_at)}` : "Not tested yet";
+          return `
+            <div style="margin-top:0.55rem;padding:0.55rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+                <strong style="font-size:0.8rem;overflow-wrap:anywhere;">${esc(install.display_name)}</strong>
+                <span style="font-size:0.68rem;color:${install.status === "active" ? "var(--green)" : "var(--muted)"};">${esc(install.status)}</span>
+              </div>
+              <div style="font-size:0.74rem;color:var(--muted);margin-top:0.2rem;overflow-wrap:anywhere;">${esc(target)}</div>
+              <div style="font-size:0.7rem;color:var(--muted);margin-top:0.15rem;">${esc(tested)}</div>
+              ${install.last_error ? `<div style="font-size:0.72rem;color:var(--red);margin-top:0.25rem;">${esc(install.last_error)}</div>` : ""}
+              <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.5rem;">
+                <button class="btn btn-outline" data-connection-test="${esc(install.id)}" style="font-size:0.7rem;padding:0.18rem 0.5rem;">Test</button>
+                <button class="btn btn-outline" data-connection-delete="${esc(install.id)}" style="font-size:0.7rem;padding:0.18rem 0.5rem;color:var(--red);border-color:var(--red);">Disconnect</button>
+              </div>
+            </div>`;
+        }).join("")
+      : `<div style="font-size:0.74rem;color:var(--muted);margin-top:0.55rem;">No active installation yet.</div>`;
+    return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:0.85rem;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;">
+          <div>
+            <div style="font-size:0.9rem;font-weight:700;color:var(--text);">${esc(provider.name)}</div>
+            <p style="font-size:0.76rem;color:var(--text-2);line-height:1.45;margin:0.28rem 0 0;">${esc(provider.summary || "")}</p>
+          </div>
+          <span style="font-size:0.68rem;font-weight:700;color:${badge.color};border:1px solid var(--border);border-radius:999px;padding:0.12rem 0.45rem;white-space:nowrap;">${esc(badge.text)}</span>
+        </div>
+        <div style="display:flex;gap:0.28rem;flex-wrap:wrap;margin:0.7rem 0;">${actions}</div>
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">${connectBtn}${fallbackBtn}</div>
+        ${installs}
+      </div>`;
+  }).join("");
+
+  list.querySelectorAll("[data-connection-connect]").forEach(btn => {
+    btn.addEventListener("click", () => _openConnectionSetup(btn.dataset.connectionConnect));
+  });
+  list.querySelectorAll("[data-connection-test]").forEach(btn => {
+    btn.addEventListener("click", () => _testConnection(btn.dataset.connectionTest, btn));
+  });
+  list.querySelectorAll("[data-connection-delete]").forEach(btn => {
+    btn.addEventListener("click", () => _deleteConnection(btn.dataset.connectionDelete));
+  });
+}
+
+async function _loadConnections(force = false) {
+  const list = document.getElementById("connections-list");
+  if (!force && _connectionsCatalog) {
+    _renderConnections(_connectionsCatalog);
+    return;
+  }
+  if (list) list.innerHTML = `<div class="loading" style="padding:0.5rem 0;"><div class="spinner"></div> Loading…</div>`;
+  try {
+    _connectionsCatalog = await apiFetch("/pro/integrations/catalog");
+    _renderConnections(_connectionsCatalog);
+  } catch (e) {
+    if (list) list.innerHTML = `<p style="font-size:0.82rem;color:var(--red);">Could not load connections: ${esc(e.message || "unknown error")}</p>`;
+  }
+}
+
+function _openConnectionSetup(providerId) {
+  const provider = (_connectionsCatalog?.providers || []).find(item => item.provider === providerId);
+  const panel = document.getElementById("connection-setup-panel");
+  const fields = document.getElementById("connection-setup-fields");
+  const title = document.getElementById("connection-setup-title");
+  const sub = document.getElementById("connection-setup-sub");
+  const msg = document.getElementById("connection-setup-msg");
+  if (!provider || !panel || !fields) return;
+  if (provider.connection_mode !== "form" || provider.availability !== "available") {
+    _modalMsg("connection-setup-msg", `${provider.name} native setup is not enabled yet. Use Universal Webhook for now.`, "error");
+    _openConnectionSetup("webhook");
+    return;
+  }
+
+  _connectionSetupProvider = provider;
+  if (title) title.textContent = `Connect ${provider.name}`;
+  if (sub) sub.textContent = provider.summary || "";
+  if (msg) msg.textContent = "";
+  const fieldHtml = (provider.connect_schema?.fields || []).map(field => `
+    <div class="settings-field">
+      <label class="settings-label" for="conn-field-${esc(field.name)}">${esc(field.label)}${field.required ? " *" : ""}</label>
+      <input id="conn-field-${esc(field.name)}" class="settings-input" type="${esc(field.type || "text")}" placeholder="${esc(field.placeholder || "")}" autocomplete="off" spellcheck="false" />
+      ${field.help ? `<p class="settings-hint">${esc(field.help)}</p>` : ""}
+    </div>`).join("");
+  const actionHtml = (provider.actions || []).map(action => `
+    <label class="scope-option" style="font-size:0.78rem;">
+      <input type="checkbox" class="conn-action-check" value="${esc(action.key || action)}" checked />
+      <span style="font-size:0.76rem;color:var(--text);">${esc(_connectionActionLabel(action))}</span>
+    </label>`).join("");
+  fields.innerHTML = `
+    <div class="settings-field">
+      <label class="settings-label" for="conn-display-name">Connection name</label>
+      <input id="conn-display-name" class="settings-input" value="${esc(provider.default_display_name || provider.name)}" autocomplete="off" />
+    </div>
+    ${fieldHtml}
+    <div class="settings-field">
+      <label class="settings-label">Allowed actions</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem;margin-top:0.35rem;">${actionHtml}</div>
+    </div>`;
+  panel.style.display = "block";
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function _closeConnectionSetup() {
+  const panel = document.getElementById("connection-setup-panel");
+  if (panel) panel.style.display = "none";
+  _connectionSetupProvider = null;
+}
+
+async function _saveConnectionSetup() {
+  const provider = _connectionSetupProvider;
+  const btn = document.getElementById("connection-setup-save-btn");
+  if (!provider || !btn) return;
+  const config = {};
+  (provider.connect_schema?.fields || []).forEach(field => {
+    config[field.name] = document.getElementById(`conn-field-${field.name}`)?.value || "";
+  });
+  const enabled = [...document.querySelectorAll("#connection-setup-panel .conn-action-check:checked")]
+    .map(item => item.value);
+  btn.disabled = true;
+  btn.textContent = "Connecting…";
+  try {
+    await apiFetch(`/pro/integrations/providers/${encodeURIComponent(provider.provider)}/installations`, {
+      method: "POST",
+      body: JSON.stringify({
+        display_name: document.getElementById("conn-display-name")?.value || provider.default_display_name || provider.name,
+        config,
+        enabled_actions: enabled,
+      }),
+    });
+    _modalMsg("connection-setup-msg", "Connection saved.", "ok");
+    _closeConnectionSetup();
+    await _loadConnections(true);
+  } catch (e) {
+    _modalMsg("connection-setup-msg", `Error: ${e.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Connect";
+  }
+}
+
+async function _testConnection(id, btn) {
+  if (!id) return;
+  const original = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = "Testing…"; }
+  try {
+    await apiFetch(`/pro/integrations/installations/${encodeURIComponent(id)}/test`, { method: "POST" });
+    _showToast("Connection test succeeded");
+    await _loadConnections(true);
+  } catch (e) {
+    _showToast(`Connection test failed: ${e.message}`, true);
+    await _loadConnections(true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = original || "Test"; }
+  }
+}
+
+async function _deleteConnection(id) {
+  if (!id || !confirm("Disconnect this integration? Approved actions will no longer deliver through it.")) return;
+  try {
+    await apiFetch(`/pro/integrations/installations/${encodeURIComponent(id)}`, { method: "DELETE" });
+    _showToast("Connection removed");
+    await _loadConnections(true);
+  } catch (e) {
+    _showToast(`Could not remove connection: ${e.message}`, true);
+  }
+}
+
 // ── Webhooks tab ─────────────────────────────────────────────────────────────
 
 const WH_EVENTS = [
@@ -5553,6 +5767,7 @@ function _switchSettingsTab(tab) {
   history.replaceState(null, "", `#settings/${tab}`);
   // Lazy-load heavy tabs only when opened
   if (tab === "key-rotation") _loadRotationAgentList();
+  if (tab === "connections") _loadConnections();
   if (tab === "webhooks") { _initWebhookEventGrid(); _loadWebhooks(); _initTelegramSection(); }
   if (tab === "sandbox") _loadSandboxStatus();
   if (tab === "preferences") _initPreferencesPanel();
@@ -6201,6 +6416,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".modal-tab").forEach(tab => {
     tab.addEventListener("click", () => _switchSettingsTab(tab.dataset.tab));
   });
+
+  // ── Connections tab handlers ───────────────────────────────────────────────
+  document.getElementById("connections-refresh-btn")?.addEventListener("click", () => _loadConnections(true));
+  document.getElementById("connection-setup-close-btn")?.addEventListener("click", _closeConnectionSetup);
+  document.getElementById("connection-setup-save-btn")?.addEventListener("click", _saveConnectionSetup);
 
   // ── Account tab actions ────────────────────────────────────────────────────
 

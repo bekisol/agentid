@@ -3744,6 +3744,7 @@ curl https://api.agentid-protocol.com/agents \
             <button class="modal-tab" data-tab="sub-accounts"><span class="tab-icon">🏢</span>Team / Sub-accounts</button>
             <button class="modal-tab" data-tab="team-keys" data-min-tier="pro"><span class="tab-icon">👥</span>Team Keys<span class="tier-pip">PRO</span></button>
             <button class="modal-tab" data-tab="key-rotation" data-min-tier="pro"><span class="tab-icon">🔄</span>Key Rotation<span class="tier-pip">PRO</span></button>
+            <button class="modal-tab" data-tab="connections" data-min-tier="pro"><span class="tab-icon">↔</span>Connections<span class="tier-pip">PRO</span></button>
             <button class="modal-tab" data-tab="webhooks" data-min-tier="pro"><span class="tab-icon">🪝</span>Webhooks<span class="tier-pip">PRO</span></button>
             <button class="modal-tab" data-tab="sandbox" data-min-tier="pro"><span class="tab-icon">🧪</span>Sandbox<span class="tier-pip">PRO</span></button>
           </div>
@@ -4392,6 +4393,36 @@ curl https://api.agentid-protocol.com/agents \
 
           <div id="rotation-cleanup-result" style="display:none;margin-top:0.75rem;padding:0.6rem 0.85rem;
             background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.82rem;"></div>
+        </div>
+
+        <!-- ── CONNECTIONS TAB ── -->
+        <div class="modal-panel" id="tab-connections" data-min-tier="pro" data-lock-feature="Connections">
+          <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:1rem;line-height:1.55;">
+            Connect external destinations once, then Team Workspace can deliver approved artifact actions to the right system.
+            Universal Webhook works today for Zapier, Make, n8n, Slack incoming webhooks, GitHub automations, and internal tools.
+          </p>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:0.75rem;">
+            <div id="connections-summary" style="font-size:0.8rem;color:var(--muted);">Loading connections…</div>
+            <button class="btn btn-outline" id="connections-refresh-btn" style="font-size:0.72rem;padding:0.2rem 0.6rem;">↻ Refresh</button>
+          </div>
+
+          <div id="connections-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.75rem;">
+            <div class="loading" style="padding:0.5rem 0;"><div class="spinner"></div> Loading…</div>
+          </div>
+
+          <div id="connection-setup-panel" style="display:none;margin-top:1rem;padding:0.9rem 1rem;border:1px solid var(--border);border-radius:8px;background:var(--surface2);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;margin-bottom:0.75rem;">
+              <div>
+                <div id="connection-setup-title" style="font-size:0.9rem;font-weight:700;color:var(--text);">Connect destination</div>
+                <div id="connection-setup-sub" style="font-size:0.78rem;color:var(--muted);margin-top:0.15rem;"></div>
+              </div>
+              <button class="btn btn-outline" id="connection-setup-close-btn" style="font-size:0.72rem;padding:0.2rem 0.6rem;">Close</button>
+            </div>
+            <div id="connection-setup-fields"></div>
+            <div id="connection-setup-msg" class="modal-msg"></div>
+            <button class="btn btn-primary" id="connection-setup-save-btn" style="margin-top:0.4rem;font-size:0.82rem;">Connect</button>
+          </div>
         </div>
 
         <!-- ── WEBHOOKS TAB ── -->
@@ -6221,7 +6252,7 @@ agent, _  := client.Agents.Create(ctx, agentid.CreateAgentParams{
 
 <!-- Cache-bust on every push so users never get a stale dashboard.js after a deploy.
      The query string changes whenever this file is committed. -->
-<script src="dashboard.js?v=20260513-02"></script>
+<script src="dashboard.js?v=20260524-01"></script>
 
 </body>
 </html>

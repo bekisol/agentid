@@ -367,7 +367,6 @@
       <a href="messages.html">Messages</a>
       <a href="tasks.html">Tasks</a>
       <a href="team-workspace.html">Team Workspace</a>
-      <a href="connections.html" class="active">Connections</a>
     </nav>
     <div class="top-right">
       <button class="btn" type="button" onclick="toggleTheme()" id="theme-btn">Light theme</button>
@@ -433,6 +432,10 @@
 
   const BASE = "https://api.agentid-protocol.com";
   const THEME_KEY = "agentid_connections_theme";
+  const STANDALONE = new URLSearchParams(location.search).get("standalone") === "1";
+  if (!STANDALONE) {
+    location.replace("dashboard.html#settings/connections");
+  }
   let apiKey = sessionStorage.getItem("agentid_key")
             || localStorage.getItem("agentid_persisted_key")
             || localStorage.getItem("agentid_key")

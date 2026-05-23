@@ -2378,7 +2378,6 @@
       <a href="messages.html">Messages</a>
       <a href="tasks.html">Tasks</a>
       <a href="team-workspace.html" class="active">Team Workspace</a>
-      <a href="connections.html">Connections</a>
     </div>
     <div class="topbar-right">
       <button id="theme-toggle" class="ghost-btn theme-toggle" type="button" onclick="toggleTheme()">Light theme</button>
@@ -5055,7 +5054,7 @@
               <div>
                 <label class="field-label" for="artifact-action-connector">Deliver with</label>
                 <select id="artifact-action-connector" ${connectors.length ? "" : "disabled"}>${connectorOptions}</select>
-                <div class="helper-copy" style="margin-top:0.35rem;">${esc(connectionHelper)} <a href="connections.html" style="cursor:pointer;">Manage connections</a></div>
+                <div class="helper-copy" style="margin-top:0.35rem;">${esc(connectionHelper)} <a href="dashboard.html#settings/connections" style="cursor:pointer;">Manage in Settings</a></div>
               </div>
               <div>
                 <label class="field-label" for="artifact-action-title">Action title</label>
