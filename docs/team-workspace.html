@@ -2159,6 +2159,67 @@
     overflow:auto;
     padding:1.15rem;
   }
+  .assignment-action-modal {
+    width:min(680px,100%);
+    height:auto;
+    max-height:calc(100vh - 2rem);
+    align-self:center;
+  }
+  .assignment-action-body {
+    display:flex;
+    flex-direction:column;
+    gap:0.78rem;
+  }
+  .assignment-action-summary {
+    border:1.3px solid var(--border);
+    border-radius:14px;
+    background:rgba(255,255,255,0.24);
+    padding:0.74rem 0.8rem;
+  }
+  .assignment-action-summary strong {
+    display:block;
+    color:var(--text);
+    font-size:0.88rem;
+  }
+  .assignment-action-summary span {
+    display:block;
+    margin-top:0.22rem;
+    color:var(--muted);
+    font-size:0.76rem;
+    line-height:1.45;
+  }
+  .assignment-action-grid {
+    display:grid;
+    grid-template-columns:1fr;
+    gap:0.62rem;
+  }
+  .assignment-action-grid select,
+  .assignment-action-grid input,
+  .assignment-action-grid textarea {
+    width:100%;
+    border:1.25px solid var(--border-strong);
+    border-radius:11px;
+    background:var(--surface);
+    color:var(--text);
+    font:inherit;
+    font-size:0.82rem;
+    line-height:1.45;
+    padding:0.58rem 0.62rem;
+    box-sizing:border-box;
+  }
+  .assignment-action-grid textarea {
+    min-height:132px;
+    resize:vertical;
+  }
+  .assignment-action-error {
+    border:1.25px solid var(--red);
+    border-radius:12px;
+    background:var(--red-bg);
+    color:var(--text);
+    padding:0.58rem 0.64rem;
+    font-size:0.78rem;
+    line-height:1.42;
+  }
   .artifact-reader {
     max-width:88ch;
     margin:0 auto;
@@ -2413,6 +2474,8 @@
     editingProfileId: null,
     editingFinalOutput: false,
     finalArtifactOpen: false,
+    assignmentAction: null,
+    assignmentActionError: "",
     taskDraft: null,
     activeDocSection: "mission",
     sectionObserver: null,
@@ -3340,6 +3403,8 @@
     const interesting = new Set([
       "orchestrator_rejected",
       "agent_reassigned",
+      "agent_redirected",
+      "assignment_revision_requested",
       "clarification_requested",
       "clarification_received",
       "approval_requested",
@@ -3476,6 +3541,18 @@
       ev.addEventListener("click", e => {
         if (e.target.closest("button")) return;
         ev.classList.toggle("tl-expanded");
+      });
+    });
+
+    document.querySelectorAll("[data-assignment-action]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        openAssignmentAction(
+          btn.dataset.assignmentAction,
+          btn.dataset.assignmentId,
+          btn.dataset.agentDid || ""
+        );
       });
     });
 
@@ -4170,44 +4247,109 @@
     }
   }
 
-  async function runAssignmentAction(action, assignmentId, currentAgentDid = "") {
+  function assignmentActionCopy(action) {
+    const map = {
+      request_revision: {
+        title: "Request Revision",
+        submit: "Request revision",
+        body: "Ask this agent to revise its work. The run will create a follow-up assignment and keep the action in the timeline.",
+        placeholder: "What exactly should change? Include missing evidence, sections to rewrite, or acceptance criteria.",
+        requiresInstructions: true,
+      },
+      redirect: {
+        title: "Redirect Agent",
+        submit: "Redirect agent",
+        body: "Give this same agent new direction. The current assignment is superseded and a follow-up assignment starts.",
+        placeholder: "Give the new direction, constraints, and expected output.",
+        requiresInstructions: true,
+      },
+      reassign: {
+        title: "Reassign Work",
+        submit: "Reassign work",
+        body: "Move this work to another team member. The backend validates that the target agent belongs to this team.",
+        placeholder: "Optional guidance for the new agent.",
+        requiresInstructions: false,
+      },
+    };
+    return map[action] || null;
+  }
+
+  function openAssignmentAction(action, assignmentId, currentAgentDid = "") {
+    const copy = assignmentActionCopy(action);
     if (!assignmentId) {
       showToast("Assignment action unavailable: missing assignment id.", true);
       return;
     }
+    if (!copy || !state.selectedRunId) {
+      showToast("Assignment action unavailable for this run.", true);
+      return;
+    }
+    const assignment = (state.run?.assignments || []).find(item => String(item.id) === String(assignmentId));
+    if (!assignment) {
+      showToast("Assignment action unavailable: assignment not found in this run.", true);
+      return;
+    }
+    state.assignmentAction = {
+      action,
+      assignmentId: String(assignmentId),
+      currentAgentDid: currentAgentDid || assignment.agent_did || "",
+      instructions: "",
+      targetAgentDid: "",
+    };
+    state.assignmentActionError = "";
+    renderWorkspace();
+    requestAnimationFrame(() => {
+      const focusTarget = action === "reassign"
+        ? (document.getElementById("assignment-action-target") || document.getElementById("assignment-action-target-manual"))
+        : document.getElementById("assignment-action-instructions");
+      focusTarget?.focus();
+    });
+  }
+
+  function closeAssignmentAction() {
+    state.assignmentAction = null;
+    state.assignmentActionError = "";
+    renderWorkspace();
+  }
+
+  async function submitAssignmentAction() {
+    const pending = state.assignmentAction;
+    const copy = assignmentActionCopy(pending?.action);
+    if (!pending || !copy || !state.selectedRunId) return;
+
     const endpointByAction = {
       request_revision: "request-revision",
       redirect: "redirect",
       reassign: "reassign",
     };
-    const endpoint = endpointByAction[action];
-    if (!endpoint || !state.selectedRunId) return;
+    const endpoint = endpointByAction[pending.action];
+    if (!endpoint) return;
 
-    let instructions = "";
-    let targetAgentDid = "";
+    const instructions = (document.getElementById("assignment-action-instructions")?.value || "").trim();
+    const selectedTarget = (document.getElementById("assignment-action-target")?.value || "").trim();
+    const manualTarget = (document.getElementById("assignment-action-target-manual")?.value || "").trim();
+    const targetAgentDid = pending.action === "reassign" ? (manualTarget || selectedTarget) : "";
+    pending.instructions = instructions;
+    pending.targetAgentDid = targetAgentDid;
 
-    if (action === "request_revision") {
-      instructions = (prompt("What should this agent revise?") || "").trim();
-      if (!instructions) return;
-    } else if (action === "redirect") {
-      instructions = (prompt("What new direction should this agent follow? This will supersede the current assignment and start a follow-up assignment.") || "").trim();
-      if (!instructions) return;
-    } else if (action === "reassign") {
-      const candidates = (state.performance || [])
-        .filter(agent => agent.did && agent.did !== currentAgentDid)
-        .slice(0, 8);
-      const candidateText = candidates.length
-        ? `\n\nTeam candidates:\n${candidates.map((agent, idx) => `${idx + 1}. ${agent.name || agent.did} — ${agent.did}`).join("\n")}`
-        : "";
-      const targetInput = (prompt(`Target agent DID or candidate number:${candidateText}`) || "").trim();
-      if (!targetInput) return;
-      const selected = /^\d+$/.test(targetInput) ? candidates[Number(targetInput) - 1] : null;
-      targetAgentDid = selected?.did || targetInput;
-      instructions = (prompt("Optional reassignment guidance:") || "").trim();
+    if (copy.requiresInstructions && !instructions) {
+      state.assignmentActionError = "Add instructions before submitting this action.";
+      renderWorkspace();
+      return;
+    }
+    if (pending.action === "reassign" && !targetAgentDid) {
+      state.assignmentActionError = "Choose or paste the target agent DID before reassigning work.";
+      renderWorkspace();
+      return;
     }
 
+    const submitBtn = document.getElementById("assignment-action-submit");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Submitting...";
+    }
     try {
-      await fetchJson(`/pro/groups/runs/${encodeURIComponent(state.selectedRunId)}/assignments/${encodeURIComponent(assignmentId)}/${endpoint}`, {
+      await fetchJson(`/pro/groups/runs/${encodeURIComponent(state.selectedRunId)}/assignments/${encodeURIComponent(pending.assignmentId)}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -4215,12 +4357,20 @@
           target_agent_did: targetAgentDid || null,
         }),
       });
-      const label = action === "request_revision" ? "Revision requested" : action === "redirect" ? "Agent redirected" : "Assignment reassigned";
+      const label = pending.action === "request_revision" ? "Revision requested" : pending.action === "redirect" ? "Agent redirected" : "Assignment reassigned";
       showToast(`${label}. Follow-up work is running.`);
+      state.assignmentAction = null;
+      state.assignmentActionError = "";
       await refreshCurrentRun();
     } catch (e) {
-      showToast(e.message || "Could not run assignment action.", true);
+      state.assignmentActionError = e.message || "Could not run assignment action.";
+      showToast(state.assignmentActionError, true);
+      renderWorkspace();
     }
+  }
+
+  function runAssignmentAction(action, assignmentId, currentAgentDid = "") {
+    openAssignmentAction(action, assignmentId, currentAgentDid);
   }
 
   function missionPrimaryAction(run) {
@@ -4363,9 +4513,9 @@
           <div class="agent-actions">
             <button class="tiny-btn" ${outputText ? `onclick="scrollToWorkProduct(${idx})"` : "disabled"}>Review output</button>
             <button class="tiny-btn" onclick="document.querySelector('[data-doc-section=timeline]')?.scrollIntoView({behavior:'smooth',block:'start'})">Activity</button>
-            ${canRunAction ? `<button class="tiny-btn" onclick="runAssignmentAction('redirect', ${jsArg(assign.id)}, ${jsArg(assign.agent_did)})">Redirect</button>` : ""}
-            ${canRunAction ? `<button class="tiny-btn" onclick="runAssignmentAction('reassign', ${jsArg(assign.id)}, ${jsArg(assign.agent_did)})">Reassign</button>` : ""}
-            ${canRunAction && outputText ? `<button class="tiny-btn" onclick="runAssignmentAction('request_revision', ${jsArg(assign.id)}, ${jsArg(assign.agent_did)})">Request revision</button>` : ""}
+            ${canRunAction ? `<button class="tiny-btn" type="button" data-assignment-action="redirect" data-assignment-id="${esc(assign.id)}" data-agent-did="${esc(assign.agent_did)}">Redirect</button>` : ""}
+            ${canRunAction ? `<button class="tiny-btn" type="button" data-assignment-action="reassign" data-assignment-id="${esc(assign.id)}" data-agent-did="${esc(assign.agent_did)}">Reassign</button>` : ""}
+            ${canRunAction && outputText ? `<button class="tiny-btn" type="button" data-assignment-action="request_revision" data-assignment-id="${esc(assign.id)}" data-agent-did="${esc(assign.agent_did)}">Request revision</button>` : ""}
           </div>
         </article>`;
     };
@@ -4457,7 +4607,7 @@
             <div class="note-actions">
               <button class="tiny-btn" onclick="document.querySelector('[data-doc-section=intervention]')?.scrollIntoView({behavior:'smooth',block:'start'})">Discuss</button>
               ${assign.id && !["paused_for_approval", "synthesizing", "failed", "cancelled"].includes(run.status || "")
-                ? `<button class="tiny-btn" onclick="runAssignmentAction('request_revision', ${jsArg(assign.id)}, ${jsArg(assign.agent_did)})">Request revision</button>`
+                ? `<button class="tiny-btn" type="button" data-assignment-action="request_revision" data-assignment-id="${esc(assign.id)}" data-agent-did="${esc(assign.agent_did)}">Request revision</button>`
                 : ""}
             </div>
           </article>`).join("")
@@ -4510,6 +4660,77 @@
                    </div>
                  </div>`
               : `<div class="artifact-reader">${renderMd(run.final_output)}</div>${run.run_summary ? `<div class="artifact-reader final-summary">${esc(run.run_summary)}</div>` : ""}`}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function buildAssignmentActionModal(run) {
+    const pending = state.assignmentAction;
+    if (!pending) return "";
+    const copy = assignmentActionCopy(pending.action);
+    if (!copy) return "";
+
+    const assign = (run.assignments || []).find(item => String(item.id) === String(pending.assignmentId));
+    const agentDid = pending.currentAgentDid || assign?.agent_did || "";
+    const candidateMap = new Map();
+    (state.performance || []).forEach(agent => {
+      if (agent.did && agent.did !== agentDid) candidateMap.set(agent.did, agent);
+    });
+    (run.assignments || []).forEach(item => {
+      if (item.agent_did && item.agent_did !== agentDid && !candidateMap.has(item.agent_did)) {
+        candidateMap.set(item.agent_did, { did: item.agent_did, name: agentName(item.agent_did) });
+      }
+    });
+    const candidates = [...candidateMap.values()].slice(0, 20);
+    const selectedTargetDid = pending.targetAgentDid || "";
+    const selectedInCandidates = candidates.some(agent => agent.did === selectedTargetDid);
+
+    const targetHtml = pending.action === "reassign"
+      ? `<div>
+          <label class="field-label" for="assignment-action-target">Target agent</label>
+          ${candidates.length
+            ? `<select id="assignment-action-target">
+                <option value="">Select a team agent...</option>
+                ${candidates.map(agent => `<option value="${esc(agent.did)}" ${agent.did === selectedTargetDid ? "selected" : ""}>${esc(agent.name || agent.did)}${agent.avg_trust_score != null ? ` · trust ${Math.round(Number(agent.avg_trust_score))}` : ""}</option>`).join("")}
+              </select>`
+            : `<div class="helper-copy">No alternate team agents were returned by performance data.</div>`}
+        </div>
+        <div>
+          <label class="field-label" for="assignment-action-target-manual">Or paste agent DID</label>
+          <input id="assignment-action-target-manual" value="${esc(selectedInCandidates ? "" : selectedTargetDid)}" placeholder="did:agent:..." autocomplete="off" spellcheck="false" />
+        </div>`
+      : "";
+
+    return `
+      <div class="artifact-modal-backdrop" onclick="closeAssignmentAction()" role="presentation">
+        <div class="artifact-modal assignment-action-modal" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-label="${esc(copy.title)}">
+          <div class="artifact-modal-head">
+            <div>
+              <div class="artifact-modal-title">${esc(copy.title)}</div>
+              <div class="artifact-modal-meta">${esc(copy.body)}</div>
+            </div>
+            <div class="artifact-modal-actions">
+              <button id="assignment-action-submit" class="tiny-btn primary" type="button" onclick="submitAssignmentAction()">${esc(copy.submit)}</button>
+              <button class="tiny-btn" type="button" onclick="closeAssignmentAction()">Cancel</button>
+            </div>
+          </div>
+          <div class="artifact-modal-body assignment-action-body">
+            ${assign
+              ? `<div class="assignment-action-summary">
+                   <strong>${esc(agentName(assign.agent_did))} · ${esc((assign.status || "assigned").replace(/_/g, " "))}</strong>
+                   <span>${esc(assign.subtask || "No assignment text recorded.")}</span>
+                 </div>`
+              : `<div class="assignment-action-error">This assignment is no longer available in the current run data.</div>`}
+            ${state.assignmentActionError ? `<div class="assignment-action-error">${esc(state.assignmentActionError)}</div>` : ""}
+            <div class="assignment-action-grid">
+              ${targetHtml}
+              <div>
+                <label class="field-label" for="assignment-action-instructions">${pending.action === "reassign" ? "Guidance" : "Instructions"}${copy.requiresInstructions ? "" : " (optional)"}</label>
+                <textarea id="assignment-action-instructions" placeholder="${esc(copy.placeholder)}">${esc(pending.instructions || "")}</textarea>
+              </div>
+            </div>
+            <div class="helper-copy">Submitting creates a backend follow-up assignment, logs the decision, and refreshes this workspace when dispatch starts.</div>
           </div>
         </div>
       </div>`;
@@ -4882,6 +5103,7 @@
           ${buildWorkProducts(run)}
         </div>
         ${buildAuditExport(run, timelineEvents, decisionHtml, contextHtml)}
+        ${buildAssignmentActionModal(run)}
         <div class="doc-foot">
           <a onclick="downloadEvidencePack('${esc(String(run.id || ""))}')">Evidence pack</a>
           <span class="sep">·</span>
@@ -5817,6 +6039,18 @@
   document.getElementById("apikey-submit").addEventListener("click", signInWithApiKey);
   document.getElementById("apikey-input").addEventListener("keydown", e => {
     if (e.key === "Enter") signInWithApiKey();
+  });
+
+  Object.assign(window, {
+    openAssignmentAction,
+    closeAssignmentAction,
+    submitAssignmentAction,
+    runAssignmentAction,
+    openFinalArtifact,
+    closeFinalArtifact,
+    beginEditFinalOutput,
+    cancelEditFinalOutput,
+    saveFinalOutput,
   });
 
   initAuth();
