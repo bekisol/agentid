@@ -2003,6 +2003,96 @@
     font-size:0.73rem;
     line-height:1.42;
   }
+  .action-queue {
+    margin-top:0.72rem;
+    border-top:1px dashed rgba(43,36,27,0.28);
+    padding-top:0.72rem;
+  }
+  .action-queue-head {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.6rem;
+    margin-bottom:0.55rem;
+  }
+  .action-queue-title {
+    color:var(--text);
+    font-size:0.86rem;
+    font-weight:900;
+  }
+  .action-queue-list {
+    display:flex;
+    flex-direction:column;
+    gap:0.5rem;
+  }
+  .action-item {
+    border:1.35px solid var(--yellow);
+    border-radius:14px;
+    background:var(--yellow-bg);
+    padding:0.66rem 0.7rem;
+  }
+  .action-item-top {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.55rem;
+  }
+  .action-kind {
+    color:var(--text);
+    font-size:0.8rem;
+    font-weight:900;
+    line-height:1.3;
+  }
+  .action-source {
+    color:var(--muted);
+    font-size:0.66rem;
+    font-weight:900;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .action-meta,
+  .action-copy {
+    margin-top:0.28rem;
+    color:var(--text-2);
+    font-size:0.72rem;
+    line-height:1.42;
+  }
+  .action-copy {
+    border-radius:10px;
+    background:rgba(255,255,255,0.28);
+    padding:0.46rem 0.5rem;
+    word-break:break-word;
+  }
+  .action-note {
+    width:100%;
+    min-height:58px;
+    margin-top:0.52rem;
+    border:1.25px solid var(--border-strong);
+    border-radius:11px;
+    background:var(--surface);
+    color:var(--text);
+    font:inherit;
+    font-size:0.76rem;
+    line-height:1.35;
+    resize:vertical;
+    padding:0.5rem 0.55rem;
+    box-sizing:border-box;
+  }
+  .action-item-buttons {
+    display:flex;
+    gap:0.42rem;
+    flex-wrap:wrap;
+    margin-top:0.48rem;
+  }
+  .action-queue-empty {
+    border:1.2px dashed var(--border);
+    border-radius:13px;
+    color:var(--muted);
+    font-size:0.74rem;
+    line-height:1.45;
+    padding:0.64rem;
+  }
   .context-injector {
     margin-top:0.72rem;
     padding-top:0.72rem;
@@ -2173,6 +2263,7 @@
   html[data-theme="dark"] .agent-lane,
   html[data-theme="dark"] .lane-summary-chip,
   html[data-theme="dark"] .agent-reason,
+  html[data-theme="dark"] .action-copy,
   html[data-theme="dark"] .attention-row {
     background:rgba(255,255,255,0.035);
   }
@@ -2308,6 +2399,9 @@
     analytics: null,
     settings: null,
     capabilityProfiles: [],
+    actionQueue: [],
+    actionQueueError: "",
+    actionQueueLoading: false,
     selectedGroupId: null,
     selectedRunId: null,
     run: null,
@@ -2339,6 +2433,10 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+
+  function jsArg(value) {
+    return esc(JSON.stringify(String(value ?? "")));
   }
 
   function relTime(iso) {
@@ -2641,6 +2739,9 @@
     state.editingNoteId = null;
     state.editingProfileId = null;
     state.taskDraft = null;
+    state.actionQueue = [];
+    state.actionQueueError = "";
+    state.actionQueueLoading = false;
 
     renderTeams();
     renderRuns();
@@ -2667,6 +2768,7 @@
     state.run = run;
     state.lastEventId = Math.max(0, ...(run.events || []).map(ev => Number(ev.id) || 0));
     history.replaceState({}, "", `team-workspace.html?group_id=${state.selectedGroupId}&run_id=${encodeURIComponent(runId)}`);
+    await loadActionQueue();
 
     renderRuns();
     renderWorkspace();
@@ -3923,6 +4025,136 @@
     });
   }
 
+  function normalizeActionPayload(value) {
+    if (!value) return "";
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2);
+      } catch (_) {
+        return value;
+      }
+    }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (_) {
+      return String(value);
+    }
+  }
+
+  function currentRunAgentSet() {
+    return new Set((state.run?.assignments || [])
+      .map(assign => assign.agent_did)
+      .filter(Boolean));
+  }
+
+  function normalizeActionQueueItem(item, source) {
+    if (source === "review-queue") {
+      return {
+        id: item.id || item.review_id,
+        source,
+        sourceLabel: "Review queue",
+        agent_did: item.agent_did || "",
+        category: item.operation || item.reason || "Human review",
+        status: item.status || "pending",
+        created_at: item.created_at,
+        resolved_at: item.reviewed_at || item.resolved_at,
+        payload: item.payload_summary || item.reason || "",
+        note: item.notes || item.reviewer_note || "",
+        caveat: item.source === "orchestrator"
+          ? "Records the human decision for the orchestrator gate; this does not invent a reassignment endpoint."
+          : "",
+      };
+    }
+    return {
+      id: item.id || item.approval_id,
+      source,
+      sourceLabel: "ACP",
+      agent_did: item.agent_did || "",
+      category: item.action_label || item.action_category || "Agent action",
+      status: item.status || "pending",
+      created_at: item.created_at,
+      resolved_at: item.resolved_at,
+      payload: normalizeActionPayload(item.action_payload),
+      note: item.reviewer_note || "",
+      caveat: "Approves or rejects the queued action through ACP. Execution depends on the originating workflow resuming it.",
+    };
+  }
+
+  function filterActionQueueForRun(items) {
+    if (!state.run) return [];
+    const dids = currentRunAgentSet();
+    const runId = String(state.run.id || "");
+    return items.filter(item => {
+      const payload = `${item.category || ""} ${item.payload || ""} ${item.caveat || ""}`;
+      const didMatch = item.agent_did && dids.has(item.agent_did);
+      const runMatch = runId && payload.includes(runId);
+      const orchestrationGate = item.source === "review-queue" && /^group_run:/.test(String(item.category || ""));
+      return didMatch || runMatch || (orchestrationGate && didMatch);
+    });
+  }
+
+  async function loadActionQueue({ rerender = false } = {}) {
+    state.actionQueueLoading = true;
+    state.actionQueueError = "";
+    if (rerender && state.run) renderWorkspace();
+
+    const params = new URLSearchParams({ status: "pending", limit: "50" });
+    const [acpRes, reviewRes] = await Promise.all([
+      fetchJson(`/pro/acp/queue?${params}`).catch(err => ({ _error: err })),
+      fetchJson(`/pro/review-queue?${params}`).catch(err => ({ _error: err })),
+    ]);
+
+    const errors = [];
+    const acpItems = acpRes?._error
+      ? (errors.push(`ACP: ${acpRes._error.message}`), [])
+      : ((acpRes?.items || acpRes?.approvals || (Array.isArray(acpRes) ? acpRes : []))
+          .map(item => normalizeActionQueueItem(item, "acp")));
+    const reviewItems = reviewRes?._error
+      ? (errors.push(`Review queue: ${reviewRes._error.message}`), [])
+      : ((reviewRes?.items || (Array.isArray(reviewRes) ? reviewRes : []))
+          .map(item => normalizeActionQueueItem(item, "review-queue")));
+
+    state.actionQueue = filterActionQueueForRun([...acpItems, ...reviewItems])
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    state.actionQueueError = errors.length === 2 ? errors.join(" · ") : "";
+    state.actionQueueLoading = false;
+    if (rerender && state.run) renderWorkspace();
+  }
+
+  async function decideActionQueueItem(source, id, verdict) {
+    const noteEl = document.getElementById(`action-note-${source}-${id}`);
+    const note = (noteEl?.value || "").trim();
+    try {
+      if (source === "review-queue") {
+        await fetchJson(`/pro/review-queue/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            verdict: verdict === "approved" ? "approved" : "rejected",
+            notes: note,
+          }),
+        });
+      } else {
+        await fetchJson(`/pro/approvals/${encodeURIComponent(id)}/${verdict === "approved" ? "approve" : "reject"}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reviewer_note: note,
+            resume_payload: verdict === "approved"
+              ? { approved_from: "team_workspace", run_id: state.selectedRunId }
+              : undefined,
+          }),
+        });
+      }
+      showToast(verdict === "approved" ? "Action approved." : "Action rejected.");
+      await loadActionQueue();
+      await refreshCurrentRun();
+    } catch (e) {
+      showToast(e.message || "Could not update action.", true);
+    }
+  }
+
   function missionPrimaryAction(run) {
     if (!run) return "";
     if (run.status === "paused_for_approval") {
@@ -4209,15 +4441,75 @@
       </div>`;
   }
 
+  function buildActionQueue() {
+    if (state.actionQueueLoading) {
+      return `
+        <div class="action-queue">
+          <div class="action-queue-head">
+            <div class="action-queue-title">Action Queue</div>
+            <span class="trust-chip">checking</span>
+          </div>
+          <div class="action-queue-empty">Checking real approval queues for this run's agents...</div>
+        </div>`;
+    }
+
+    if (state.actionQueueError && !state.actionQueue.length) {
+      return `
+        <div class="action-queue">
+          <div class="action-queue-head">
+            <div class="action-queue-title">Action Queue</div>
+            <span class="trust-chip">unavailable</span>
+          </div>
+          <div class="action-queue-empty">${esc(state.actionQueueError)}. No offline action buttons are shown.</div>
+        </div>`;
+    }
+
+    const items = state.actionQueue.slice(0, 5);
+    const body = items.length
+      ? `<div class="action-queue-list">${items.map(item => {
+          const agent = item.agent_did ? agentName(item.agent_did) : "Orchestrator";
+          const requested = item.created_at ? relTime(item.created_at) : "pending";
+          const noteId = `action-note-${item.source}-${item.id}`;
+          return `
+            <div class="action-item">
+              <div class="action-item-top">
+                <div class="action-kind">${esc(item.category)}</div>
+                <div class="action-source">${esc(item.sourceLabel)}</div>
+              </div>
+              <div class="action-meta">${esc(agent)} · requested ${esc(requested)}</div>
+              ${item.payload ? `<div class="action-copy">${esc(previewText(item.payload, 180))}</div>` : ""}
+              ${item.caveat ? `<div class="action-meta">${esc(item.caveat)}</div>` : ""}
+              <textarea id="${esc(noteId)}" class="action-note" placeholder="Optional reviewer note..."></textarea>
+              <div class="action-item-buttons">
+                <button class="tiny-btn primary" onclick="decideActionQueueItem(${jsArg(item.source)}, ${jsArg(item.id)}, 'approved')">Approve</button>
+                <button class="tiny-btn" onclick="decideActionQueueItem(${jsArg(item.source)}, ${jsArg(item.id)}, 'rejected')">Reject</button>
+              </div>
+            </div>`;
+        }).join("")}</div>`
+      : `<div class="action-queue-empty">No wired approval actions are pending for this run. Unsupported actions stay hidden until a backend endpoint exists.</div>`;
+
+    return `
+      <div class="action-queue">
+        <div class="action-queue-head">
+          <div class="action-queue-title">Action Queue</div>
+          <span class="trust-chip">${state.actionQueue.length} pending</span>
+        </div>
+        ${body}
+      </div>`;
+  }
+
   function buildInterventionColumn(run, plan, timelineEvents) {
     const isApproval = run.status === "paused_for_approval";
     const isClarification = run.status === "paused_for_user";
     const isLive = !isTerminal(run.status);
     const blockers = blockedAssignments(run);
+    const actionItems = state.actionQueue || [];
     const attentionCopy = isApproval
       ? `${plan.length} planned assignment${plan.length === 1 ? "" : "s"} need approval before dispatch.`
       : isClarification
         ? (run.pause_question || "The team needs clarification before it can continue.")
+        : actionItems.length
+          ? `${actionItems.length} backend-wired approval action${actionItems.length === 1 ? "" : "s"} can be decided here.`
         : blockers.length
           ? `${blockers.length} agent work item${blockers.length === 1 ? "" : "s"} need review before this run is fully clean.`
         : run.status === "synthesizing"
@@ -4247,8 +4539,8 @@
       <aside class="ops-side" data-doc-section="intervention">
         <section class="intervention-card">
           <div class="ops-section-title">Needs Your Attention</div>
-          <div class="attention-row${isApproval || isClarification || blockers.length ? " urgent" : ""}" style="margin-top:0.75rem;">
-            <strong>${isApproval ? "Plan approval required" : isClarification ? "Clarification required" : blockers.length ? "Blocked work needs review" : isLive ? "Run is operating" : "Review complete"}</strong>
+          <div class="attention-row${isApproval || isClarification || actionItems.length || blockers.length ? " urgent" : ""}" style="margin-top:0.75rem;">
+            <strong>${isApproval ? "Plan approval required" : isClarification ? "Clarification required" : actionItems.length ? "Action approval pending" : blockers.length ? "Blocked work needs review" : isLive ? "Run is operating" : "Review complete"}</strong>
             <span>${esc(attentionCopy)}</span>
           </div>
           ${blockers.length ? `<div class="blocker-list">
@@ -4267,6 +4559,7 @@
                 <button class="tiny-btn" onclick="refreshCurrentRun()">Refresh</button>
               </div>
             </div>` : ""}
+          ${buildActionQueue()}
           <div class="context-injector">
             <label class="field-label" for="run-context-input">Add operator context</label>
             <textarea id="run-context-input" placeholder="Save context, constraints, or decision notes for this team..."></textarea>
@@ -4553,6 +4846,7 @@
         state.run = run;
         state.lastEventId = Math.max(state.lastEventId, ...(run.events || []).map(ev => Number(ev.id) || 0));
         syncRunIntoList(run);
+        await loadActionQueue();
         renderRuns();
         renderWorkspace();
         if (prevStatus !== run.status || isTerminal(run.status)) {
@@ -4615,6 +4909,7 @@
     state.run = run;
     state.lastEventId = Math.max(0, ...(run.events || []).map(ev => Number(ev.id) || 0));
     syncRunIntoList(run);
+    await loadActionQueue();
     renderRuns();
     renderWorkspace();
     if (prevStatus !== run.status || isTerminal(run.status)) {
