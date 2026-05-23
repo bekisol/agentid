@@ -2567,6 +2567,8 @@
       agent_completed: "Agent completed",
       orchestrator_rejected: "Output rejected",
       agent_reassigned: "Agent reassigned",
+      agent_redirected: "Agent redirected",
+      assignment_revision_requested: "Revision requested",
       context_written: "Context written",
       clarification_requested: "Clarification needed",
       clarification_received: "Clarification received",
@@ -3418,7 +3420,7 @@
   }
 
   function sectionTargetForEventType(type) {
-    if (["clarification_requested", "clarification_received", "approval_requested", "approval_granted", "orchestrator_rejected", "agent_reassigned", "run_failed", "run_cancelled"].includes(type)) {
+    if (["clarification_requested", "clarification_received", "approval_requested", "approval_granted", "orchestrator_rejected", "agent_reassigned", "agent_redirected", "assignment_revision_requested", "run_failed", "run_cancelled"].includes(type)) {
       return "decisions";
     }
     if (["run_completed", "synthesis_started"].includes(type)) {
@@ -3512,6 +3514,8 @@
     agent_completed:                "output",
     orchestrator_rejected:          "decision",
     agent_reassigned:               "decision",
+    agent_redirected:               "decision",
+    assignment_revision_requested:   "decision",
     synthesis_started:              "output",
     synthesis_completed:            "output",
     approval_requested:             "review",
@@ -3539,6 +3543,8 @@
       agent_completed:          "Agent completed",
       orchestrator_rejected:    "Orchestrator rejected",
       agent_reassigned:         "Agent reassigned",
+      agent_redirected:         "Agent redirected",
+      assignment_revision_requested: "Revision requested",
       synthesis_started:        "Synthesis started",
       synthesis_completed:      "Synthesis completed",
       approval_requested:       "Approval requested",
@@ -3602,6 +3608,15 @@
           : (d.rejection_reason ? ` · ${esc(String(d.rejection_reason).slice(0, 60))}` : "");
         return `${what("Orchestrator")} restricted ${who} from ${pill(cap)}${dimInfo}`;
       }
+      case "agent_reassigned": {
+        const from = d.from_did || d.reassigned_from || d.from_agent || d.from || "";
+        const to = d.to_did || d.to_agent || d.to || did || "";
+        return `${what("Operator")} reassigned work from ${pill(from ? agentName(from) : "previous agent")} to ${pill(to ? agentName(to) : "new agent")}`;
+      }
+      case "agent_redirected":
+        return `${what("Operator")} redirected ${who} · ${esc(previewText(d.instructions || d.reason || "follow-up assignment started", 90))}`;
+      case "assignment_revision_requested":
+        return `${what("Operator")} requested revision from ${who} · ${esc(previewText(d.instructions || "follow-up assignment started", 90))}`;
       case "approval_requested": {
         const cap = d.capability || d.required_capability || "action";
         return `${who} requested capability ${pill(cap)} · ${what("awaiting approval")}`;
@@ -4010,9 +4025,9 @@
       .map(ev => {
         const data = ev.event_data || ev.data || {};
         return {
-          from: data.reassigned_from || data.from_agent || data.from || "",
-          to: ev.agent_did || data.to_agent || data.to || "",
-          why: data.reason || data.rejection_reason || data.capability || "orchestrator reassigned work",
+          from: data.reassigned_from || data.from_did || data.from_agent || data.from || "",
+          to: ev.agent_did || data.to_did || data.to_agent || data.to || "",
+          why: data.instructions || data.reason || data.rejection_reason || data.capability || "orchestrator reassigned work",
         };
       })
       .filter(item => item.from || item.to);
@@ -4062,7 +4077,7 @@
         payload: item.payload_summary || item.reason || "",
         note: item.notes || item.reviewer_note || "",
         caveat: item.source === "orchestrator"
-          ? "Records the human decision for the orchestrator gate; this does not invent a reassignment endpoint."
+          ? "Records the human decision for the orchestrator gate. Assignment changes use the run-action endpoints below."
           : "",
       };
     }
@@ -4152,6 +4167,59 @@
       await refreshCurrentRun();
     } catch (e) {
       showToast(e.message || "Could not update action.", true);
+    }
+  }
+
+  async function runAssignmentAction(action, assignmentId, currentAgentDid = "") {
+    if (!assignmentId) {
+      showToast("Assignment action unavailable: missing assignment id.", true);
+      return;
+    }
+    const endpointByAction = {
+      request_revision: "request-revision",
+      redirect: "redirect",
+      reassign: "reassign",
+    };
+    const endpoint = endpointByAction[action];
+    if (!endpoint || !state.selectedRunId) return;
+
+    let instructions = "";
+    let targetAgentDid = "";
+
+    if (action === "request_revision") {
+      instructions = (prompt("What should this agent revise?") || "").trim();
+      if (!instructions) return;
+    } else if (action === "redirect") {
+      instructions = (prompt("What new direction should this agent follow? This will supersede the current assignment and start a follow-up assignment.") || "").trim();
+      if (!instructions) return;
+    } else if (action === "reassign") {
+      const candidates = (state.performance || [])
+        .filter(agent => agent.did && agent.did !== currentAgentDid)
+        .slice(0, 8);
+      const candidateText = candidates.length
+        ? `\n\nTeam candidates:\n${candidates.map((agent, idx) => `${idx + 1}. ${agent.name || agent.did} — ${agent.did}`).join("\n")}`
+        : "";
+      const targetInput = (prompt(`Target agent DID or candidate number:${candidateText}`) || "").trim();
+      if (!targetInput) return;
+      const selected = /^\d+$/.test(targetInput) ? candidates[Number(targetInput) - 1] : null;
+      targetAgentDid = selected?.did || targetInput;
+      instructions = (prompt("Optional reassignment guidance:") || "").trim();
+    }
+
+    try {
+      await fetchJson(`/pro/groups/runs/${encodeURIComponent(state.selectedRunId)}/assignments/${encodeURIComponent(assignmentId)}/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instructions,
+          target_agent_did: targetAgentDid || null,
+        }),
+      });
+      const label = action === "request_revision" ? "Revision requested" : action === "redirect" ? "Agent redirected" : "Assignment reassigned";
+      showToast(`${label}. Follow-up work is running.`);
+      await refreshCurrentRun();
+    } catch (e) {
+      showToast(e.message || "Could not run assignment action.", true);
     }
   }
 
@@ -4268,6 +4336,7 @@
       const reason = buildAgentReason(assign, planItem);
       const outputPreview = outputText ? previewText(outputText, 180) : "";
       const blocker = assign.rejection_reason || (tone === "attention" ? `${(assign.status || "blocked").replace(/_/g, " ")} state needs operator review.` : "");
+      const canRunAction = assign.id && !["paused_for_approval", "synthesizing", "failed", "cancelled"].includes(run.status || "");
       return `
         <article class="agent-card ${tone}">
           <div class="agent-card-top">
@@ -4294,6 +4363,9 @@
           <div class="agent-actions">
             <button class="tiny-btn" ${outputText ? `onclick="scrollToWorkProduct(${idx})"` : "disabled"}>Review output</button>
             <button class="tiny-btn" onclick="document.querySelector('[data-doc-section=timeline]')?.scrollIntoView({behavior:'smooth',block:'start'})">Activity</button>
+            ${canRunAction ? `<button class="tiny-btn" onclick="runAssignmentAction('redirect', ${jsArg(assign.id)}, ${jsArg(assign.agent_did)})">Redirect</button>` : ""}
+            ${canRunAction ? `<button class="tiny-btn" onclick="runAssignmentAction('reassign', ${jsArg(assign.id)}, ${jsArg(assign.agent_did)})">Reassign</button>` : ""}
+            ${canRunAction && outputText ? `<button class="tiny-btn" onclick="runAssignmentAction('request_revision', ${jsArg(assign.id)}, ${jsArg(assign.agent_did)})">Request revision</button>` : ""}
           </div>
         </article>`;
     };
@@ -4384,7 +4456,9 @@
             <div class="work-card-body">${renderMd(outputText)}</div>
             <div class="note-actions">
               <button class="tiny-btn" onclick="document.querySelector('[data-doc-section=intervention]')?.scrollIntoView({behavior:'smooth',block:'start'})">Discuss</button>
-              <button class="tiny-btn" disabled title="Request revision needs a dedicated run-action endpoint.">Request revision</button>
+              ${assign.id && !["paused_for_approval", "synthesizing", "failed", "cancelled"].includes(run.status || "")
+                ? `<button class="tiny-btn" onclick="runAssignmentAction('request_revision', ${jsArg(assign.id)}, ${jsArg(assign.agent_did)})">Request revision</button>`
+                : ""}
             </div>
           </article>`).join("")
       : `<article class="work-card">
@@ -5288,6 +5362,9 @@
     agent_assigned:                           "👤",
     agent_completed:                          "✓",
     orchestrator_rejected:                    "✗",
+    agent_reassigned:                         "↔",
+    agent_redirected:                         "↷",
+    assignment_revision_requested:             "↺",
     synthesis_started:                        "⚡",
     synthesis_completed:                      "⚡",
     run_completed:                            "🏁",
@@ -5307,6 +5384,9 @@
     agent_assigned:                           "Agent dispatched",
     agent_completed:                          "Task completed",
     orchestrator_rejected:                    "Output rejected",
+    agent_reassigned:                         "Agent reassigned",
+    agent_redirected:                         "Agent redirected",
+    assignment_revision_requested:             "Revision requested",
     synthesis_started:                        "Merging outputs",
     synthesis_completed:                      "Outputs merged",
     run_completed:                            "Run completed",
@@ -5326,6 +5406,9 @@
     agent_assigned:                           "An agent was dispatched with a subtask. The trust state at this moment is captured in the snapshot.",
     agent_completed:                          "The agent submitted its output. The orchestrator evaluated it against the quality rubric.",
     orchestrator_rejected:                    "The agent's output did not meet the quality bar. It may be retried with a different agent.",
+    agent_reassigned:                         "An operator or orchestrator moved this work to another agent and created a durable follow-up assignment.",
+    agent_redirected:                         "An operator redirected the assignment with new instructions and created a durable follow-up assignment.",
+    assignment_revision_requested:             "An operator requested a concrete revision and the run created a follow-up assignment.",
     synthesis_started:                        "All accepted outputs are being merged into a single coherent final answer.",
     synthesis_completed:                      "The synthesis model produced a merged output from all agent contributions.",
     run_completed:                            "The run finished successfully. The final answer is ready.",
