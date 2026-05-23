@@ -3319,7 +3319,7 @@ function _renderConnections(data) {
       ? `<button class="btn btn-primary" data-connection-connect="${esc(provider.provider)}" style="font-size:0.74rem;padding:0.25rem 0.65rem;">${esc(provider.setup_label || "Connect")}</button>`
       : `<button class="btn btn-outline" disabled style="font-size:0.74rem;padding:0.25rem 0.65rem;">${esc(provider.setup_label || "Unavailable")}</button>`;
     const fallbackBtn = provider.provider !== "webhook"
-      ? `<button class="btn btn-outline" data-connection-connect="webhook" style="font-size:0.74rem;padding:0.25rem 0.65rem;">Use webhook</button>`
+      ? `<button class="btn btn-outline" data-connection-connect="webhook" style="font-size:0.74rem;padding:0.25rem 0.65rem;">Use automation link</button>`
       : "";
     const installs = (provider.installations || []).length
       ? (provider.installations || []).map(install => {
@@ -3391,18 +3391,40 @@ function _openConnectionSetup(providerId) {
   const msg = document.getElementById("connection-setup-msg");
   if (!provider || !panel || !fields) return;
   if (provider.connection_mode !== "form" || provider.availability !== "available") {
-    _modalMsg("connection-setup-msg", `${provider.name} native setup is not enabled yet. Use Universal Webhook for now.`, "error");
+    _modalMsg("connection-setup-msg", `${provider.name} native setup is not enabled yet. Use Automation Link for now.`, "error");
     _openConnectionSetup("webhook");
     return;
   }
 
   _connectionSetupProvider = provider;
-  if (title) title.textContent = `Connect ${provider.name}`;
-  if (sub) sub.textContent = provider.summary || "";
+  const isAutomationLink = provider.provider === "webhook";
+  if (title) title.textContent = isAutomationLink ? "Connect automation" : `Connect ${provider.name}`;
+  if (sub) {
+    sub.textContent = isAutomationLink
+      ? "Paste the URL from Zapier, Make, n8n, Slack, GitHub Actions, or an internal workflow. AgentID sends approved work there."
+      : (provider.summary || "");
+  }
   if (msg) msg.textContent = "";
-  const fieldHtml = (provider.connect_schema?.fields || []).map(field => `
+  const allFields = provider.connect_schema?.fields || [];
+  const simpleFields = isAutomationLink
+    ? allFields.filter(field => field.name === "endpoint_url" || field.name === "default_target")
+    : allFields.filter(field => !field.secret);
+  const advancedFields = isAutomationLink
+    ? allFields.filter(field => field.secret)
+    : allFields.filter(field => field.secret);
+  const fieldHtml = simpleFields.map(field => {
+    const label = field.name === "endpoint_url" ? "Automation URL" : field.label;
+    const optional = field.required ? " *" : " (optional)";
+    return `
+      <div class="settings-field">
+        <label class="settings-label" for="conn-field-${esc(field.name)}">${esc(label)}${optional}</label>
+        <input id="conn-field-${esc(field.name)}" class="settings-input" type="${esc(field.type || "text")}" placeholder="${esc(field.placeholder || "")}" autocomplete="off" spellcheck="false" />
+        ${field.help ? `<p class="settings-hint">${esc(field.help)}</p>` : ""}
+      </div>`;
+  }).join("");
+  const advancedFieldHtml = advancedFields.map(field => `
     <div class="settings-field">
-      <label class="settings-label" for="conn-field-${esc(field.name)}">${esc(field.label)}${field.required ? " *" : ""}</label>
+      <label class="settings-label" for="conn-field-${esc(field.name)}">${esc(field.label)} (optional)</label>
       <input id="conn-field-${esc(field.name)}" class="settings-input" type="${esc(field.type || "text")}" placeholder="${esc(field.placeholder || "")}" autocomplete="off" spellcheck="false" />
       ${field.help ? `<p class="settings-hint">${esc(field.help)}</p>` : ""}
     </div>`).join("");
@@ -3412,15 +3434,39 @@ function _openConnectionSetup(providerId) {
       <span style="font-size:0.76rem;color:var(--text);">${esc(_connectionActionLabel(action))}</span>
     </label>`).join("");
   fields.innerHTML = `
-    <div class="settings-field">
-      <label class="settings-label" for="conn-display-name">Connection name</label>
-      <input id="conn-display-name" class="settings-input" value="${esc(provider.default_display_name || provider.name)}" autocomplete="off" />
-    </div>
+    ${isAutomationLink ? `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:0.45rem;margin-bottom:0.9rem;">
+        ${["Zapier", "Make", "n8n", "Slack", "GitHub Actions", "Internal tool"].map(name => `
+          <div style="padding:0.45rem 0.55rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);font-size:0.76rem;font-weight:600;color:var(--text-2);">${name}</div>
+        `).join("")}
+      </div>
+      <p style="font-size:0.78rem;color:var(--muted);line-height:1.5;margin:0 0 0.9rem;">
+        Create a webhook/automation trigger in the app you use, paste its URL below, and AgentID will send approved actions there. No coding inside AgentID required.
+      </p>
+    ` : `
+      <div class="settings-field">
+        <label class="settings-label" for="conn-display-name">Connection name</label>
+        <input id="conn-display-name" class="settings-input" value="${esc(provider.default_display_name || provider.name)}" autocomplete="off" />
+      </div>
+    `}
     ${fieldHtml}
-    <div class="settings-field">
-      <label class="settings-label">Allowed actions</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem;margin-top:0.35rem;">${actionHtml}</div>
-    </div>`;
+    <details style="margin-top:0.4rem;">
+      <summary style="cursor:pointer;font-size:0.78rem;font-weight:700;color:var(--muted);">Advanced options</summary>
+      <div style="margin-top:0.75rem;">
+        ${!isAutomationLink ? "" : `
+          <div class="settings-field">
+            <label class="settings-label" for="conn-display-name">Connection name</label>
+            <input id="conn-display-name" class="settings-input" value="${esc(provider.default_display_name || provider.name)}" autocomplete="off" />
+          </div>
+        `}
+        ${advancedFieldHtml}
+        <div class="settings-field">
+          <label class="settings-label">Allowed actions</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem;margin-top:0.35rem;">${actionHtml}</div>
+          <p class="settings-hint">Leave these checked unless this destination should only handle certain approved actions.</p>
+        </div>
+      </div>
+    </details>`;
   panel.style.display = "block";
   panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -3439,15 +3485,19 @@ async function _saveConnectionSetup() {
   (provider.connect_schema?.fields || []).forEach(field => {
     config[field.name] = document.getElementById(`conn-field-${field.name}`)?.value || "";
   });
-  const enabled = [...document.querySelectorAll("#connection-setup-panel .conn-action-check:checked")]
+  const checked = [...document.querySelectorAll("#connection-setup-panel .conn-action-check:checked")]
     .map(item => item.value);
+  const enabled = checked.length
+    ? checked
+    : (provider.actions || []).map(action => action.key || action);
+  const destinationLabel = (config.default_target || "").trim();
   btn.disabled = true;
   btn.textContent = "Connecting…";
   try {
     await apiFetch(`/pro/integrations/providers/${encodeURIComponent(provider.provider)}/installations`, {
       method: "POST",
       body: JSON.stringify({
-        display_name: document.getElementById("conn-display-name")?.value || provider.default_display_name || provider.name,
+        display_name: document.getElementById("conn-display-name")?.value || destinationLabel || provider.default_display_name || provider.name,
         config,
         enabled_actions: enabled,
       }),
