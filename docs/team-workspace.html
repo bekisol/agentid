@@ -2378,6 +2378,7 @@
       <a href="messages.html">Messages</a>
       <a href="tasks.html">Tasks</a>
       <a href="team-workspace.html" class="active">Team Workspace</a>
+      <a href="connections.html">Connections</a>
     </div>
     <div class="topbar-right">
       <button id="theme-toggle" class="ghost-btn theme-toggle" type="button" onclick="toggleTheme()">Light theme</button>
@@ -2478,6 +2479,9 @@
     assignmentActionError: "",
     artifactAction: null,
     artifactActionError: "",
+    integrations: null,
+    integrationsLoading: false,
+    integrationsError: "",
     taskDraft: null,
     activeDocSection: "mission",
     sectionObserver: null,
@@ -2635,6 +2639,9 @@
       agent_redirected: "Agent redirected",
       assignment_revision_requested: "Revision requested",
       artifact_action_requested: "Artifact action queued",
+      artifact_action_executed: "Artifact action executed",
+      artifact_action_failed: "Artifact action failed",
+      artifact_action_needs_connector: "Needs connection",
       context_written: "Context written",
       clarification_requested: "Clarification needed",
       clarification_received: "Clarification received",
@@ -3409,6 +3416,9 @@
       "agent_redirected",
       "assignment_revision_requested",
       "artifact_action_requested",
+      "artifact_action_executed",
+      "artifact_action_failed",
+      "artifact_action_needs_connector",
       "clarification_requested",
       "clarification_received",
       "approval_requested",
@@ -3489,7 +3499,7 @@
   }
 
   function sectionTargetForEventType(type) {
-    if (["clarification_requested", "clarification_received", "approval_requested", "approval_granted", "orchestrator_rejected", "agent_reassigned", "agent_redirected", "assignment_revision_requested", "artifact_action_requested", "run_failed", "run_cancelled"].includes(type)) {
+    if (["clarification_requested", "clarification_received", "approval_requested", "approval_granted", "orchestrator_rejected", "agent_reassigned", "agent_redirected", "assignment_revision_requested", "artifact_action_requested", "artifact_action_executed", "artifact_action_failed", "artifact_action_needs_connector", "run_failed", "run_cancelled"].includes(type)) {
       return "decisions";
     }
     if (["run_completed", "synthesis_started"].includes(type)) {
@@ -3609,6 +3619,9 @@
     agent_redirected:               "decision",
     assignment_revision_requested:   "decision",
     artifact_action_requested:       "decision",
+    artifact_action_executed:        "decision",
+    artifact_action_failed:          "bad",
+    artifact_action_needs_connector: "review",
     synthesis_started:              "output",
     synthesis_completed:            "output",
     approval_requested:             "review",
@@ -3639,6 +3652,9 @@
       agent_redirected:         "Agent redirected",
       assignment_revision_requested: "Revision requested",
       artifact_action_requested: "Artifact action queued",
+      artifact_action_executed: "Artifact action executed",
+      artifact_action_failed: "Artifact action failed",
+      artifact_action_needs_connector: "Needs connection",
       synthesis_started:        "Synthesis started",
       synthesis_completed:      "Synthesis completed",
       approval_requested:       "Approval requested",
@@ -3715,6 +3731,19 @@
         const label = d.action_label || (d.action_type || "artifact action").replace(/_/g, " ");
         const target = d.target ? ` → ${pill(d.target)}` : "";
         return `${what("Operator")} queued ${pill(label)} from ${esc((d.artifact_type || "artifact").replace(/_/g, " "))}${target}`;
+      }
+      case "artifact_action_executed": {
+        const label = d.action_label || (d.action_type || "artifact action").replace(/_/g, " ");
+        const via = d.connector || d.provider || "connected destination";
+        return `${what("AgentID")} executed ${pill(label)} via ${pill(via)}`;
+      }
+      case "artifact_action_failed": {
+        const label = d.action_label || (d.action_type || "artifact action").replace(/_/g, " ");
+        return `${what("Connector failed")} for ${pill(label)} · ${esc(previewText(d.error || "delivery failed", 90))}`;
+      }
+      case "artifact_action_needs_connector": {
+        const label = d.action_label || (d.action_type || "artifact action").replace(/_/g, " ");
+        return `${what("Action approved")} but ${pill(label)} needs an active connection`;
       }
       case "approval_requested": {
         const cap = d.capability || d.required_capability || "action";
@@ -4198,7 +4227,9 @@
         : normalizeActionPayload(actionPayload),
       note: item.reviewer_note || "",
       caveat: isArtifactAction
-        ? "Approval records owner intent. Connector execution is not automatic until a real integration consumes the approved request."
+        ? (actionPayload.payload?.connector_installation_id
+            ? "After approval, AgentID will execute this through the selected connection and log the result."
+            : "Approval records owner intent only. Connect a destination to execute it outside AgentID.")
         : "Approves or rejects the queued action through ACP. Execution depends on the originating workflow resuming it.",
     };
   }
@@ -4442,6 +4473,45 @@
     },
   };
 
+  async function loadIntegrations({ force = false, rerender = false } = {}) {
+    if (state.integrations && !force) return state.integrations;
+    state.integrationsLoading = true;
+    state.integrationsError = "";
+    if (rerender && state.run) renderWorkspace();
+    try {
+      state.integrations = await fetchJson("/pro/integrations/catalog");
+    } catch (e) {
+      state.integrations = { providers: [], installations: [] };
+      state.integrationsError = e.message || "Could not load connections.";
+    } finally {
+      state.integrationsLoading = false;
+      if (rerender && state.run) renderWorkspace();
+    }
+    return state.integrations;
+  }
+
+  function actionConnectorOptions(actionType) {
+    const providers = state.integrations?.providers || [];
+    return providers.flatMap(provider => {
+      const actionKeys = (provider.actions || []).map(action => action.key || action);
+      if (!actionKeys.includes(actionType)) return [];
+      return (provider.installations || [])
+        .filter(install => install.status === "active" && (install.enabled_actions || []).includes(actionType))
+        .map(install => ({
+          id: install.id,
+          provider: provider.provider,
+          providerName: provider.name,
+          name: install.display_name,
+          target: install.config?.default_target || "",
+        }));
+    });
+  }
+
+  function connectorById(id) {
+    return actionConnectorOptions(state.artifactAction?.actionType || "")
+      .find(item => String(item.id) === String(id));
+  }
+
   function openArtifactAction(artifactType = "final_output", assignmentId = "") {
     const run = state.run;
     if (!run) return;
@@ -4463,15 +4533,37 @@
       title: "",
       target: "",
       instructions: "",
+      connectorInstallationId: "",
     };
     state.artifactActionError = "";
     renderWorkspace();
+    loadIntegrations({ force: true }).then(() => {
+      if (!state.artifactAction) return;
+      const options = actionConnectorOptions(state.artifactAction.actionType);
+      if (!state.artifactAction.connectorInstallationId && options[0]) {
+        state.artifactAction.connectorInstallationId = options[0].id;
+        if (!state.artifactAction.target && options[0].target) state.artifactAction.target = options[0].target;
+      }
+      renderWorkspace();
+    });
     requestAnimationFrame(() => document.getElementById("artifact-action-type")?.focus());
   }
 
   function closeArtifactAction() {
     state.artifactAction = null;
     state.artifactActionError = "";
+    renderWorkspace();
+  }
+
+  function changeArtifactActionType(value) {
+    if (!state.artifactAction) return;
+    state.artifactAction.actionType = value;
+    state.artifactAction.title = document.getElementById("artifact-action-title")?.value || "";
+    state.artifactAction.target = document.getElementById("artifact-action-target")?.value || "";
+    state.artifactAction.instructions = document.getElementById("artifact-action-instructions")?.value || "";
+    const options = actionConnectorOptions(value);
+    state.artifactAction.connectorInstallationId = options[0]?.id || "";
+    if (!state.artifactAction.target && options[0]?.target) state.artifactAction.target = options[0].target;
     renderWorkspace();
   }
 
@@ -4482,11 +4574,14 @@
     const title = (document.getElementById("artifact-action-title")?.value || "").trim();
     const target = (document.getElementById("artifact-action-target")?.value || "").trim();
     const instructions = (document.getElementById("artifact-action-instructions")?.value || "").trim();
+    const connectorInstallationId = (document.getElementById("artifact-action-connector")?.value || "").trim();
+    const connector = connectorById(connectorInstallationId);
 
     pending.actionType = actionType;
     pending.title = title;
     pending.target = target;
     pending.instructions = instructions;
+    pending.connectorInstallationId = connectorInstallationId;
 
     if (!ARTIFACT_ACTION_TYPES[actionType]) {
       state.artifactActionError = "Choose an action type before queueing this artifact.";
@@ -4516,7 +4611,11 @@
           title: title || ARTIFACT_ACTION_TYPES[actionType].label,
           target,
           instructions,
-          payload: { queued_from: "team_workspace" },
+          payload: {
+            queued_from: "team_workspace",
+            connector_installation_id: connectorInstallationId || null,
+            connector_provider: connector?.provider || null,
+          },
         }),
       });
       showToast(`Artifact action queued for approval${data?.approval_id ? ` (${String(data.approval_id).slice(0, 8)})` : ""}.`);
@@ -4912,6 +5011,22 @@
     const options = Object.entries(ARTIFACT_ACTION_TYPES)
       .map(([key, meta]) => `<option value="${esc(key)}" ${key === pending.actionType ? "selected" : ""}>${esc(meta.label)}</option>`)
       .join("");
+    const connectors = actionConnectorOptions(pending.actionType);
+    const selectedConnectorId = pending.connectorInstallationId || connectors[0]?.id || "";
+    if (!pending.connectorInstallationId && connectors[0]) pending.connectorInstallationId = connectors[0].id;
+    const connectorOptions = connectors.length
+      ? connectors.map(connector => {
+          const target = connector.target ? ` · ${connector.target}` : "";
+          return `<option value="${esc(connector.id)}" ${String(connector.id) === String(selectedConnectorId) ? "selected" : ""}>${esc(connector.providerName)} · ${esc(connector.name)}${esc(target)}</option>`;
+        }).join("")
+      : `<option value="">Approval only - connect a destination first</option>`;
+    const connectionHelper = state.integrationsLoading
+      ? "Loading connected destinations..."
+      : state.integrationsError
+        ? state.integrationsError
+        : connectors.length
+          ? "After approval, AgentID will deliver this action through the selected connection."
+          : "No active destination is connected for this action. Connect a webhook, Slack, or GitHub destination first.";
 
     return `
       <div class="artifact-modal-backdrop" onclick="closeArtifactAction()" role="presentation">
@@ -4919,7 +5034,7 @@
           <div class="artifact-modal-head">
             <div>
               <div class="artifact-modal-title">Queue Artifact Action</div>
-              <div class="artifact-modal-meta">Creates a pending approval request from this artifact. It does not execute Jira, email, CRM, calendar, or webhook connectors until an integration handles the approved request.</div>
+              <div class="artifact-modal-meta">Creates a pending approval request from this artifact. If a connection is selected, AgentID executes it only after approval.</div>
             </div>
             <div class="artifact-modal-actions">
               <button id="artifact-action-submit" class="tiny-btn primary" type="button" onclick="submitArtifactAction()">Queue for approval</button>
@@ -4935,7 +5050,12 @@
             <div class="assignment-action-grid">
               <div>
                 <label class="field-label" for="artifact-action-type">Action type</label>
-                <select id="artifact-action-type">${options}</select>
+                <select id="artifact-action-type" onchange="changeArtifactActionType(this.value)">${options}</select>
+              </div>
+              <div>
+                <label class="field-label" for="artifact-action-connector">Deliver with</label>
+                <select id="artifact-action-connector" ${connectors.length ? "" : "disabled"}>${connectorOptions}</select>
+                <div class="helper-copy" style="margin-top:0.35rem;">${esc(connectionHelper)} <a href="connections.html" style="cursor:pointer;">Manage connections</a></div>
               </div>
               <div>
                 <label class="field-label" for="artifact-action-title">Action title</label>
@@ -5809,6 +5929,9 @@
     agent_redirected:                         "↷",
     assignment_revision_requested:             "↺",
     artifact_action_requested:                 "↗",
+    artifact_action_executed:                  "✓",
+    artifact_action_failed:                    "✗",
+    artifact_action_needs_connector:           "!",
     synthesis_started:                        "⚡",
     synthesis_completed:                      "⚡",
     run_completed:                            "🏁",
@@ -5832,6 +5955,9 @@
     agent_redirected:                         "Agent redirected",
     assignment_revision_requested:             "Revision requested",
     artifact_action_requested:                 "Artifact action queued",
+    artifact_action_executed:                  "Artifact action executed",
+    artifact_action_failed:                    "Artifact action failed",
+    artifact_action_needs_connector:           "Connection needed",
     synthesis_started:                        "Merging outputs",
     synthesis_completed:                      "Outputs merged",
     run_completed:                            "Run completed",
@@ -5855,6 +5981,9 @@
     agent_redirected:                         "An operator redirected the assignment with new instructions and created a durable follow-up assignment.",
     assignment_revision_requested:             "An operator requested a concrete revision and the run created a follow-up assignment.",
     artifact_action_requested:                 "An operator turned a final or agent artifact into a pending approval-backed action request.",
+    artifact_action_executed:                  "An approved artifact action was delivered through a connected external destination.",
+    artifact_action_failed:                    "AgentID tried to deliver an approved artifact action, but the connected destination returned an error.",
+    artifact_action_needs_connector:           "The artifact action was approved, but no active destination was connected for execution.",
     synthesis_started:                        "All accepted outputs are being merged into a single coherent final answer.",
     synthesis_completed:                      "The synthesis model produced a merged output from all agent contributions.",
     run_completed:                            "The run finished successfully. The final answer is ready.",
@@ -6272,6 +6401,7 @@
     runAssignmentAction,
     openArtifactAction,
     closeArtifactAction,
+    changeArtifactActionType,
     submitArtifactAction,
     openFinalArtifact,
     closeFinalArtifact,

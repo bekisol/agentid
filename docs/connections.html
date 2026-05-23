@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentID - Connections</title>
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self' 'unsafe-inline';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             font-src https://fonts.gstatic.com;
+             connect-src https://api.agentid-protocol.com https://fonts.googleapis.com https://fonts.gstatic.com;
+             img-src 'self' data:;
+             frame-ancestors 'none';" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    html { font-size:80%; }
+    *, *::before, *::after { box-sizing:border-box; }
+    :root {
+      --bg:#f7f4ef;
+      --surface:#fff;
+      --surface2:#f1ede6;
+      --ink:#1e1b18;
+      --muted:#756f66;
+      --line:#ddd6cb;
+      --line2:#c7bfb2;
+      --accent:#c15f28;
+      --accent2:#0f766e;
+      --green:#16803c;
+      --red:#bc2f2f;
+      --blue:#2f6fb3;
+      --shadow:0 18px 55px rgba(38,29,18,0.12);
+    }
+    html[data-theme="dark"] {
+      --bg:#101114;
+      --surface:#17191f;
+      --surface2:#20232b;
+      --ink:#f3efe8;
+      --muted:#aaa198;
+      --line:#303642;
+      --line2:#455066;
+      --accent:#f08b53;
+      --accent2:#5eead4;
+      --green:#4ade80;
+      --red:#f87171;
+      --blue:#60a5fa;
+      --shadow:0 18px 60px rgba(0,0,0,0.3);
+    }
+    body {
+      margin:0;
+      min-height:100vh;
+      background:var(--bg);
+      color:var(--ink);
+      font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      line-height:1.5;
+    }
+    a { color:inherit; text-decoration:none; }
+    .topbar {
+      height:64px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:1.25rem;
+      padding:0 2rem;
+      border-bottom:1px solid var(--line);
+      background:var(--surface);
+      position:sticky;
+      top:0;
+      z-index:20;
+    }
+    .brand {
+      font-family:"Playfair Display",Georgia,serif;
+      font-size:1.8rem;
+      font-weight:800;
+      font-style:italic;
+      letter-spacing:-0.02em;
+      white-space:nowrap;
+    }
+    .brand span { color:var(--accent); }
+    .nav {
+      display:flex;
+      align-items:center;
+      gap:1.25rem;
+      color:var(--muted);
+      font-weight:700;
+    }
+    .nav a { padding:0.4rem 0; border-bottom:2px solid transparent; }
+    .nav a.active { color:var(--ink); border-bottom-color:var(--accent); }
+    .top-right {
+      display:flex;
+      align-items:center;
+      gap:0.75rem;
+      color:var(--muted);
+      font-size:0.85rem;
+    }
+    .btn {
+      border:1px solid var(--line2);
+      background:var(--surface);
+      color:var(--ink);
+      border-radius:8px;
+      padding:0.55rem 0.85rem;
+      font:inherit;
+      font-weight:800;
+      cursor:pointer;
+    }
+    .btn:hover { border-color:var(--accent); color:var(--accent); }
+    .btn.primary { background:var(--ink); color:var(--surface); border-color:var(--ink); }
+    .btn.primary:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .btn.danger { color:var(--red); border-color:color-mix(in srgb, var(--red), var(--line) 35%); }
+    .btn:disabled { opacity:0.55; cursor:not-allowed; }
+    .shell {
+      max-width:1180px;
+      margin:0 auto;
+      padding:2rem;
+    }
+    .hero {
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 320px;
+      gap:1rem;
+      align-items:stretch;
+      margin-bottom:1.25rem;
+    }
+    .hero-main,
+    .hero-side,
+    .card,
+    .modal {
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:8px;
+      box-shadow:var(--shadow);
+    }
+    .hero-main { padding:1.5rem; }
+    .eyebrow {
+      color:var(--accent);
+      font-size:0.82rem;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+      font-weight:800;
+      margin-bottom:0.45rem;
+    }
+    h1 {
+      margin:0;
+      font-family:"Playfair Display",Georgia,serif;
+      font-size:clamp(2rem,4vw,3.8rem);
+      line-height:0.98;
+      letter-spacing:0;
+    }
+    .hero-main p {
+      max-width:760px;
+      color:var(--muted);
+      font-size:1.02rem;
+      margin:0.85rem 0 0;
+    }
+    .hero-side {
+      padding:1.15rem;
+      display:grid;
+      gap:0.75rem;
+      align-content:center;
+    }
+    .metric {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      border-bottom:1px solid var(--line);
+      padding-bottom:0.65rem;
+    }
+    .metric:last-child { border-bottom:0; padding-bottom:0; }
+    .metric strong { font-size:1.4rem; }
+    .metric span { color:var(--muted); font-weight:700; }
+    .toolbar {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:1rem;
+      margin:1.25rem 0;
+    }
+    .toolbar h2 { margin:0; font-size:1rem; }
+    .toolbar p { margin:0.15rem 0 0; color:var(--muted); }
+    .grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+      gap:1rem;
+    }
+    .card {
+      box-shadow:none;
+      padding:1rem;
+      display:flex;
+      flex-direction:column;
+      min-height:260px;
+    }
+    .card-top {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:1rem;
+      margin-bottom:0.75rem;
+    }
+    .provider-name { font-size:1.12rem; font-weight:900; }
+    .summary { color:var(--muted); margin:0.35rem 0 0; font-size:0.9rem; }
+    .badge {
+      display:inline-flex;
+      align-items:center;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:0.22rem 0.55rem;
+      font-size:0.74rem;
+      font-weight:900;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .badge.connected { color:var(--green); border-color:color-mix(in srgb, var(--green), var(--line) 45%); }
+    .badge.setup { color:var(--blue); border-color:color-mix(in srgb, var(--blue), var(--line) 45%); }
+    .actions {
+      display:flex;
+      flex-wrap:wrap;
+      gap:0.35rem;
+      margin:0.9rem 0;
+    }
+    .pill {
+      background:var(--surface2);
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:0.2rem 0.5rem;
+      color:var(--muted);
+      font-size:0.75rem;
+      font-weight:800;
+    }
+    .installations {
+      margin-top:auto;
+      border-top:1px solid var(--line);
+      padding-top:0.75rem;
+      display:grid;
+      gap:0.55rem;
+    }
+    .installation {
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:0.7rem;
+      background:var(--surface2);
+    }
+    .installation-head {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:0.75rem;
+      margin-bottom:0.35rem;
+    }
+    .installation strong { overflow-wrap:anywhere; }
+    .muted { color:var(--muted); }
+    .small { font-size:0.82rem; }
+    #auth-wall {
+      min-height:calc(100vh - 64px);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:2rem;
+    }
+    .auth-card {
+      width:min(420px,100%);
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:1.4rem;
+      box-shadow:var(--shadow);
+    }
+    .auth-card h2 { margin:0 0 0.4rem; }
+    .auth-card p { color:var(--muted); margin:0 0 1rem; }
+    input,
+    select,
+    textarea {
+      width:100%;
+      border:1px solid var(--line2);
+      background:var(--surface);
+      color:var(--ink);
+      border-radius:8px;
+      padding:0.65rem 0.75rem;
+      font:inherit;
+    }
+    input:focus,
+    select:focus,
+    textarea:focus { outline:2px solid color-mix(in srgb, var(--accent), transparent 70%); border-color:var(--accent); }
+    label {
+      display:block;
+      font-size:0.78rem;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:0.06em;
+      color:var(--muted);
+      margin:0 0 0.35rem;
+    }
+    .field { margin-bottom:0.85rem; }
+    .help { margin-top:0.3rem; color:var(--muted); font-size:0.78rem; }
+    .modal-backdrop {
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:1rem;
+      z-index:50;
+    }
+    .modal-backdrop.open { display:flex; }
+    .modal {
+      width:min(620px,100%);
+      max-height:90vh;
+      overflow:auto;
+      box-shadow:var(--shadow);
+      padding:1.1rem;
+    }
+    .modal-head {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:1rem;
+      margin-bottom:1rem;
+    }
+    .modal-title { font-size:1.15rem; font-weight:900; }
+    .check-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+      gap:0.45rem;
+    }
+    .check-row {
+      display:flex;
+      align-items:center;
+      gap:0.45rem;
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:0.5rem;
+      background:var(--surface2);
+      font-weight:800;
+      color:var(--muted);
+    }
+    .check-row input { width:auto; }
+    .toast {
+      position:fixed;
+      right:1rem;
+      bottom:1rem;
+      background:var(--ink);
+      color:var(--surface);
+      padding:0.8rem 1rem;
+      border-radius:8px;
+      box-shadow:var(--shadow);
+      display:none;
+      z-index:60;
+      max-width:360px;
+    }
+    .toast.show { display:block; }
+    .error { color:var(--red); margin-top:0.65rem; font-weight:700; }
+    @media (max-width:820px) {
+      .topbar { height:auto; padding:1rem; flex-wrap:wrap; }
+      .nav { order:3; width:100%; overflow-x:auto; }
+      .shell { padding:1rem; }
+      .hero { grid-template-columns:1fr; }
+      h1 { font-size:2.2rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="dashboard.html">Agent<span>ID</span></a>
+    <nav class="nav">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="messages.html">Messages</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="team-workspace.html">Team Workspace</a>
+      <a href="connections.html" class="active">Connections</a>
+    </nav>
+    <div class="top-right">
+      <button class="btn" type="button" onclick="toggleTheme()" id="theme-btn">Light theme</button>
+      <span id="user-label"></span>
+    </div>
+  </header>
+
+  <section id="auth-wall">
+    <div class="auth-card">
+      <h2>Open Connections</h2>
+      <p>Sign in once, then connect AgentID to webhooks, automation tools, and native integrations as they become available.</p>
+      <div class="field">
+        <input id="apikey-input" type="password" placeholder="Paste your API key" autocomplete="off" />
+      </div>
+      <button class="btn primary" type="button" onclick="signIn()">Sign in</button>
+      <div class="error" id="auth-error"></div>
+    </div>
+  </section>
+
+  <main class="shell" id="app" style="display:none;">
+    <section class="hero">
+      <div class="hero-main">
+        <div class="eyebrow">Connection Center</div>
+        <h1>Connect once. Let approved work leave the workspace.</h1>
+        <p>Users see a simple connect, approve, execute flow. The underlying registry keeps each connector modular, so adding Slack, GitHub, Jira, or CRM later does not require redesigning Team Workspace.</p>
+      </div>
+      <div class="hero-side" id="summary"></div>
+    </section>
+
+    <div class="toolbar">
+      <div>
+        <h2>Available connections</h2>
+        <p>Universal Webhook is executable today. Native connectors appear from the same registry when enabled.</p>
+      </div>
+      <button class="btn" type="button" onclick="loadCatalog(true)">Refresh</button>
+    </div>
+
+    <section class="grid" id="provider-grid"></section>
+  </main>
+
+  <div class="modal-backdrop" id="connect-modal" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title" id="modal-title">Connect</div>
+          <div class="muted small" id="modal-sub"></div>
+        </div>
+        <button class="btn" type="button" onclick="closeModal()">Close</button>
+      </div>
+      <div id="modal-body"></div>
+      <div class="error" id="modal-error"></div>
+      <div style="display:flex;justify-content:flex-end;gap:0.6rem;margin-top:1rem;">
+        <button class="btn" type="button" onclick="closeModal()">Cancel</button>
+        <button class="btn primary" type="button" id="modal-submit" onclick="submitConnection()">Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  "use strict";
+
+  const BASE = "https://api.agentid-protocol.com";
+  const THEME_KEY = "agentid_connections_theme";
+  let apiKey = sessionStorage.getItem("agentid_key")
+            || localStorage.getItem("agentid_persisted_key")
+            || localStorage.getItem("agentid_key")
+            || "";
+  let catalog = { providers: [], summary: {}, actions: [] };
+  let modalProvider = null;
+
+  function esc(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function applyTheme() {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved) document.documentElement.dataset.theme = saved;
+    document.getElementById("theme-btn").textContent =
+      document.documentElement.dataset.theme === "dark" ? "Light theme" : "Dark theme";
+  }
+
+  function toggleTheme() {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem(THEME_KEY, next);
+    applyTheme();
+  }
+
+  async function apiFetch(path, opts = {}) {
+    const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+    if (apiKey) headers["x-api-key"] = apiKey;
+    const res = await fetch(`${BASE}${path}`, { ...opts, credentials: "include", headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const raw = data.detail ?? data.error ?? data.message ?? `HTTP ${res.status}`;
+      throw new Error(typeof raw === "string" ? raw : (raw.message || raw.error || JSON.stringify(raw)));
+    }
+    return data;
+  }
+
+  function showToast(message, isError = false) {
+    const el = document.getElementById("toast");
+    el.textContent = message;
+    el.style.background = isError ? "var(--red)" : "var(--ink)";
+    el.classList.add("show");
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => el.classList.remove("show"), 3600);
+  }
+
+  function showAuth() {
+    document.getElementById("auth-wall").style.display = "flex";
+    document.getElementById("app").style.display = "none";
+  }
+
+  function showApp(email = "") {
+    document.getElementById("auth-wall").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    document.getElementById("user-label").textContent = email;
+  }
+
+  async function signIn() {
+    const input = document.getElementById("apikey-input");
+    const err = document.getElementById("auth-error");
+    const entered = (input.value || "").trim();
+    if (!entered) return;
+    err.textContent = "";
+    try {
+      const res = await fetch(`${BASE}/auth/me`, { headers: { "x-api-key": entered }, credentials: "include" });
+      if (!res.ok) throw new Error("Invalid API key");
+      const me = await res.json();
+      apiKey = entered;
+      sessionStorage.setItem("agentid_key", apiKey);
+      localStorage.setItem("agentid_persisted_key", apiKey);
+      showApp(me.email || "");
+      await loadCatalog(true);
+    } catch (e) {
+      err.textContent = e.message || "Could not sign in";
+    }
+  }
+
+  async function boot() {
+    applyTheme();
+    if (!apiKey) {
+      showAuth();
+      return;
+    }
+    try {
+      const me = await apiFetch("/auth/me");
+      showApp(me.email || "");
+      await loadCatalog(true);
+    } catch (_) {
+      showAuth();
+    }
+  }
+
+  async function loadCatalog(force = false) {
+    if (!force && catalog.providers.length) return;
+    document.getElementById("provider-grid").innerHTML = `<div class="card">Loading connections...</div>`;
+    try {
+      catalog = await apiFetch("/pro/integrations/catalog");
+      render();
+    } catch (e) {
+      document.getElementById("provider-grid").innerHTML = `<div class="card"><strong>Could not load connections</strong><p class="summary">${esc(e.message)}</p></div>`;
+    }
+  }
+
+  function renderSummary() {
+    const connected = catalog.summary?.connected || 0;
+    const total = catalog.providers?.length || 0;
+    const executable = (catalog.providers || []).filter(p => p.execution === "native" && p.availability === "available").length;
+    document.getElementById("summary").innerHTML = `
+      <div class="metric"><span>Connected</span><strong>${connected}</strong></div>
+      <div class="metric"><span>Providers</span><strong>${total}</strong></div>
+      <div class="metric"><span>Executable now</span><strong>${executable}</strong></div>
+    `;
+  }
+
+  function availabilityBadge(provider) {
+    if (provider.connected) return `<span class="badge connected">Connected</span>`;
+    if (provider.availability === "available") return `<span class="badge setup">Ready</span>`;
+    if (provider.availability === "planned") return `<span class="badge">Planned</span>`;
+    return `<span class="badge">Setup needed</span>`;
+  }
+
+  function renderProvider(provider) {
+    const actions = (provider.actions || [])
+      .map(action => `<span class="pill">${esc(action.label || action.key)}</span>`)
+      .join("");
+    const installations = (provider.installations || []).length
+      ? provider.installations.map(install => {
+          const target = install.config?.default_target || install.config?.endpoint_url || "No default target";
+          const last = install.last_tested_at ? `Last tested ${new Date(install.last_tested_at).toLocaleString()}` : "Not tested yet";
+          const err = install.last_error ? `<div class="small" style="color:var(--red);">${esc(install.last_error)}</div>` : "";
+          return `
+            <div class="installation">
+              <div class="installation-head">
+                <strong>${esc(install.display_name)}</strong>
+                <span class="badge connected">${esc(install.status)}</span>
+              </div>
+              <div class="muted small">${esc(target)}</div>
+              <div class="muted small">${esc(last)}</div>
+              ${err}
+              <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.55rem;">
+                <button class="btn" type="button" onclick="testConnection('${esc(install.id)}')">Test</button>
+                <button class="btn danger" type="button" onclick="deleteConnection('${esc(install.id)}')">Disconnect</button>
+              </div>
+            </div>`;
+        }).join("")
+      : `<div class="muted small">No active installation yet.</div>`;
+
+    const canConnect = provider.connection_mode === "form" && provider.availability === "available";
+    const connectButton = canConnect
+      ? `<button class="btn primary" type="button" onclick="openConnect('${esc(provider.provider)}')">${esc(provider.setup_label || "Connect")}</button>`
+      : `<button class="btn" type="button" disabled>${esc(provider.setup_label || "Unavailable")}</button>`;
+    const fallback = provider.provider !== "webhook"
+      ? `<button class="btn" type="button" onclick="openConnect('webhook')">Use webhook instead</button>`
+      : "";
+
+    return `
+      <article class="card">
+        <div class="card-top">
+          <div>
+            <div class="provider-name">${esc(provider.name)}</div>
+            <p class="summary">${esc(provider.summary)}</p>
+          </div>
+          ${availabilityBadge(provider)}
+        </div>
+        <div class="actions">${actions}</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.85rem;">${connectButton}${fallback}</div>
+        <div class="installations">${installations}</div>
+      </article>`;
+  }
+
+  function render() {
+    renderSummary();
+    document.getElementById("provider-grid").innerHTML =
+      (catalog.providers || []).map(renderProvider).join("") || `<div class="card">No connectors returned by the API.</div>`;
+  }
+
+  function openConnect(providerId) {
+    const provider = (catalog.providers || []).find(item => item.provider === providerId);
+    if (!provider) return;
+    modalProvider = provider;
+    document.getElementById("modal-title").textContent = `Connect ${provider.name}`;
+    document.getElementById("modal-sub").textContent = provider.summary || "";
+    document.getElementById("modal-error").textContent = "";
+    const fields = provider.connect_schema?.fields || [];
+    const fieldHtml = fields.map(field => `
+      <div class="field">
+        <label for="field-${esc(field.name)}">${esc(field.label)}${field.required ? " *" : ""}</label>
+        <input id="field-${esc(field.name)}" type="${esc(field.type || "text")}" placeholder="${esc(field.placeholder || "")}" autocomplete="off" />
+        ${field.help ? `<div class="help">${esc(field.help)}</div>` : ""}
+      </div>
+    `).join("");
+    const actionHtml = (provider.actions || []).map(action => `
+      <label class="check-row">
+        <input type="checkbox" class="action-check" value="${esc(action.key)}" checked />
+        <span>${esc(action.label || action.key)}</span>
+      </label>
+    `).join("");
+    document.getElementById("modal-body").innerHTML = `
+      <div class="field">
+        <label for="connection-name">Connection name</label>
+        <input id="connection-name" value="${esc(provider.default_display_name || provider.name)}" autocomplete="off" />
+      </div>
+      ${fieldHtml}
+      <div class="field">
+        <label>Allowed actions</label>
+        <div class="check-grid">${actionHtml}</div>
+      </div>
+    `;
+    document.getElementById("connect-modal").classList.add("open");
+    setTimeout(() => document.getElementById("connection-name")?.focus(), 0);
+  }
+
+  function closeModal() {
+    modalProvider = null;
+    document.getElementById("connect-modal").classList.remove("open");
+  }
+
+  async function submitConnection() {
+    if (!modalProvider) return;
+    const submit = document.getElementById("modal-submit");
+    const error = document.getElementById("modal-error");
+    const config = {};
+    (modalProvider.connect_schema?.fields || []).forEach(field => {
+      config[field.name] = document.getElementById(`field-${field.name}`)?.value || "";
+    });
+    const enabled = [...document.querySelectorAll(".action-check:checked")].map(item => item.value);
+    submit.disabled = true;
+    submit.textContent = "Connecting...";
+    error.textContent = "";
+    try {
+      await apiFetch(`/pro/integrations/providers/${encodeURIComponent(modalProvider.provider)}/installations`, {
+        method: "POST",
+        body: JSON.stringify({
+          display_name: document.getElementById("connection-name")?.value || modalProvider.default_display_name,
+          config,
+          enabled_actions: enabled,
+        }),
+      });
+      closeModal();
+      showToast(`${modalProvider.name} connected.`);
+      await loadCatalog(true);
+    } catch (e) {
+      error.textContent = e.message || "Could not connect.";
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "Connect";
+    }
+  }
+
+  async function testConnection(id) {
+    try {
+      await apiFetch(`/pro/integrations/installations/${encodeURIComponent(id)}/test`, { method: "POST" });
+      showToast("Connection test succeeded.");
+      await loadCatalog(true);
+    } catch (e) {
+      showToast(e.message || "Connection test failed.", true);
+      await loadCatalog(true);
+    }
+  }
+
+  async function deleteConnection(id) {
+    if (!confirm("Disconnect this integration?")) return;
+    try {
+      await apiFetch(`/pro/integrations/installations/${encodeURIComponent(id)}`, { method: "DELETE" });
+      showToast("Connection removed.");
+      await loadCatalog(true);
+    } catch (e) {
+      showToast(e.message || "Could not disconnect.", true);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("apikey-input")?.addEventListener("keydown", e => {
+      if (e.key === "Enter") signIn();
+    });
+    boot();
+  });
+  </script>
+</body>
+</html>
