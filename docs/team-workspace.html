@@ -1508,6 +1508,414 @@
   .run-status-dot.dot-yellow { background:var(--yellow); }
   .run-status-dot.dot-red    { background:var(--red); }
   .run-status-dot.dot-gray   { background:#374151; border:1px solid #4b5563; }
+
+  /* ── Phase 1 operations workspace ─────────────────────────────────────── */
+  .ops-workspace {
+    display:flex;
+    flex-direction:column;
+    gap:1rem;
+  }
+  .mission-control {
+    position:sticky;
+    top:0;
+    z-index:12;
+    border:1.9px solid var(--border);
+    border-radius:22px;
+    background:rgba(244,239,231,0.96);
+    box-shadow:var(--shadow);
+    padding:0.95rem 1rem;
+    backdrop-filter:blur(10px);
+  }
+  html[data-theme="dark"] .mission-control {
+    background:rgba(18,24,33,0.96);
+  }
+  .mission-control-grid {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:1rem;
+    align-items:start;
+  }
+  .mission-eyebrow {
+    display:flex;
+    align-items:center;
+    gap:0.45rem;
+    flex-wrap:wrap;
+    color:var(--muted);
+    font-size:0.72rem;
+    font-weight:900;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+  }
+  .mission-title {
+    margin-top:0.32rem;
+    font-family:"Source Serif 4", Georgia, serif;
+    font-size:2rem;
+    line-height:1.02;
+    color:var(--text);
+    font-weight:700;
+  }
+  .mission-brief {
+    margin-top:0.38rem;
+    color:var(--text-2);
+    font-size:0.88rem;
+    line-height:1.55;
+    max-width:68rem;
+  }
+  .mission-actions {
+    display:flex;
+    align-items:flex-start;
+    justify-content:flex-end;
+    gap:0.5rem;
+    flex-wrap:wrap;
+  }
+  .mission-stats {
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:0.58rem;
+    margin-top:0.85rem;
+  }
+  .mission-stat {
+    border:1.45px solid var(--border);
+    border-radius:14px;
+    background:rgba(255,255,255,0.42);
+    padding:0.62rem 0.7rem;
+    min-height:64px;
+  }
+  .mission-stat strong {
+    display:block;
+    color:var(--text);
+    font-size:1.02rem;
+    font-weight:900;
+  }
+  .mission-stat span {
+    display:block;
+    margin-top:0.18rem;
+    color:var(--muted);
+    font-size:0.63rem;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    font-weight:900;
+  }
+  .mission-launch {
+    position:relative;
+  }
+  .mission-launch summary {
+    list-style:none;
+  }
+  .mission-launch summary::-webkit-details-marker {
+    display:none;
+  }
+  .mission-launch-body {
+    position:absolute;
+    right:0;
+    top:calc(100% + 0.55rem);
+    width:min(560px, 86vw);
+    border:1.7px solid var(--border);
+    border-radius:18px;
+    background:var(--paper);
+    box-shadow:var(--shadow);
+    padding:0.9rem;
+    z-index:20;
+  }
+  .mission-launch-body textarea {
+    min-height:112px;
+  }
+  .agent-board {
+    border:1.7px solid var(--border);
+    border-radius:22px;
+    background:var(--paper);
+    box-shadow:0 10px 24px rgba(43,36,27,0.05);
+    padding:0.95rem 1rem;
+  }
+  .ops-section-head {
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:0.75rem;
+    margin-bottom:0.78rem;
+  }
+  .ops-section-title {
+    font-family:"Source Serif 4", Georgia, serif;
+    font-size:1.4rem;
+    color:var(--text);
+    font-weight:700;
+    line-height:1.1;
+  }
+  .ops-section-note {
+    margin-top:0.18rem;
+    color:var(--muted);
+    font-size:0.8rem;
+    line-height:1.45;
+  }
+  .agent-card-grid {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(220px,1fr));
+    gap:0.72rem;
+    overflow-x:auto;
+    padding-bottom:0.1rem;
+  }
+  .agent-card {
+    border:1.5px solid var(--border);
+    border-radius:16px;
+    background:rgba(255,255,255,0.46);
+    padding:0.82rem 0.86rem;
+    min-height:210px;
+    display:flex;
+    flex-direction:column;
+  }
+  .agent-card.working {
+    border-color:var(--blue);
+    box-shadow:0 0 0 2px var(--blue-bg);
+  }
+  .agent-card.completed {
+    border-color:var(--green);
+    box-shadow:0 0 0 2px var(--green-bg);
+  }
+  .agent-card.attention {
+    border-color:var(--red);
+    box-shadow:0 0 0 2px var(--red-bg);
+  }
+  .agent-card-top {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.6rem;
+  }
+  .agent-name {
+    font-size:0.9rem;
+    font-weight:900;
+    color:var(--text);
+    line-height:1.3;
+  }
+  .agent-capability {
+    margin-top:0.18rem;
+    color:var(--muted);
+    font-size:0.72rem;
+    font-weight:800;
+  }
+  .agent-task {
+    margin-top:0.62rem;
+    color:var(--text-2);
+    font-size:0.8rem;
+    line-height:1.52;
+    flex:1;
+  }
+  .agent-metrics {
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.32rem;
+    margin-top:0.65rem;
+  }
+  .agent-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.35rem;
+    margin-top:0.7rem;
+  }
+  .tiny-btn[disabled] {
+    opacity:0.46;
+    cursor:not-allowed;
+  }
+  .ops-body {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(310px,360px);
+    gap:1rem;
+    align-items:start;
+  }
+  .work-products {
+    display:flex;
+    flex-direction:column;
+    gap:0.85rem;
+  }
+  .work-card {
+    border:1.7px solid var(--border);
+    border-radius:22px;
+    background:var(--paper);
+    box-shadow:0 10px 24px rgba(43,36,27,0.05);
+    padding:1rem 1.05rem;
+  }
+  .work-card.final-work {
+    border-color:var(--green);
+    background:linear-gradient(180deg, rgba(29,122,58,0.06), var(--paper));
+  }
+  .work-card-head {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.75rem;
+    margin-bottom:0.62rem;
+  }
+  .work-card-title {
+    font-size:1rem;
+    font-weight:900;
+    color:var(--text);
+    line-height:1.35;
+  }
+  .work-card-meta {
+    color:var(--muted);
+    font-size:0.72rem;
+    line-height:1.45;
+    margin-top:0.16rem;
+  }
+  .work-card-body {
+    color:var(--text-2);
+    font-size:0.86rem;
+    line-height:1.68;
+    word-break:break-word;
+  }
+  .work-card-body h1,
+  .work-card-body h2,
+  .work-card-body h3,
+  .work-card-body h4 {
+    margin:0.8rem 0 0.32rem;
+    color:var(--text);
+  }
+  .work-card-body p {
+    margin:0 0 0.55rem;
+  }
+  .work-card-body ul,
+  .work-card-body ol {
+    margin:0 0 0.55rem;
+    padding-left:1.25rem;
+  }
+  .work-card-body pre {
+    overflow:auto;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:0.65rem;
+    background:var(--surface2);
+  }
+  .ops-side {
+    position:sticky;
+    top:1rem;
+    display:flex;
+    flex-direction:column;
+    gap:0.85rem;
+  }
+  .intervention-card,
+  .activity-card {
+    border:1.7px solid var(--border);
+    border-radius:22px;
+    background:var(--paper);
+    box-shadow:0 10px 24px rgba(43,36,27,0.05);
+    padding:0.95rem 1rem;
+  }
+  .attention-row {
+    border:1.45px solid var(--border);
+    border-radius:14px;
+    background:rgba(255,255,255,0.42);
+    padding:0.74rem 0.78rem;
+    margin-bottom:0.62rem;
+  }
+  .attention-row.urgent {
+    border-color:#9a7a16;
+    background:var(--yellow-bg);
+  }
+  .attention-row strong {
+    display:block;
+    color:var(--text);
+    font-size:0.86rem;
+  }
+  .attention-row span {
+    display:block;
+    margin-top:0.18rem;
+    color:var(--text-2);
+    font-size:0.77rem;
+    line-height:1.48;
+  }
+  .context-injector {
+    margin-top:0.72rem;
+    padding-top:0.72rem;
+    border-top:1px dashed rgba(43,36,27,0.28);
+  }
+  .context-injector textarea {
+    min-height:86px;
+  }
+  .activity-feed {
+    display:flex;
+    flex-direction:column;
+    gap:0.55rem;
+  }
+  .activity-item {
+    border-left:3px solid var(--border-2);
+    padding:0.2rem 0 0.25rem 0.58rem;
+  }
+  .activity-item.live {
+    border-left-color:var(--accent);
+  }
+  .activity-item strong {
+    display:block;
+    color:var(--text);
+    font-size:0.78rem;
+  }
+  .activity-item span {
+    display:block;
+    margin-top:0.14rem;
+    color:var(--muted);
+    font-size:0.72rem;
+    line-height:1.42;
+  }
+  .audit-drawer {
+    border:1.7px solid var(--border);
+    border-radius:22px;
+    background:var(--paper);
+    box-shadow:0 10px 24px rgba(43,36,27,0.05);
+    overflow:hidden;
+  }
+  .audit-drawer > summary {
+    list-style:none;
+    cursor:pointer;
+    padding:0.95rem 1rem;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.8rem;
+  }
+  .audit-drawer > summary::-webkit-details-marker {
+    display:none;
+  }
+  .audit-drawer-body {
+    border-top:1px solid var(--border);
+    padding:1rem;
+    display:flex;
+    flex-direction:column;
+    gap:0.9rem;
+  }
+  html[data-theme="dark"] .mission-stat,
+  html[data-theme="dark"] .agent-card,
+  html[data-theme="dark"] .attention-row {
+    background:rgba(255,255,255,0.035);
+  }
+  @media (max-width:1320px) {
+    .agent-card-grid {
+      grid-template-columns:repeat(3,minmax(220px,1fr));
+    }
+    .ops-body {
+      grid-template-columns:1fr;
+    }
+    .ops-side {
+      position:static;
+    }
+  }
+  @media (max-width:980px) {
+    .mission-control-grid {
+      grid-template-columns:1fr;
+    }
+    .mission-actions {
+      justify-content:flex-start;
+    }
+    .mission-stats {
+      grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+    .agent-card-grid {
+      grid-template-columns:1fr;
+    }
+    .mission-launch-body {
+      position:static;
+      width:100%;
+      margin-top:0.55rem;
+    }
+  }
   </style>
 </head>
 <body>
@@ -3102,6 +3510,361 @@
     return buckets;
   }
 
+  function scorePct(value) {
+    if (value == null) return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return `${Math.round(n <= 1 ? n * 100 : n)}%`;
+  }
+
+  function assignmentTone(status) {
+    const s = status || "assigned";
+    if (s === "completed") return "completed";
+    if (["running", "working"].includes(s)) return "working";
+    if (["failed", "rejected", "reassigned", "denied", "cancelled"].includes(s)) return "attention";
+    return "planned";
+  }
+
+  function assignmentCapability(assign, planItem = {}) {
+    return assign?.required_capability || planItem?.capability || "general";
+  }
+
+  function findPlanForAssignment(assign, plan) {
+    return (plan || []).find(item => item.agent_did === assign.agent_did && item.subtask === assign.subtask)
+      || (plan || []).find(item => item.agent_did === assign.agent_did)
+      || {};
+  }
+
+  function missionPrimaryAction(run) {
+    if (!run) return "";
+    if (run.status === "paused_for_approval") {
+      return `<button class="action-btn primary" onclick="approveCurrentPlan()">Approve plan</button>`;
+    }
+    if (run.status === "paused_for_user") {
+      return `<button class="action-btn primary" onclick="focusClarificationBox()">Answer clarification</button>`;
+    }
+    if (run.status === "completed") {
+      return `<button class="action-btn primary" onclick="downloadRunReport()">Export final</button>`;
+    }
+    if (!isTerminal(run.status)) {
+      return `<button class="action-btn primary" onclick="focusContextInjector()">Add context</button>`;
+    }
+    return `<button class="action-btn primary" onclick="downloadRunReport()">Download report</button>`;
+  }
+
+  function buildMissionControl({ run, plan, completed, elapsedSec, avgTrustValue, selectedGroup }) {
+    const missionSeed = state.taskDraft != null ? state.taskDraft : (run?.user_task || "");
+    const activeCount = state.runs.filter(item => !isTerminal(item.status)).length;
+    const waitingCount = state.runs.filter(item => ["paused_for_user", "paused_for_approval"].includes(item.status)).length;
+    const missionTitle = selectedGroup?.name || `Team ${state.selectedGroupId}`;
+    return `
+      <section class="mission-control" data-doc-section="mission">
+        <div class="mission-control-grid">
+          <div>
+            <div class="mission-eyebrow">
+              <span>Mission Control</span>
+              <span>${runBadge(run.status)}</span>
+              <span>${activeCount} active</span>
+              <span>${waitingCount} waiting on humans</span>
+            </div>
+            <div class="mission-title">${esc(missionTitle)}</div>
+            <div class="mission-brief">${esc(run.user_task || "No mission text recorded for this run.")}</div>
+          </div>
+          <div class="mission-actions">
+            ${missionPrimaryAction(run)}
+            <button class="action-btn" onclick="refreshCurrentRun()">Refresh</button>
+            ${!isTerminal(run.status) ? `<button class="action-btn" onclick="cancelCurrentRun()">Stop run</button>` : ""}
+            <details class="mission-launch" id="mission-launch">
+              <summary class="action-btn">New mission</summary>
+              <div class="mission-launch-body">
+                <div class="command-card-title">Launch Team Run</div>
+                <div class="helper-copy">Start work directly from the workspace. The orchestrator will split the mission across this team.</div>
+                <div class="control-stack">
+                  <label class="field-label" for="team-task-input">Mission for the team</label>
+                  <textarea id="team-task-input" class="control-textarea" placeholder="Give the team a concrete objective, expected output, and constraints.">${esc(missionSeed)}</textarea>
+                  <div class="control-row">
+                    <button class="tiny-btn primary" onclick="createTeamRun()">Start team run</button>
+                    ${run?.user_task ? `<button class="tiny-btn" onclick="seedCurrentMission()">Reuse current mission</button>` : ""}
+                    <button class="tiny-btn" onclick="clearTeamTaskComposer()">Clear</button>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+        <div class="mission-stats">
+          <div class="mission-stat"><strong>${(run.assignments || []).length}</strong><span>Assignments</span></div>
+          <div class="mission-stat"><strong>${completed}</strong><span>Completed</span></div>
+          <div class="mission-stat"><strong>${plan.length}</strong><span>Planned work units</span></div>
+          <div class="mission-stat"><strong>${fmtDuration(elapsedSec)}</strong><span>Elapsed</span></div>
+          <div class="mission-stat"><strong>${avgTrustValue != null ? avgTrustValue : "n/a"}</strong><span>Avg trust</span></div>
+        </div>
+      </section>`;
+  }
+
+  function buildAgentBoard(run, plan) {
+    const assignments = run.assignments || [];
+    const rows = assignments.length
+      ? assignments.map((assign, idx) => ({ assign, idx, planItem: findPlanForAssignment(assign, plan) }))
+      : (plan || []).map((item, idx) => ({
+          idx,
+          planItem: item,
+          assign: {
+            agent_did: item.agent_did,
+            subtask: item.subtask,
+            status: "assigned",
+            required_capability: item.capability,
+            trust_score_at_assignment: item.trust_score_at_assignment ?? item.trust_score,
+            risk_level: item.risk_level,
+          },
+        }));
+
+    if (!rows.length) {
+      return `
+        <section class="agent-board" data-doc-section="agents">
+          <div class="ops-section-head">
+            <div>
+              <div class="ops-section-title">Agent Board</div>
+              <div class="ops-section-note">Agents will appear here as soon as the orchestrator records a plan.</div>
+            </div>
+          </div>
+          <div class="empty">No assigned agents yet.</div>
+        </section>`;
+    }
+
+    const cards = rows.map(({ assign, idx, planItem }) => {
+      const tone = assignmentTone(assign.status);
+      const capability = assignmentCapability(assign, planItem);
+      const trust = assign.trust_score_at_assignment ?? planItem.trust_score_at_assignment ?? planItem.trust_score;
+      const quality = scorePct(assign.quality_score);
+      const outputText = toPlainText(assign.output);
+      const risk = assign.risk_level || planItem.risk_level || "medium";
+      return `
+        <article class="agent-card ${tone}">
+          <div class="agent-card-top">
+            <div>
+              <div class="agent-name">${esc(agentName(assign.agent_did))}</div>
+              <div class="agent-capability">${esc(capability)} · ${esc(assign.resolved_permission_level || "contribute")}</div>
+            </div>
+            ${runBadge(assign.status || "assigned")}
+          </div>
+          <div class="agent-task">${esc(assign.subtask || planItem.subtask || "Waiting for assigned work.")}</div>
+          <div class="agent-metrics">
+            ${trust != null ? `<span class="trust-chip">trust ${Math.round(Number(trust))}</span>` : ""}
+            ${quality ? `<span class="trust-chip">${quality} quality</span>` : ""}
+            ${assign.candidate_score != null ? `<span class="trust-chip">suit. ${Math.round(assign.candidate_score * 100)}%</span>` : ""}
+            <span class="trust-chip">${esc(risk)} risk</span>
+          </div>
+          ${assign.rejection_reason ? `<div class="output-meta" style="margin-top:0.55rem;">Blocked: ${esc(assign.rejection_reason)}</div>` : ""}
+          <div class="agent-actions">
+            <button class="tiny-btn" ${outputText ? `onclick="scrollToWorkProduct(${idx})"` : "disabled"}>Review output</button>
+            <button class="tiny-btn" onclick="document.querySelector('[data-doc-section=timeline]')?.scrollIntoView({behavior:'smooth',block:'start'})">Activity</button>
+          </div>
+        </article>`;
+    }).join("");
+
+    return `
+      <section class="agent-board" data-doc-section="agents">
+        <div class="ops-section-head">
+          <div>
+            <div class="ops-section-title">Agent Board</div>
+            <div class="ops-section-note">Each agent is visible as a worker with a task, status, trust state, and output path.</div>
+          </div>
+          <span class="trust-chip">${rows.length} worker${rows.length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="agent-card-grid">${cards}</div>
+      </section>`;
+  }
+
+  function buildWorkProducts(run) {
+    const assignments = run.assignments || [];
+    const outputCards = assignments
+      .map((assign, idx) => ({ assign, idx, outputText: toPlainText(assign.output) }))
+      .filter(item => item.outputText);
+
+    const finalCard = `
+      <article class="work-card final-work" data-doc-section="final">
+        <div class="work-card-head">
+          <div>
+            <div class="work-card-title">Final Deliverable</div>
+            <div class="work-card-meta">${isTerminal(run.status) ? "Terminal run state" : "Synthesis output appears here when ready."}</div>
+          </div>
+          <div class="ws-pill-row">
+            ${run.final_output ? `<button class="tiny-btn" onclick="beginEditFinalOutput()">Edit answer</button>` : ""}
+            <button class="tiny-btn" onclick="downloadRunReport()">Export</button>
+          </div>
+        </div>
+        ${state.editingFinalOutput
+          ? `<div style="display:flex;flex-direction:column;gap:0.55rem;">
+               <label class="field-label">Final answer (markdown)</label>
+               <textarea id="final-output-editor" style="min-height:18rem;font-size:0.82rem;">${esc(run.final_output || "")}</textarea>
+               <label class="field-label" style="margin-top:0.3rem;">Run summary <span style="color:var(--muted);font-weight:400;">(auto-generated - editable)</span></label>
+               <textarea id="run-summary-editor" style="min-height:4rem;font-size:0.8rem;">${esc(run.run_summary || "")}</textarea>
+               <div style="display:flex;gap:0.5rem;">
+                 <button class="tiny-btn primary" onclick="saveFinalOutput()">Save</button>
+                 <button class="tiny-btn" onclick="cancelEditFinalOutput()">Cancel</button>
+               </div>
+             </div>`
+          : (run.final_output
+              ? `<div class="work-card-body">${renderMd(run.final_output)}</div>${run.run_summary ? `<div class="final-summary">${esc(run.run_summary)}</div>` : ""}`
+              : `<div class="empty">The final merged answer will appear once accepted agent outputs are synthesized.</div>`)}
+      </article>`;
+
+    const outputHtml = outputCards.length
+      ? outputCards.map(({ assign, idx, outputText }) => `
+          <article class="work-card" id="work-product-${idx}">
+            <div class="work-card-head">
+              <div>
+                <div class="work-card-title">${esc(agentName(assign.agent_did))} Work Product</div>
+                <div class="work-card-meta">${esc(assign.required_capability || "general")} · ${esc(assign.subtask || "Assigned output")}</div>
+              </div>
+              <div class="ws-pill-row">
+                ${assign.quality_score != null ? `<span class="trust-chip">${scorePct(assign.quality_score)} quality</span>` : ""}
+                ${runBadge(assign.status || "completed")}
+              </div>
+            </div>
+            <div class="work-card-body">${renderMd(outputText)}</div>
+            <div class="note-actions">
+              <button class="tiny-btn" onclick="document.querySelector('[data-doc-section=intervention]')?.scrollIntoView({behavior:'smooth',block:'start'})">Discuss</button>
+              <button class="tiny-btn" disabled title="Request revision needs a dedicated run-action endpoint.">Request revision</button>
+            </div>
+          </article>`).join("")
+      : `<article class="work-card">
+          <div class="work-card-title">Agent Work Products</div>
+          <div class="empty" style="margin-top:0.6rem;">Accepted agent outputs will appear as reviewable work cards instead of a chat transcript.</div>
+        </article>`;
+
+    return `
+      <section class="work-products" data-doc-section="work-products">
+        <div class="ops-section-head">
+          <div>
+            <div class="ops-section-title">Work Products</div>
+            <div class="ops-section-note">Outputs are treated as artifacts the operator can review, discuss, export, or turn into later actions.</div>
+          </div>
+        </div>
+        ${finalCard}
+        ${outputHtml}
+      </section>`;
+  }
+
+  function buildInterventionColumn(run, plan, timelineEvents) {
+    const isApproval = run.status === "paused_for_approval";
+    const isClarification = run.status === "paused_for_user";
+    const isLive = !isTerminal(run.status);
+    const attentionCopy = isApproval
+      ? `${plan.length} planned assignment${plan.length === 1 ? "" : "s"} need approval before dispatch.`
+      : isClarification
+        ? (run.pause_question || "The team needs clarification before it can continue.")
+        : run.status === "synthesizing"
+          ? "Agents are done. The orchestrator is merging accepted outputs."
+          : isTerminal(run.status)
+            ? "Run is complete or stopped. Review the deliverable and export evidence."
+            : "No blocker is waiting on you right now.";
+
+    const activityHtml = timelineEvents.length
+      ? timelineEvents.slice(0, 8).map((ev, idx) => {
+          const data = ev.event_data || ev.data || {};
+          const subtitle =
+            data.reason ||
+            data.pause_question ||
+            data.status ||
+            data.clarification ||
+            data.output_preview ||
+            (ev.agent_did ? agentName(ev.agent_did) : "Orchestrator");
+          return `<div class="activity-item${idx === 0 ? " live" : ""}">
+            <strong>${esc(formatEventLabel(ev.event_type))}</strong>
+            <span>${esc(relTime(ev.ts || ev.created_at))} · ${esc(previewText(subtitle, 104))}</span>
+          </div>`;
+        }).join("")
+      : `<div class="empty">Live activity will appear when this run starts moving.</div>`;
+
+    return `
+      <aside class="ops-side" data-doc-section="intervention">
+        <section class="intervention-card">
+          <div class="ops-section-title">Needs Your Attention</div>
+          <div class="attention-row${isApproval || isClarification ? " urgent" : ""}" style="margin-top:0.75rem;">
+            <strong>${isApproval ? "Plan approval required" : isClarification ? "Clarification required" : isLive ? "Run is operating" : "Review complete"}</strong>
+            <span>${esc(attentionCopy)}</span>
+          </div>
+          ${isApproval ? `<button class="tiny-btn primary" onclick="approveCurrentPlan()">Approve &amp; dispatch</button>` : ""}
+          ${isClarification ? `
+            <div class="side-form">
+              <label class="field-label" for="clarification-input">Reply to the team</label>
+              <textarea id="clarification-input" placeholder="Answer the question so the run can continue..."></textarea>
+              <div class="note-actions">
+                <button class="tiny-btn primary" onclick="submitRunClarification()">Send clarification</button>
+                <button class="tiny-btn" onclick="refreshCurrentRun()">Refresh</button>
+              </div>
+            </div>` : ""}
+          <div class="context-injector">
+            <label class="field-label" for="run-context-input">Add operator context</label>
+            <textarea id="run-context-input" placeholder="Save context, constraints, or decision notes for this team..."></textarea>
+            <div class="note-actions">
+              <button class="tiny-btn primary" onclick="saveRunContextNote()">Save context</button>
+              ${!isTerminal(run.status) ? `<button class="tiny-btn" onclick="cancelCurrentRun()">Stop run</button>` : ""}
+            </div>
+            <div class="helper-copy">Phase 1 uses team memory for operator context. A later run-action endpoint can inject context directly into a live worker.</div>
+          </div>
+        </section>
+        <section class="activity-card">
+          <div class="ops-section-head" style="margin-bottom:0.6rem;">
+            <div>
+              <div class="ops-section-title">Live Activity</div>
+              <div class="ops-section-note">Compact event feed. Full audit lives below.</div>
+            </div>
+          </div>
+          <div class="activity-feed">${activityHtml}</div>
+        </section>
+      </aside>`;
+  }
+
+  function buildAuditExport(run, timelineEvents, decisionHtml, contextHtml) {
+    return `
+      <details class="audit-drawer" data-doc-section="audit">
+        <summary>
+          <div>
+            <div class="ops-section-title">Audit &amp; Export</div>
+            <div class="ops-section-note">Timeline, decisions, context, causal graph, sign-off, and evidence exports are available without dominating the work surface.</div>
+          </div>
+          <div class="ws-pill-row">
+            <span class="trust-chip">${timelineEvents.length} events</span>
+            <span class="trust-chip">evidence ready</span>
+          </div>
+        </summary>
+        <div class="audit-drawer-body">
+          <section class="doc-section" data-doc-section="timeline">
+            <h3>Live Timeline</h3>
+            <p class="lede">Full event stream. Click an event to expand detail.</p>
+            ${buildLiveTimeline(timelineEvents, run)}
+          </section>
+          <section class="doc-section" data-doc-section="decisions">
+            <h3>Decisions</h3>
+            <p class="lede">Rejections, reassignments, approvals, clarifications, and terminal run state.</p>
+            <div class="decision-list">${decisionHtml}</div>
+          </section>
+          <section class="doc-section" data-doc-section="context">
+            <h3>Context Used</h3>
+            <p class="lede">Shared artifacts and context captured during the run.</p>
+            <div class="col-2">${contextHtml}</div>
+          </section>
+          <section class="doc-section" data-doc-section="graph" id="graph-section">
+            <h3>Audit Graph</h3>
+            <p class="lede">Causal event DAG. Click a node to inspect trust state and trace decisions to the run root.</p>
+            <div id="cg-container">
+              <div class="cg-load-btn">
+                <button class="tiny-btn primary" onclick="loadCausalGraph()">Load causal graph</button>
+              </div>
+            </div>
+          </section>
+          <section class="doc-section" data-doc-section="signoff">
+            <h3>Sign-off &amp; Export</h3>
+            <p class="lede">Evidence pack bundles graph, trust snapshots, and platform signature for compliance review.</p>
+            ${buildSignoffSection(run)}
+          </section>
+        </div>
+      </details>`;
+  }
+
   function renderWorkspace() {
     const run = state.run;
     if (!run) {
@@ -3273,141 +4036,23 @@
 
     const root = document.getElementById("workspace-root");
     root.innerHTML = `
-      ${buildTeamCommandPanel(run)}
-      <div class="hero">
-        <div class="hero-top">
-          <div>
-            <div class="hero-title">${esc(selectedGroup?.name || `Team ${state.selectedGroupId}`)} · Living Run Memo</div>
-            <div class="hero-sub">Trusted team execution as a readable working document. The run stays inspectable, attributable, and interruptible without dropping back into the Messages drawer.</div>
-          </div>
-          <div class="hero-actions">
-            <button class="action-btn" onclick="location.href='messages.html'">Back to Messages</button>
-            <button class="action-btn" onclick="refreshCurrentRun()">Refresh run</button>
-            <button class="action-btn" onclick="downloadRunReport()">Download report</button>
-            ${!isTerminal(run.status) ? `<button class="action-btn primary" onclick="cancelCurrentRun()">Stop run</button>` : ""}
-          </div>
+      <div class="ops-workspace">
+        ${buildMissionControl({ run, plan, completed, elapsedSec, avgTrustValue, selectedGroup })}
+        ${buildAgentBoard(run, plan)}
+        <div class="ops-body">
+          ${buildWorkProducts(run)}
+          ${buildInterventionColumn(run, plan, timelineEvents)}
         </div>
-        <div class="hero-kpis">
-          <div class="kpi"><div class="kpi-value">${(run.assignments || []).length}</div><div class="kpi-label">Assignments</div></div>
-          <div class="kpi"><div class="kpi-value">${completed}</div><div class="kpi-label">Completed</div></div>
-          <div class="kpi"><div class="kpi-value">${runBadge(run.status)}</div><div class="kpi-label">Run phase</div></div>
-          <div class="kpi"><div class="kpi-value">${fmtDuration(elapsedSec)}</div><div class="kpi-label">Elapsed</div></div>
-          ${avgTrustValue != null ? `<div class="kpi"><div class="kpi-value">${avgTrustValue}</div><div class="kpi-label">Avg trust</div></div>` : ""}
+        ${buildAuditExport(run, timelineEvents, decisionHtml, contextHtml)}
+        <div class="doc-foot">
+          <a onclick="downloadEvidencePack('${esc(String(run.id || ""))}')">Evidence pack</a>
+          <span class="sep">·</span>
+          <a onclick="downloadRunReport()">Export audit log (CSV)</a>
+          <span class="sep">·</span>
+          <a onclick="loadCausalGraph()">Causal graph</a>
+          <span class="sep">·</span>
+          <span>${esc(String(run.id || ""))} · ${esc(run.status || "")} · ${esc(run.created_at ? new Date(run.created_at).toLocaleString() : "")}</span>
         </div>
-      </div>
-      ${interventionHtml}
-      <nav class="doc-jumpbar">
-        ${navSections.map(s => `<button class="doc-jump${s.id === (state.activeDocSection || "mission") ? " active" : ""}" data-section="${s.id}" onclick="document.querySelector('[data-doc-section=${s.id}]')?.scrollIntoView({behavior:'smooth',block:'start'})">${s.title}</button>`).join("")}
-      </nav>
-      <div class="doc-shell">
-        <div class="doc-body">
-          <section class="doc-section" data-doc-section="mission">
-            <h3>Mission</h3>
-            <p class="lede">What the team is trying to accomplish right now.</p>
-            <div class="mission-copy">${esc(run.user_task || "")}</div>
-          </section>
-          <section class="doc-section" data-doc-section="plan">
-            <h3>The Plan</h3>
-            <p class="lede">What the orchestrator broke the mission into, and why each agent.</p>
-            ${planHtml}
-          </section>
-          <section class="doc-section" data-doc-section="happening">
-            <h3>What's happening</h3>
-            <p class="lede">Live narrative. Agent work lands here as readable run updates instead of raw system noise.</p>
-            ${run.status === "paused_for_user" ? `
-              <blockquote class="story warning">
-                <span class="who">Needs you now</span>
-                ${esc(run.pause_question || "The team needs clarification before it can continue.")}
-                <div class="inline-reply">
-                  <textarea id="clarification-input" placeholder="Reply inline to keep the run moving..."></textarea>
-                  <div style="display:flex;gap:0.5rem;align-items:flex-start;">
-                    <button class="tiny-btn primary" onclick="submitRunClarification()">Send</button>
-                    <button class="tiny-btn" onclick="refreshCurrentRun()">Refresh</button>
-                  </div>
-                </div>
-              </blockquote>` : ""}
-            ${outputsHtml}
-          </section>
-          <section class="doc-section" data-doc-section="context">
-            <h3>Context used</h3>
-            <p class="lede">Shared artifacts and context that shaped the run.</p>
-            <div class="col-2">${contextHtml}</div>
-          </section>
-          <section class="doc-section" data-doc-section="decisions">
-            <h3>Decisions</h3>
-            <p class="lede">Why the run changed shape: rejections, reassignments, approvals, and clarifications.</p>
-            <div class="decision-list">${decisionHtml}</div>
-          </section>
-          <section class="doc-section" data-doc-section="timeline">
-            <h3>Live timeline</h3>
-            <p class="lede">Full event stream — every orchestrator decision, agent action, and policy enforcement in order. Click an event to expand detail.</p>
-            ${buildLiveTimeline(timelineEvents, run)}
-          </section>
-          <section class="doc-section" data-doc-section="assignments">
-            <h3>Assignments</h3>
-            <p class="lede">Role, status, quality, and permission history for each agent task in this run.</p>
-            <div class="output-list">${assignmentHtml}</div>
-          </section>
-          <section class="doc-section" data-doc-section="graph" id="graph-section">
-            <h3>Audit Graph</h3>
-            <p class="lede">Causal event DAG — every decision traced back to its source. Click a node to inspect trust state. Use Trace to walk any event back to the run root.</p>
-            <div id="cg-container">
-              <div class="cg-load-btn">
-                <button class="tiny-btn primary" onclick="loadCausalGraph()">Load causal graph</button>
-              </div>
-            </div>
-          </section>
-          <section class="doc-section" data-doc-section="signoff">
-            <h3>Sign-off &amp; export</h3>
-            <p class="lede">Evidence pack bundles the causal graph, participant trust snapshots, and a platform HMAC-SHA256 signature over canonical JSON — suitable for compliance review.</p>
-            ${buildSignoffSection(run)}
-          </section>
-          <section class="doc-section final-panel" data-doc-section="final">
-            <h3>Final answer</h3>
-            <p class="lede">${isTerminal(run.status) ? "The run is in a terminal state." : "Waiting for synthesis to merge accepted work into one answer."}</p>
-            ${run.final_output
-              ? (state.editingFinalOutput
-                ? `<div style="display:flex;flex-direction:column;gap:0.55rem;">
-                     <label class="field-label">Final answer (markdown)</label>
-                     <textarea id="final-output-editor" style="min-height:18rem;font-size:0.82rem;">${esc(run.final_output)}</textarea>
-                     <label class="field-label" style="margin-top:0.3rem;">Run summary <span style="color:var(--muted);font-weight:400;">(auto-generated — editable)</span></label>
-                     <textarea id="run-summary-editor" style="min-height:4rem;font-size:0.8rem;">${esc(run.run_summary || "")}</textarea>
-                     <div style="display:flex;gap:0.5rem;">
-                       <button class="tiny-btn primary" onclick="saveFinalOutput()">Save</button>
-                       <button class="tiny-btn" onclick="cancelEditFinalOutput()">Cancel</button>
-                     </div>
-                   </div>`
-                : `<div style="display:flex;justify-content:flex-end;margin-bottom:0.55rem;">
-                     <button class="tiny-btn" onclick="beginEditFinalOutput()">Edit answer</button>
-                   </div>
-                   <div class="final-copy">${renderMd(run.final_output)}</div>
-                   ${run.run_summary ? `<div class="final-summary">${esc(run.run_summary)}</div>` : ""}`)
-              : `<div class="empty">The final merged answer will appear here once synthesis finishes.</div>`}
-          </section>
-        </div>
-      </div>
-      <div class="doc-foot">
-        <a onclick="downloadEvidencePack('${esc(String(run.id || ""))}')">Evidence pack</a>
-        <span class="sep">·</span>
-        <a onclick="downloadRunReport()">Export audit log (CSV)</a>
-        <span class="sep">·</span>
-        <a onclick="loadCausalGraph()">Causal graph</a>
-        <span class="sep">·</span>
-        <span>${esc(String(run.id || ""))} · ${esc(run.status || "")} · ${esc(run.created_at ? new Date(run.created_at).toLocaleString() : "")}</span>
-      </div>
-      <div class="ws-dock">
-        <button class="${timelineEvents.length ? "has-dot" : ""}" onclick="document.querySelector('[data-doc-section=timeline]')?.scrollIntoView({behavior:'smooth',block:'start'})">
-          <span class="d-label">Live timeline · ${timelineEvents.length} events</span>T
-        </button>
-        <button onclick="document.querySelector('[data-doc-section=graph]')?.scrollIntoView({behavior:'smooth',block:'start'})">
-          <span class="d-label">Audit graph</span>G
-        </button>
-        <button onclick="document.querySelector('[data-doc-section=signoff]')?.scrollIntoView({behavior:'smooth',block:'start'})">
-          <span class="d-label">Sign-off &amp; export</span>S
-        </button>
-        <button onclick="document.querySelector('[data-doc-section=decisions]')?.scrollIntoView({behavior:'smooth',block:'start'})">
-          <span class="d-label">Decisions</span>D
-        </button>
       </div>`;
     requestAnimationFrame(bindWorkspaceSidebarInteractions);
   }
@@ -3606,6 +4251,43 @@
       await refreshCurrentRun();
     } catch (e) {
       showToast(e.message || "Could not approve the plan.", true);
+    }
+  }
+
+  function focusClarificationBox() {
+    document.querySelector("[data-doc-section=intervention]")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => document.getElementById("clarification-input")?.focus(), 220);
+  }
+
+  function focusContextInjector() {
+    document.querySelector("[data-doc-section=intervention]")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => document.getElementById("run-context-input")?.focus(), 220);
+  }
+
+  function scrollToWorkProduct(idx) {
+    const target = document.getElementById(`work-product-${idx}`);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function saveRunContextNote() {
+    if (!state.selectedGroupId) return;
+    const input = document.getElementById("run-context-input");
+    const content = (input?.value || "").trim();
+    if (!content) {
+      showToast("Add context before saving it.", true);
+      return;
+    }
+    try {
+      await fetchJson(`/pro/groups/${state.selectedGroupId}/memory`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (input) input.value = "";
+      showToast("Operator context saved to team memory.");
+      await refreshGroupMemory();
+    } catch (e) {
+      showToast(e.message || "Could not save operator context.", true);
     }
   }
 
