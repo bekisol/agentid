@@ -2476,6 +2476,8 @@
     finalArtifactOpen: false,
     assignmentAction: null,
     assignmentActionError: "",
+    artifactAction: null,
+    artifactActionError: "",
     taskDraft: null,
     activeDocSection: "mission",
     sectionObserver: null,
@@ -2632,6 +2634,7 @@
       agent_reassigned: "Agent reassigned",
       agent_redirected: "Agent redirected",
       assignment_revision_requested: "Revision requested",
+      artifact_action_requested: "Artifact action queued",
       context_written: "Context written",
       clarification_requested: "Clarification needed",
       clarification_received: "Clarification received",
@@ -3405,6 +3408,7 @@
       "agent_reassigned",
       "agent_redirected",
       "assignment_revision_requested",
+      "artifact_action_requested",
       "clarification_requested",
       "clarification_received",
       "approval_requested",
@@ -3485,7 +3489,7 @@
   }
 
   function sectionTargetForEventType(type) {
-    if (["clarification_requested", "clarification_received", "approval_requested", "approval_granted", "orchestrator_rejected", "agent_reassigned", "agent_redirected", "assignment_revision_requested", "run_failed", "run_cancelled"].includes(type)) {
+    if (["clarification_requested", "clarification_received", "approval_requested", "approval_granted", "orchestrator_rejected", "agent_reassigned", "agent_redirected", "assignment_revision_requested", "artifact_action_requested", "run_failed", "run_cancelled"].includes(type)) {
       return "decisions";
     }
     if (["run_completed", "synthesis_started"].includes(type)) {
@@ -3556,6 +3560,17 @@
       });
     });
 
+    document.querySelectorAll("[data-artifact-action]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        openArtifactAction(
+          btn.dataset.artifactType || "final_output",
+          btn.dataset.assignmentId || ""
+        );
+      });
+    });
+
     const scrollRoot = document.querySelector(".main-scroll");
     const sections = [...document.querySelectorAll("[data-doc-section]")];
     if (!scrollRoot || !sections.length) return;
@@ -3593,6 +3608,7 @@
     agent_reassigned:               "decision",
     agent_redirected:               "decision",
     assignment_revision_requested:   "decision",
+    artifact_action_requested:       "decision",
     synthesis_started:              "output",
     synthesis_completed:            "output",
     approval_requested:             "review",
@@ -3622,6 +3638,7 @@
       agent_reassigned:         "Agent reassigned",
       agent_redirected:         "Agent redirected",
       assignment_revision_requested: "Revision requested",
+      artifact_action_requested: "Artifact action queued",
       synthesis_started:        "Synthesis started",
       synthesis_completed:      "Synthesis completed",
       approval_requested:       "Approval requested",
@@ -3694,6 +3711,11 @@
         return `${what("Operator")} redirected ${who} · ${esc(previewText(d.instructions || d.reason || "follow-up assignment started", 90))}`;
       case "assignment_revision_requested":
         return `${what("Operator")} requested revision from ${who} · ${esc(previewText(d.instructions || "follow-up assignment started", 90))}`;
+      case "artifact_action_requested": {
+        const label = d.action_label || (d.action_type || "artifact action").replace(/_/g, " ");
+        const target = d.target ? ` → ${pill(d.target)}` : "";
+        return `${what("Operator")} queued ${pill(label)} from ${esc((d.artifact_type || "artifact").replace(/_/g, " "))}${target}`;
+      }
       case "approval_requested": {
         const cap = d.capability || d.required_capability || "action";
         return `${who} requested capability ${pill(cap)} · ${what("awaiting approval")}`;
@@ -4158,18 +4180,26 @@
           : "",
       };
     }
+    const actionPayload = item.action_payload || {};
+    const isArtifactAction = item.action_category === "artifact_action";
     return {
       id: item.id || item.approval_id,
       source,
       sourceLabel: "ACP",
       agent_did: item.agent_did || "",
-      category: item.action_label || item.action_category || "Agent action",
+      category: isArtifactAction
+        ? (actionPayload.action_label || "Artifact action")
+        : (item.action_label || item.action_category || "Agent action"),
       status: item.status || "pending",
       created_at: item.created_at,
       resolved_at: item.resolved_at,
-      payload: normalizeActionPayload(item.action_payload),
+      payload: isArtifactAction
+        ? `${actionPayload.title || actionPayload.action_label || "Artifact action"} · ${previewText(actionPayload.instructions || actionPayload.artifact_preview || "", 170)}`
+        : normalizeActionPayload(actionPayload),
       note: item.reviewer_note || "",
-      caveat: "Approves or rejects the queued action through ACP. Execution depends on the originating workflow resuming it.",
+      caveat: isArtifactAction
+        ? "Approval records owner intent. Connector execution is not automatic until a real integration consumes the approved request."
+        : "Approves or rejects the queued action through ACP. Execution depends on the originating workflow resuming it.",
     };
   }
 
@@ -4371,6 +4401,133 @@
 
   function runAssignmentAction(action, assignmentId, currentAgentDid = "") {
     openAssignmentAction(action, assignmentId, currentAgentDid);
+  }
+
+  const ARTIFACT_ACTION_TYPES = {
+    create_ticket: {
+      label: "Create ticket",
+      targetLabel: "Project or queue",
+      targetPlaceholder: "Linear/Jira project, backlog, or owner",
+      instructionsPlaceholder: "Describe the ticket that should be created, acceptance criteria, priority, and evidence to attach.",
+    },
+    draft_email: {
+      label: "Draft email",
+      targetLabel: "Recipient or audience",
+      targetPlaceholder: "legal@company.com, customer name, or team alias",
+      instructionsPlaceholder: "Describe the email goal, tone, recipient, required claims, and anything to avoid.",
+    },
+    schedule_review: {
+      label: "Schedule review",
+      targetLabel: "Review owner",
+      targetPlaceholder: "Person, team, or calendar owner",
+      instructionsPlaceholder: "Describe the review meeting, attendees, desired timing, and decision needed.",
+    },
+    send_to_legal: {
+      label: "Send to legal",
+      targetLabel: "Legal owner",
+      targetPlaceholder: "Legal team, reviewer, or intake queue",
+      instructionsPlaceholder: "Describe what legal should review, the risk area, deadline, and required response format.",
+    },
+    update_crm: {
+      label: "Update CRM",
+      targetLabel: "Account or opportunity",
+      targetPlaceholder: "Account name, CRM object, or owner",
+      instructionsPlaceholder: "Describe the CRM update, fields to change, source evidence, and follow-up owner.",
+    },
+    trigger_workflow: {
+      label: "Trigger workflow",
+      targetLabel: "Workflow",
+      targetPlaceholder: "Workflow name, webhook, or automation id",
+      instructionsPlaceholder: "Describe the workflow to run, inputs to pass, and approval constraints.",
+    },
+  };
+
+  function openArtifactAction(artifactType = "final_output", assignmentId = "") {
+    const run = state.run;
+    if (!run) return;
+    if (artifactType === "final_output" && !run.final_output) {
+      showToast("Final result artifact is not ready yet.", true);
+      return;
+    }
+    if (artifactType === "assignment_output") {
+      const assignment = (run.assignments || []).find(item => String(item.id) === String(assignmentId));
+      if (!assignment || !toPlainText(assignment.output)) {
+        showToast("This agent output is not ready to turn into an action yet.", true);
+        return;
+      }
+    }
+    state.artifactAction = {
+      artifactType,
+      assignmentId: assignmentId || "",
+      actionType: "create_ticket",
+      title: "",
+      target: "",
+      instructions: "",
+    };
+    state.artifactActionError = "";
+    renderWorkspace();
+    requestAnimationFrame(() => document.getElementById("artifact-action-type")?.focus());
+  }
+
+  function closeArtifactAction() {
+    state.artifactAction = null;
+    state.artifactActionError = "";
+    renderWorkspace();
+  }
+
+  async function submitArtifactAction() {
+    const pending = state.artifactAction;
+    if (!pending || !state.selectedRunId) return;
+    const actionType = (document.getElementById("artifact-action-type")?.value || "").trim();
+    const title = (document.getElementById("artifact-action-title")?.value || "").trim();
+    const target = (document.getElementById("artifact-action-target")?.value || "").trim();
+    const instructions = (document.getElementById("artifact-action-instructions")?.value || "").trim();
+
+    pending.actionType = actionType;
+    pending.title = title;
+    pending.target = target;
+    pending.instructions = instructions;
+
+    if (!ARTIFACT_ACTION_TYPES[actionType]) {
+      state.artifactActionError = "Choose an action type before queueing this artifact.";
+      renderWorkspace();
+      return;
+    }
+    if (!instructions) {
+      state.artifactActionError = "Add instructions so the approval request is actionable.";
+      renderWorkspace();
+      return;
+    }
+
+    const submitBtn = document.getElementById("artifact-action-submit");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Queueing...";
+    }
+
+    try {
+      const data = await fetchJson(`/pro/groups/runs/${encodeURIComponent(state.selectedRunId)}/artifact-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artifact_type: pending.artifactType,
+          assignment_id: pending.assignmentId || null,
+          action_type: actionType,
+          title: title || ARTIFACT_ACTION_TYPES[actionType].label,
+          target,
+          instructions,
+          payload: { queued_from: "team_workspace" },
+        }),
+      });
+      showToast(`Artifact action queued for approval${data?.approval_id ? ` (${String(data.approval_id).slice(0, 8)})` : ""}.`);
+      state.artifactAction = null;
+      state.artifactActionError = "";
+      await refreshCurrentRun();
+    } catch (e) {
+      state.artifactActionError = e.message || "Could not queue artifact action.";
+      showToast(state.artifactActionError, true);
+      renderWorkspace();
+    }
   }
 
   function missionPrimaryAction(run) {
@@ -4582,6 +4739,7 @@
           <div class="ws-pill-row">
             ${run.final_output ? `<button class="tiny-btn primary" onclick="event.stopPropagation();openFinalArtifact('view')">Open result</button>` : ""}
             ${run.final_output ? `<button class="tiny-btn" onclick="event.stopPropagation();openFinalArtifact('edit')">Edit</button>` : ""}
+            ${run.final_output ? `<button class="tiny-btn" type="button" data-artifact-action="queue" data-artifact-type="final_output">Queue action</button>` : ""}
             <button class="tiny-btn" onclick="event.stopPropagation();downloadRunReport()">Export</button>
           </div>
         </div>
@@ -4609,6 +4767,7 @@
               ${assign.id && !["paused_for_approval", "synthesizing", "failed", "cancelled"].includes(run.status || "")
                 ? `<button class="tiny-btn" type="button" data-assignment-action="request_revision" data-assignment-id="${esc(assign.id)}" data-agent-did="${esc(assign.agent_did)}">Request revision</button>`
                 : ""}
+              <button class="tiny-btn" type="button" data-artifact-action="queue" data-artifact-type="assignment_output" data-assignment-id="${esc(assign.id)}">Queue action</button>
             </div>
           </article>`).join("")
       : `<article class="work-card">
@@ -4645,6 +4804,7 @@
                 ? `<button class="tiny-btn primary" onclick="saveFinalOutput()">Save changes</button>
                    <button class="tiny-btn" onclick="cancelEditFinalOutput()">Cancel edit</button>`
                 : `<button class="tiny-btn primary" onclick="beginEditFinalOutput()">Edit result</button>
+                   <button class="tiny-btn" type="button" data-artifact-action="queue" data-artifact-type="final_output">Queue action</button>
                    <button class="tiny-btn" onclick="downloadRunReport()">Export</button>`}
               <button class="tiny-btn" onclick="closeFinalArtifact()">Close</button>
             </div>
@@ -4731,6 +4891,66 @@
               </div>
             </div>
             <div class="helper-copy">Submitting creates a backend follow-up assignment, logs the decision, and refreshes this workspace when dispatch starts.</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function buildArtifactActionModal(run) {
+    const pending = state.artifactAction;
+    if (!pending) return "";
+    const selected = ARTIFACT_ACTION_TYPES[pending.actionType] || ARTIFACT_ACTION_TYPES.create_ticket;
+    const sourceAssignment = pending.artifactType === "assignment_output"
+      ? (run.assignments || []).find(item => String(item.id) === String(pending.assignmentId))
+      : null;
+    const sourceTitle = pending.artifactType === "final_output"
+      ? "Final Result Artifact"
+      : `${agentName(sourceAssignment?.agent_did)} Work Product`;
+    const sourceCopy = pending.artifactType === "final_output"
+      ? previewText(run.final_output || "", 220)
+      : previewText(sourceAssignment?.output || sourceAssignment?.subtask || "", 220);
+    const options = Object.entries(ARTIFACT_ACTION_TYPES)
+      .map(([key, meta]) => `<option value="${esc(key)}" ${key === pending.actionType ? "selected" : ""}>${esc(meta.label)}</option>`)
+      .join("");
+
+    return `
+      <div class="artifact-modal-backdrop" onclick="closeArtifactAction()" role="presentation">
+        <div class="artifact-modal assignment-action-modal" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Queue artifact action">
+          <div class="artifact-modal-head">
+            <div>
+              <div class="artifact-modal-title">Queue Artifact Action</div>
+              <div class="artifact-modal-meta">Creates a pending approval request from this artifact. It does not execute Jira, email, CRM, calendar, or webhook connectors until an integration handles the approved request.</div>
+            </div>
+            <div class="artifact-modal-actions">
+              <button id="artifact-action-submit" class="tiny-btn primary" type="button" onclick="submitArtifactAction()">Queue for approval</button>
+              <button class="tiny-btn" type="button" onclick="closeArtifactAction()">Cancel</button>
+            </div>
+          </div>
+          <div class="artifact-modal-body assignment-action-body">
+            <div class="assignment-action-summary">
+              <strong>${esc(sourceTitle)}</strong>
+              <span>${esc(sourceCopy || "Artifact source will be attached to the approval request.")}</span>
+            </div>
+            ${state.artifactActionError ? `<div class="assignment-action-error">${esc(state.artifactActionError)}</div>` : ""}
+            <div class="assignment-action-grid">
+              <div>
+                <label class="field-label" for="artifact-action-type">Action type</label>
+                <select id="artifact-action-type">${options}</select>
+              </div>
+              <div>
+                <label class="field-label" for="artifact-action-title">Action title</label>
+                <input id="artifact-action-title" value="${esc(pending.title || "")}" placeholder="${esc(selected.label)} from ${esc(sourceTitle)}" autocomplete="off" />
+              </div>
+              <div>
+                <label class="field-label" for="artifact-action-target">${esc(selected.targetLabel)}</label>
+                <input id="artifact-action-target" value="${esc(pending.target || "")}" placeholder="${esc(selected.targetPlaceholder)}" autocomplete="off" />
+              </div>
+              <div>
+                <label class="field-label" for="artifact-action-instructions">Instructions</label>
+                <textarea id="artifact-action-instructions" placeholder="${esc(selected.instructionsPlaceholder)}">${esc(pending.instructions || "")}</textarea>
+              </div>
+            </div>
+            <div class="helper-copy">Approving the queued item records owner intent and provides a resume payload for the connector/workflow layer. Unsupported direct execution stays out of the UI.</div>
           </div>
         </div>
       </div>`;
@@ -5104,6 +5324,7 @@
         </div>
         ${buildAuditExport(run, timelineEvents, decisionHtml, contextHtml)}
         ${buildAssignmentActionModal(run)}
+        ${buildArtifactActionModal(run)}
         <div class="doc-foot">
           <a onclick="downloadEvidencePack('${esc(String(run.id || ""))}')">Evidence pack</a>
           <span class="sep">·</span>
@@ -5587,6 +5808,7 @@
     agent_reassigned:                         "↔",
     agent_redirected:                         "↷",
     assignment_revision_requested:             "↺",
+    artifact_action_requested:                 "↗",
     synthesis_started:                        "⚡",
     synthesis_completed:                      "⚡",
     run_completed:                            "🏁",
@@ -5609,6 +5831,7 @@
     agent_reassigned:                         "Agent reassigned",
     agent_redirected:                         "Agent redirected",
     assignment_revision_requested:             "Revision requested",
+    artifact_action_requested:                 "Artifact action queued",
     synthesis_started:                        "Merging outputs",
     synthesis_completed:                      "Outputs merged",
     run_completed:                            "Run completed",
@@ -5631,6 +5854,7 @@
     agent_reassigned:                         "An operator or orchestrator moved this work to another agent and created a durable follow-up assignment.",
     agent_redirected:                         "An operator redirected the assignment with new instructions and created a durable follow-up assignment.",
     assignment_revision_requested:             "An operator requested a concrete revision and the run created a follow-up assignment.",
+    artifact_action_requested:                 "An operator turned a final or agent artifact into a pending approval-backed action request.",
     synthesis_started:                        "All accepted outputs are being merged into a single coherent final answer.",
     synthesis_completed:                      "The synthesis model produced a merged output from all agent contributions.",
     run_completed:                            "The run finished successfully. The final answer is ready.",
@@ -6046,6 +6270,9 @@
     closeAssignmentAction,
     submitAssignmentAction,
     runAssignmentAction,
+    openArtifactAction,
+    closeArtifactAction,
+    submitArtifactAction,
     openFinalArtifact,
     closeFinalArtifact,
     beginEditFinalOutput,
