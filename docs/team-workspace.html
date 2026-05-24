@@ -1941,6 +1941,131 @@
     line-height:1.58;
     max-width:72ch;
   }
+  .governance-panel {
+    border:1.7px solid var(--border);
+    border-radius:22px;
+    background:var(--paper);
+    box-shadow:0 10px 24px rgba(43,36,27,0.05);
+    padding:0.95rem 1rem;
+  }
+  .governance-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));
+    gap:0.72rem;
+  }
+  .governance-card {
+    border:1.35px solid var(--border);
+    border-radius:16px;
+    background:rgba(255,255,255,0.34);
+    padding:0.78rem 0.82rem;
+    min-width:0;
+  }
+  .governance-card.wide {
+    grid-column:span 2;
+  }
+  .governance-card-head {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.65rem;
+    margin-bottom:0.58rem;
+  }
+  .governance-card-title {
+    color:var(--text);
+    font-size:0.88rem;
+    font-weight:900;
+    line-height:1.32;
+  }
+  .governance-card-note {
+    margin-top:0.15rem;
+    color:var(--muted);
+    font-size:0.7rem;
+    line-height:1.42;
+  }
+  .gov-status {
+    display:inline-flex;
+    align-items:center;
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:0.14rem 0.42rem;
+    color:var(--muted);
+    font-size:0.62rem;
+    font-weight:900;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .gov-status.ready { color:var(--green); background:var(--green-bg); border-color:rgba(16,185,129,0.35); }
+  .gov-status.warn { color:var(--yellow); background:var(--yellow-bg); border-color:rgba(245,158,11,0.36); }
+  .gov-status.block { color:var(--red); background:var(--red-bg); border-color:rgba(239,68,68,0.36); }
+  .gov-list {
+    display:flex;
+    flex-direction:column;
+    gap:0.46rem;
+  }
+  .gov-row {
+    border:1px solid rgba(43,36,27,0.18);
+    border-radius:12px;
+    background:rgba(255,255,255,0.22);
+    padding:0.52rem 0.58rem;
+    min-width:0;
+  }
+  .gov-row-top {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:0.48rem;
+  }
+  .gov-row strong {
+    display:block;
+    color:var(--text);
+    font-size:0.76rem;
+    line-height:1.35;
+    overflow-wrap:anywhere;
+  }
+  .gov-row span,
+  .gov-row p {
+    display:block;
+    margin:0.16rem 0 0;
+    color:var(--muted);
+    font-size:0.69rem;
+    line-height:1.42;
+  }
+  .gov-code {
+    font-family:ui-monospace,monospace;
+    word-break:break-all;
+  }
+  .gov-step-list {
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.28rem;
+    margin-top:0.4rem;
+  }
+  .gov-step {
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:0.12rem 0.38rem;
+    color:var(--muted);
+    font-size:0.62rem;
+    font-weight:800;
+    background:rgba(255,255,255,0.2);
+  }
+  .gov-step.done { color:var(--green); background:var(--green-bg); border-color:rgba(16,185,129,0.32); }
+  .gov-step.pending,
+  .gov-step.waiting,
+  .gov-step.not_configured { color:var(--yellow); background:var(--yellow-bg); border-color:rgba(245,158,11,0.32); }
+  .gov-step.blocked { color:var(--red); background:var(--red-bg); border-color:rgba(239,68,68,0.32); }
+  .gov-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.42rem;
+    margin-top:0.64rem;
+  }
+  @media (max-width:980px) {
+    .governance-card.wide {
+      grid-column:auto;
+    }
+  }
   .ops-side {
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -2325,6 +2450,8 @@
   html[data-theme="dark"] .lane-summary-chip,
   html[data-theme="dark"] .agent-reason,
   html[data-theme="dark"] .action-copy,
+  html[data-theme="dark"] .governance-card,
+  html[data-theme="dark"] .gov-row,
   html[data-theme="dark"] .attention-row {
     background:rgba(255,255,255,0.035);
   }
@@ -2463,6 +2590,9 @@
     actionQueue: [],
     actionQueueError: "",
     actionQueueLoading: false,
+    governance: null,
+    governanceError: "",
+    governanceLoading: false,
     selectedGroupId: null,
     selectedRunId: null,
     run: null,
@@ -2816,6 +2946,9 @@
     state.actionQueue = [];
     state.actionQueueError = "";
     state.actionQueueLoading = false;
+    state.governance = null;
+    state.governanceError = "";
+    state.governanceLoading = false;
 
     renderTeams();
     renderRuns();
@@ -2842,7 +2975,10 @@
     state.run = run;
     state.lastEventId = Math.max(0, ...(run.events || []).map(ev => Number(ev.id) || 0));
     history.replaceState({}, "", `team-workspace.html?group_id=${state.selectedGroupId}&run_id=${encodeURIComponent(runId)}`);
-    await loadActionQueue();
+    await Promise.all([
+      loadActionQueue(),
+      loadGovernance(),
+    ]);
 
     renderRuns();
     renderWorkspace();
@@ -3920,10 +4056,8 @@
     if (!run) return "";
     const runId = run.id || run.run_id || "";
     const isLive = !isTerminal(run.status);
-    const apiBase = state.apiBase || "";
-    const key = state.apiKey || "";
 
-    const packLink = (runId && apiBase && key)
+    const packLink = runId
       ? `<a onclick="downloadEvidencePack('${esc(runId)}')" style="cursor:pointer;">Download evidence pack</a>`
       : `<span style="color:var(--muted);">Evidence pack (run must be complete)</span>`;
 
@@ -3962,14 +4096,15 @@
 
   async function downloadEvidencePack(runId) {
     try {
-      const res = await apiFetch(`/pro/groups/runs/${runId}/evidence-pack`);
+      const res = await fetchJson(`/pro/groups/runs/${encodeURIComponent(runId)}/evidence-pack`);
       const blob = new Blob([JSON.stringify(res, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url; a.download = `evidence-pack-${runId}.json`; a.click();
       URL.revokeObjectURL(url);
+      showToast("Evidence pack downloaded.");
     } catch(e) {
-      alert("Evidence pack: " + (e.message || "error"));
+      showToast(e.message || "Could not download evidence pack.", true);
     }
   }
 
@@ -4272,6 +4407,28 @@
     state.actionQueueError = errors.length === 2 ? errors.join(" · ") : "";
     state.actionQueueLoading = false;
     if (rerender && state.run) renderWorkspace();
+  }
+
+  async function loadGovernance({ rerender = false } = {}) {
+    if (!state.selectedRunId) {
+      state.governance = null;
+      state.governanceError = "";
+      state.governanceLoading = false;
+      return null;
+    }
+    state.governanceLoading = true;
+    state.governanceError = "";
+    if (rerender && state.run) renderWorkspace();
+    try {
+      state.governance = await fetchJson(`/pro/groups/runs/${encodeURIComponent(state.selectedRunId)}/governance`);
+    } catch (e) {
+      state.governance = null;
+      state.governanceError = e.message || "Governance data is unavailable.";
+    } finally {
+      state.governanceLoading = false;
+      if (rerender && state.run) renderWorkspace();
+    }
+    return state.governance;
   }
 
   async function decideActionQueueItem(source, id, verdict) {
@@ -4887,6 +5044,233 @@
       </section>`;
   }
 
+  function govStatusTone(status) {
+    const s = String(status || "").toLowerCase();
+    if (["ready", "signed", "succeeded", "approved", "done", "enforced", "active", "recorded"].includes(s)) return "ready";
+    if (["failed", "rejected", "blocked", "error", "expired"].includes(s)) return "block";
+    return "warn";
+  }
+
+  function govBadge(status, label = "") {
+    const text = label || String(status || "pending").replace(/_/g, " ");
+    return `<span class="gov-status ${govStatusTone(status)}">${esc(text)}</span>`;
+  }
+
+  function govEmpty(text) {
+    return `<div class="action-queue-empty">${esc(text)}</div>`;
+  }
+
+  function govStepList(steps = []) {
+    if (!steps.length) return "";
+    return `<div class="gov-step-list">${steps.map(step => {
+      const status = String(step.status || "pending").toLowerCase();
+      return `<span class="gov-step ${esc(status)}">${esc(step.label || status)}</span>`;
+    }).join("")}</div>`;
+  }
+
+  function governanceCard(title, note, status, body, extraClass = "") {
+    return `
+      <article class="governance-card ${extraClass}">
+        <div class="governance-card-head">
+          <div>
+            <div class="governance-card-title">${esc(title)}</div>
+            ${note ? `<div class="governance-card-note">${esc(note)}</div>` : ""}
+          </div>
+          ${govBadge(status)}
+        </div>
+        ${body}
+      </article>`;
+  }
+
+  function buildGovernancePanel(run) {
+    const gov = state.governance;
+    if (state.governanceLoading) {
+      return `
+        <section class="governance-panel" data-doc-section="governance">
+          <div class="ops-section-head">
+            <div>
+              <div class="ops-section-title">Enterprise Governance</div>
+              <div class="ops-section-note">Loading approvals, connector permissions, execution logs, and signed audit state.</div>
+            </div>
+            <span class="trust-chip">checking</span>
+          </div>
+          ${govEmpty("Building the run governance view from live backend records...")}
+        </section>`;
+    }
+    if (state.governanceError) {
+      return `
+        <section class="governance-panel" data-doc-section="governance">
+          <div class="ops-section-head">
+            <div>
+              <div class="ops-section-title">Enterprise Governance</div>
+              <div class="ops-section-note">Governance endpoint is not available for this run yet.</div>
+            </div>
+            ${govBadge("error", "unavailable")}
+          </div>
+          ${govEmpty(state.governanceError)}
+        </section>`;
+    }
+    if (!gov) return "";
+
+    const approvals = gov.approval_chains?.items || [];
+    const executions = gov.tool_execution_logs?.items || [];
+    const connectors = gov.connector_permissions?.items || [];
+    const blocks = gov.policy_based_blocking?.items || [];
+    const overrides = gov.human_override_records?.items || [];
+    const actions = gov.action_history?.items || [];
+    const permissions = gov.role_permissions?.assignment_permissions || [];
+    const criteria = gov.success_criteria || [];
+    const audit = gov.signed_audit_trail || {};
+    const evidence = gov.evidence_pack?.items || [];
+
+    const approvalsBody = approvals.length
+      ? `<div class="gov-list">${approvals.slice(0, 4).map(item => `
+          <div class="gov-row">
+            <div class="gov-row-top">
+              <strong>${esc(item.title || item.kind || "Approval")}</strong>
+              ${govBadge(item.status)}
+            </div>
+            <span>${esc(item.agent_did ? agentName(item.agent_did) : "Orchestrator")} · ${esc(item.requested_at ? relTime(item.requested_at) : "recorded")}</span>
+            ${govStepList(item.steps || [])}
+          </div>`).join("")}</div>`
+      : govEmpty("No approvals have been requested for this run yet.");
+
+    const permissionBody = permissions.length
+      ? `<div class="gov-list">${permissions.slice(0, 5).map(item => `
+          <div class="gov-row">
+            <div class="gov-row-top">
+              <strong>${esc(agentName(item.agent_did))}</strong>
+              ${govBadge(item.requires_approval ? "pending" : "ready", item.permission || "contribute")}
+            </div>
+            <span>${esc(item.required_capability || "general")} · ${esc(item.risk_level || "medium")} risk${item.trust_score != null ? ` · trust ${Math.round(Number(item.trust_score))}` : ""}</span>
+          </div>`).join("")}</div>`
+      : govEmpty("No assignment-level permissions are recorded yet.");
+
+    const executionBody = executions.length
+      ? `<div class="gov-list">${executions.slice(0, 4).map(item => `
+          <div class="gov-row">
+            <div class="gov-row-top">
+              <strong>${esc(item.provider || "Connector")} · ${esc(item.action_type || "action")}</strong>
+              ${govBadge(item.status)}
+            </div>
+            <span>${esc(item.error || item.request_summary?.destination || item.response_summary?.url || "Execution recorded")}</span>
+          </div>`).join("")}</div>`
+      : govEmpty("No external tool execution has happened yet. Approved artifact actions will appear here after a connection runs.");
+
+    const connectorBody = connectors.length
+      ? `<div class="gov-list">${connectors.slice(0, 4).map(item => `
+          <div class="gov-row">
+            <div class="gov-row-top">
+              <strong>${esc(item.display_name || item.provider)}</strong>
+              ${govBadge(item.status)}
+            </div>
+            <span>${esc((item.enabled_actions || []).join(", ") || "No actions enabled")} · secrets ${item.secrets_configured ? "configured" : "not configured"}</span>
+          </div>`).join("")}</div>`
+      : govEmpty("No connected destinations yet. Connect one in Settings to let approved actions change external state.");
+
+    const policyBody = blocks.length
+      ? `<div class="gov-list">${blocks.slice(0, 5).map(item => `
+          <div class="gov-row">
+            <div class="gov-row-top">
+              <strong>${esc((item.type || "policy block").replace(/_/g, " "))}</strong>
+              ${govBadge(item.severity === "high" ? "blocked" : "pending", item.severity || "medium")}
+            </div>
+            <span>${esc(item.reason || "Policy decision recorded.")}</span>
+          </div>`).join("")}</div>`
+      : govEmpty("No policy blocks are recorded for this run.");
+
+    const overrideBody = overrides.length
+      ? `<div class="gov-list">${overrides.slice(-5).reverse().map(item => `
+          <div class="gov-row">
+            <div class="gov-row-top">
+              <strong>${esc((item.type || "override").replace(/_/g, " "))}</strong>
+              ${govBadge("recorded")}
+            </div>
+            <span>${esc(item.summary || "Human decision recorded.")}${item.at ? ` · ${esc(relTime(item.at))}` : ""}</span>
+          </div>`).join("")}</div>`
+      : govEmpty("No human override records yet.");
+
+    const evidenceBody = evidence.length
+      ? `<div class="gov-list">${evidence.map(item => `
+          <div class="gov-row">
+            <div class="gov-row-top">
+              <strong>${esc(item.label)}</strong>
+              ${govBadge(item.status)}
+            </div>
+            <span>${esc(item.url || "Stored inside the run artifact")}</span>
+          </div>`).join("")}</div>`
+      : govEmpty("Evidence pack metadata is not available yet.");
+
+    const auditBody = `
+      <div class="gov-list">
+        <div class="gov-row">
+          <div class="gov-row-top">
+            <strong>Audit root</strong>
+            ${govBadge(audit.status || "ready")}
+          </div>
+          <span class="gov-code">${esc(audit.merkle_root || "pending")}</span>
+        </div>
+        <div class="gov-row">
+          <strong>${esc(audit.algorithm || "SHA-256")}</strong>
+          <span>${Number(audit.event_count || 0)} events · ${Number(audit.approval_count || 0)} approvals · ${Number(audit.execution_count || 0)} executions</span>
+        </div>
+      </div>`;
+
+    const actionBody = actions.length
+      ? `<div class="gov-list">${actions.slice(-5).reverse().map(item => `
+          <div class="gov-row">
+            <div class="gov-row-top">
+              <strong>${esc(item.label || item.type)}</strong>
+              ${govBadge(item.status || "recorded")}
+            </div>
+            <span>${esc(item.actor || "System")} · ${esc(item.summary || "")}</span>
+          </div>`).join("")}</div>`
+      : govEmpty("No action history records yet.");
+
+    const criteriaBody = criteria.length
+      ? `<div class="gov-list">${criteria.map(item => `
+          <div class="gov-row">
+            <div class="gov-row-top">
+              <strong>${esc(item.label)}</strong>
+              ${govBadge(item.status)}
+            </div>
+            ${item.count != null ? `<span>${Number(item.count)} record${Number(item.count) === 1 ? "" : "s"}</span>` : ""}
+          </div>`).join("")}</div>`
+      : govEmpty("Success criteria are not available.");
+
+    return `
+      <section class="governance-panel" data-doc-section="governance">
+        <div class="ops-section-head">
+          <div>
+            <div class="ops-section-title">Enterprise Governance</div>
+            <div class="ops-section-note">Approval chains, permissions, evidence, policy blocks, tool logs, and compliance export are pulled from the live run record.</div>
+          </div>
+          <div class="ws-pill-row">
+            ${govBadge(audit.status || "ready", audit.status === "signed" ? "signed" : "audit")}
+            <span class="trust-chip">${Number(gov.action_history?.total || 0)} actions</span>
+          </div>
+        </div>
+        <div class="governance-grid">
+          ${governanceCard("Approval Chains", "Owner decisions and connector execution gates.", approvals.length ? "ready" : "available", approvalsBody)}
+          ${governanceCard("Role Permissions", "Current account role plus per-agent run permissions.", permissions.length ? "ready" : "pending", permissionBody)}
+          ${governanceCard("Tool Execution Logs", "External state changes after approved artifact actions.", executions.length ? (gov.tool_execution_logs.failed ? "failed" : "ready") : "needs_connection", executionBody)}
+          ${governanceCard("Connector Visibility", "Installed destinations and allowed action scopes.", connectors.length ? "ready" : "needs_connection", connectorBody)}
+          ${governanceCard("Policy Blocking", "Trust, risk, routing, and connector blocks.", blocks.length ? "blocked" : "ready", policyBody)}
+          ${governanceCard("Human Overrides", "Clarifications, approvals, reassignments, and cancellations.", overrides.length ? "ready" : "available", overrideBody)}
+          ${governanceCard("Evidence Pack", "Signed run evidence and exportable audit artifacts.", "ready", evidenceBody)}
+          ${governanceCard("Signed Audit Trail", "Tamper-evident digest over events, approvals, executions, and assignments.", audit.status || "ready", auditBody)}
+          ${governanceCard("Action History", "Operational events that changed the run state.", actions.length ? "ready" : "pending", actionBody, "wide")}
+          ${governanceCard("Success Criteria", "Phase completion checklist backed by run data.", "ready", criteriaBody, "wide")}
+        </div>
+        <div class="gov-actions">
+          <button class="tiny-btn primary" onclick="downloadComplianceExport()">Download compliance export</button>
+          <button class="tiny-btn" onclick="downloadEvidencePack('${esc(String(run.id || ""))}')">Download evidence pack</button>
+          <button class="tiny-btn" onclick="loadCausalGraph()">Open causal graph</button>
+          <button class="tiny-btn" onclick="refreshCurrentRun()">Refresh governance</button>
+        </div>
+      </section>`;
+  }
+
   function buildFinalArtifactModal(run) {
     if (!state.finalArtifactOpen || !run.final_output) return "";
     return `
@@ -5287,6 +5671,7 @@
       { id: "timeline", title: "Live timeline", note: "Full filterable event log" },
       { id: "assignments", title: "Assignments", note: "Role, status, and quality" },
       { id: "final", title: "Final answer", note: "Merged output and summary" },
+      { id: "governance", title: "Governance", note: "Approvals, logs, and evidence" },
       { id: "graph", title: "Audit Graph", note: "Causal event DAG" },
       { id: "signoff", title: "Sign-off & export", note: "Evidence pack and compliance" },
     ];
@@ -5441,6 +5826,7 @@
           ${buildInterventionColumn(run, plan, timelineEvents)}
           ${buildWorkProducts(run)}
         </div>
+        ${buildGovernancePanel(run)}
         ${buildAuditExport(run, timelineEvents, decisionHtml, contextHtml)}
         ${buildAssignmentActionModal(run)}
         ${buildArtifactActionModal(run)}
@@ -5482,7 +5868,10 @@
         state.run = run;
         state.lastEventId = Math.max(state.lastEventId, ...(run.events || []).map(ev => Number(ev.id) || 0));
         syncRunIntoList(run);
-        await loadActionQueue();
+        await Promise.all([
+          loadActionQueue(),
+          loadGovernance(),
+        ]);
         renderRuns();
         renderWorkspace();
         if (prevStatus !== run.status || isTerminal(run.status)) {
@@ -5545,7 +5934,10 @@
     state.run = run;
     state.lastEventId = Math.max(0, ...(run.events || []).map(ev => Number(ev.id) || 0));
     syncRunIntoList(run);
-    await loadActionQueue();
+    await Promise.all([
+      loadActionQueue(),
+      loadGovernance(),
+    ]);
     renderRuns();
     renderWorkspace();
     if (prevStatus !== run.status || isTerminal(run.status)) {
@@ -5902,6 +6294,30 @@
       showToast("Report downloaded.");
     } catch (e) {
       showToast(e.message || "Could not download report.", true);
+    }
+  }
+
+  async function downloadComplianceExport() {
+    if (!state.selectedRunId) return;
+    try {
+      const res = await fetch(`${BASE}/pro/groups/runs/${encodeURIComponent(state.selectedRunId)}/compliance-export`, {
+        headers: apiKey ? { "x-api-key": apiKey } : {},
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Compliance export is not available yet.");
+      const text = await res.text();
+      const blob = new Blob([text], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `governance_export_${state.selectedRunId.slice(0, 8)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Compliance export downloaded.");
+    } catch (e) {
+      showToast(e.message || "Could not download compliance export.", true);
     }
   }
 
